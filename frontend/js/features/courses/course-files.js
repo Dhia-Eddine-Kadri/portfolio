@@ -243,7 +243,12 @@ export function bindFileEvents(co, course) {
   co.querySelectorAll('.co-file[data-fname]').forEach(function (el) {
     el.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (e.target.closest('.co-dl-btn') || e.target.closest('.co-del-btn') || e.target.closest('.co-rag-status')) return;
+      if (
+        e.target.closest('.co-dl-btn') ||
+        e.target.closest('.co-del-btn') ||
+        e.target.closest('.co-rag-status')
+      )
+        return;
       var fname = el.getAttribute('data-fname');
       var folderAttr = el.getAttribute('data-folder') || null;
       var snameAttr = el.querySelector('.co-del-btn')
@@ -433,15 +438,24 @@ export function bindFileEvents(co, course) {
                 course.short
             );
           // Auto-index any newly uploaded PDFs for RAG
-          var pdfFiles = files.filter(function (f) { return f.name.toLowerCase().endsWith('.pdf'); });
+          var pdfFiles = files.filter(function (f) {
+            return f.name.toLowerCase().endsWith('.pdf');
+          });
           if (pdfFiles.length && course.id) {
             // Find the freshly merged file objects to get storageName
             var allFiles = course.files || [];
             pdfFiles.forEach(function (pf) {
-              var merged = allFiles.find(function (x) { return x.name === pf.name && x._uploaded && x._storageName; });
+              var merged = allFiles.find(function (x) {
+                return x.name === pf.name && x._uploaded && x._storageName;
+              });
               if (merged) {
-                indexExistingDocument(course.id, merged._storageName, merged.name, _guessSourceType(merged.name), merged._folder || null)
-                  .catch(function () {});
+                indexExistingDocument(
+                  course.id,
+                  merged._storageName,
+                  merged.name,
+                  _guessSourceType(merged.name),
+                  merged._folder || null
+                ).catch(function () {});
               }
             });
           }
@@ -459,7 +473,8 @@ export function bindFileEvents(co, course) {
 function _guessSourceType(fileName) {
   var n = fileName.toLowerCase();
   if (n.includes('lösung') || n.includes('loesung') || n.includes('solution')) return 'solution';
-  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_')) return 'exercise';
+  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_'))
+    return 'exercise';
   if (n.includes('exam') || n.includes('klausur') || n.includes('prüfung')) return 'exam';
   if (n.includes('notes') || n.includes('notiz') || n.includes('mitschrift')) return 'notes';
   return 'lecture';
@@ -473,11 +488,14 @@ function _ragEnqueue(fn) {
   return new Promise(function (resolve) {
     _ragQueue.push(function () {
       _ragRunning++;
-      Promise.resolve().then(fn).catch(function () {}).then(function () {
-        _ragRunning--;
-        resolve();
-        _ragDrain();
-      });
+      Promise.resolve()
+        .then(fn)
+        .catch(function () {})
+        .then(function () {
+          _ragRunning--;
+          resolve();
+          _ragDrain();
+        });
     });
     _ragDrain();
   });
@@ -494,14 +512,22 @@ async function _bindRagStatus(co, course) {
   if (!courseId) return;
 
   // Wait for auth session to be ready before making authenticated API calls
-  if (window._sbSessionReady) { try { await window._sbSessionReady; } catch (e) {} }
+  if (window._sbSessionReady) {
+    try {
+      await window._sbSessionReady;
+    } catch (e) {}
+  }
   if (!window._sbToken) return; // not authenticated yet — skip silently
 
   var ragDocs = [];
-  try { ragDocs = await listCourseDocuments(courseId); } catch (e) {}
+  try {
+    ragDocs = await listCourseDocuments(courseId);
+  } catch (e) {}
 
   var ragMap = {};
-  ragDocs.forEach(function (d) { ragMap[d.file_name.toLowerCase()] = d; });
+  ragDocs.forEach(function (d) {
+    ragMap[d.file_name.toLowerCase()] = d;
+  });
 
   co.querySelectorAll('.co-rag-status').forEach(function (el) {
     var fname = el.dataset.fname || '';
@@ -518,17 +544,24 @@ async function _bindRagStatus(co, course) {
         // Auto-retry failed docs once per page load (handles stale storage_path from earlier bugs)
         if (f && !window['_ragRetried_' + doc.id]) {
           window['_ragRetried_' + doc.id] = true;
-          _ragEnqueue(function () { return _triggerRagIndex(el, fname, f, course, courseId); });
+          _ragEnqueue(function () {
+            return _triggerRagIndex(el, fname, f, course, courseId);
+          });
         }
         return;
       }
 
       // In-progress — re-trigger to refresh path/status, or just poll if no file ref
-      if (f) _ragEnqueue(function () { return _triggerRagIndex(el, fname, f, course, courseId); });
+      if (f)
+        _ragEnqueue(function () {
+          return _triggerRagIndex(el, fname, f, course, courseId);
+        });
       else _pollRagStatus(el, courseId, doc.id);
     } else if (f) {
       // Not indexed yet — auto-start
-      _ragEnqueue(function () { return _triggerRagIndex(el, fname, f, course, courseId); });
+      _ragEnqueue(function () {
+        return _triggerRagIndex(el, fname, f, course, courseId);
+      });
     }
 
     // Allow click only to retry a failed index
@@ -536,17 +569,24 @@ async function _bindRagStatus(co, course) {
       e.stopPropagation();
       if (el.dataset.ragStatus !== 'failed') return;
       var fr = _findUploadedFile(course, fname);
-      if (fr) _ragEnqueue(function () { return _triggerRagIndex(el, fname, fr, course, courseId); });
+      if (fr)
+        _ragEnqueue(function () {
+          return _triggerRagIndex(el, fname, fr, course, courseId);
+        });
     });
   });
 }
 
 function _findUploadedFile(course, fname) {
   var lower = fname.toLowerCase();
-  var found = (course.files || []).find(function (x) { return x.name === fname && x._uploaded; });
+  var found = (course.files || []).find(function (x) {
+    return x.name === fname && x._uploaded;
+  });
   if (found) return found;
   for (var i = 0; i < (course.userFolders || []).length; i++) {
-    found = course.userFolders[i].files.find(function (x) { return x.name === fname && x._uploaded; });
+    found = course.userFolders[i].files.find(function (x) {
+      return x.name === fname && x._uploaded;
+    });
     if (found) return found;
   }
   return null;
@@ -558,7 +598,13 @@ async function _triggerRagIndex(el, fname, f, course, courseId) {
   _setRagStatus(el, 'uploading');
 
   try {
-    var result = await indexExistingDocument(courseId, f._storageName, fname, _guessSourceType(fname), f._folder || null);
+    var result = await indexExistingDocument(
+      courseId,
+      f._storageName,
+      fname,
+      _guessSourceType(fname),
+      f._folder || null
+    );
     if (result.alreadyIndexed) {
       _setRagStatus(el, result.processingStatus || 'ready');
       return;
@@ -566,7 +612,9 @@ async function _triggerRagIndex(el, fname, f, course, courseId) {
     _setRagStatus(el, 'uploaded');
 
     var updatedDocs = await listCourseDocuments(courseId);
-    var updated = updatedDocs.find(function (d) { return d.file_name.toLowerCase() === fname.toLowerCase(); });
+    var updated = updatedDocs.find(function (d) {
+      return d.file_name.toLowerCase() === fname.toLowerCase();
+    });
     if (updated) {
       _setRagStatus(el, updated.processing_status);
       if (updated.processing_status !== 'ready' && updated.processing_status !== 'failed') {
@@ -580,34 +628,40 @@ async function _triggerRagIndex(el, fname, f, course, courseId) {
 
 function _setRagStatus(el, status) {
   el.dataset.ragStatus = status;
-  el.title = {
-    ready: 'Ready for AI ✓',
-    failed: 'Indexing failed — click to retry',
-    uploading: 'Sending to AI…',
-    uploaded: 'Processing…',
-    extracting_text: 'Extracting text…',
-    chunking: 'Chunking…',
-    embedding: 'Indexing…'
-  }[status] || 'Preparing for AI…';
-  el.textContent = {
-    ready: '🟢',
-    failed: '🔴',
-    uploading: '⏳',
-    uploaded: '🔵',
-    extracting_text: '🔵',
-    chunking: '🔵',
-    embedding: '🔵'
-  }[status] || '⏳';
+  el.title =
+    {
+      ready: 'Ready for AI ✓',
+      failed: 'Indexing failed — click to retry',
+      uploading: 'Sending to AI…',
+      uploaded: 'Processing…',
+      extracting_text: 'Extracting text…',
+      chunking: 'Chunking…',
+      embedding: 'Indexing…'
+    }[status] || 'Preparing for AI…';
+  el.textContent =
+    {
+      ready: '🟢',
+      failed: '🔴',
+      uploading: '⏳',
+      uploaded: '🔵',
+      extracting_text: '🔵',
+      chunking: '🔵',
+      embedding: '🔵'
+    }[status] || '⏳';
   el.style.cursor = status === 'failed' ? 'pointer' : 'default';
 }
 
 async function _pollRagStatus(el, courseId, docId, _attempts) {
   _attempts = (_attempts || 0) + 1;
   if (_attempts > 60) return; // give up after ~4 minutes
-  await new Promise(function (r) { setTimeout(r, 4000); });
+  await new Promise(function (r) {
+    setTimeout(r, 4000);
+  });
   try {
     var docs = await listCourseDocuments(courseId);
-    var doc = docs.find(function (d) { return d.id === docId; });
+    var doc = docs.find(function (d) {
+      return d.id === docId;
+    });
     if (!doc) return;
     _setRagStatus(el, doc.processing_status);
     if (doc.processing_status === 'ready' || doc.processing_status === 'failed') return;

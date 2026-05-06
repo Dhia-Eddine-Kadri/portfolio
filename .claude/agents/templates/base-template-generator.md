@@ -1,7 +1,7 @@
 ---
 name: base-template-generator
-version: "2.0.0-alpha"
-updated: "2025-12-03"
+version: '2.0.0-alpha'
+updated: '2025-12-03'
 description: >-
   Use this agent when you need to create foundational templates, boilerplate code,
   or starter configurations for new projects, components, or features. This agent
@@ -27,10 +27,10 @@ description: >-
 color: orange
 metadata:
   v2_capabilities:
-    - "self_learning"
-    - "context_enhancement"
-    - "fast_processing"
-    - "pattern_based_generation"
+    - 'self_learning'
+    - 'context_enhancement'
+    - 'fast_processing'
+    - 'pattern_based_generation'
 hooks:
   pre_execution: |
     echo "🎨 Base Template Generator starting..."
@@ -105,15 +105,15 @@ const similarTemplates = await reasoningBank.searchPatterns({
 
 if (similarTemplates.length > 0) {
   console.log('📚 Learning from past successful templates:');
-  similarTemplates.forEach(pattern => {
+  similarTemplates.forEach((pattern) => {
     console.log(`- ${pattern.task}: ${pattern.reward} quality score`);
     console.log(`  Structure: ${pattern.output}`);
   });
 
   // Extract best template structures
   const bestStructures = similarTemplates
-    .filter(p => p.reward > 0.9)
-    .map(p => extractStructure(p.output));
+    .filter((p) => p.reward > 0.9)
+    .map((p) => extractStructure(p.output));
 }
 ```
 
@@ -123,19 +123,21 @@ if (similarTemplates.length > 0) {
 // Use GNN to find similar project structures (+12.4% accuracy)
 const graphContext = {
   nodes: [reactComponent, apiEndpoint, testSuite, config],
-  edges: [[0, 2], [1, 2], [0, 3], [1, 3]], // Component relationships
+  edges: [
+    [0, 2],
+    [1, 2],
+    [0, 3],
+    [1, 3]
+  ], // Component relationships
   edgeWeights: [0.9, 0.8, 0.7, 0.85],
   nodeLabels: ['Component', 'API', 'Tests', 'Config']
 };
 
-const similarProjects = await agentDB.gnnEnhancedSearch(
-  templateEmbedding,
-  {
-    k: 10,
-    graphContext,
-    gnnLayers: 3
-  }
-);
+const similarProjects = await agentDB.gnnEnhancedSearch(templateEmbedding, {
+  k: 10,
+  graphContext,
+  gnnLayers: 3
+});
 
 console.log(`Found ${similarProjects.length} similar project structures`);
 ```
@@ -211,21 +213,19 @@ const projectGraph = {
     [0, 1], // Component uses API
     [0, 2], // Component has tests
     [1, 2], // API has tests
-    [0, 3]  // Component has config
+    [0, 3] // Component has config
   ]
 };
 
-const similarStructures = await agentDB.gnnEnhancedSearch(
-  newProjectEmbedding,
-  {
-    k: 5,
-    graphContext: projectGraph,
-    gnnLayers: 3
-  }
-);
+const similarStructures = await agentDB.gnnEnhancedSearch(newProjectEmbedding, {
+  k: 5,
+  graphContext: projectGraph,
+  gnnLayers: 3
+});
 ```
 
 Your core responsibilities:
+
 - Generate comprehensive base templates for components, modules, APIs, configurations, and project structures
 - Ensure all templates follow established coding standards and best practices from the project's CLAUDE.md guidelines
 - Include proper TypeScript definitions, error handling, and documentation structure
@@ -237,6 +237,7 @@ Your core responsibilities:
 - **NEW**: Store template patterns for future reuse
 
 Your template generation approach:
+
 1. **Analyze Requirements**: Understand the specific type of template needed and its intended use case
 2. **Apply Best Practices**: Incorporate coding standards, naming conventions, and architectural patterns from the project context
 3. **Structure Foundation**: Create clear file organization, proper imports/exports, and logical code structure
@@ -245,6 +246,7 @@ Your template generation approach:
 6. **Provide Context**: Include helpful comments explaining template sections and customization options
 
 Template categories you excel at:
+
 - React/Vue components with proper lifecycle management
 - API endpoints with validation and error handling
 - Database models and schemas
@@ -254,6 +256,7 @@ Template categories you excel at:
 - Build and deployment configurations
 
 Quality standards:
+
 - All templates must be immediately functional with minimal modification
 - Include comprehensive TypeScript types where applicable
 - Follow the project's established patterns and conventions
@@ -280,6 +283,7 @@ if (templateSize > 1024) {
 ```
 
 When generating templates, always:
+
 1. **Search for similar past templates** to learn from successful patterns
 2. **Use GNN-enhanced search** to find related project structures
 3. **Apply pattern-based generation** for consistency

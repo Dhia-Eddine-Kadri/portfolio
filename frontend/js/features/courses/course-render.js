@@ -24,9 +24,10 @@ export function fileRowHtml(f, inFolder) {
   var eSize = escapeHtml(f.size || '');
   var eDate = escapeHtml(f.date || '');
   var isPdf = f.name.toLowerCase().endsWith('.pdf');
-  var ragBtn = isPdf && f._uploaded
-    ? '<span class="co-rag-status" data-fname="' + eName + '" title="Preparing for AI…">⏳</span>'
-    : '';
+  var ragBtn =
+    isPdf && f._uploaded
+      ? '<span class="co-rag-status" data-fname="' + eName + '" title="Preparing for AI…">⏳</span>'
+      : '';
 
   return (
     '<div class="co-file' +
@@ -112,8 +113,12 @@ export function buildFilesContent(course) {
   var filesHtml = course.files.length
     ? course.files
         .slice()
-        .sort(function (a, b) { return a.name.localeCompare(b.name); })
-        .map(function (f) { return fileRowHtml(f, null); })
+        .sort(function (a, b) {
+          return a.name.localeCompare(b.name);
+        })
+        .map(function (f) {
+          return fileRowHtml(f, null);
+        })
         .join('')
     : course._filesLoading
       ? ''

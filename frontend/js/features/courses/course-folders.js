@@ -145,14 +145,28 @@ export function bindFolderEvents(co, course) {
           // Auto-index any PDFs uploaded to this folder
           if (course.id) {
             var allFolderFiles = [];
-            (course.userFolders || []).forEach(function (fd) { allFolderFiles = allFolderFiles.concat(fd.files || []); });
-            files.filter(function (f) { return f.name.toLowerCase().endsWith('.pdf'); }).forEach(function (pf) {
-              var merged = allFolderFiles.find(function (x) { return x.name === pf.name && x._uploaded && x._storageName; });
-              if (merged) {
-                var st = _guessFolderSourceType(pf.name);
-                indexExistingDocument(course.id, merged._storageName, merged.name, st, merged._folder || targetFolder || null).catch(function () {});
-              }
+            (course.userFolders || []).forEach(function (fd) {
+              allFolderFiles = allFolderFiles.concat(fd.files || []);
             });
+            files
+              .filter(function (f) {
+                return f.name.toLowerCase().endsWith('.pdf');
+              })
+              .forEach(function (pf) {
+                var merged = allFolderFiles.find(function (x) {
+                  return x.name === pf.name && x._uploaded && x._storageName;
+                });
+                if (merged) {
+                  var st = _guessFolderSourceType(pf.name);
+                  indexExistingDocument(
+                    course.id,
+                    merged._storageName,
+                    merged.name,
+                    st,
+                    merged._folder || targetFolder || null
+                  ).catch(function () {});
+                }
+              });
           }
         })
         .catch(function (e) {
@@ -186,7 +200,8 @@ export function bindFolderEvents(co, course) {
 function _guessFolderSourceType(fileName) {
   var n = fileName.toLowerCase();
   if (n.includes('lösung') || n.includes('loesung') || n.includes('solution')) return 'solution';
-  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_')) return 'exercise';
+  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_'))
+    return 'exercise';
   if (n.includes('exam') || n.includes('klausur') || n.includes('prüfung')) return 'exam';
   if (n.includes('notes') || n.includes('notiz') || n.includes('mitschrift')) return 'notes';
   return 'lecture';

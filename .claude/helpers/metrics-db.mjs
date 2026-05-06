@@ -99,28 +99,28 @@ async function initDatabase() {
   `);
 
   // Initialize rows if empty
-  const progressCheck = db.exec("SELECT COUNT(*) FROM v3_progress");
+  const progressCheck = db.exec('SELECT COUNT(*) FROM v3_progress');
   if (progressCheck[0]?.values[0][0] === 0) {
-    db.run("INSERT INTO v3_progress (id) VALUES (1)");
+    db.run('INSERT INTO v3_progress (id) VALUES (1)');
   }
 
-  const securityCheck = db.exec("SELECT COUNT(*) FROM security_audit");
+  const securityCheck = db.exec('SELECT COUNT(*) FROM security_audit');
   if (securityCheck[0]?.values[0][0] === 0) {
-    db.run("INSERT INTO security_audit (id) VALUES (1)");
+    db.run('INSERT INTO security_audit (id) VALUES (1)');
   }
 
-  const swarmCheck = db.exec("SELECT COUNT(*) FROM swarm_activity");
+  const swarmCheck = db.exec('SELECT COUNT(*) FROM swarm_activity');
   if (swarmCheck[0]?.values[0][0] === 0) {
-    db.run("INSERT INTO swarm_activity (id) VALUES (1)");
+    db.run('INSERT INTO swarm_activity (id) VALUES (1)');
   }
 
-  const perfCheck = db.exec("SELECT COUNT(*) FROM performance_metrics");
+  const perfCheck = db.exec('SELECT COUNT(*) FROM performance_metrics');
   if (perfCheck[0]?.values[0][0] === 0) {
-    db.run("INSERT INTO performance_metrics (id) VALUES (1)");
+    db.run('INSERT INTO performance_metrics (id) VALUES (1)');
   }
 
   // Initialize CVE records
-  const cveCheck = db.exec("SELECT COUNT(*) FROM cve_status");
+  const cveCheck = db.exec('SELECT COUNT(*) FROM cve_status');
   if (cveCheck[0]?.values[0][0] === 0) {
     db.run(`INSERT INTO cve_status (id, description, fixed_by) VALUES
       ('CVE-1', 'Input validation bypass', 'input-validator.ts'),
@@ -178,8 +178,18 @@ function countFilesAndLines(dir, ext = '.ts') {
  * as their services ARE the application layer (DDD by design)
  */
 const UTILITY_PACKAGES = new Set([
-  'cli', 'hooks', 'mcp', 'shared', 'testing', 'agents', 'integration',
-  'embeddings', 'deployment', 'performance', 'plugins', 'providers'
+  'cli',
+  'hooks',
+  'mcp',
+  'shared',
+  'testing',
+  'agents',
+  'integration',
+  'embeddings',
+  'deployment',
+  'performance',
+  'plugins',
+  'providers'
 ]);
 
 function calculateModuleProgress(moduleDir) {
@@ -198,8 +208,10 @@ function calculateModuleProgress(moduleDir) {
   if (existsSync(join(moduleDir, 'src/domain'))) progress += 30;
   if (existsSync(join(moduleDir, 'src/application'))) progress += 30;
   if (existsSync(join(moduleDir, 'src'))) progress += 10;
-  if (existsSync(join(moduleDir, 'src/index.ts')) || existsSync(join(moduleDir, 'index.ts'))) progress += 10;
-  if (existsSync(join(moduleDir, '__tests__')) || existsSync(join(moduleDir, 'tests'))) progress += 10;
+  if (existsSync(join(moduleDir, 'src/index.ts')) || existsSync(join(moduleDir, 'index.ts')))
+    progress += 10;
+  if (existsSync(join(moduleDir, '__tests__')) || existsSync(join(moduleDir, 'tests')))
+    progress += 10;
   if (existsSync(join(moduleDir, 'package.json'))) progress += 10;
 
   return Math.min(progress, 100);
@@ -265,18 +277,21 @@ async function syncMetrics() {
         totalProgress += progress;
 
         // Update module_status table
-        db.run(`
+        db.run(
+          `
           INSERT OR REPLACE INTO module_status (name, files, lines, progress, has_src, has_tests, last_updated)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [
-          entry.name,
-          files,
-          lines,
-          progress,
-          existsSync(join(moduleDir, 'src')) ? 1 : 0,
-          existsSync(join(moduleDir, '__tests__')) ? 1 : 0,
-          now
-        ]);
+        `,
+          [
+            entry.name,
+            files,
+            lines,
+            progress,
+            existsSync(join(moduleDir, 'src')) ? 1 : 0,
+            existsSync(join(moduleDir, '__tests__')) ? 1 : 0,
+            now
+          ]
+        );
       }
     }
   }
@@ -286,12 +301,13 @@ async function syncMetrics() {
 
   // Count completed domains (mapped to modules)
   const domainModules = ['swarm', 'memory', 'performance', 'cli', 'integration'];
-  const domainsCompleted = domainModules.filter(m =>
-    modules.some(mod => mod.name === m && mod.progress >= 50)
+  const domainsCompleted = domainModules.filter((m) =>
+    modules.some((mod) => mod.name === m && mod.progress >= 50)
   ).length;
 
   // Update v3_progress
-  db.run(`
+  db.run(
+    `
     UPDATE v3_progress SET
       domains_completed = ?,
       ddd_progress = ?,
@@ -300,7 +316,9 @@ async function syncMetrics() {
       total_lines = ?,
       last_updated = ?
     WHERE id = 1
-  `, [domainsCompleted, avgProgress, modules.length, totalStats.files, totalStats.lines, now]);
+  `,
+    [domainsCompleted, avgProgress, modules.length, totalStats.files, totalStats.lines, now]
+  );
 
   // Check security CVEs
   const cve1Fixed = checkSecurityFile('input-validator.ts');
@@ -312,22 +330,35 @@ async function syncMetrics() {
   if (cvesFixed === 3) securityStatus = 'CLEAN';
   else if (cvesFixed > 0) securityStatus = 'IN_PROGRESS';
 
-  db.run(`
+  db.run(
+    `
     UPDATE security_audit SET
       status = ?,
       cves_fixed = ?,
       last_audit = ?
     WHERE id = 1
-  `, [securityStatus, cvesFixed, now]);
+  `,
+    [securityStatus, cvesFixed, now]
+  );
 
   // Update individual CVE status
-  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-1'", [cve1Fixed ? 'fixed' : 'pending', now]);
-  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-2'", [cve2Fixed ? 'fixed' : 'pending', now]);
-  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-3'", [cve3Fixed ? 'fixed' : 'pending', now]);
+  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-1'", [
+    cve1Fixed ? 'fixed' : 'pending',
+    now
+  ]);
+  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-2'", [
+    cve2Fixed ? 'fixed' : 'pending',
+    now
+  ]);
+  db.run("UPDATE cve_status SET status = ?, last_updated = ? WHERE id = 'CVE-3'", [
+    cve3Fixed ? 'fixed' : 'pending',
+    now
+  ]);
 
   // Update swarm activity
   const processes = countProcesses();
-  db.run(`
+  db.run(
+    `
     UPDATE swarm_activity SET
       agentic_flow_processes = ?,
       mcp_server_processes = ?,
@@ -336,14 +367,16 @@ async function syncMetrics() {
       coordination_active = ?,
       last_updated = ?
     WHERE id = 1
-  `, [
-    processes.agenticFlow,
-    processes.mcp,
-    processes.agents,
-    processes.agents > 0 ? 1 : 0,
-    processes.agenticFlow > 0 ? 1 : 0,
-    now
-  ]);
+  `,
+    [
+      processes.agenticFlow,
+      processes.mcp,
+      processes.agents,
+      processes.agents > 0 ? 1 : 0,
+      processes.agenticFlow > 0 ? 1 : 0,
+      now
+    ]
+  );
 
   persist();
 
@@ -362,10 +395,10 @@ async function syncMetrics() {
  * Get current metrics as JSON (for statusline compatibility)
  */
 function getMetricsJSON() {
-  const progress = db.exec("SELECT * FROM v3_progress WHERE id = 1")[0];
-  const security = db.exec("SELECT * FROM security_audit WHERE id = 1")[0];
-  const swarm = db.exec("SELECT * FROM swarm_activity WHERE id = 1")[0];
-  const perf = db.exec("SELECT * FROM performance_metrics WHERE id = 1")[0];
+  const progress = db.exec('SELECT * FROM v3_progress WHERE id = 1')[0];
+  const security = db.exec('SELECT * FROM security_audit WHERE id = 1')[0];
+  const swarm = db.exec('SELECT * FROM swarm_activity WHERE id = 1')[0];
+  const perf = db.exec('SELECT * FROM performance_metrics WHERE id = 1')[0];
 
   // Map column names to values
   const mapRow = (result) => {
@@ -395,49 +428,70 @@ function exportToJSON() {
   if (!existsSync(securityDir)) mkdirSync(securityDir, { recursive: true });
 
   // v3-progress.json
-  writeFileSync(join(metricsDir, 'v3-progress.json'), JSON.stringify({
-    domains: {
-      completed: metrics.v3Progress.domains_completed,
-      total: metrics.v3Progress.domains_total
-    },
-    ddd: {
-      progress: metrics.v3Progress.ddd_progress,
-      modules: metrics.v3Progress.total_modules,
-      totalFiles: metrics.v3Progress.total_files,
-      totalLines: metrics.v3Progress.total_lines
-    },
-    swarm: {
-      activeAgents: metrics.swarmActivity.estimated_agents,
-      totalAgents: 15
-    },
-    lastUpdated: metrics.v3Progress.last_updated,
-    source: 'metrics.db'
-  }, null, 2));
+  writeFileSync(
+    join(metricsDir, 'v3-progress.json'),
+    JSON.stringify(
+      {
+        domains: {
+          completed: metrics.v3Progress.domains_completed,
+          total: metrics.v3Progress.domains_total
+        },
+        ddd: {
+          progress: metrics.v3Progress.ddd_progress,
+          modules: metrics.v3Progress.total_modules,
+          totalFiles: metrics.v3Progress.total_files,
+          totalLines: metrics.v3Progress.total_lines
+        },
+        swarm: {
+          activeAgents: metrics.swarmActivity.estimated_agents,
+          totalAgents: 15
+        },
+        lastUpdated: metrics.v3Progress.last_updated,
+        source: 'metrics.db'
+      },
+      null,
+      2
+    )
+  );
 
   // security/audit-status.json
-  writeFileSync(join(securityDir, 'audit-status.json'), JSON.stringify({
-    status: metrics.securityAudit.status,
-    cvesFixed: metrics.securityAudit.cves_fixed,
-    totalCves: metrics.securityAudit.total_cves,
-    lastAudit: metrics.securityAudit.last_audit,
-    source: 'metrics.db'
-  }, null, 2));
+  writeFileSync(
+    join(securityDir, 'audit-status.json'),
+    JSON.stringify(
+      {
+        status: metrics.securityAudit.status,
+        cvesFixed: metrics.securityAudit.cves_fixed,
+        totalCves: metrics.securityAudit.total_cves,
+        lastAudit: metrics.securityAudit.last_audit,
+        source: 'metrics.db'
+      },
+      null,
+      2
+    )
+  );
 
   // swarm-activity.json
-  writeFileSync(join(metricsDir, 'swarm-activity.json'), JSON.stringify({
-    timestamp: metrics.swarmActivity.last_updated,
-    processes: {
-      agentic_flow: metrics.swarmActivity.agentic_flow_processes,
-      mcp_server: metrics.swarmActivity.mcp_server_processes,
-      estimated_agents: metrics.swarmActivity.estimated_agents
-    },
-    swarm: {
-      active: metrics.swarmActivity.swarm_active === 1,
-      agent_count: metrics.swarmActivity.estimated_agents,
-      coordination_active: metrics.swarmActivity.coordination_active === 1
-    },
-    source: 'metrics.db'
-  }, null, 2));
+  writeFileSync(
+    join(metricsDir, 'swarm-activity.json'),
+    JSON.stringify(
+      {
+        timestamp: metrics.swarmActivity.last_updated,
+        processes: {
+          agentic_flow: metrics.swarmActivity.agentic_flow_processes,
+          mcp_server: metrics.swarmActivity.mcp_server_processes,
+          estimated_agents: metrics.swarmActivity.estimated_agents
+        },
+        swarm: {
+          active: metrics.swarmActivity.swarm_active === 1,
+          agent_count: metrics.swarmActivity.estimated_agents,
+          coordination_active: metrics.swarmActivity.coordination_active === 1
+        },
+        source: 'metrics.db'
+      },
+      null,
+      2
+    )
+  );
 }
 
 /**

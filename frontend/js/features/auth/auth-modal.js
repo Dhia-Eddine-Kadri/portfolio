@@ -21,8 +21,7 @@ export function initAuthModal(options) {
 
   function setSubmitIdleLabel() {
     if (!authSubmit) return;
-    authSubmit.textContent =
-      authMode === 'signin' ? 'Sign In' : 'Create Account';
+    authSubmit.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
     authSubmit.disabled = false;
   }
 
@@ -41,19 +40,13 @@ export function initAuthModal(options) {
     authMode = mode;
     var isSignup = mode === 'signup';
     if (authTitle) {
-      authTitle.textContent = isSignup
-        ? t('auth_title_signup')
-        : t('auth_title_signin');
+      authTitle.textContent = isSignup ? t('auth_title_signup') : t('auth_title_signin');
     }
     if (authSubmit) {
-      authSubmit.textContent = isSignup
-        ? t('auth_submit_signup')
-        : t('auth_submit_signin');
+      authSubmit.textContent = isSignup ? t('auth_submit_signup') : t('auth_submit_signin');
     }
     if (authSwitch) {
-      authSwitch.textContent = isSignup
-        ? t('auth_switch_signup')
-        : t('auth_switch_signin');
+      authSwitch.textContent = isSignup ? t('auth_switch_signup') : t('auth_switch_signin');
     }
     var confirmWrap = document.getElementById('authConfirmWrap');
     var strengthWrap = document.getElementById('pwStrengthWrap');
@@ -88,8 +81,7 @@ export function initAuthModal(options) {
     ['pws1', 'pws2', 'pws3', 'pws4'].forEach(function (id, i) {
       var el = document.getElementById(id);
       if (el) {
-        el.style.background =
-          i < score ? colors[score - 1] : 'rgba(255,255,255,.1)';
+        el.style.background = i < score ? colors[score - 1] : 'rgba(255,255,255,.1)';
       }
     });
     var lbl = document.getElementById('pwStrengthLabel');

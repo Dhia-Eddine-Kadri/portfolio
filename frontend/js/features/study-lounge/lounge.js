@@ -101,9 +101,7 @@ export function initStudyLounge() {
       var meta = document.createElement('div');
       meta.className = 'lounge-recent-item-course';
       var ago = timeAgo(recent.ts);
-      meta.textContent = recent.course
-        ? recent.course + (ago ? ' · ' + ago : '')
-        : ago;
+      meta.textContent = recent.course ? recent.course + (ago ? ' · ' + ago : '') : ago;
 
       item.appendChild(icon);
       item.appendChild(name);
@@ -124,7 +122,11 @@ export function initStudyLounge() {
     if (el2) {
       el2.textContent =
         hours > 0
-          ? hours + ' hour' + (hours !== 1 ? 's' : '') + (minutes ? ' ' + minutes + 'm' : '') + ' total'
+          ? hours +
+            ' hour' +
+            (hours !== 1 ? 's' : '') +
+            (minutes ? ' ' + minutes + 'm' : '') +
+            ' total'
           : minutes + ' min total';
     }
 
@@ -138,7 +140,8 @@ export function initStudyLounge() {
     var coursesEl = document.getElementById('lsCourses');
     if (coursesEl) coursesEl.textContent = coursesCount;
     var coursesSub = document.getElementById('lsCoursesSub');
-    if (coursesSub) coursesSub.textContent = coursesCount + ' subject' + (coursesCount !== 1 ? 's' : '');
+    if (coursesSub)
+      coursesSub.textContent = coursesCount + ' subject' + (coursesCount !== 1 ? 's' : '');
 
     var aiEl = document.getElementById('lsAI');
     if (aiEl) aiEl.textContent = stats.aiMessages || 0;

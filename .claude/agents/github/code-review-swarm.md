@@ -4,10 +4,10 @@ description: Deploy specialized AI agents to perform comprehensive, intelligent 
 type: development
 color: blue
 capabilities:
-  - self_learning         # ReasoningBank pattern storage
-  - context_enhancement   # GNN-enhanced search
-  - fast_processing       # Flash Attention
-  - smart_coordination    # Attention-based consensus
+  - self_learning # ReasoningBank pattern storage
+  - context_enhancement # GNN-enhanced search
+  - fast_processing # Flash Attention
+  - smart_coordination # Attention-based consensus
   - automated_multi_agent_code_review
   - security_vulnerability_analysis
   - performance_bottleneck_detection
@@ -85,6 +85,7 @@ hooks:
 # Code Review Swarm - Automated Code Review with AI Agents
 
 ## Overview
+
 Deploy specialized AI agents to perform comprehensive, intelligent code reviews that go beyond traditional static analysis, enhanced with **self-learning** and **continuous improvement** capabilities powered by Agentic-Flow v3.0.0-alpha.1.
 
 ## 🧠 Self-Learning Protocol (v3.0.0-alpha.1)
@@ -101,7 +102,7 @@ const similarReviews = await reasoningBank.searchPatterns({
 
 if (similarReviews.length > 0) {
   console.log('📚 Learning from past successful reviews:');
-  similarReviews.forEach(pattern => {
+  similarReviews.forEach((pattern) => {
     console.log(`- ${pattern.task}: ${pattern.reward} quality score`);
     console.log(`  Issues found: ${pattern.output.issuesFound}`);
     console.log(`  False positives: ${pattern.output.falsePositives}`);
@@ -110,8 +111,8 @@ if (similarReviews.length > 0) {
 
   // Apply best review patterns
   const bestPractices = similarReviews
-    .filter(p => p.reward > 0.9 && p.output.falsePositives < 0.1)
-    .map(p => p.output.reviewStrategy);
+    .filter((p) => p.reward > 0.9 && p.output.falsePositives < 0.1)
+    .map((p) => p.output.reviewStrategy);
 }
 
 // 2. Learn from past review failures (reduce false positives)
@@ -123,7 +124,7 @@ const failedReviews = await reasoningBank.searchPatterns({
 
 if (failedReviews.length > 0) {
   console.log('⚠️  Avoiding past review mistakes:');
-  failedReviews.forEach(pattern => {
+  failedReviews.forEach((pattern) => {
     console.log(`- ${pattern.critique}`);
     console.log(`  False positive rate: ${pattern.output.falsePositiveRate}`);
   });
@@ -135,33 +136,27 @@ if (failedReviews.length > 0) {
 ```typescript
 // Build code dependency graph for better context
 const buildCodeGraph = (files) => ({
-  nodes: files.map(f => ({ id: f.path, type: detectFileType(f) })),
+  nodes: files.map((f) => ({ id: f.path, type: detectFileType(f) })),
   edges: analyzeDependencies(files),
   edgeWeights: calculateCouplingScores(files),
-  nodeLabels: files.map(f => f.path)
+  nodeLabels: files.map((f) => f.path)
 });
 
 // GNN-enhanced search for related code (+12.4% better accuracy)
-const relatedCode = await agentDB.gnnEnhancedSearch(
-  fileEmbedding,
-  {
-    k: 10,
-    graphContext: buildCodeGraph(changedFiles),
-    gnnLayers: 3
-  }
-);
+const relatedCode = await agentDB.gnnEnhancedSearch(fileEmbedding, {
+  k: 10,
+  graphContext: buildCodeGraph(changedFiles),
+  gnnLayers: 3
+});
 
 console.log(`Found related code with ${relatedCode.improvementPercent}% better accuracy`);
 
 // Use GNN to find similar bug patterns
-const bugPatterns = await agentDB.gnnEnhancedSearch(
-  codePatternEmbedding,
-  {
-    k: 5,
-    graphContext: buildBugPatternGraph(),
-    gnnLayers: 2
-  }
-);
+const bugPatterns = await agentDB.gnnEnhancedSearch(codePatternEmbedding, {
+  k: 5,
+  graphContext: buildBugPatternGraph(),
+  gnnLayers: 2
+});
 
 console.log(`Detected ${bugPatterns.length} potential issues based on learned patterns`);
 ```
@@ -189,8 +184,8 @@ console.log(`Critical issues: ${consensus.aggregatedFindings.critical.length}`);
 console.log(`Agent influence: ${consensus.attentionWeights}`);
 
 // Prioritize issues based on attention scores
-const prioritizedIssues = consensus.aggregatedFindings.sort((a, b) =>
-  b.attentionScore - a.attentionScore
+const prioritizedIssues = consensus.aggregatedFindings.sort(
+  (a, b) => b.attentionScore - a.attentionScore
 );
 ```
 
@@ -211,7 +206,7 @@ const reviewMetrics = {
 await reasoningBank.storePattern({
   sessionId: `code-review-${prId}-${Date.now()}`,
   task: `Review PR: ${pr.title}`,
-  input: JSON.stringify({ files: files.map(f => f.path), context: pr.description }),
+  input: JSON.stringify({ files: files.map((f) => f.path), context: pr.description }),
   output: JSON.stringify({
     issues: prioritizedIssues,
     reviewStrategy: reviewStrategy,
@@ -241,29 +236,26 @@ const bugHistory = await reasoningBank.searchPatterns({
 const learnedPatterns = extractBugPatterns(bugHistory);
 
 // Apply learned patterns to new code
-const detectedIssues = learnedPatterns.map(pattern =>
-  pattern.detect(currentCode)
-).filter(issue => issue !== null);
+const detectedIssues = learnedPatterns
+  .map((pattern) => pattern.detect(currentCode))
+  .filter((issue) => issue !== null);
 ```
 
 ### GNN-Enhanced Similar Code Search
 
 ```typescript
 // Find similar code that had issues in the past
-const similarCodeWithIssues = await agentDB.gnnEnhancedSearch(
-  currentCodeEmbedding,
-  {
-    k: 10,
-    graphContext: buildHistoricalIssueGraph(),
-    gnnLayers: 3,
-    filter: 'has_issues'
-  }
-);
+const similarCodeWithIssues = await agentDB.gnnEnhancedSearch(currentCodeEmbedding, {
+  k: 10,
+  graphContext: buildHistoricalIssueGraph(),
+  gnnLayers: 3,
+  filter: 'has_issues'
+});
 
 // Proactively flag potential issues
-similarCodeWithIssues.forEach(match => {
+similarCodeWithIssues.forEach((match) => {
   console.log(`Warning: Similar code had ${match.historicalIssues.length} issues`);
-  match.historicalIssues.forEach(issue => {
+  match.historicalIssues.forEach((issue) => {
     console.log(`  - ${issue.type}: ${issue.description}`);
   });
 });
@@ -280,16 +272,15 @@ const reviewPriorities = await agentDB.flashAttention(
 );
 
 // Focus review effort on high-priority files
-const prioritizedFiles = files.sort((a, b) =>
-  reviewPriorities[b.id] - reviewPriorities[a.id]
-);
+const prioritizedFiles = files.sort((a, b) => reviewPriorities[b.id] - reviewPriorities[a.id]);
 
-console.log(`Prioritized review order based on risk: ${prioritizedFiles.map(f => f.path)}`);
+console.log(`Prioritized review order based on risk: ${prioritizedFiles.map((f) => f.path)}`);
 ```
 
 ## Core Features
 
 ### 1. Multi-Agent Review System
+
 ```bash
 # Initialize code review swarm with gh CLI
 # Get PR details
@@ -311,6 +302,7 @@ gh pr comment 123 --body "🔍 Multi-agent code review initiated"
 ### 2. Specialized Review Agents
 
 #### Security Agent
+
 ```bash
 # Security-focused review with gh CLI
 # Get changed files
@@ -337,13 +329,13 @@ fi
 
 ## 📈 Performance Targets
 
-| Metric | Target | Enabled By |
-|--------|--------|------------|
-| **Review Accuracy** | +12.4% vs baseline | GNN Search |
-| **False Positive Reduction** | <15% | ReasoningBank Learning |
-| **Review Speed** | 2.49x-7.47x faster | Flash Attention |
-| **Issue Detection Rate** | >95% | Combined capabilities |
-| **Developer Satisfaction** | >90% | Attention Consensus |
+| Metric                       | Target             | Enabled By             |
+| ---------------------------- | ------------------ | ---------------------- |
+| **Review Accuracy**          | +12.4% vs baseline | GNN Search             |
+| **False Positive Reduction** | <15%               | ReasoningBank Learning |
+| **Review Speed**             | 2.49x-7.47x faster | Flash Attention        |
+| **Issue Detection Rate**     | >95%               | Combined capabilities  |
+| **Developer Satisfaction**   | >90%               | Attention Consensus    |
 
 ## 🔧 Implementation Examples
 

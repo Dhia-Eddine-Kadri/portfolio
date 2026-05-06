@@ -46,7 +46,17 @@ are passed via execFileSync (no shell interpretation).
 // Whitelist of gh top-level commands we forward. Restricting this is
 // defense-in-depth even though execFileSync would already block shell
 // metacharacters in args.
-const ALLOWED_COMMANDS = new Set(['issue', 'pr', 'repo', 'api', 'workflow', 'run', 'release', 'auth', 'gist']);
+const ALLOWED_COMMANDS = new Set([
+  'issue',
+  'pr',
+  'repo',
+  'api',
+  'workflow',
+  'run',
+  'release',
+  'auth',
+  'gist'
+]);
 
 const [command, subcommand, ...restArgs] = args;
 
@@ -65,7 +75,7 @@ function runGh(argv) {
       timeout: 30000,
       // shell:false is the default — kept explicit so a future refactor
       // doesn't accidentally turn it on.
-      shell: false,
+      shell: false
     });
   } catch (error) {
     console.error('Error:', error?.message ?? String(error));
@@ -74,9 +84,10 @@ function runGh(argv) {
 }
 
 // Handle commands that take body content
-if ((command === 'issue' || command === 'pr') &&
-    (subcommand === 'comment' || subcommand === 'create')) {
-
+if (
+  (command === 'issue' || command === 'pr') &&
+  (subcommand === 'comment' || subcommand === 'create')
+) {
   let bodyIndex = -1;
   let body = '';
 
@@ -109,7 +120,11 @@ if ((command === 'issue' || command === 'pr') &&
 
       runGh(finalArgs);
     } finally {
-      try { unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+      try {
+        unlinkSync(tmpFile);
+      } catch {
+        /* ignore cleanup errors */
+      }
     }
   } else {
     // No body — forward all args as-is (still via execFileSync)

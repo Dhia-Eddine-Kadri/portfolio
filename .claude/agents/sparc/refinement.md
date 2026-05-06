@@ -112,7 +112,7 @@ const similarRefactorings = await reasoningBank.searchPatterns({
 
 if (similarRefactorings.length > 0) {
   console.log('📚 Learning from past successful refactorings:');
-  similarRefactorings.forEach(pattern => {
+  similarRefactorings.forEach((pattern) => {
     console.log(`- ${pattern.task}: ${pattern.reward} quality improvement`);
     console.log(`  Optimization: ${pattern.critique}`);
     // Apply proven refactoring patterns
@@ -130,7 +130,7 @@ const testFailures = await reasoningBank.searchPatterns({
 
 if (testFailures.length > 0) {
   console.log('⚠️  Learning from past test failures:');
-  testFailures.forEach(pattern => {
+  testFailures.forEach((pattern) => {
     console.log(`- ${pattern.critique}`);
     // Avoid common testing pitfalls
     // Ensure comprehensive edge case coverage
@@ -145,20 +145,22 @@ if (testFailures.length > 0) {
 // Build graph of code dependencies
 const codeGraph = {
   nodes: [authModule, userService, database, cache, validator],
-  edges: [[0, 1], [1, 2], [1, 3], [0, 4]], // Code dependencies
-  edgeWeights: [0.95, 0.90, 0.85, 0.80],
+  edges: [
+    [0, 1],
+    [1, 2],
+    [1, 3],
+    [0, 4]
+  ], // Code dependencies
+  edgeWeights: [0.95, 0.9, 0.85, 0.8],
   nodeLabels: ['Auth', 'UserService', 'DB', 'Cache', 'Validator']
 };
 
 // GNN-enhanced search for similar code patterns (+12.4% accuracy)
-const relevantPatterns = await agentDB.gnnEnhancedSearch(
-  codeEmbedding,
-  {
-    k: 10,
-    graphContext: codeGraph,
-    gnnLayers: 3
-  }
-);
+const relevantPatterns = await agentDB.gnnEnhancedSearch(codeEmbedding, {
+  k: 10,
+  graphContext: codeGraph,
+  gnnLayers: 3
+});
 
 console.log(`Code pattern accuracy improved by ${relevantPatterns.improvementPercent}%`);
 
@@ -216,12 +218,10 @@ describe('AuthService', () => {
 
     // Apply proven test patterns
     for (let i = 0; i < 5; i++) {
-      await expect(service.login(wrongCredentials))
-        .rejects.toThrow('Invalid credentials');
+      await expect(service.login(wrongCredentials)).rejects.toThrow('Invalid credentials');
     }
 
-    await expect(service.login(wrongCredentials))
-      .rejects.toThrow('Account locked');
+    await expect(service.login(wrongCredentials)).rejects.toThrow('Account locked');
   });
 });
 
@@ -271,6 +271,7 @@ console.log(`Refinement quality improved by ${weeklyImprovement}% this week`);
 ## ⚡ Performance Examples
 
 ### Before: Traditional refinement
+
 ```typescript
 // Manual code review
 // Ad-hoc testing
@@ -280,6 +281,7 @@ console.log(`Refinement quality improved by ${weeklyImprovement}% this week`);
 ```
 
 ### After: Self-learning refinement (v3.0.0-alpha.1)
+
 ```typescript
 // 1. Learn from past refactorings (avoid known pitfalls)
 // 2. GNN finds similar code patterns (+12.4% accuracy)
@@ -308,6 +310,7 @@ console.log(`Coverage gaps: ${testAlignment.gaps}`);
 ## SPARC Refinement Phase
 
 The Refinement phase ensures code quality through:
+
 1. Test-Driven Development (TDD)
 2. Code optimization and refactoring
 3. Performance tuning
@@ -343,7 +346,7 @@ describe('AuthenticationService', () => {
         email: credentials.email,
         passwordHash: await hash(credentials.password)
       };
-      
+
       mockUserRepo.findByEmail.mockResolvedValue(mockUser);
 
       // Act
@@ -369,13 +372,13 @@ describe('AuthenticationService', () => {
 
       // Simulate 5 failed attempts
       for (let i = 0; i < 5; i++) {
-        await expect(service.login(credentials))
-          .rejects.toThrow('Invalid credentials');
+        await expect(service.login(credentials)).rejects.toThrow('Invalid credentials');
       }
 
       // 6th attempt should indicate locked account
-      await expect(service.login(credentials))
-        .rejects.toThrow('Account locked due to multiple failed attempts');
+      await expect(service.login(credentials)).rejects.toThrow(
+        'Account locked due to multiple failed attempts'
+      );
     });
   });
 });
@@ -402,9 +405,7 @@ export class AuthenticationService {
     // Check if account is locked
     const attempts = this.failedAttempts.get(email) || 0;
     if (attempts >= this.MAX_ATTEMPTS) {
-      throw new AccountLockedException(
-        'Account locked due to multiple failed attempts'
-      );
+      throw new AccountLockedException('Account locked due to multiple failed attempts');
     }
 
     // Find user
@@ -415,10 +416,7 @@ export class AuthenticationService {
     }
 
     // Verify password
-    const isValidPassword = await this.verifyPassword(
-      password,
-      user.passwordHash
-    );
+    const isValidPassword = await this.verifyPassword(password, user.passwordHash);
     if (!isValidPassword) {
       this.recordFailedAttempt(email);
       throw new UnauthorizedException('Invalid credentials');
@@ -435,11 +433,7 @@ export class AuthenticationService {
       createdAt: new Date()
     };
 
-    await this.cache.set(
-      `session:${token}`,
-      session,
-      this.SESSION_DURATION
-    );
+    await this.cache.set(`session:${token}`, session, this.SESSION_DURATION);
 
     return {
       user: this.sanitizeUser(user),
@@ -450,7 +444,7 @@ export class AuthenticationService {
   private recordFailedAttempt(email: string): void {
     const current = this.failedAttempts.get(email) || 0;
     this.failedAttempts.set(email, current + 1);
-    
+
     this.logger.warn('Failed login attempt', {
       email,
       attempts: current + 1
@@ -479,7 +473,7 @@ export class AuthenticationService {
     try {
       const user = await this.authenticateUser(credentials);
       const session = await this.createSession(user);
-      
+
       // Emit event for other services
       await this.eventBus.emit('user.logged_in', {
         userId: user.id,
@@ -501,15 +495,13 @@ export class AuthenticationService {
     const lockInfo = await this.cache.get(`lock:${email}`);
     if (lockInfo) {
       const remainingTime = this.calculateRemainingLockTime(lockInfo);
-      throw new AccountLockedException(
-        `Account locked. Try again in ${remainingTime} minutes`
-      );
+      throw new AccountLockedException(`Account locked. Try again in ${remainingTime} minutes`);
     }
   }
 
   private async authenticateUser(credentials: LoginDto): Promise<User> {
     const user = await this.userRepo.findByEmail(credentials.email);
-    if (!user || !await this.verifyPassword(credentials.password, user.passwordHash)) {
+    if (!user || !(await this.verifyPassword(credentials.password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid credentials');
     }
     return user;
@@ -518,7 +510,7 @@ export class AuthenticationService {
   private async handleLoginFailure(email: string, error: Error): Promise<void> {
     if (error instanceof UnauthorizedException) {
       const attempts = await this.incrementFailedAttempts(email);
-      
+
       if (attempts >= this.config.maxLoginAttempts) {
         await this.lockAccount(email);
       }
@@ -536,16 +528,21 @@ export class AuthenticationService {
 describe('Performance', () => {
   it('should handle 1000 concurrent login requests', async () => {
     const startTime = performance.now();
-    
-    const promises = Array(1000).fill(null).map((_, i) => 
-      service.login({
-        email: `user${i}@example.com`,
-        password: 'password'
-      }).catch(() => {}) // Ignore errors for perf test
-    );
+
+    const promises = Array(1000)
+      .fill(null)
+      .map(
+        (_, i) =>
+          service
+            .login({
+              email: `user${i}@example.com`,
+              password: 'password'
+            })
+            .catch(() => {}) // Ignore errors for perf test
+      );
 
     await Promise.all(promises);
-    
+
     const duration = performance.now() - startTime;
     expect(duration).toBeLessThan(5000); // Should complete in 5 seconds
   });
@@ -560,12 +557,12 @@ async function getUserPermissions(userId: string): Promise<string[]> {
   const user = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
   const roles = await db.query('SELECT * FROM user_roles WHERE user_id = ?', [userId]);
   const permissions = [];
-  
+
   for (const role of roles) {
     const perms = await db.query('SELECT * FROM role_permissions WHERE role_id = ?', [role.id]);
     permissions.push(...perms);
   }
-  
+
   return permissions;
 }
 
@@ -576,18 +573,21 @@ async function getUserPermissions(userId: string): Promise<string[]> {
   if (cached) return cached;
 
   // Single query with joins
-  const permissions = await db.query(`
+  const permissions = await db.query(
+    `
     SELECT DISTINCT p.name
     FROM users u
     JOIN user_roles ur ON u.id = ur.user_id
     JOIN role_permissions rp ON ur.role_id = rp.role_id
     JOIN permissions p ON rp.permission_id = p.id
     WHERE u.id = ?
-  `, [userId]);
+  `,
+    [userId]
+  );
 
   // Cache for 5 minutes
   await cache.set(`permissions:${userId}`, permissions, 300);
-  
+
   return permissions;
 }
 ```
@@ -612,7 +612,10 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, public fields?: Record<string, string>) {
+  constructor(
+    message: string,
+    public fields?: Record<string, string>
+  ) {
     super(message, 'VALIDATION_ERROR', 400);
   }
 }
@@ -624,12 +627,7 @@ export class AuthenticationError extends AppError {
 }
 
 // Global error handler
-export function errorHandler(
-  error: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function errorHandler(error: Error, req: Request, res: Response, next: NextFunction): void {
   if (error instanceof AppError && error.isOperational) {
     res.status(error.statusCode).json({
       error: {
@@ -656,18 +654,18 @@ export function errorHandler(
 ```typescript
 // Retry decorator for transient failures
 function retry(attempts = 3, delay = 1000) {
-  return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function(...args: any[]) {
+    descriptor.value = async function (...args: any[]) {
       let lastError: Error;
-      
+
       for (let i = 0; i < attempts; i++) {
         try {
           return await originalMethod.apply(this, args);
         } catch (error) {
           lastError = error;
-          
+
           if (i < attempts - 1 && isRetryable(error)) {
             await sleep(delay * Math.pow(2, i)); // Exponential backoff
           } else {
@@ -675,7 +673,7 @@ function retry(attempts = 3, delay = 1000) {
           }
         }
       }
-      
+
       throw lastError;
     };
   };
@@ -719,15 +717,14 @@ export class CircuitBreaker {
   private onFailure(): void {
     this.failures++;
     this.lastFailureTime = new Date();
-    
+
     if (this.failures >= this.threshold) {
       this.state = 'OPEN';
     }
   }
 
   private shouldAttemptReset(): boolean {
-    return this.lastFailureTime 
-      && (Date.now() - this.lastFailureTime.getTime()) > this.timeout;
+    return this.lastFailureTime && Date.now() - this.lastFailureTime.getTime() > this.timeout;
   }
 }
 ```
@@ -735,6 +732,7 @@ export class CircuitBreaker {
 ## Quality Metrics
 
 ### 1. Code Coverage
+
 ```bash
 # Jest configuration for coverage
 module.exports = {
@@ -755,6 +753,7 @@ module.exports = {
 ```
 
 ### 2. Complexity Analysis
+
 ```typescript
 // Keep cyclomatic complexity low
 // Bad: Complexity = 7

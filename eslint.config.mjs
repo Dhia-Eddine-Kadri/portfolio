@@ -34,7 +34,7 @@ const nodeGlobals = {
   crypto: 'readonly',
   atob: 'readonly',
   btoa: 'readonly',
-  structuredClone: 'readonly',
+  structuredClone: 'readonly'
 };
 
 const browserGlobals = {
@@ -176,18 +176,12 @@ const browserGlobals = {
   _ssEnsureJsPdf: 'readonly',
   _ssReplaceHistory: 'readonly',
   _ufMerge: 'readonly',
-  _ufUpload: 'readonly',
+  _ufUpload: 'readonly'
 };
 
 export default [
   {
-    ignores: [
-      'node_modules/',
-      'backend/node_modules/',
-      'frontend/assets/',
-      'docs/',
-      '.netlify/',
-    ],
+    ignores: ['node_modules/', 'backend/node_modules/', 'frontend/assets/', 'docs/', '.netlify/']
   },
   js.configs.recommended,
   {
@@ -195,7 +189,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
-      globals: nodeGlobals,
+      globals: nodeGlobals
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
@@ -203,15 +197,15 @@ export default [
       'no-undef': 'error',
       'no-control-regex': 'warn',
       'no-useless-escape': 'warn',
-      'no-redeclare': 'warn',
-    },
+      'no-redeclare': 'warn'
+    }
   },
   {
     files: ['frontend/js/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: browserGlobals,
+      globals: browserGlobals
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
@@ -221,7 +215,7 @@ export default [
       'no-useless-escape': 'warn',
       'no-irregular-whitespace': 'warn',
       'no-redeclare': 'warn',
-      'no-func-assign': 'warn',
-    },
-  },
+      'no-func-assign': 'warn'
+    }
+  }
 ];

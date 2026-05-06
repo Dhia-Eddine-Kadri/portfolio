@@ -1,6 +1,6 @@
 ---
-name: "AgentDB Advanced Features"
-description: "Master advanced AgentDB features including QUIC synchronization, multi-database management, custom distance metrics, hybrid search, and distributed systems integration. Use when building distributed AI systems, multi-agent coordination, or advanced vector search applications."
+name: 'AgentDB Advanced Features'
+description: 'Master advanced AgentDB features including QUIC synchronization, multi-database management, custom distance metrics, hybrid search, and distributed systems integration. Use when building distributed AI systems, multi-agent coordination, or advanced vector search applications.'
 ---
 
 # AgentDB Advanced Features
@@ -27,6 +27,7 @@ Covers advanced AgentDB capabilities for distributed systems, multi-database coo
 QUIC (Quick UDP Internet Connections) enables sub-millisecond latency synchronization between AgentDB instances across network boundaries with automatic retry, multiplexing, and encryption.
 
 **Benefits**:
+
 - <1ms latency between nodes
 - Multiplexed streams (multiple operations simultaneously)
 - Built-in encryption (TLS 1.3)
@@ -43,11 +44,7 @@ const adapter = await createAgentDBAdapter({
   dbPath: '.agentdb/distributed.db',
   enableQUICSync: true,
   syncPort: 4433,
-  syncPeers: [
-    '192.168.1.10:4433',
-    '192.168.1.11:4433',
-    '192.168.1.12:4433',
-  ],
+  syncPeers: ['192.168.1.10:4433', '192.168.1.11:4433', '192.168.1.12:4433']
 });
 
 // Patterns automatically sync across all peers
@@ -63,12 +60,12 @@ await adapter.insertPattern({
 ```typescript
 const adapter = await createAgentDBAdapter({
   enableQUICSync: true,
-  syncPort: 4433,              // QUIC server port
-  syncPeers: ['host1:4433'],   // Peer addresses
-  syncInterval: 1000,          // Sync interval (ms)
-  syncBatchSize: 100,          // Patterns per batch
-  maxRetries: 3,               // Retry failed syncs
-  compression: true,           // Enable compression
+  syncPort: 4433, // QUIC server port
+  syncPeers: ['host1:4433'], // Peer addresses
+  syncInterval: 1000, // Sync interval (ms)
+  syncBatchSize: 100, // Patterns per batch
+  maxRetries: 3, // Retry failed syncs
+  compression: true // Enable compression
 });
 ```
 
@@ -114,6 +111,7 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
 ```
 
 **Use Cases**:
+
 - Text embeddings (BERT, GPT, etc.)
 - Semantic search
 - Document similarity
@@ -138,6 +136,7 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
 ```
 
 **Use Cases**:
+
 - Image embeddings
 - Spatial data
 - Computer vision
@@ -162,6 +161,7 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
 ```
 
 **Use Cases**:
+
 - Pre-normalized embeddings
 - Fast similarity computation
 - When vectors are already unit-length
@@ -207,14 +207,14 @@ await adapter.insertPattern({
       author: 'Jane Smith',
       year: 2025,
       category: 'machine-learning',
-      citations: 150,
+      citations: 150
     }
   }),
   confidence: 1.0,
   usage_count: 0,
   success_count: 0,
   created_at: Date.now(),
-  last_used: Date.now(),
+  last_used: Date.now()
 });
 
 // Hybrid search: vector similarity + metadata filters
@@ -222,10 +222,10 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
   domain: 'research-papers',
   k: 20,
   filters: {
-    year: { $gte: 2023 },          // Published 2023 or later
-    category: 'machine-learning',   // ML papers only
-    citations: { $gte: 50 },       // Highly cited
-  },
+    year: { $gte: 2023 }, // Published 2023 or later
+    category: 'machine-learning', // ML papers only
+    citations: { $gte: 50 } // Highly cited
+  }
 });
 ```
 
@@ -237,12 +237,12 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
   domain: 'products',
   k: 50,
   filters: {
-    price: { $gte: 10, $lte: 100 },      // Price range
-    category: { $in: ['electronics', 'gadgets'] },  // Multiple categories
-    rating: { $gte: 4.0 },                // High rated
-    inStock: true,                        // Available
-    tags: { $contains: 'wireless' },      // Has tag
-  },
+    price: { $gte: 10, $lte: 100 }, // Price range
+    category: { $in: ['electronics', 'gadgets'] }, // Multiple categories
+    rating: { $gte: 4.0 }, // High rated
+    inStock: true, // Available
+    tags: { $contains: 'wireless' } // Has tag
+  }
 });
 ```
 
@@ -255,13 +255,13 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
   domain: 'content',
   k: 20,
   hybridWeights: {
-    vectorSimilarity: 0.7,  // 70% weight on semantic similarity
-    metadataScore: 0.3,     // 30% weight on metadata match
+    vectorSimilarity: 0.7, // 70% weight on semantic similarity
+    metadataScore: 0.3 // 30% weight on metadata match
   },
   filters: {
     category: 'technology',
-    recency: { $gte: Date.now() - 30 * 24 * 3600000 },  // Last 30 days
-  },
+    recency: { $gte: Date.now() - 30 * 24 * 3600000 } // Last 30 days
+  }
 });
 ```
 
@@ -274,21 +274,27 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
 ```typescript
 // Separate databases for different domains
 const knowledgeDB = await createAgentDBAdapter({
-  dbPath: '.agentdb/knowledge.db',
+  dbPath: '.agentdb/knowledge.db'
 });
 
 const conversationDB = await createAgentDBAdapter({
-  dbPath: '.agentdb/conversations.db',
+  dbPath: '.agentdb/conversations.db'
 });
 
 const codeDB = await createAgentDBAdapter({
-  dbPath: '.agentdb/code.db',
+  dbPath: '.agentdb/code.db'
 });
 
 // Use appropriate database for each task
-await knowledgeDB.insertPattern({ /* knowledge */ });
-await conversationDB.insertPattern({ /* conversation */ });
-await codeDB.insertPattern({ /* code */ });
+await knowledgeDB.insertPattern({
+  /* knowledge */
+});
+await conversationDB.insertPattern({
+  /* conversation */
+});
+await codeDB.insertPattern({
+  /* code */
+});
 ```
 
 ### Database Sharding
@@ -298,18 +304,20 @@ await codeDB.insertPattern({ /* code */ });
 const shards = {
   'domain-a': await createAgentDBAdapter({ dbPath: '.agentdb/shard-a.db' }),
   'domain-b': await createAgentDBAdapter({ dbPath: '.agentdb/shard-b.db' }),
-  'domain-c': await createAgentDBAdapter({ dbPath: '.agentdb/shard-c.db' }),
+  'domain-c': await createAgentDBAdapter({ dbPath: '.agentdb/shard-c.db' })
 };
 
 // Route queries to appropriate shard
 function getDBForDomain(domain: string) {
-  const shardKey = domain.split('-')[0];  // Extract shard key
+  const shardKey = domain.split('-')[0]; // Extract shard key
   return shards[shardKey] || shards['domain-a'];
 }
 
 // Insert to correct shard
 const db = getDBForDomain('domain-a-task');
-await db.insertPattern({ /* ... */ });
+await db.insertPattern({
+  /* ... */
+});
 ```
 
 ---
@@ -322,23 +330,25 @@ Retrieve diverse results to avoid redundancy:
 // Without MMR: Similar results may be redundant
 const standardResults = await adapter.retrieveWithReasoning(queryEmbedding, {
   k: 10,
-  useMMR: false,
+  useMMR: false
 });
 
 // With MMR: Diverse, non-redundant results
 const diverseResults = await adapter.retrieveWithReasoning(queryEmbedding, {
   k: 10,
   useMMR: true,
-  mmrLambda: 0.5,  // Balance relevance (0) vs diversity (1)
+  mmrLambda: 0.5 // Balance relevance (0) vs diversity (1)
 });
 ```
 
 **MMR Parameters**:
+
 - `mmrLambda = 0`: Maximum relevance (may be redundant)
 - `mmrLambda = 0.5`: Balanced (default)
 - `mmrLambda = 1`: Maximum diversity (may be less relevant)
 
 **Use Cases**:
+
 - Search result diversification
 - Recommendation systems
 - Avoiding echo chambers
@@ -354,7 +364,7 @@ Generate rich context from multiple memories:
 const result = await adapter.retrieveWithReasoning(queryEmbedding, {
   domain: 'problem-solving',
   k: 10,
-  synthesizeContext: true,  // Enable context synthesis
+  synthesizeContext: true // Enable context synthesis
 });
 
 // ContextSynthesizer creates coherent narrative
@@ -383,7 +393,7 @@ class AgentDBPool {
       this.instance = await createAgentDBAdapter({
         dbPath: '.agentdb/production.db',
         quantizationType: 'scalar',
-        cacheSize: 2000,
+        cacheSize: 2000
       });
     }
     return this.instance;
@@ -408,7 +418,7 @@ async function safeRetrieve(queryEmbedding: number[], options: any) {
       // Handle dimension error
     } else if (error.code === 'DATABASE_LOCKED') {
       // Retry with exponential backoff
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       return safeRetrieve(queryEmbedding, options);
     }
     throw error;
@@ -434,7 +444,7 @@ console.log('Database Stats:', {
   totalPatterns: stats.totalPatterns,
   dbSize: stats.dbSize,
   cacheHitRate: stats.cacheHitRate,
-  avgSearchLatency: stats.avgSearchLatency,
+  avgSearchLatency: stats.avgSearchLatency
 });
 ```
 
@@ -517,10 +527,10 @@ DEBUG=agentdb:quic node server.js
 ```typescript
 // Relax filters
 const result = await adapter.retrieveWithReasoning(queryEmbedding, {
-  k: 100,  // Increase k
+  k: 100, // Increase k
   filters: {
     // Remove or relax filters
-  },
+  }
 });
 ```
 
@@ -529,8 +539,8 @@ const result = await adapter.retrieveWithReasoning(queryEmbedding, {
 ```typescript
 // Disable automatic optimization
 const result = await adapter.retrieveWithReasoning(queryEmbedding, {
-  optimizeMemory: false,  // Disable auto-consolidation
-  k: 10,
+  optimizeMemory: false, // Disable auto-consolidation
+  k: 10
 });
 ```
 

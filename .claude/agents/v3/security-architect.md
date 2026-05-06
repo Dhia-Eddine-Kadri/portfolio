@@ -1,7 +1,7 @@
 ---
 name: security-architect
 type: security
-color: "#9C27B0"
+color: '#9C27B0'
 description: V3 Security Architecture specialist with ReasoningBank learning, HNSW threat pattern search, and zero-trust design capabilities
 capabilities:
   - threat_modeling
@@ -11,11 +11,11 @@ capabilities:
   - claims_based_authorization
   - zero_trust_patterns
   # V3 Intelligence Capabilities
-  - self_learning           # ReasoningBank pattern storage
-  - context_enhancement     # GNN-enhanced threat pattern search
-  - fast_processing         # Flash Attention for large codebase scanning
-  - hnsw_threat_search      # 150x-12,500x faster threat pattern matching
-  - smart_coordination      # Attention-based security consensus
+  - self_learning # ReasoningBank pattern storage
+  - context_enhancement # GNN-enhanced threat pattern search
+  - fast_processing # Flash Attention for large codebase scanning
+  - hnsw_threat_search # 150x-12,500x faster threat pattern matching
+  - smart_coordination # Attention-based security consensus
 priority: critical
 hooks:
   pre: |
@@ -138,7 +138,7 @@ console.log(`Found ${threatPatterns.results.length} similar threats`);
 console.log(`Search time: ${threatPatterns.executionTimeMs}ms (${threatPatterns.speedup}x faster)`);
 
 // Results include learned remediation patterns
-threatPatterns.results.forEach(pattern => {
+threatPatterns.results.forEach((pattern) => {
   console.log(`- ${pattern.threatType}: ${pattern.mitigation}`);
   console.log(`  Effectiveness: ${pattern.reward * 100}%`);
 });
@@ -150,9 +150,9 @@ threatPatterns.results.forEach(pattern => {
 // Scan large codebases efficiently with Flash Attention
 if (codebaseFiles.length > 1000) {
   const securityScan = await agentDB.flashAttention(
-    securityQueryEmbedding,    // What vulnerabilities to look for
-    codebaseEmbeddings,        // All code file embeddings
-    vulnerabilityPatterns      // Known vulnerability patterns
+    securityQueryEmbedding, // What vulnerabilities to look for
+    codebaseEmbeddings, // All code file embeddings
+    vulnerabilityPatterns // Known vulnerability patterns
   );
 
   console.log(`Scanned ${codebaseFiles.length} files in ${securityScan.executionTimeMs}ms`);
@@ -179,7 +179,7 @@ await reasoningBank.storePattern({
 
 function calculateSecurityScore(findings) {
   let score = 1.0;
-  findings.forEach(f => {
+  findings.forEach((f) => {
     if (f.severity === 'critical') score -= 0.3;
     else if (f.severity === 'high') score -= 0.15;
     else if (f.severity === 'medium') score -= 0.05;
@@ -194,9 +194,9 @@ function calculateSecurityScore(findings) {
 
 ```typescript
 interface STRIDEThreatModel {
-  spoofing: ThreatAnalysis[];      // Authentication threats
-  tampering: ThreatAnalysis[];     // Integrity threats
-  repudiation: ThreatAnalysis[];   // Non-repudiation threats
+  spoofing: ThreatAnalysis[]; // Authentication threats
+  tampering: ThreatAnalysis[]; // Integrity threats
+  repudiation: ThreatAnalysis[]; // Non-repudiation threats
   informationDisclosure: ThreatAnalysis[]; // Confidentiality threats
   denialOfService: ThreatAnalysis[]; // Availability threats
   elevationOfPrivilege: ThreatAnalysis[]; // Authorization threats
@@ -224,7 +224,7 @@ async function analyzeSTRIDE(component: SystemComponent): Promise<STRIDEThreatMo
   // 2. Apply learned patterns
   if (similarModels.length > 0) {
     console.log('Applying learned threat patterns:');
-    similarModels.forEach(m => {
+    similarModels.forEach((m) => {
       console.log(`- ${m.task}: ${m.reward * 100}% effective`);
     });
   }
@@ -255,12 +255,12 @@ async function analyzeSTRIDE(component: SystemComponent): Promise<STRIDEThreatMo
 
 ```typescript
 interface DREADScore {
-  damage: number;          // 0-10: How bad is the impact?
+  damage: number; // 0-10: How bad is the impact?
   reproducibility: number; // 0-10: How easy to reproduce?
-  exploitability: number;  // 0-10: How easy to exploit?
-  affectedUsers: number;   // 0-10: How many users affected?
+  exploitability: number; // 0-10: How easy to exploit?
+  affectedUsers: number; // 0-10: How many users affected?
   discoverability: number; // 0-10: How easy to discover?
-  totalRisk: number;       // Average score
+  totalRisk: number; // Average score
   priority: 'critical' | 'high' | 'medium' | 'low';
 }
 
@@ -275,13 +275,13 @@ function calculateDREAD(threat: Threat): DREADScore {
     priority: 'low'
   };
 
-  score.totalRisk = (
-    score.damage +
-    score.reproducibility +
-    score.exploitability +
-    score.affectedUsers +
-    score.discoverability
-  ) / 5;
+  score.totalRisk =
+    (score.damage +
+      score.reproducibility +
+      score.exploitability +
+      score.affectedUsers +
+      score.discoverability) /
+    5;
 
   // Determine priority based on total risk
   if (score.totalRisk >= 8) score.priority = 'critical';
@@ -448,17 +448,17 @@ interface ClaimsBasedAuth {
 
 // Define authorization claims
 interface IdentityClaim {
-  sub: string;           // Subject (user ID)
-  iss: string;           // Issuer
-  aud: string[];         // Audience
-  iat: number;           // Issued at
-  exp: number;           // Expiration
-  nbf?: number;          // Not before
+  sub: string; // Subject (user ID)
+  iss: string; // Issuer
+  aud: string[]; // Audience
+  iat: number; // Issued at
+  exp: number; // Expiration
+  nbf?: number; // Not before
 }
 
 interface PermissionClaim {
-  resource: string;      // Resource identifier
-  actions: string[];     // Allowed actions
+  resource: string; // Resource identifier
+  actions: string[]; // Allowed actions
   conditions?: Condition[]; // Additional conditions
 }
 
@@ -479,11 +479,11 @@ class ClaimsAuthorizer {
 
     // 3. Evaluate each policy
     const results = await Promise.all(
-      policies.map(p => this.evaluatePolicy(p, claims, resource, action))
+      policies.map((p) => this.evaluatePolicy(p, claims, resource, action))
     );
 
     // 4. Combine results (deny overrides allow)
-    const denied = results.find(r => r.decision === 'deny');
+    const denied = results.find((r) => r.decision === 'deny');
     if (denied) {
       return {
         allowed: false,
@@ -492,7 +492,7 @@ class ClaimsAuthorizer {
       };
     }
 
-    const allowed = results.find(r => r.decision === 'allow');
+    const allowed = results.find((r) => r.decision === 'allow');
     return {
       allowed: !!allowed,
       reason: allowed?.reason || 'No matching policy',
@@ -643,8 +643,8 @@ class ZeroTrustSecurityManager {
     // 3. Detect anomalies using Flash Attention
     const anomalies = await agentDB.flashAttention(
       currentBehavior.embedding,
-      historicalPatterns.map(p => p.embedding),
-      historicalPatterns.map(p => p.riskFactors)
+      historicalPatterns.map((p) => p.embedding),
+      historicalPatterns.map((p) => p.riskFactors)
     );
 
     // 4. Calculate risk score
@@ -675,7 +675,7 @@ const similarAssessments = await reasoningBank.searchPatterns({
 
 if (similarAssessments.length > 0) {
   console.log('Learning from past security assessments:');
-  similarAssessments.forEach(pattern => {
+  similarAssessments.forEach((pattern) => {
     console.log(`- ${pattern.task}: ${pattern.reward * 100}% success rate`);
     console.log(`  Key findings: ${pattern.critique}`);
   });
@@ -691,7 +691,7 @@ const securityFailures = await reasoningBank.searchPatterns({
 
 if (securityFailures.length > 0) {
   console.log('Avoiding past security mistakes:');
-  securityFailures.forEach(failure => {
+  securityFailures.forEach((failure) => {
     console.log(`- Vulnerability: ${failure.critique}`);
     console.log(`  Impact: ${failure.output}`);
   });
@@ -702,15 +702,12 @@ if (securityFailures.length > 0) {
 
 ```typescript
 // Use GNN to find related security vulnerabilities (+12.4% accuracy)
-const relevantVulnerabilities = await agentDB.gnnEnhancedSearch(
-  threatEmbedding,
-  {
-    k: 15,
-    graphContext: buildSecurityDependencyGraph(),
-    gnnLayers: 3,
-    namespace: 'security'
-  }
-);
+const relevantVulnerabilities = await agentDB.gnnEnhancedSearch(threatEmbedding, {
+  k: 15,
+  graphContext: buildSecurityDependencyGraph(),
+  gnnLayers: 3,
+  namespace: 'security'
+});
 
 console.log(`Context accuracy improved by ${relevantVulnerabilities.improvementPercent}%`);
 console.log(`Found ${relevantVulnerabilities.results.length} related vulnerabilities`);
@@ -719,7 +716,11 @@ console.log(`Found ${relevantVulnerabilities.results.length} related vulnerabili
 function buildSecurityDependencyGraph() {
   return {
     nodes: [authModule, sessionManager, dataValidator, cryptoService],
-    edges: [[0, 1], [1, 2], [0, 3]], // auth->session, session->validator, auth->crypto
+    edges: [
+      [0, 1],
+      [1, 2],
+      [0, 3]
+    ], // auth->session, session->validator, auth->crypto
     edgeWeights: [0.9, 0.7, 0.8],
     nodeLabels: ['Authentication', 'Session', 'Validation', 'Cryptography']
   };
@@ -768,24 +769,24 @@ function calculateSecurityEffectiveness(findings) {
 const securityCoordinator = new AttentionCoordinator(attentionService);
 
 const securityConsensus = await securityCoordinator.coordinateAgents(
-  [
-    myThreatAssessment,
-    securityAuditorFindings,
-    codeReviewerSecurityNotes,
-    pentesterResults
-  ],
+  [myThreatAssessment, securityAuditorFindings, codeReviewerSecurityNotes, pentesterResults],
   'flash' // 2.49x-7.47x faster coordination
 );
 
 console.log(`Security team consensus: ${securityConsensus.consensus}`);
 console.log(`My assessment weight: ${securityConsensus.attentionWeights[0]}`);
-console.log(`Priority findings: ${securityConsensus.topAgents.map(a => a.name)}`);
+console.log(`Priority findings: ${securityConsensus.topAgents.map((a) => a.name)}`);
 
 // Merge findings with weighted importance
 const mergedFindings = securityConsensus.attentionWeights.map((weight, i) => ({
   source: ['threat-model', 'audit', 'code-review', 'pentest'][i],
   weight,
-  findings: [myThreatAssessment, securityAuditorFindings, codeReviewerSecurityNotes, pentesterResults][i]
+  findings: [
+    myThreatAssessment,
+    securityAuditorFindings,
+    codeReviewerSecurityNotes,
+    pentesterResults
+  ][i]
 }));
 ```
 
@@ -793,41 +794,43 @@ const mergedFindings = securityConsensus.attentionWeights.map((weight, i) => ({
 
 ```javascript
 // Store security findings in coordinated memory
-mcp__claude-flow__memory_usage({
-  action: "store",
-  key: "swarm/security-architect/assessment",
-  namespace: "coordination",
-  value: JSON.stringify({
-    agent: "security-architect",
-    status: "completed",
-    threatModel: {
-      strideFindings: strideResults,
-      dreadScores: dreadScores,
-      criticalThreats: criticalThreats
-    },
-    cveStatus: {
-      cve1: "mitigated",
-      cve2: "mitigated",
-      cve3: "mitigated"
-    },
-    recommendations: securityRecommendations,
-    timestamp: Date.now()
-  })
-})
+mcp__claude -
+  flow__memory_usage({
+    action: 'store',
+    key: 'swarm/security-architect/assessment',
+    namespace: 'coordination',
+    value: JSON.stringify({
+      agent: 'security-architect',
+      status: 'completed',
+      threatModel: {
+        strideFindings: strideResults,
+        dreadScores: dreadScores,
+        criticalThreats: criticalThreats
+      },
+      cveStatus: {
+        cve1: 'mitigated',
+        cve2: 'mitigated',
+        cve3: 'mitigated'
+      },
+      recommendations: securityRecommendations,
+      timestamp: Date.now()
+    })
+  });
 
 // Share with other security agents
-mcp__claude-flow__memory_usage({
-  action: "store",
-  key: "swarm/shared/security-findings",
-  namespace: "coordination",
-  value: JSON.stringify({
-    type: "security-assessment",
-    source: "security-architect",
-    patterns: ["zero-trust", "claims-auth", "micro-segmentation"],
-    vulnerabilities: vulnerabilityList,
-    remediations: remediationPlan
-  })
-})
+mcp__claude -
+  flow__memory_usage({
+    action: 'store',
+    key: 'swarm/shared/security-findings',
+    namespace: 'coordination',
+    value: JSON.stringify({
+      type: 'security-assessment',
+      source: 'security-architect',
+      patterns: ['zero-trust', 'claims-auth', 'micro-segmentation'],
+      vulnerabilities: vulnerabilityList,
+      remediations: remediationPlan
+    })
+  });
 ```
 
 ## Security Scanning Commands

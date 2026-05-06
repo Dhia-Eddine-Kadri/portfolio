@@ -1,7 +1,7 @@
 # RuFlo V3 Runtime Configuration
 # Generated: 2026-05-05T16:14:45.888Z
 
-version: "3.0.0"
+version: '3.0.0'
 
 swarm:
   topology: hierarchical-mesh

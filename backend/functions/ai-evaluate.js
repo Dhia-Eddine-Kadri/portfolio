@@ -12,10 +12,10 @@ const { supaRequest } = require('../lib/supabase-admin');
 const https = require('https');
 
 const VALID_BEHAVIORS = new Set([
-  'answer_found',       // should find and cite from docs
-  'answer_not_found',   // should refuse (no relevant chunks)
+  'answer_found', // should find and cite from docs
+  'answer_not_found', // should refuse (no relevant chunks)
   'cite_specific_file', // answer must cite a specific file
-  'no_hallucination'    // answer must not include content outside retrieved chunks
+  'no_hallucination' // answer must not include content outside retrieved chunks
 ]);
 
 // Re-use the ai-ask logic inline by calling the live endpoint
@@ -40,9 +40,15 @@ function callAskEndpoint(token, courseId, question) {
 
     const req = (isLocalhost ? require('http') : https).request(options, function (res) {
       let d = '';
-      res.on('data', function (c) { d += c; });
+      res.on('data', function (c) {
+        d += c;
+      });
       res.on('end', function () {
-        try { resolve(JSON.parse(d)); } catch (e) { reject(e); }
+        try {
+          resolve(JSON.parse(d));
+        } catch (e) {
+          reject(e);
+        }
       });
     });
     req.on('error', reject);
@@ -57,17 +63,32 @@ function evaluateResult(answer, sources, expectedBehavior, expectedSourceKeyword
 
   if (expectedBehavior === 'answer_found') {
     passed = !answer.unsupported && sources.length > 0;
-    if (!passed) notes.push('Expected a grounded answer with sources but got unsupported=' + answer.unsupported + ', sources=' + sources.length);
+    if (!passed)
+      notes.push(
+        'Expected a grounded answer with sources but got unsupported=' +
+          answer.unsupported +
+          ', sources=' +
+          sources.length
+      );
   } else if (expectedBehavior === 'answer_not_found') {
     passed = !!answer.unsupported || sources.length === 0;
     if (!passed) notes.push('Expected refusal but AI returned an answer with sources');
   } else if (expectedBehavior === 'cite_specific_file') {
-    const keywords = (expectedSourceKeywords || []).map(function (k) { return k.toLowerCase(); });
-    const citedFiles = sources.map(function (s) { return (s.file_name || '').toLowerCase(); });
-    passed = keywords.every(function (k) {
-      return citedFiles.some(function (f) { return f.includes(k); });
+    const keywords = (expectedSourceKeywords || []).map(function (k) {
+      return k.toLowerCase();
     });
-    if (!passed) notes.push('Expected citation of ' + keywords.join(', ') + ' but got: ' + citedFiles.join(', '));
+    const citedFiles = sources.map(function (s) {
+      return (s.file_name || '').toLowerCase();
+    });
+    passed = keywords.every(function (k) {
+      return citedFiles.some(function (f) {
+        return f.includes(k);
+      });
+    });
+    if (!passed)
+      notes.push(
+        'Expected citation of ' + keywords.join(', ') + ' but got: ' + citedFiles.join(', ')
+      );
   } else if (expectedBehavior === 'no_hallucination') {
     // Pass if confidence is high or medium and not unsupported
     passed = answer.confidence !== 'low' && !answer.unsupported;
@@ -95,7 +116,11 @@ exports.handler = async function (event) {
 
     const result = await supaRequest(
       'GET',
-      'ai_evaluations?course_id=eq.' + encodeURIComponent(courseId) + '&user_id=eq.' + user.id + '&order=created_at.desc&limit=50',
+      'ai_evaluations?course_id=eq.' +
+        encodeURIComponent(courseId) +
+        '&user_id=eq.' +
+        user.id +
+        '&order=created_at.desc&limit=50',
       null,
       serviceKey
     );
@@ -105,11 +130,16 @@ exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') return fail(405, 'Method not allowed');
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); } catch (e) { return fail(400, 'Invalid JSON'); }
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return fail(400, 'Invalid JSON');
+  }
 
   const { courseId, testQuestion, expectedBehavior, expectedSourceKeywords } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
-  if (!testQuestion || typeof testQuestion !== 'string') return fail(400, 'testQuestion is required');
+  if (!testQuestion || typeof testQuestion !== 'string')
+    return fail(400, 'testQuestion is required');
   if (!expectedBehavior || !VALID_BEHAVIORS.has(expectedBehavior)) {
     return fail(400, 'expectedBehavior must be one of: ' + [...VALID_BEHAVIORS].join(', '));
   }
@@ -123,7 +153,12 @@ exports.handler = async function (event) {
   }
 
   const sources = ragResponse.sources || [];
-  const { passed, notes } = evaluateResult(ragResponse, sources, expectedBehavior, expectedSourceKeywords || []);
+  const { passed, notes } = evaluateResult(
+    ragResponse,
+    sources,
+    expectedBehavior,
+    expectedSourceKeywords || []
+  );
 
   // Store result
   const row = {

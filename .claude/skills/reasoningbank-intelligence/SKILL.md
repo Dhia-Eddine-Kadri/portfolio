@@ -1,6 +1,6 @@
 ---
-name: "ReasoningBank Intelligence"
-description: "Implement adaptive learning with ReasoningBank for pattern recognition, strategy optimization, and continuous improvement. Use when building self-learning agents, optimizing workflows, or implementing meta-cognitive systems."
+name: 'ReasoningBank Intelligence'
+description: 'Implement adaptive learning with ReasoningBank for pattern recognition, strategy optimization, and continuous improvement. Use when building self-learning agents, optimizing workflows, or implementing meta-cognitive systems.'
 ---
 
 # ReasoningBank Intelligence
@@ -55,6 +55,7 @@ const strategy = await rb.recommendStrategy('code_review', {
 ## Core Features
 
 ### 1. Pattern Recognition
+
 ```typescript
 // Learn patterns from data
 await rb.learnPattern({
@@ -69,6 +70,7 @@ const matches = await rb.matchPatterns(currentSituation);
 ```
 
 ### 2. Strategy Optimization
+
 ```typescript
 // Compare strategies
 const comparison = await rb.compareStrategies('bug_fixing', [
@@ -83,17 +85,19 @@ console.log(`Best: ${best.name} (score: ${best.score})`);
 ```
 
 ### 3. Continuous Learning
+
 ```typescript
 // Enable auto-learning from all tasks
 await rb.enableAutoLearning({
-  threshold: 0.7,        // Only learn from high-confidence outcomes
-  updateFrequency: 100   // Update models every 100 experiences
+  threshold: 0.7, // Only learn from high-confidence outcomes
+  updateFrequency: 100 // Update models every 100 experiences
 });
 ```
 
 ## Advanced Usage
 
 ### Meta-Learning
+
 ```typescript
 // Learn about learning
 await rb.metaLearn({
@@ -107,6 +111,7 @@ await rb.metaLearn({
 ```
 
 ### Transfer Learning
+
 ```typescript
 // Apply knowledge from one domain to another
 await rb.transferKnowledge({
@@ -117,6 +122,7 @@ await rb.transferKnowledge({
 ```
 
 ### Adaptive Agents
+
 ```typescript
 // Create self-improving agent
 class AdaptiveAgent {
@@ -186,12 +192,15 @@ console.log(`
 ## Troubleshooting
 
 ### Issue: Poor recommendations
+
 **Solution**: Ensure sufficient training data (100+ experiences per task type)
 
 ### Issue: Slow pattern matching
+
 **Solution**: Enable vector indexing in AgentDB
 
 ### Issue: Memory growing large
+
 **Solution**: Set TTL for old experiences or enable pruning
 
 ## Learn More

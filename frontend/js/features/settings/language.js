@@ -331,8 +331,7 @@ export function applyLanguage(lang) {
   });
   var langSel = document.getElementById('settingsLanguage');
   if (langSel) langSel.value = _lang;
-  if (typeof window._setAuthMode === 'function')
-    window._setAuthMode(window._authMode || 'signin');
+  if (typeof window._setAuthMode === 'function') window._setAuthMode(window._authMode || 'signin');
   var obSub = document.getElementById('obSub');
   if (obSub) obSub.textContent = tr[obSub.getAttribute('data-i18n')] || obSub.textContent;
   var ssb = document.getElementById('saveSettingsBtn');

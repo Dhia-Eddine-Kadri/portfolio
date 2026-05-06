@@ -13,8 +13,14 @@ const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-aut
 const { supaRequest } = require('../lib/supabase-admin');
 
 const VALID_RATINGS = new Set([
-  'helpful', 'not_helpful', 'wrong_answer', 'not_in_lecture',
-  'missing_citation', 'wrong_formula', 'too_vague', 'wrong_language'
+  'helpful',
+  'not_helpful',
+  'wrong_answer',
+  'not_in_lecture',
+  'missing_citation',
+  'wrong_formula',
+  'too_vague',
+  'wrong_language'
 ]);
 
 exports.handler = async function (event) {

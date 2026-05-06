@@ -1,1 +1,119 @@
-[["entry_1777998202736_skvreys",{"id":"entry_1777998202736_skvreys","key":"studysphere-appjs-refactor","namespace":"default","content":"StudySphere app.js refactor in progress. Completed: moved boot-only initializers to main.js, extracted auth modal, study lounge, music services, course search, globals helpers, and removed inline onclick handlers from static UI and games-solitaire overlays. Next target: move more startup orchestration from app.js into main.js, especially onboarding/study lounge/music/study timer init block."}],["entry_1777999697358_54dmki",{"id":"entry_1777999697358_54dmki","key":"studysphere-mainjs-bootstrap-step-2","namespace":"default","content":"Moved app startup-only init calls out of frontend/js/app.js into frontend/js/main.js: admin panel, onboarding, study lounge, music services, and study timer now initialize from main.js. app.js keeps wrapper/global behavior but no longer owns those init calls."}],["entry_1778003775934_vcpiu",{"id":"entry_1778003775934_vcpiu","key":"studysphere-auth-bridge-step","namespace":"default","content":"Moved auth modal and user-data wrapper logic out of frontend/js/app.js into frontend/js/features/auth/auth-bridge.js. app.js now initializes a smaller auth bridge instead of carrying window auth globals, loadUserData/applyProfile wrappers, and auth-mode bridging inline."}],["entry_1778006200718_w3bbwd",{"id":"entry_1778006200718_w3bbwd","key":"studysphere-settings-bridge-step","namespace":"default","content":"Moved language/settings global wrapper setup out of frontend/js/app.js into frontend/js/features/settings/settings-bridge.js. app.js now imports the t binding it needs and initializes settings globals through initSettingsBridge() instead of carrying applyLanguage/applySettings wrapper functions inline."}],["entry_1778008315004_k208nw",{"id":"entry_1778008315004_k208nw","key":"studysphere-landing-auth-admin-bridge-step","namespace":"default","content":"Moved the small landing/auth/admin helper strip out of frontend/js/app.js into frontend/js/features/auth/landing-auth-bridge.js. app.js now initializes initLandingAuthBridge(authBridge) instead of defining _adminShowIfEligible, _showOnboarding, and landing auth globals inline."}],["entry_1778010034462_i8fai",{"id":"entry_1778010034462_i8fai","key":"studysphere-ai-render-bridge-step","namespace":"default","content":"Moved AI markdown and KaTeX render glue out of frontend/js/app.js into frontend/js/features/ai-chat/ai-render-bridge.js. app.js now initializes initAiRenderBridge() instead of carrying renderMarkdown, _renderMath, and KaTeX scheduling logic inline."}],["entry_1778010396978_v6n6uq",{"id":"entry_1778010396978_v6n6uq","key":"studysphere-ai-export-bridge-step","namespace":"default","content":"Moved the AI export/global window bridge out of frontend/js/app.js into frontend/js/features/ai-chat/ai-export-bridge.js. app.js now initializes initAiExportBridge() instead of wiring _aiMakePdfBlob, _aiDownloadPdf, _ufDestPicker, _glMoveDestPicker, _aiExportToCourse, _aiShowExportModal, _aiResponseActions, and export modal close behavior inline."}],["entry_1778011703581_8gkldn",{"id":"entry_1778011703581_8gkldn","key":"studysphere-ai-ask-bridge-step","namespace":"default","content":"Moved AI ask/send/stop-generation UI wiring out of frontend/js/app.js into frontend/js/features/ai-chat/ai-ask-bridge.js. app.js now initializes initAiAskBridge(_aiState) instead of wiring askAI, addTyping, pdfToImages, stopGeneration, and AI input/send listeners inline."}],["entry_1778012388963_6imr4j",{"id":"entry_1778012388963_6imr4j","key":"studysphere-ai-chips-confetti-bridge-step","namespace":"default","content":"Moved the remaining AI chips global wrappers and spawnConfetti helper out of frontend/js/app.js into ai-chips-bridge.js and ai-confetti-bridge.js. app.js now initializes those bridges instead of hosting the behavior inline."}],["entry_1778014688182_yzj06c",{"id":"entry_1778014688182_yzj06c","key":"studysphere-ai-panel-effects-step","namespace":"default","content":"Moved the AI message flash wrapper and AI panel ripple click effect out of frontend/js/app.js into frontend/js/features/ai-chat/ai-panel-effects.js. app.js now initializes initAiPanelEffects with aiMsgs and aiPanel instead of keeping those UI micro-effects inline."}],["entry_1778015689228_91svmb",{"id":"entry_1778015689228_91svmb","key":"studysphere-ai-panel-bridge-step","namespace":"default","content":"Moved AI panel lifecycle wiring into frontend/js/features/ai-chat/ai-panel-bridge.js. app.js now initializes the bridge, refreshes window.openAI/window.closeAI/window.forceCloseAI/window.pinAI to the bridged methods, and no longer binds the panel listeners inline. Also added pdf-parse to package.json to unblock Netlify bundling for documents-process.js."}],["entry_1778016119968_ucwpjn",{"id":"entry_1778016119968_ucwpjn","key":"studysphere-ai-selection-bridge-wire-step","namespace":"default","content":"Extended ai-panel-bridge.js to preserve the old localized selection-banner behavior and wired app.js so the live showSelectionBanner binding now comes from the bridge after init. The legacy inline function block still exists in app.js as dead code due patch friction from file encoding, but runtime behavior now uses the bridge implementation."}],["entry_1778017043358_folpm0p",{"id":"entry_1778017043358_folpm0p","key":"studysphere-ai-panel-source-cleanup-step","namespace":"default","content":"Removed the old inline openAI/closeAI/forceCloseAI function bodies from frontend/js/app.js and finished cleaning the dangerous leftover selection-banner source block. app.js now relies on ai-panel-bridge.js for the live panel behavior, though a few descriptive bridge comments still remain in that section."}]]
+[
+  [
+    "entry_1777998202736_skvreys",
+    {
+      "id": "entry_1777998202736_skvreys",
+      "key": "studysphere-appjs-refactor",
+      "namespace": "default",
+      "content": "StudySphere app.js refactor in progress. Completed: moved boot-only initializers to main.js, extracted auth modal, study lounge, music services, course search, globals helpers, and removed inline onclick handlers from static UI and games-solitaire overlays. Next target: move more startup orchestration from app.js into main.js, especially onboarding/study lounge/music/study timer init block."
+    }
+  ],
+  [
+    "entry_1777999697358_54dmki",
+    {
+      "id": "entry_1777999697358_54dmki",
+      "key": "studysphere-mainjs-bootstrap-step-2",
+      "namespace": "default",
+      "content": "Moved app startup-only init calls out of frontend/js/app.js into frontend/js/main.js: admin panel, onboarding, study lounge, music services, and study timer now initialize from main.js. app.js keeps wrapper/global behavior but no longer owns those init calls."
+    }
+  ],
+  [
+    "entry_1778003775934_vcpiu",
+    {
+      "id": "entry_1778003775934_vcpiu",
+      "key": "studysphere-auth-bridge-step",
+      "namespace": "default",
+      "content": "Moved auth modal and user-data wrapper logic out of frontend/js/app.js into frontend/js/features/auth/auth-bridge.js. app.js now initializes a smaller auth bridge instead of carrying window auth globals, loadUserData/applyProfile wrappers, and auth-mode bridging inline."
+    }
+  ],
+  [
+    "entry_1778006200718_w3bbwd",
+    {
+      "id": "entry_1778006200718_w3bbwd",
+      "key": "studysphere-settings-bridge-step",
+      "namespace": "default",
+      "content": "Moved language/settings global wrapper setup out of frontend/js/app.js into frontend/js/features/settings/settings-bridge.js. app.js now imports the t binding it needs and initializes settings globals through initSettingsBridge() instead of carrying applyLanguage/applySettings wrapper functions inline."
+    }
+  ],
+  [
+    "entry_1778008315004_k208nw",
+    {
+      "id": "entry_1778008315004_k208nw",
+      "key": "studysphere-landing-auth-admin-bridge-step",
+      "namespace": "default",
+      "content": "Moved the small landing/auth/admin helper strip out of frontend/js/app.js into frontend/js/features/auth/landing-auth-bridge.js. app.js now initializes initLandingAuthBridge(authBridge) instead of defining _adminShowIfEligible, _showOnboarding, and landing auth globals inline."
+    }
+  ],
+  [
+    "entry_1778010034462_i8fai",
+    {
+      "id": "entry_1778010034462_i8fai",
+      "key": "studysphere-ai-render-bridge-step",
+      "namespace": "default",
+      "content": "Moved AI markdown and KaTeX render glue out of frontend/js/app.js into frontend/js/features/ai-chat/ai-render-bridge.js. app.js now initializes initAiRenderBridge() instead of carrying renderMarkdown, _renderMath, and KaTeX scheduling logic inline."
+    }
+  ],
+  [
+    "entry_1778010396978_v6n6uq",
+    {
+      "id": "entry_1778010396978_v6n6uq",
+      "key": "studysphere-ai-export-bridge-step",
+      "namespace": "default",
+      "content": "Moved the AI export/global window bridge out of frontend/js/app.js into frontend/js/features/ai-chat/ai-export-bridge.js. app.js now initializes initAiExportBridge() instead of wiring _aiMakePdfBlob, _aiDownloadPdf, _ufDestPicker, _glMoveDestPicker, _aiExportToCourse, _aiShowExportModal, _aiResponseActions, and export modal close behavior inline."
+    }
+  ],
+  [
+    "entry_1778011703581_8gkldn",
+    {
+      "id": "entry_1778011703581_8gkldn",
+      "key": "studysphere-ai-ask-bridge-step",
+      "namespace": "default",
+      "content": "Moved AI ask/send/stop-generation UI wiring out of frontend/js/app.js into frontend/js/features/ai-chat/ai-ask-bridge.js. app.js now initializes initAiAskBridge(_aiState) instead of wiring askAI, addTyping, pdfToImages, stopGeneration, and AI input/send listeners inline."
+    }
+  ],
+  [
+    "entry_1778012388963_6imr4j",
+    {
+      "id": "entry_1778012388963_6imr4j",
+      "key": "studysphere-ai-chips-confetti-bridge-step",
+      "namespace": "default",
+      "content": "Moved the remaining AI chips global wrappers and spawnConfetti helper out of frontend/js/app.js into ai-chips-bridge.js and ai-confetti-bridge.js. app.js now initializes those bridges instead of hosting the behavior inline."
+    }
+  ],
+  [
+    "entry_1778014688182_yzj06c",
+    {
+      "id": "entry_1778014688182_yzj06c",
+      "key": "studysphere-ai-panel-effects-step",
+      "namespace": "default",
+      "content": "Moved the AI message flash wrapper and AI panel ripple click effect out of frontend/js/app.js into frontend/js/features/ai-chat/ai-panel-effects.js. app.js now initializes initAiPanelEffects with aiMsgs and aiPanel instead of keeping those UI micro-effects inline."
+    }
+  ],
+  [
+    "entry_1778015689228_91svmb",
+    {
+      "id": "entry_1778015689228_91svmb",
+      "key": "studysphere-ai-panel-bridge-step",
+      "namespace": "default",
+      "content": "Moved AI panel lifecycle wiring into frontend/js/features/ai-chat/ai-panel-bridge.js. app.js now initializes the bridge, refreshes window.openAI/window.closeAI/window.forceCloseAI/window.pinAI to the bridged methods, and no longer binds the panel listeners inline. Also added pdf-parse to package.json to unblock Netlify bundling for documents-process.js."
+    }
+  ],
+  [
+    "entry_1778016119968_ucwpjn",
+    {
+      "id": "entry_1778016119968_ucwpjn",
+      "key": "studysphere-ai-selection-bridge-wire-step",
+      "namespace": "default",
+      "content": "Extended ai-panel-bridge.js to preserve the old localized selection-banner behavior and wired app.js so the live showSelectionBanner binding now comes from the bridge after init. The legacy inline function block still exists in app.js as dead code due patch friction from file encoding, but runtime behavior now uses the bridge implementation."
+    }
+  ],
+  [
+    "entry_1778017043358_folpm0p",
+    {
+      "id": "entry_1778017043358_folpm0p",
+      "key": "studysphere-ai-panel-source-cleanup-step",
+      "namespace": "default",
+      "content": "Removed the old inline openAI/closeAI/forceCloseAI function bodies from frontend/js/app.js and finished cleaning the dangerous leftover selection-banner source block. app.js now relies on ai-panel-bridge.js for the live panel behavior, though a few descriptive bridge comments still remain in that section."
+    }
+  ]
+]

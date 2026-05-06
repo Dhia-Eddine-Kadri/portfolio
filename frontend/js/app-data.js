@@ -54,7 +54,9 @@ function _loadUserCourses(data) {
         if (!c.files) c.files = [];
         // Preserve already-loaded files/userFolders from the old course object
         // so that opened courses don't lose their displayed files when SEMS is replaced.
-        var old = oldCourses.find(function (oc) { return oc.id === c.id; });
+        var old = oldCourses.find(function (oc) {
+          return oc.id === c.id;
+        });
         if (old) {
           if (old.files && old.files.length) c.files = old.files;
           if (old.userFolders) c.userFolders = old.userFolders;

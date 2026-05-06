@@ -114,7 +114,8 @@ function _ssApplyHistoryState(state) {
     if (course) {
       _showFilesView();
       if (typeof window.openCourse === 'function') window.openCourse(course);
-      if (state.section && typeof window.showCourseSection === 'function') window.showCourseSection(course, state.section);
+      if (state.section && typeof window.showCourseSection === 'function')
+        window.showCourseSection(course, state.section);
     }
     return;
   }
@@ -128,7 +129,8 @@ function _ssApplyHistoryState(state) {
         if (typeof window.openFile === 'function') window.openFile(file, fileCourse);
       } else {
         if (typeof window.openCourse === 'function') window.openCourse(fileCourse);
-        if (state.section && typeof window.showCourseSection === 'function') window.showCourseSection(fileCourse, state.section);
+        if (state.section && typeof window.showCourseSection === 'function')
+          window.showCourseSection(fileCourse, state.section);
       }
     }
   }
@@ -240,7 +242,12 @@ if (!window.location.hash || window.location.hash.indexOf('access_token') === -1
     _ssReplaceHistory({ view: 'studip' }, '#studip');
   } else if (_rst.inApp && _rst.fileName) {
     _ssReplaceHistory(
-      { view: 'file', courseId: _rst.courseId, fileName: _rst.fileName, section: _rst.section || 'files' },
+      {
+        view: 'file',
+        courseId: _rst.courseId,
+        fileName: _rst.fileName,
+        section: _rst.section || 'files'
+      },
       '#file=' + encodeURIComponent(_rst.fileName)
     );
   } else if (_rst.inApp && _rst.courseId) {

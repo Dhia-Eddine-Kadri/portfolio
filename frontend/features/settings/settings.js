@@ -34,7 +34,8 @@ async function saveSettings(patch) {
     });
   }
 
-  if (typeof window.applyLanguage === 'function') window.applyLanguage(window._lang || localStorage.getItem('ss_lang') || 'en');
+  if (typeof window.applyLanguage === 'function')
+    window.applyLanguage(window._lang || localStorage.getItem('ss_lang') || 'en');
 
   var dmToggle = document.getElementById('settingsDarkMode');
   if (dmToggle) {
@@ -124,7 +125,11 @@ async function saveSettings(patch) {
   var saveSettingsBtn = document.getElementById('saveSettingsBtn');
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', async function () {
-      var lang = (document.getElementById('settingsLanguage') || {}).value || window._lang || localStorage.getItem('ss_lang') || 'en';
+      var lang =
+        (document.getElementById('settingsLanguage') || {}).value ||
+        window._lang ||
+        localStorage.getItem('ss_lang') ||
+        'en';
       var autoOpen = !!(document.getElementById('settingsAutoOpen') || {}).checked;
       var saveChat = !!(document.getElementById('settingsSaveChat') || {}).checked;
       if (!saveChat) {

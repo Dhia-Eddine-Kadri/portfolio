@@ -26,22 +26,31 @@ function triggerProcessing(documentId, userId) {
   return new Promise(function (resolve) {
     try {
       const url = new URL(processUrl);
-      const req = https.request({
-        hostname: url.hostname,
-        path: url.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-          'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
+      const req = https.request(
+        {
+          hostname: url.hostname,
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
+          }
+        },
+        function () {
+          resolve();
         }
-      }, function () { resolve(); }); // resolve when response starts arriving
-      req.on('error', function () { resolve(); });
+      ); // resolve when response starts arriving
+      req.on('error', function () {
+        resolve();
+      });
       req.write(body);
       req.end();
       // Safety timeout — don't wait more than 5s for the trigger
       setTimeout(resolve, 5000);
-    } catch (e) { resolve(); }
+    } catch (e) {
+      resolve();
+    }
   });
 }
 
@@ -56,7 +65,11 @@ exports.handler = async function (event) {
   if (!user) return fail(401, 'Invalid or expired token');
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); } catch (e) { return fail(400, 'Invalid JSON'); }
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return fail(400, 'Invalid JSON');
+  }
 
   const { courseId, storageName, fileName, sourceType, folder } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
@@ -64,7 +77,12 @@ exports.handler = async function (event) {
   if (!fileName || typeof fileName !== 'string') return fail(400, 'fileName is required');
 
   function _sanitizeFolder(f) {
-    return String(f).replace(/[^\x20-\x7E]/g, '_').replace(/[^a-zA-Z0-9._\-() ]/g, '_').replace(/ +/g, '_').replace(/_+/g, '_').replace(/^_+|_+(?=\.[^.]+$)/g, '');
+    return String(f)
+      .replace(/[^\x20-\x7E]/g, '_')
+      .replace(/[^a-zA-Z0-9._\-() ]/g, '_')
+      .replace(/ +/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+(?=\.[^.]+$)/g, '');
   }
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
@@ -78,28 +96,48 @@ exports.handler = async function (event) {
 
   const existing = await supaRequest(
     'GET',
-    'documents?user_id=eq.' + user.id +
-    '&course_id=eq.' + encodeURIComponent(courseId) +
-    '&file_name=eq.' + encodeURIComponent(fileName) +
-    '&select=id,processing_status,storage_path&limit=1',
+    'documents?user_id=eq.' +
+      user.id +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&file_name=eq.' +
+      encodeURIComponent(fileName) +
+      '&select=id,processing_status,storage_path&limit=1',
     null,
     serviceKey
   );
   if (Array.isArray(existing.body) && existing.body[0]) {
     const doc = existing.body[0];
     if (doc.processing_status === 'ready' && doc.storage_path === docStoragePath) {
-      return jsonResponse(200, { alreadyIndexed: true, documentId: doc.id, processingStatus: 'ready' });
+      return jsonResponse(200, {
+        alreadyIndexed: true,
+        documentId: doc.id,
+        processingStatus: 'ready'
+      });
     }
     // Failed, stuck, or stale storage_path — reset and re-trigger
-    await supaRequest('PATCH', 'documents?id=eq.' + doc.id, {
-      processing_status: 'uploaded',
-      storage_path: docStoragePath
-    }, serviceKey);
+    await supaRequest(
+      'PATCH',
+      'documents?id=eq.' + doc.id,
+      {
+        processing_status: 'uploaded',
+        storage_path: docStoragePath
+      },
+      serviceKey
+    );
     // Clear any old chunks/pages from previous failed run
-    await supaRequest('DELETE', 'document_chunks?document_id=eq.' + doc.id, null, serviceKey).catch(function () {});
-    await supaRequest('DELETE', 'document_pages?document_id=eq.' + doc.id, null, serviceKey).catch(function () {});
+    await supaRequest('DELETE', 'document_chunks?document_id=eq.' + doc.id, null, serviceKey).catch(
+      function () {}
+    );
+    await supaRequest('DELETE', 'document_pages?document_id=eq.' + doc.id, null, serviceKey).catch(
+      function () {}
+    );
     await triggerProcessing(doc.id, user.id);
-    return jsonResponse(200, { alreadyIndexed: false, documentId: doc.id, processingStatus: 'uploaded' });
+    return jsonResponse(200, {
+      alreadyIndexed: false,
+      documentId: doc.id,
+      processingStatus: 'uploaded'
+    });
   }
 
   // Insert document row

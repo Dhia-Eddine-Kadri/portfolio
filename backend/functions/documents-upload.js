@@ -34,7 +34,9 @@ function uploadToStorage(serviceKey, storagePath, fileBuffer, mimeType) {
       },
       function (res) {
         let data = '';
-        res.on('data', function (c) { data += c; });
+        res.on('data', function (c) {
+          data += c;
+        });
         res.on('end', function () {
           if (res.statusCode === 200 || res.statusCode === 201) {
             resolve(storagePath);
@@ -63,21 +65,30 @@ function triggerProcessing(documentId, userId) {
   return new Promise(function (resolve) {
     try {
       const url = new URL(processUrl);
-      const req = https.request({
-        hostname: url.hostname,
-        path: url.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-          'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
+      const req = https.request(
+        {
+          hostname: url.hostname,
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
+          }
+        },
+        function () {
+          resolve();
         }
-      }, function () { resolve(); });
-      req.on('error', function () { resolve(); });
+      );
+      req.on('error', function () {
+        resolve();
+      });
       req.write(body);
       req.end();
       setTimeout(resolve, 5000);
-    } catch (e) { resolve(); }
+    } catch (e) {
+      resolve();
+    }
   });
 }
 

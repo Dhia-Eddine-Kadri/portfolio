@@ -3239,11 +3239,9 @@ function _solWinOverlay(moves, newGameFn) {
       return;
     }
     if (typeof newGameFn === 'string') {
-      var fn = newGameFn
-        .split('.')
-        .reduce(function (ctx, key) {
-          return ctx && ctx[key];
-        }, window);
+      var fn = newGameFn.split('.').reduce(function (ctx, key) {
+        return ctx && ctx[key];
+      }, window);
       if (typeof fn === 'function') fn();
     }
   });

@@ -1,7 +1,7 @@
 ---
 name: injection-analyst
 type: security
-color: "#9C27B0"
+color: '#9C27B0'
 description: Deep analysis specialist for prompt injection and jailbreak attempts with pattern learning
 capabilities:
   - injection_analysis
@@ -14,7 +14,7 @@ priority: high
 
 requires:
   packages:
-    - "@claude-flow/aidefence"
+    - '@claude-flow/aidefence'
 
 hooks:
   pre: |
@@ -31,14 +31,14 @@ You are the **Injection Analyst**, a specialized agent that performs deep analys
 
 ### Attack Technique Classification
 
-| Category | Techniques | Severity |
-|----------|------------|----------|
-| **Instruction Override** | "Ignore previous", "Forget all", "Disregard" | Critical |
-| **Role Switching** | "You are now", "Act as", "Pretend to be" | High |
-| **Jailbreak** | DAN, Developer mode, Bypass requests | Critical |
-| **Context Manipulation** | Fake system messages, Delimiter abuse | Critical |
-| **Encoding Attacks** | Base64, ROT13, Unicode tricks | Medium |
-| **Social Engineering** | Hypothetical framing, Research claims | Low-Medium |
+| Category                 | Techniques                                   | Severity   |
+| ------------------------ | -------------------------------------------- | ---------- |
+| **Instruction Override** | "Ignore previous", "Forget all", "Disregard" | Critical   |
+| **Role Switching**       | "You are now", "Act as", "Pretend to be"     | High       |
+| **Jailbreak**            | DAN, Developer mode, Bypass requests         | Critical   |
+| **Context Manipulation** | Fake system messages, Delimiter abuse        | Critical   |
+| **Encoding Attacks**     | Base64, ROT13, Unicode tricks                | Medium     |
+| **Social Engineering**   | Hypothetical framing, Research claims        | Low-Medium |
 
 ### Analysis Workflow
 
@@ -60,7 +60,7 @@ async function analyzeInjection(input: string) {
       sophistication: calculateSophistication(input, detection),
       evasionAttempts: detectEvasion(input),
       similarPatterns: await analyst.searchSimilarThreats(input, { k: 5 }),
-      recommendedMitigations: [],
+      recommendedMitigations: []
     };
 
     // Step 3: Get mitigation recommendations

@@ -64,7 +64,11 @@ export function openCourse(course) {
   } catch (e) {}
 
   // Mark loading only if there's nothing in cache to show yet
-  var hasCache = course.files.length > 0 || (course.userFolders || []).some(function (fd) { return fd.files && fd.files.length > 0; });
+  var hasCache =
+    course.files.length > 0 ||
+    (course.userFolders || []).some(function (fd) {
+      return fd.files && fd.files.length > 0;
+    });
   if (!hasCache) course._filesLoading = true;
 
   showCourseSection(course, 'files');
@@ -108,7 +112,9 @@ export function openCourse(course) {
         localStorage.setItem('ss_fc_' + course.id, _totalCount + '');
       } catch (e) {}
     })
-    .catch(function () { course._filesLoading = false; });
+    .catch(function () {
+      course._filesLoading = false;
+    });
 }
 
 export function showCourseSection(course, section) {

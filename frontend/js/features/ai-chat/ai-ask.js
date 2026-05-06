@@ -1,4 +1,9 @@
-import { sendAiRequest, sendRagRequest, courseHasRagDocs, submitRagFeedback } from '../../services/ai-service.js';
+import {
+  sendAiRequest,
+  sendRagRequest,
+  courseHasRagDocs,
+  submitRagFeedback
+} from '../../services/ai-service.js';
 import { extractPdfText } from '../pdf-viewer/pdf-text-extraction.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
 
@@ -173,25 +178,41 @@ export function initAskAI(state) {
             var answer = data.answer || 'No answer found.';
 
             // Confidence badge
-            var confEmoji = data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';
+            var confEmoji =
+              data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';
             var confLabel = confEmoji + ' Confidence: ' + (data.confidence || 'unknown');
 
             // Only warn when the AI had zero course context and fell back to general knowledge
             if (data.unsupported && (!data.sources || !data.sources.length)) {
-              answer = '⚠️ *No matching course materials found — answering from general knowledge.*\n\n' + answer;
+              answer =
+                '⚠️ *No matching course materials found — answering from general knowledge.*\n\n' +
+                answer;
             }
 
             // Sources block
             if (data.sources && data.sources.length) {
-              answer += '\n\n**Sources:**\n' + data.sources.map(function (s) {
-                return '- ' + s.file_name + (s.pages ? ', p.' + s.pages : '') + (s.quote ? ' — *"' + s.quote.slice(0, 80) + '…"*' : '');
-              }).join('\n');
+              answer +=
+                '\n\n**Sources:**\n' +
+                data.sources
+                  .map(function (s) {
+                    return (
+                      '- ' +
+                      s.file_name +
+                      (s.pages ? ', p.' + s.pages : '') +
+                      (s.quote ? ' — *"' + s.quote.slice(0, 80) + '…"*' : '')
+                    );
+                  })
+                  .join('\n');
             }
 
             answer += '\n\n' + confLabel + (data.cached ? ' · ⚡ cached' : '');
 
             // Attach feedback metadata to window for the feedback buttons
-            window._lastRagMeta = { courseId: _courseId, question: question, answerCacheId: data.id || null };
+            window._lastRagMeta = {
+              courseId: _courseId,
+              question: question,
+              answerCacheId: data.id || null
+            };
 
             return { content: [{ text: answer }], _ragData: data };
           });
@@ -222,7 +243,13 @@ export function initAskAI(state) {
           thinkWrap.remove();
         }, 320);
 
-        var _ragMeta = data._ragData ? { courseId: window.activeCourseId || '', question: question, answerCacheId: data._ragData.id || null } : null;
+        var _ragMeta = data._ragData
+          ? {
+              courseId: window.activeCourseId || '',
+              question: question,
+              answerCacheId: data._ragData.id || null
+            }
+          : null;
 
         var rawText = data.error
           ? '❌ Error: ' + (data.error.message || JSON.stringify(data.error))
@@ -337,15 +364,27 @@ function _buildRagFeedbackBar(meta) {
     '<button class="rag-fb-btn rag-fb-cite" title="Missing citation">📄</button>';
 
   function _send(rating) {
-    bar.querySelectorAll('.rag-fb-btn').forEach(function (b) { b.disabled = true; });
+    bar.querySelectorAll('.rag-fb-btn').forEach(function (b) {
+      b.disabled = true;
+    });
     bar.querySelector('.rag-fb-label').textContent = 'Thanks for your feedback!';
-    submitRagFeedback(meta.courseId, meta.question, rating, meta.answerCacheId).catch(function () {});
+    submitRagFeedback(meta.courseId, meta.question, rating, meta.answerCacheId).catch(
+      function () {}
+    );
   }
 
-  bar.querySelector('.rag-fb-yes').addEventListener('click', function () { _send('helpful'); });
-  bar.querySelector('.rag-fb-no').addEventListener('click', function () { _send('not_helpful'); });
-  bar.querySelector('.rag-fb-wrong').addEventListener('click', function () { _send('wrong_answer'); });
-  bar.querySelector('.rag-fb-cite').addEventListener('click', function () { _send('missing_citation'); });
+  bar.querySelector('.rag-fb-yes').addEventListener('click', function () {
+    _send('helpful');
+  });
+  bar.querySelector('.rag-fb-no').addEventListener('click', function () {
+    _send('not_helpful');
+  });
+  bar.querySelector('.rag-fb-wrong').addEventListener('click', function () {
+    _send('wrong_answer');
+  });
+  bar.querySelector('.rag-fb-cite').addEventListener('click', function () {
+    _send('missing_citation');
+  });
 
   return bar;
 }

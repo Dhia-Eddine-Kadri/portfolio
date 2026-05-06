@@ -1,6 +1,6 @@
 ---
-name: "V3 Performance Optimization"
-description: "Achieve aggressive v3 performance targets: 2.49x-7.47x Flash Attention speedup, 150x-12,500x search improvements, 50-75% memory reduction. Comprehensive benchmarking and optimization suite."
+name: 'V3 Performance Optimization'
+description: 'Achieve aggressive v3 performance targets: 2.49x-7.47x Flash Attention speedup, 150x-12,500x search improvements, 50-75% memory reduction. Comprehensive benchmarking and optimization suite.'
 ---
 
 # V3 Performance Optimization
@@ -24,6 +24,7 @@ Task("Memory optimization", "Achieve 50-75% memory reduction", "v3-performance-e
 ## Performance Target Matrix
 
 ### Flash Attention Revolution
+
 ```
 ┌─────────────────────────────────────────┐
 │           FLASH ATTENTION               │
@@ -36,6 +37,7 @@ Task("Memory optimization", "Achieve 50-75% memory reduction", "v3-performance-e
 ```
 
 ### Search Performance Revolution
+
 ```
 ┌─────────────────────────────────────────┐
 │            SEARCH OPTIMIZATION         │
@@ -50,6 +52,7 @@ Task("Memory optimization", "Achieve 50-75% memory reduction", "v3-performance-e
 ## Comprehensive Benchmark Suite
 
 ### Startup Performance
+
 ```typescript
 class StartupBenchmarks {
   async benchmarkColdStart(): Promise<BenchmarkResult> {
@@ -71,20 +74,17 @@ class StartupBenchmarks {
 ```
 
 ### Memory Operation Benchmarks
+
 ```typescript
 class MemoryBenchmarks {
   async benchmarkVectorSearch(): Promise<SearchBenchmark> {
     const queries = this.generateTestQueries(10000);
 
     // Baseline: Current linear search
-    const baselineTime = await this.timeOperation(() =>
-      this.currentMemory.searchAll(queries)
-    );
+    const baselineTime = await this.timeOperation(() => this.currentMemory.searchAll(queries));
 
     // Target: HNSW search
-    const hnswTime = await this.timeOperation(() =>
-      this.agentDBMemory.hnswSearchAll(queries)
-    );
+    const hnswTime = await this.timeOperation(() => this.agentDBMemory.hnswSearchAll(queries));
 
     const improvement = baselineTime / hnswTime;
 
@@ -121,25 +121,20 @@ class MemoryBenchmarks {
 ```
 
 ### Swarm Coordination Benchmarks
+
 ```typescript
 class SwarmBenchmarks {
   async benchmark15AgentCoordination(): Promise<SwarmBenchmark> {
     const agents = await this.spawn15Agents();
 
     // Coordination latency
-    const coordinationTime = await this.timeOperation(() =>
-      this.coordinateSwarmTask(agents)
-    );
+    const coordinationTime = await this.timeOperation(() => this.coordinateSwarmTask(agents));
 
     // Task decomposition
-    const decompositionTime = await this.timeOperation(() =>
-      this.decomposeComplexTask()
-    );
+    const decompositionTime = await this.timeOperation(() => this.decomposeComplexTask());
 
     // Consensus achievement
-    const consensusTime = await this.timeOperation(() =>
-      this.achieveSwarmConsensus(agents)
-    );
+    const consensusTime = await this.timeOperation(() => this.achieveSwarmConsensus(agents));
 
     return {
       coordination: coordinationTime,
@@ -153,6 +148,7 @@ class SwarmBenchmarks {
 ```
 
 ### Flash Attention Benchmarks
+
 ```typescript
 class AttentionBenchmarks {
   async benchmarkFlashAttention(): Promise<AttentionBenchmark> {
@@ -185,6 +181,7 @@ class AttentionBenchmarks {
 ```
 
 ### SONA Learning Benchmarks
+
 ```typescript
 class SONABenchmarks {
   async benchmarkAdaptationTime(): Promise<SONABenchmark> {
@@ -215,7 +212,7 @@ class SONABenchmarks {
     return {
       scenarios: results,
       averageTime: results.reduce((sum, r) => sum + r.adaptationTime, 0) / results.length,
-      successRate: results.filter(r => r.achieved).length / results.length
+      successRate: results.filter((r) => r.achieved).length / results.length
     };
   }
 }
@@ -224,6 +221,7 @@ class SONABenchmarks {
 ## Performance Monitoring Dashboard
 
 ### Real-time Metrics
+
 ```typescript
 class PerformanceMonitor {
   async collectMetrics(): Promise<PerformanceSnapshot> {
@@ -253,6 +251,7 @@ class PerformanceMonitor {
 ```
 
 ### Continuous Regression Detection
+
 ```typescript
 class PerformanceRegression {
   async detectRegressions(): Promise<RegressionReport> {
@@ -265,7 +264,8 @@ class PerformanceRegression {
       const baselineValue = baseline[metric];
       const change = (currentValue - baselineValue) / baselineValue;
 
-      if (change < -0.05) { // 5% regression threshold
+      if (change < -0.05) {
+        // 5% regression threshold
         regressions.push({
           metric,
           baseline: baselineValue,
@@ -288,6 +288,7 @@ class PerformanceRegression {
 ## Optimization Strategies
 
 ### Memory Optimization
+
 ```typescript
 class MemoryOptimization {
   async optimizeMemoryUsage(): Promise<OptimizationResult> {
@@ -309,6 +310,7 @@ class MemoryOptimization {
 ```
 
 ### CPU Optimization
+
 ```typescript
 class CPUOptimization {
   async optimizeCPUUsage(): Promise<OptimizationResult> {
@@ -329,19 +331,20 @@ class CPUOptimization {
 ## Target Validation Framework
 
 ### Performance Gates
+
 ```typescript
 class PerformanceGates {
   async validateAllTargets(): Promise<ValidationReport> {
     const results = await Promise.all([
-      this.validateFlashAttention(),     // 2.49x-7.47x
-      this.validateSearchPerformance(),  // 150x-12,500x
-      this.validateMemoryReduction(),    // 50-75%
-      this.validateStartupTime(),        // <500ms
-      this.validateSONAAdaptation()      // <0.05ms
+      this.validateFlashAttention(), // 2.49x-7.47x
+      this.validateSearchPerformance(), // 150x-12,500x
+      this.validateMemoryReduction(), // 50-75%
+      this.validateStartupTime(), // <500ms
+      this.validateSONAAdaptation() // <0.05ms
     ]);
 
     return {
-      allTargetsAchieved: results.every(r => r.achieved),
+      allTargetsAchieved: results.every((r) => r.achieved),
       results,
       overallScore: this.calculateOverallScore(results),
       recommendations: this.generateRecommendations(results)
@@ -353,6 +356,7 @@ class PerformanceGates {
 ## Success Metrics
 
 ### Primary Targets
+
 - [ ] **Flash Attention**: 2.49x-7.47x speedup validated
 - [ ] **Search Performance**: 150x-12,500x improvement confirmed
 - [ ] **Memory Reduction**: 50-75% usage optimization achieved
@@ -361,6 +365,7 @@ class PerformanceGates {
 - [ ] **15-Agent Coordination**: Efficient parallel execution
 
 ### Continuous Monitoring
+
 - [ ] **Performance Dashboard**: Real-time metrics collection
 - [ ] **Regression Testing**: Automated performance validation
 - [ ] **Trend Analysis**: Performance evolution tracking
@@ -376,6 +381,7 @@ class PerformanceGates {
 ## Usage Examples
 
 ### Complete Performance Validation
+
 ```bash
 # Full performance suite
 npm run benchmark:v3

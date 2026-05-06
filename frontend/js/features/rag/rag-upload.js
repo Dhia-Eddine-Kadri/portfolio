@@ -2,7 +2,11 @@
 // Injects an "AI Knowledge Base" section into the course view, letting students
 // upload PDFs that get indexed for RAG-powered answers.
 
-import { uploadCourseDocument, listCourseDocuments, deleteRagDocument } from '../../services/ai-service.js';
+import {
+  uploadCourseDocument,
+  listCourseDocuments,
+  deleteRagDocument
+} from '../../services/ai-service.js';
 
 var STATUS_LABELS = {
   uploaded: 'Uploaded',
@@ -42,7 +46,9 @@ async function refreshPanel(courseId) {
   if (!courseId) return;
 
   var docs = [];
-  try { docs = await listCourseDocuments(courseId); } catch (e) {}
+  try {
+    docs = await listCourseDocuments(courseId);
+  } catch (e) {}
 
   container.innerHTML = _renderPanel(courseId, docs);
   _bindPanel(container, courseId);
@@ -52,7 +58,9 @@ async function refreshPanel(courseId) {
     return d.processing_status !== 'ready' && d.processing_status !== 'failed';
   });
   if (pending.length) {
-    setTimeout(function () { refreshPanel(courseId); }, 4000);
+    setTimeout(function () {
+      refreshPanel(courseId);
+    }, 4000);
   }
 }
 
@@ -62,21 +70,35 @@ function _renderPanel(courseId, docs) {
   }).join('');
 
   var docRows = docs.length
-    ? docs.map(function (d) {
-        var status = STATUS_LABELS[d.processing_status] || d.processing_status;
-        var isReady = d.processing_status === 'ready';
-        var isFailed = d.processing_status === 'failed';
-        var dot = isReady ? 'rag-dot-ready' : isFailed ? 'rag-dot-failed' : 'rag-dot-pending';
-        return (
-          '<div class="rag-doc-row" data-doc-id="' + _esc(d.id) + '">' +
-          '<span class="rag-dot ' + dot + '"></span>' +
-          '<span class="rag-doc-name">' + _esc(d.file_name) + '</span>' +
-          '<span class="rag-doc-type">' + _esc(d.source_type) + '</span>' +
-          '<span class="rag-doc-status">' + status + '</span>' +
-          '<button class="rag-doc-delete" title="Delete document" data-doc-id="' + _esc(d.id) + '">✕</button>' +
-          '</div>'
-        );
-      }).join('')
+    ? docs
+        .map(function (d) {
+          var status = STATUS_LABELS[d.processing_status] || d.processing_status;
+          var isReady = d.processing_status === 'ready';
+          var isFailed = d.processing_status === 'failed';
+          var dot = isReady ? 'rag-dot-ready' : isFailed ? 'rag-dot-failed' : 'rag-dot-pending';
+          return (
+            '<div class="rag-doc-row" data-doc-id="' +
+            _esc(d.id) +
+            '">' +
+            '<span class="rag-dot ' +
+            dot +
+            '"></span>' +
+            '<span class="rag-doc-name">' +
+            _esc(d.file_name) +
+            '</span>' +
+            '<span class="rag-doc-type">' +
+            _esc(d.source_type) +
+            '</span>' +
+            '<span class="rag-doc-status">' +
+            status +
+            '</span>' +
+            '<button class="rag-doc-delete" title="Delete document" data-doc-id="' +
+            _esc(d.id) +
+            '">✕</button>' +
+            '</div>'
+          );
+        })
+        .join('')
     : '<div class="rag-empty">No documents indexed yet. Upload a PDF to get started.</div>';
 
   return (
@@ -87,14 +109,18 @@ function _renderPanel(courseId, docs) {
     '<span class="rag-subtitle">Upload lecture files so the AI can answer from your course material</span>' +
     '</div>' +
     '<div class="rag-upload-row">' +
-    '<select class="rag-source-select" id="ragSourceType">' + sourceOpts + '</select>' +
+    '<select class="rag-source-select" id="ragSourceType">' +
+    sourceOpts +
+    '</select>' +
     '<label class="rag-upload-btn" for="ragFileInput">+ Add PDF</label>' +
     '<input type="file" id="ragFileInput" accept=".pdf,application/pdf" style="display:none" multiple>' +
     '</div>' +
     '<div id="ragUploadProgress" style="display:none" class="rag-progress">' +
     '<span id="ragProgressText">Uploading…</span>' +
     '</div>' +
-    '<div class="rag-doc-list">' + docRows + '</div>' +
+    '<div class="rag-doc-list">' +
+    docRows +
+    '</div>' +
     '</div>'
   );
 }
@@ -132,7 +158,8 @@ function _bindPanel(container, courseId) {
     progressEl.style.display = 'block';
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
-      progressText.textContent = 'Uploading ' + file.name + '… (' + (i + 1) + '/' + files.length + ')';
+      progressText.textContent =
+        'Uploading ' + file.name + '… (' + (i + 1) + '/' + files.length + ')';
       try {
         await uploadCourseDocument(file, courseId, sourceType);
       } catch (e) {
@@ -146,7 +173,14 @@ function _bindPanel(container, courseId) {
   });
 }
 
-function _wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function _wait(ms) {
+  return new Promise(function (r) {
+    setTimeout(r, ms);
+  });
+}
 function _esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }

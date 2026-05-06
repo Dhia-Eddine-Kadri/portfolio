@@ -12,7 +12,7 @@ const AGENT_CAPABILITIES = {
   architect: ['system-design', 'architecture', 'patterns', 'scalability'],
   'backend-dev': ['api', 'database', 'server', 'authentication'],
   'frontend-dev': ['ui', 'react', 'css', 'components'],
-  devops: ['ci-cd', 'docker', 'deployment', 'infrastructure'],
+  devops: ['ci-cd', 'docker', 'deployment', 'infrastructure']
 };
 
 const TASK_PATTERNS = {
@@ -26,7 +26,7 @@ const TASK_PATTERNS = {
   // Domain patterns
   'api|endpoint|server|backend|database': 'backend-dev',
   'ui|frontend|component|react|css|style': 'frontend-dev',
-  'deploy|docker|ci|cd|pipeline|infrastructure': 'devops',
+  'deploy|docker|ci|cd|pipeline|infrastructure': 'devops'
 };
 
 function routeTask(task) {
@@ -39,7 +39,7 @@ function routeTask(task) {
       return {
         agent,
         confidence: 0.8,
-        reason: `Matched pattern: ${pattern}`,
+        reason: `Matched pattern: ${pattern}`
       };
     }
   }
@@ -48,7 +48,7 @@ function routeTask(task) {
   return {
     agent: 'coder',
     confidence: 0.5,
-    reason: 'Default routing - no specific pattern matched',
+    reason: 'Default routing - no specific pattern matched'
   };
 }
 

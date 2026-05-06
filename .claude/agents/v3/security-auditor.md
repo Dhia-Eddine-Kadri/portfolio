@@ -1,7 +1,7 @@
 ---
 name: security-auditor
 type: security
-color: "#DC2626"
+color: '#DC2626'
 description: Advanced security auditor with self-learning vulnerability detection, CVE database search, and compliance auditing
 capabilities:
   - vulnerability_scanning
@@ -11,10 +11,10 @@ capabilities:
   - compliance_auditing
   - threat_modeling
   # V3 Enhanced Capabilities
-  - reasoningbank_learning    # Pattern learning from past audits
-  - hnsw_cve_search          # 150x-12,500x faster CVE lookup
-  - flash_attention_scan     # 2.49x-7.47x faster code scanning
-  - owasp_detection          # OWASP Top 10 vulnerability detection
+  - reasoningbank_learning # Pattern learning from past audits
+  - hnsw_cve_search # 150x-12,500x faster CVE lookup
+  - flash_attention_scan # 2.49x-7.47x faster code scanning
+  - owasp_detection # OWASP Top 10 vulnerability detection
 priority: critical
 hooks:
   pre: |
@@ -121,7 +121,7 @@ const similarVulns = await reasoningBank.searchPatterns({
 
 if (similarVulns.length > 0) {
   console.log('Learning from past successful detections:');
-  similarVulns.forEach(pattern => {
+  similarVulns.forEach((pattern) => {
     console.log(`- ${pattern.task}: ${pattern.reward} accuracy`);
     console.log(`  Detection method: ${pattern.critique}`);
   });
@@ -137,7 +137,7 @@ const missedVulns = await reasoningBank.searchPatterns({
 
 if (missedVulns.length > 0) {
   console.log('Avoiding past detection failures:');
-  missedVulns.forEach(pattern => {
+  missedVulns.forEach((pattern) => {
     console.log(`- Missed: ${pattern.critique}`);
   });
 }
@@ -153,7 +153,7 @@ const cveMatches = await agentDB.hnswSearch({
   query: 'buffer overflow in image processing library',
   index: 'cve_database',
   k: 20,
-  efSearch: 200  // Higher ef for better recall
+  efSearch: 200 // Higher ef for better recall
 });
 
 console.log(`Found ${cveMatches.length} related CVEs in ${cveMatches.executionTimeMs}ms`);
@@ -175,9 +175,9 @@ Scan large codebases efficiently:
 // Process large codebases with Flash Attention (2.49x-7.47x speedup)
 if (codebaseSize > 5000) {
   const scanResult = await agentDB.flashAttention(
-    securityPatternEmbeddings,  // Query: security vulnerability patterns
-    codeEmbeddings,              // Keys: code file embeddings
-    codeEmbeddings               // Values: code content
+    securityPatternEmbeddings, // Query: security vulnerability patterns
+    codeEmbeddings, // Keys: code file embeddings
+    codeEmbeddings // Values: code content
   );
 
   console.log(`Scanned ${codebaseSize} files in ${scanResult.executionTimeMs}ms`);
@@ -298,11 +298,7 @@ const misconfigPatterns = {
 const vulnerableComponentsCheck = {
   name: 'Vulnerable Components',
   severity: 'HIGH',
-  checks: [
-    'npm audit --json',
-    'snyk test --json',
-    'retire --outputformat json'
-  ],
+  checks: ['npm audit --json', 'snyk test --json', 'retire --outputformat json'],
   knownVulnerablePackages: [
     { name: 'lodash', versions: '<4.17.21', cve: 'CVE-2021-23337' },
     { name: 'axios', versions: '<0.21.1', cve: 'CVE-2020-28168' },
@@ -393,16 +389,16 @@ const secretPatterns = {
   // API Keys
   apiKeys: [
     /(?:api[_-]?key|apikey)\s*[:=]\s*['"][a-zA-Z0-9]{20,}['"]/gi,
-    /(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}/g,  // AWS Access Key
-    /sk-[a-zA-Z0-9]{48}/g,                     // OpenAI API Key
-    /ghp_[a-zA-Z0-9]{36}/g,                    // GitHub Personal Access Token
-    /glpat-[a-zA-Z0-9\-_]{20,}/g,              // GitLab Personal Access Token
+    /(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}/g, // AWS Access Key
+    /sk-[a-zA-Z0-9]{48}/g, // OpenAI API Key
+    /ghp_[a-zA-Z0-9]{36}/g, // GitHub Personal Access Token
+    /glpat-[a-zA-Z0-9\-_]{20,}/g // GitLab Personal Access Token
   ],
 
   // Private Keys
   privateKeys: [
     /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
-    /-----BEGIN PGP PRIVATE KEY BLOCK-----/g,
+    /-----BEGIN PGP PRIVATE KEY BLOCK-----/g
   ],
 
   // Database Credentials
@@ -410,20 +406,20 @@ const secretPatterns = {
     /mongodb(?:\+srv)?:\/\/[^:]+:[^@]+@/gi,
     /postgres(?:ql)?:\/\/[^:]+:[^@]+@/gi,
     /mysql:\/\/[^:]+:[^@]+@/gi,
-    /redis:\/\/:[^@]+@/gi,
+    /redis:\/\/:[^@]+@/gi
   ],
 
   // Cloud Provider Secrets
   cloud: [
     /AZURE_[A-Z_]+\s*[:=]\s*['"][^'"]{20,}['"]/gi,
     /GOOGLE_[A-Z_]+\s*[:=]\s*['"][^'"]{20,}['"]/gi,
-    /HEROKU_[A-Z_]+\s*[:=]\s*['"][^'"]{20,}['"]/gi,
+    /HEROKU_[A-Z_]+\s*[:=]\s*['"][^'"]{20,}['"]/gi
   ],
 
   // JWT and Tokens
   tokens: [
-    /eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g,  // JWT
-    /Bearer\s+[a-zA-Z0-9\-._~+\/]+=*/gi,
+    /eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g, // JWT
+    /Bearer\s+[a-zA-Z0-9\-._~+\/]+=*/gi
   ]
 };
 ```
@@ -536,20 +532,14 @@ const gdprPatterns = {
 
     // Article 20 - Data Portability
     dataPortability: {
-      patterns: [
-        /(?:export|download).*(?:data|personal)/gi,
-        /(?:portable|portability)/gi
-      ],
+      patterns: [/(?:export|download).*(?:data|personal)/gi, /(?:portable|portability)/gi],
       required: true,
       description: 'Users must be able to export their data'
     },
 
     // Article 7 - Consent
     consent: {
-      patterns: [
-        /(?:consent|agree|accept).*(?:privacy|terms|policy)/gi,
-        /(?:opt-in|opt-out)/gi
-      ],
+      patterns: [/(?:consent|agree|accept).*(?:privacy|terms|policy)/gi, /(?:opt-in|opt-out)/gi],
       required: true,
       description: 'Valid consent must be obtained for data processing'
     }
@@ -575,18 +565,14 @@ const hipaaPatterns = {
 
     // Access Audit Trail
     auditTrail: {
-      patterns: [
-        /(?:audit|track).*(?:access|view|modify).*(?:phi|patient|health)/gi
-      ],
+      patterns: [/(?:audit|track).*(?:access|view|modify).*(?:phi|patient|health)/gi],
       required: true,
       description: 'Access to PHI must be logged'
     },
 
     // Minimum Necessary
     minimumNecessary: {
-      patterns: [
-        /(?:select|query).*(?:phi|patient)(?!.*\*)/gi
-      ],
+      patterns: [/(?:select|query).*(?:phi|patient)(?!.*\*)/gi],
       required: true,
       description: 'Only minimum necessary PHI should be accessed'
     }
@@ -649,8 +635,8 @@ async function generateSecurityReport(scanResults: ScanResult[]): Promise<Securi
 ```typescript
 // After each audit, learn from results
 async function learnFromAudit(auditResults: AuditResult[]): Promise<void> {
-  const verifiedVulns = auditResults.filter(r => r.verified);
-  const falsePositives = auditResults.filter(r => r.falsePositive);
+  const verifiedVulns = auditResults.filter((r) => r.verified);
+  const falsePositives = auditResults.filter((r) => r.falsePositive);
 
   // Store successful detections
   for (const vuln of verifiedVulns) {
@@ -735,7 +721,7 @@ await mcp__claude_flow__memory_usage({
     timestamp: new Date().toISOString()
   }),
   namespace: 'security_audits',
-  ttl: 2592000000  // 30 days
+  ttl: 2592000000 // 30 days
 });
 
 // Search for related past vulnerabilities

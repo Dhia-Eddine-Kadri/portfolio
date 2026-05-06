@@ -5,15 +5,33 @@ export function initAiPanelBridge(options) {
   var aiTab = options.aiTab || document.getElementById('aiTab');
   var aiClose = options.aiClose || document.getElementById('aiClose');
   var aiMsgs = options.aiMsgs || document.getElementById('aiMsgs');
-  var getAiPinned = options.getAiPinned || function () { return false; };
+  var getAiPinned =
+    options.getAiPinned ||
+    function () {
+      return false;
+    };
   var setAiPinned = options.setAiPinned || function () {};
-  var getAiOpen = options.getAiOpen || function () { return false; };
+  var getAiOpen =
+    options.getAiOpen ||
+    function () {
+      return false;
+    };
   var setAiOpen = options.setAiOpen || function () {};
-  var t = options.t || function (key) { return key; };
-  var escapeHtml = options.escapeHtml || function (value) { return String(value || ''); };
-  var askAI = options.askAI || function (prompt) {
-    if (typeof window.askAI === 'function') return window.askAI(prompt);
-  };
+  var t =
+    options.t ||
+    function (key) {
+      return key;
+    };
+  var escapeHtml =
+    options.escapeHtml ||
+    function (value) {
+      return String(value || '');
+    };
+  var askAI =
+    options.askAI ||
+    function (prompt) {
+      if (typeof window.askAI === 'function') return window.askAI(prompt);
+    };
 
   var _aiManualClosed = false;
 

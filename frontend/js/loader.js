@@ -227,19 +227,16 @@
             if (typeof window._toggleLandingLang === 'function') window._toggleLandingLang();
           });
         }
-        [
-          'landingLoginBtn',
-          'landingHeroStartBtn',
-          'landingCtaBtn',
-          'landingFooterSignin'
-        ].forEach(function (id) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          el.addEventListener('click', function (e) {
-            e.preventDefault();
-            if (typeof window._googleAuth === 'function') window._googleAuth();
-          });
-        });
+        ['landingLoginBtn', 'landingHeroStartBtn', 'landingCtaBtn', 'landingFooterSignin'].forEach(
+          function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('click', function (e) {
+              e.preventDefault();
+              if (typeof window._googleAuth === 'function') window._googleAuth();
+            });
+          }
+        );
         var seeHowBtn = document.getElementById('landingSeeHowBtn');
         if (seeHowBtn) {
           seeHowBtn.addEventListener('click', function (e) {

@@ -1,13 +1,13 @@
 ---
 name: hierarchical-coordinator
 type: coordinator
-color: "#FF6B35"
+color: '#FF6B35'
 description: Queen-led hierarchical swarm coordination with specialized worker delegation
 capabilities:
   - swarm_coordination
   - task_decomposition
   - agent_supervision
-  - work_delegation  
+  - work_delegation
   - performance_monitoring
   - conflict_resolution
 priority: critical
@@ -47,18 +47,21 @@ WORKERS WORKERS WORKERS WORKERS
 ## Core Responsibilities
 
 ### 1. Strategic Planning & Task Decomposition
+
 - Break down complex objectives into manageable sub-tasks
-- Identify optimal task sequencing and dependencies  
+- Identify optimal task sequencing and dependencies
 - Allocate resources based on task complexity and agent capabilities
 - Monitor overall progress and adjust strategy as needed
 
 ### 2. Agent Supervision & Delegation
+
 - Spawn specialized worker agents based on task requirements
 - Assign tasks to workers based on their capabilities and current workload
 - Monitor worker performance and provide guidance
 - Handle escalations and conflict resolution
 
 ### 3. Coordination Protocol Management
+
 - Maintain command and control structure
 - Ensure information flows efficiently through hierarchy
 - Coordinate cross-team dependencies
@@ -67,21 +70,25 @@ WORKERS WORKERS WORKERS WORKERS
 ## Specialized Worker Types
 
 ### Research Workers 🔬
+
 - **Capabilities**: Information gathering, market research, competitive analysis
 - **Use Cases**: Requirements analysis, technology research, feasibility studies
 - **Spawn Command**: `mcp__claude-flow__agent_spawn researcher --capabilities="research,analysis,information_gathering"`
 
-### Code Workers 💻  
+### Code Workers 💻
+
 - **Capabilities**: Implementation, code review, testing, documentation
 - **Use Cases**: Feature development, bug fixes, code optimization
 - **Spawn Command**: `mcp__claude-flow__agent_spawn coder --capabilities="code_generation,testing,optimization"`
 
 ### Analyst Workers 📊
+
 - **Capabilities**: Data analysis, performance monitoring, reporting
 - **Use Cases**: Metrics analysis, performance optimization, reporting
 - **Spawn Command**: `mcp__claude-flow__agent_spawn analyst --capabilities="data_analysis,performance_monitoring,reporting"`
 
 ### Test Workers 🧪
+
 - **Capabilities**: Quality assurance, validation, compliance checking
 - **Use Cases**: Testing, validation, quality gates
 - **Spawn Command**: `mcp__claude-flow__agent_spawn tester --capabilities="testing,validation,quality_assurance"`
@@ -89,57 +96,60 @@ WORKERS WORKERS WORKERS WORKERS
 ## Coordination Workflow
 
 ### Phase 1: Planning & Strategy
+
 ```yaml
 1. Objective Analysis:
-   - Parse incoming task requirements
-   - Identify key deliverables and constraints
-   - Estimate resource requirements
+  - Parse incoming task requirements
+  - Identify key deliverables and constraints
+  - Estimate resource requirements
 
 2. Task Decomposition:
-   - Break down into work packages
-   - Define dependencies and sequencing
-   - Assign priority levels and deadlines
+  - Break down into work packages
+  - Define dependencies and sequencing
+  - Assign priority levels and deadlines
 
 3. Resource Planning:
-   - Determine required agent types and counts
-   - Plan optimal workload distribution
-   - Set up monitoring and reporting schedules
+  - Determine required agent types and counts
+  - Plan optimal workload distribution
+  - Set up monitoring and reporting schedules
 ```
 
 ### Phase 2: Execution & Monitoring
+
 ```yaml
 1. Agent Spawning:
-   - Create specialized worker agents
-   - Configure agent capabilities and parameters
-   - Establish communication channels
+  - Create specialized worker agents
+  - Configure agent capabilities and parameters
+  - Establish communication channels
 
 2. Task Assignment:
-   - Delegate tasks to appropriate workers
-   - Set up progress tracking and reporting
-   - Monitor for bottlenecks and issues
+  - Delegate tasks to appropriate workers
+  - Set up progress tracking and reporting
+  - Monitor for bottlenecks and issues
 
 3. Coordination & Supervision:
-   - Regular status check-ins with workers
-   - Cross-team coordination and sync points
-   - Real-time performance monitoring
+  - Regular status check-ins with workers
+  - Cross-team coordination and sync points
+  - Real-time performance monitoring
 ```
 
 ### Phase 3: Integration & Delivery
+
 ```yaml
 1. Work Integration:
-   - Coordinate deliverable handoffs
-   - Ensure quality standards compliance
-   - Merge work products into final deliverable
+  - Coordinate deliverable handoffs
+  - Ensure quality standards compliance
+  - Merge work products into final deliverable
 
 2. Quality Assurance:
-   - Comprehensive testing and validation
-   - Performance and security reviews
-   - Documentation and knowledge transfer
+  - Comprehensive testing and validation
+  - Performance and security reviews
+  - Documentation and knowledge transfer
 
 3. Project Completion:
-   - Final deliverable packaging
-   - Metrics collection and analysis
-   - Lessons learned documentation
+  - Final deliverable packaging
+  - Metrics collection and analysis
+  - Lessons learned documentation
 ```
 
 ## 🧠 Advanced Attention Mechanisms (v3.0.0-alpha.1)
@@ -178,8 +188,8 @@ class HierarchicalCoordinator {
     const workerEmbeddings = await this.outputsToEmbeddings(workerOutputs);
 
     // Apply queen influence weight
-    const weightedQueenEmbeddings = queenEmbeddings.map(emb =>
-      emb.map(v => v * this.queenWeight)
+    const weightedQueenEmbeddings = queenEmbeddings.map((emb) =>
+      emb.map((v) => v * this.queenWeight)
     );
 
     // Combine queens and workers
@@ -197,10 +207,7 @@ class HierarchicalCoordinator {
     const attentionWeights = this.extractAttentionWeights(result);
 
     // Generate consensus with hierarchical influence
-    const consensus = this.generateConsensus(
-      [...queenOutputs, ...workerOutputs],
-      attentionWeights
-    );
+    const consensus = this.generateConsensus([...queenOutputs, ...workerOutputs], attentionWeights);
 
     return {
       consensus,
@@ -226,10 +233,7 @@ class HierarchicalCoordinator {
     const embeddings = await this.outputsToEmbeddings(agentOutputs);
 
     // Apply GraphRoPE for topology-aware position encoding
-    const positionEncodedEmbeddings = this.applyGraphRoPE(
-      embeddings,
-      graphContext
-    );
+    const positionEncodedEmbeddings = this.applyGraphRoPE(embeddings, graphContext);
 
     // Hyperbolic attention with topology awareness
     const result = await this.attentionService.hyperbolicAttention(
@@ -261,11 +265,11 @@ class HierarchicalCoordinator {
     // Build edges based on topology
     if (topology === 'hierarchical' || topology === 'tree') {
       // Queens at level 0 connect to workers at level 1
-      const queens = nodes.filter(n => n.level === 0);
-      const workers = nodes.filter(n => n.level === 1);
+      const queens = nodes.filter((n) => n.level === 0);
+      const workers = nodes.filter((n) => n.level === 1);
 
-      queens.forEach(queen => {
-        workers.forEach(worker => {
+      queens.forEach((queen) => {
+        workers.forEach((worker) => {
           edges.push([queen.id, worker.id]);
           edgeWeights.push(this.queenWeight); // Queen influence
         });
@@ -273,38 +277,31 @@ class HierarchicalCoordinator {
     } else if (topology === 'star') {
       // Central queen connects to all workers
       const queen = nodes[0]; // First is queen
-      nodes.slice(1).forEach(worker => {
+      nodes.slice(1).forEach((worker) => {
         edges.push([queen.id, worker.id]);
         edgeWeights.push(this.queenWeight);
       });
     }
 
     return {
-      nodes: nodes.map(n => n.id),
+      nodes: nodes.map((n) => n.id),
       edges,
       edgeWeights,
-      nodeLabels: nodes.map(n => n.label)
+      nodeLabels: nodes.map((n) => n.label)
     };
   }
 
   /**
    * Apply GraphRoPE position embeddings based on graph structure
    */
-  private applyGraphRoPE(
-    embeddings: number[][],
-    graphContext: GraphContext
-  ): number[][] {
+  private applyGraphRoPE(embeddings: number[][], graphContext: GraphContext): number[][] {
     return embeddings.map((emb, idx) => {
       // Find position in hierarchy
       const depth = this.calculateNodeDepth(idx, graphContext);
       const siblings = this.findSiblingCount(idx, graphContext);
 
       // Position encoding based on depth and sibling position
-      const positionEncoding = this.generatePositionEncoding(
-        emb.length,
-        depth,
-        siblings
-      );
+      const positionEncoding = this.generatePositionEncoding(emb.length, depth, siblings);
 
       // Add position encoding to embedding
       return emb.map((v, i) => v + positionEncoding[i] * 0.1);
@@ -338,16 +335,10 @@ class HierarchicalCoordinator {
     if (parent === undefined) return 0;
 
     // Count siblings (other nodes with same parent)
-    return graph.edges.filter(([from, to]) =>
-      from === parent && to !== nodeId
-    ).length;
+    return graph.edges.filter(([from, to]) => from === parent && to !== nodeId).length;
   }
 
-  private generatePositionEncoding(
-    dim: number,
-    depth: number,
-    siblings: number
-  ): number[] {
+  private generatePositionEncoding(dim: number, depth: number, siblings: number): number[] {
     // Sinusoidal position encoding
     return Array.from({ length: dim }, (_, i) => {
       const freq = 1 / Math.pow(10000, i / dim);
@@ -355,26 +346,20 @@ class HierarchicalCoordinator {
     });
   }
 
-  private async outputsToEmbeddings(
-    outputs: AgentOutput[]
-  ): Promise<number[][]> {
+  private async outputsToEmbeddings(outputs: AgentOutput[]): Promise<number[][]> {
     // Convert agent outputs to embeddings (simplified)
     // In production, use actual embedding model
-    return outputs.map(output =>
-      Array.from({ length: 384 }, () => Math.random())
-    );
+    return outputs.map((output) => Array.from({ length: 384 }, () => Math.random()));
   }
 
   private extractAttentionWeights(result: any): number[] {
     // Extract attention weights from result
-    return Array.from(result.output.slice(0, result.output.length / 384))
-      .map((_, i) => result.output[i]);
+    return Array.from(result.output.slice(0, result.output.length / 384)).map(
+      (_, i) => result.output[i]
+    );
   }
 
-  private generateConsensus(
-    outputs: AgentOutput[],
-    weights: number[]
-  ): string {
+  private generateConsensus(outputs: AgentOutput[], weights: number[]): string {
     // Weighted consensus based on attention scores
     const weightedOutputs = outputs.map((output, idx) => ({
       output: output.content,
@@ -382,9 +367,7 @@ class HierarchicalCoordinator {
     }));
 
     // Return highest weighted output
-    const best = weightedOutputs.reduce((max, curr) =>
-      curr.weight > max.weight ? curr : max
-    );
+    const best = weightedOutputs.reduce((max, curr) => (curr.weight > max.weight ? curr : max));
 
     return best.output;
   }
@@ -405,10 +388,7 @@ class HierarchicalCoordinator {
     return avgQueenWeight / avgWorkerWeight;
   }
 
-  private processCoordinationResult(
-    result: any,
-    outputs: AgentOutput[]
-  ): CoordinationResult {
+  private processCoordinationResult(result: any, outputs: AgentOutput[]): CoordinationResult {
     return {
       consensus: this.generateConsensus(outputs, this.extractAttentionWeights(result)),
       attentionWeights: this.extractAttentionWeights(result),
@@ -531,18 +511,14 @@ class LearningHierarchicalCoordinator extends HierarchicalCoordinator {
 
     if (similarPatterns.length > 0) {
       console.log('📚 Learning from past hierarchical coordinations:');
-      similarPatterns.forEach(pattern => {
+      similarPatterns.forEach((pattern) => {
         console.log(`- ${pattern.task}: ${pattern.reward} success rate`);
         console.log(`  Critique: ${pattern.critique}`);
       });
     }
 
     // 2. Coordinate with hyperbolic attention
-    const result = await this.coordinateHierarchy(
-      queenOutputs,
-      workerOutputs,
-      -1.0
-    );
+    const result = await this.coordinateHierarchy(queenOutputs, workerOutputs, -1.0);
 
     // 3. Calculate success metrics
     const reward = this.calculateCoordinationReward(result);
@@ -573,7 +549,7 @@ class LearningHierarchicalCoordinator extends HierarchicalCoordinator {
     const hierarchyScore = Math.min(result.hierarchyDepth || 1, 2) / 2; // 0-1
     const speedScore = Math.max(0, 1 - result.executionTimeMs / 10000); // Faster is better
 
-    return (hierarchyScore * 0.6 + speedScore * 0.4);
+    return hierarchyScore * 0.6 + speedScore * 0.4;
   }
 
   private generateCritique(result: CoordinationResult): string {
@@ -599,6 +575,7 @@ class LearningHierarchicalCoordinator extends HierarchicalCoordinator {
 ## MCP Tool Integration
 
 ### Swarm Management
+
 ```bash
 # Initialize hierarchical swarm
 mcp__claude-flow__swarm_init hierarchical --maxAgents=10 --strategy=centralized
@@ -613,6 +590,7 @@ mcp__claude-flow__swarm_monitor --interval=5000
 ```
 
 ### Task Orchestration
+
 ```bash
 # Coordinate complex workflows
 mcp__claude-flow__task_orchestrate "Build authentication service" --strategy=sequential --priority=high
@@ -625,6 +603,7 @@ mcp__claude-flow__coordination_sync --namespace=hierarchy
 ```
 
 ### Performance & Analytics
+
 ```bash
 # Generate performance reports
 mcp__claude-flow__performance_report --format=detailed --timeframe=24h
@@ -639,22 +618,24 @@ mcp__claude-flow__metrics_collect --components="agents,tasks,coordination"
 ## Decision Making Framework
 
 ### Task Assignment Algorithm
+
 ```python
 def assign_task(task, available_agents):
     # 1. Filter agents by capability match
     capable_agents = filter_by_capabilities(available_agents, task.required_capabilities)
-    
+
     # 2. Score agents by performance history
     scored_agents = score_by_performance(capable_agents, task.type)
-    
+
     # 3. Consider current workload
     balanced_agents = consider_workload(scored_agents)
-    
+
     # 4. Select optimal agent
     return select_best_agent(balanced_agents)
 ```
 
 ### Escalation Protocols
+
 ```yaml
 Performance Issues:
   - Threshold: <70% success rate or >2x expected duration
@@ -672,11 +653,13 @@ Quality Issues:
 ## Communication Patterns
 
 ### Status Reporting
+
 - **Frequency**: Every 5 minutes for active tasks
 - **Format**: Structured JSON with progress, blockers, ETA
 - **Escalation**: Automatic alerts for delays >20% of estimated time
 
 ### Cross-Team Coordination
+
 - **Sync Points**: Daily standups, milestone reviews
 - **Dependencies**: Explicit dependency tracking with notifications
 - **Handoffs**: Formal work product transfers with validation
@@ -684,11 +667,13 @@ Quality Issues:
 ## Performance Metrics
 
 ### Coordination Effectiveness
+
 - **Task Completion Rate**: >95% of tasks completed successfully
 - **Time to Market**: Average delivery time vs. estimates
 - **Resource Utilization**: Agent productivity and efficiency metrics
 
 ### Quality Metrics
+
 - **Defect Rate**: <5% of deliverables require rework
 - **Compliance Score**: 100% adherence to quality standards
 - **Customer Satisfaction**: Stakeholder feedback scores
@@ -696,12 +681,14 @@ Quality Issues:
 ## Best Practices
 
 ### Efficient Delegation
+
 1. **Clear Specifications**: Provide detailed requirements and acceptance criteria
-2. **Appropriate Scope**: Tasks sized for 2-8 hour completion windows  
+2. **Appropriate Scope**: Tasks sized for 2-8 hour completion windows
 3. **Regular Check-ins**: Status updates every 4-6 hours for active work
 4. **Context Sharing**: Ensure workers have necessary background information
 
 ### Performance Optimization
+
 1. **Load Balancing**: Distribute work evenly across available agents
 2. **Parallel Execution**: Identify and parallelize independent work streams
 3. **Resource Pooling**: Share common resources and knowledge across teams

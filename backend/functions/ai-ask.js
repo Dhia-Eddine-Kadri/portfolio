@@ -30,13 +30,13 @@ const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3
 
 // Source type priority boost for ranking (added to cosine similarity)
 const SOURCE_BOOST = {
-  solution:  0.08,
-  exercise:  0.08,
-  lecture:   0.10,
-  exam:      0.06,
-  notes:     0.02,
-  summary:  -0.03,
-  other:     0.00
+  solution: 0.08,
+  exercise: 0.08,
+  lecture: 0.1,
+  exam: 0.06,
+  notes: 0.02,
+  summary: -0.03,
+  other: 0.0
 };
 
 // ─── OpenAI embeddings ────────────────────────────────────────────────────────
@@ -62,13 +62,18 @@ function embedQuestion(question) {
       },
       function (res) {
         let data = '';
-        res.on('data', function (c) { data += c; });
+        res.on('data', function (c) {
+          data += c;
+        });
         res.on('end', function () {
           try {
             const parsed = JSON.parse(data);
-            if (!parsed.data || !parsed.data[0]) return reject(new Error('Embedding failed: ' + data));
+            if (!parsed.data || !parsed.data[0])
+              return reject(new Error('Embedding failed: ' + data));
             resolve(parsed.data[0].embedding);
-          } catch (e) { reject(e); }
+          } catch (e) {
+            reject(e);
+          }
         });
       }
     );
@@ -109,16 +114,22 @@ function retrieveChunks(serviceKey, userId, courseId, embedding) {
       },
       function (res) {
         let data = '';
-        res.on('data', function (c) { data += c; });
+        res.on('data', function (c) {
+          data += c;
+        });
         res.on('end', function () {
           try {
             const parsed = JSON.parse(data);
             resolve(Array.isArray(parsed) ? parsed : []);
-          } catch (e) { resolve([]); }
+          } catch (e) {
+            resolve([]);
+          }
         });
       }
     );
-    req.on('error', function () { resolve([]); });
+    req.on('error', function () {
+      resolve([]);
+    });
     req.write(body);
     req.end();
   });
@@ -131,13 +142,19 @@ function rankChunks(chunks) {
       const boost = SOURCE_BOOST[c.source_type] || 0;
       return Object.assign({}, c, { final_score: c.similarity + boost });
     })
-    .sort(function (a, b) { return b.final_score - a.final_score; });
+    .sort(function (a, b) {
+      return b.final_score - a.final_score;
+    });
 }
 
 // Fetch file_name for each unique document_id so we can cite properly
 function fetchDocumentNames(serviceKey, documentIds) {
   if (!documentIds.length) return Promise.resolve({});
-  const ids = documentIds.map(function (id) { return '"' + id + '"'; }).join(',');
+  const ids = documentIds
+    .map(function (id) {
+      return '"' + id + '"';
+    })
+    .join(',');
   return supaRequest(
     'GET',
     'documents?id=in.(' + ids + ')&select=id,file_name',
@@ -146,7 +163,9 @@ function fetchDocumentNames(serviceKey, documentIds) {
   ).then(function (result) {
     const map = {};
     if (Array.isArray(result.body)) {
-      result.body.forEach(function (d) { map[d.id] = d.file_name; });
+      result.body.forEach(function (d) {
+        map[d.id] = d.file_name;
+      });
     }
     return map;
   });
@@ -158,10 +177,10 @@ function buildSystemPrompt(mode) {
   const base = [
     'You are StudySphere AI, a course-specific study assistant.',
     '',
-    'You will receive COURSE CONTEXT containing excerpts from the student\'s uploaded lecture files, exercises, notes, and solutions.',
+    "You will receive COURSE CONTEXT containing excerpts from the student's uploaded lecture files, exercises, notes, and solutions.",
     '',
     'Rules:',
-    '1. Use the course context as your primary source — adopt the professor\'s notation, terminology, and method.',
+    "1. Use the course context as your primary source — adopt the professor's notation, terminology, and method.",
     '2. Always give a complete, helpful answer. If the context is only partially relevant, use what is there and fill gaps with standard knowledge for the subject.',
     '3. Never refuse to answer or say you cannot find something. If context is sparse, still solve the problem step by step.',
     '4. Set "unsupported": false unless the context is completely unrelated to the question.',
@@ -178,7 +197,10 @@ function buildSystemPrompt(mode) {
   ].join('\n');
 
   if (mode === 'general') {
-    return base + '\n\n7. If the student explicitly asks for an outside explanation, you may use general knowledge but MUST label it clearly with: "Outside explanation, not from your uploaded course materials:"';
+    return (
+      base +
+      '\n\n7. If the student explicitly asks for an outside explanation, you may use general knowledge but MUST label it clearly with: "Outside explanation, not from your uploaded course materials:"'
+    );
   }
   return base;
 }
@@ -204,26 +226,30 @@ function buildFallbackSystemPrompt() {
 
 function buildContextBlock(rankedChunks, docNames) {
   if (!rankedChunks.length) return 'No relevant course material found.';
-  return rankedChunks.map(function (c, i) {
-    const fileName = docNames[c.document_id] || 'Unknown file';
-    const pages = c.page_start === c.page_end
-      ? 'page ' + c.page_start
-      : 'pages ' + c.page_start + '-' + c.page_end;
-    return [
-      '[Source ' + (i + 1) + ']',
-      'File: ' + fileName,
-      'Pages: ' + pages,
-      'Type: ' + c.source_type,
-      'Text:',
-      c.chunk_text
-    ].join('\n');
-  }).join('\n\n---\n\n');
+  return rankedChunks
+    .map(function (c, i) {
+      const fileName = docNames[c.document_id] || 'Unknown file';
+      const pages =
+        c.page_start === c.page_end
+          ? 'page ' + c.page_start
+          : 'pages ' + c.page_start + '-' + c.page_end;
+      return [
+        '[Source ' + (i + 1) + ']',
+        'File: ' + fileName,
+        'Pages: ' + pages,
+        'Type: ' + c.source_type,
+        'Text:',
+        c.chunk_text
+      ].join('\n');
+    })
+    .join('\n\n---\n\n');
 }
 
 function callOpenAI(systemPrompt, contextBlock, question) {
   return new Promise(function (resolve, reject) {
     const apiKey = requireEnv('OPENAI_API_KEY');
-    const userMessage = 'COURSE CONTEXT:\n\n' + contextBlock + '\n\n---\n\nSTUDENT QUESTION:\n' + question;
+    const userMessage =
+      'COURSE CONTEXT:\n\n' + contextBlock + '\n\n---\n\nSTUDENT QUESTION:\n' + question;
     const body = JSON.stringify({
       model: OPENAI_CHAT_MODEL,
       max_tokens: MAX_COMPLETION_TOKENS,
@@ -245,14 +271,22 @@ function callOpenAI(systemPrompt, contextBlock, question) {
       },
       function (res) {
         let data = '';
-        res.on('data', function (c) { data += c; });
+        res.on('data', function (c) {
+          data += c;
+        });
         res.on('end', function () {
           try {
             const parsed = JSON.parse(data);
-            const text = parsed.choices && parsed.choices[0] && parsed.choices[0].message && parsed.choices[0].message.content;
+            const text =
+              parsed.choices &&
+              parsed.choices[0] &&
+              parsed.choices[0].message &&
+              parsed.choices[0].message.content;
             if (!text) return reject(new Error('Empty OpenAI response'));
             resolve(text);
-          } catch (e) { reject(e); }
+          } catch (e) {
+            reject(e);
+          }
         });
       }
     );
@@ -277,7 +311,8 @@ function normalizeQuestion(q) {
 }
 
 function hashQuestion(userId, courseId, normalizedQ, docVersionHash) {
-  return crypto.createHash('sha256')
+  return crypto
+    .createHash('sha256')
     .update('v2|' + userId + '|' + courseId + '|' + normalizedQ + '|' + docVersionHash)
     .digest('hex');
 }
@@ -286,13 +321,20 @@ function hashQuestion(userId, courseId, normalizedQ, docVersionHash) {
 async function getDocumentVersionHash(serviceKey, userId, courseId) {
   const result = await supaRequest(
     'GET',
-    'documents?user_id=eq.' + userId + '&course_id=eq.' + encodeURIComponent(courseId) +
-    '&processing_status=eq.ready&select=id,updated_at&order=id.asc',
+    'documents?user_id=eq.' +
+      userId +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&processing_status=eq.ready&select=id,updated_at&order=id.asc',
     null,
     serviceKey
   );
   if (!Array.isArray(result.body) || !result.body.length) return 'empty';
-  const str = result.body.map(function (d) { return d.id + ':' + d.updated_at; }).join('|');
+  const str = result.body
+    .map(function (d) {
+      return d.id + ':' + d.updated_at;
+    })
+    .join('|');
   return crypto.createHash('sha256').update(str).digest('hex');
 }
 
@@ -300,11 +342,15 @@ async function getDocumentVersionHash(serviceKey, userId, courseId) {
 async function getExactCache(serviceKey, userId, courseId, questionHash, docVersionHash) {
   const result = await supaRequest(
     'GET',
-    'ai_answer_cache?user_id=eq.' + userId +
-    '&course_id=eq.' + encodeURIComponent(courseId) +
-    '&question_hash=eq.' + questionHash +
-    '&document_version_hash=eq.' + docVersionHash +
-    '&select=id,answer_json&limit=1',
+    'ai_answer_cache?user_id=eq.' +
+      userId +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&question_hash=eq.' +
+      questionHash +
+      '&document_version_hash=eq.' +
+      docVersionHash +
+      '&select=id,answer_json&limit=1',
     null,
     serviceKey
   );
@@ -348,16 +394,22 @@ async function getSemanticCache(serviceKey, userId, courseId, embedding, docVers
       },
       function (res) {
         let data = '';
-        res.on('data', function (c) { data += c; });
+        res.on('data', function (c) {
+          data += c;
+        });
         res.on('end', function () {
           try {
             const parsed = JSON.parse(data);
             resolve(Array.isArray(parsed) && parsed[0] ? parsed[0] : null);
-          } catch (e) { resolve(null); }
+          } catch (e) {
+            resolve(null);
+          }
         });
       }
     );
-    req.on('error', function () { resolve(null); });
+    req.on('error', function () {
+      resolve(null);
+    });
     req.write(body);
     req.end();
   });
@@ -376,7 +428,15 @@ async function getAnswerById(serviceKey, answerId) {
 }
 
 // Store a new answer in the cache
-async function storeAnswerCache(serviceKey, userId, courseId, questionHash, normalizedQ, docVersionHash, answerJson) {
+async function storeAnswerCache(
+  serviceKey,
+  userId,
+  courseId,
+  questionHash,
+  normalizedQ,
+  docVersionHash,
+  answerJson
+) {
   const result = await supaRequest(
     'POST',
     'ai_answer_cache',
@@ -396,7 +456,15 @@ async function storeAnswerCache(serviceKey, userId, courseId, questionHash, norm
 }
 
 // Store question embedding for future semantic cache lookups
-function storeQuestionCache(serviceKey, userId, courseId, question, embedding, answerId, docVersionHash) {
+function storeQuestionCache(
+  serviceKey,
+  userId,
+  courseId,
+  question,
+  embedding,
+  answerId,
+  docVersionHash
+) {
   return supaRequest(
     'POST',
     'ai_question_cache',
@@ -428,7 +496,12 @@ exports.handler = async function (event) {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   // Rate limit
-  const recentCount = await countRecentEvents(serviceKey, user.id, 'ai_ask', AI_RATE_LIMIT_WINDOW_MS);
+  const recentCount = await countRecentEvents(
+    serviceKey,
+    user.id,
+    'ai_ask',
+    AI_RATE_LIMIT_WINDOW_MS
+  );
   if (recentCount >= AI_RATE_LIMIT_MAX) {
     return rateLimitResponse();
   }
@@ -468,7 +541,13 @@ exports.handler = async function (event) {
   }
 
   // 4. Check semantic question cache
-  const semanticHit = await getSemanticCache(serviceKey, user.id, courseId, embedding, docVersionHash);
+  const semanticHit = await getSemanticCache(
+    serviceKey,
+    user.id,
+    courseId,
+    embedding,
+    docVersionHash
+  );
   if (semanticHit && semanticHit.answer_cache_id) {
     const cachedAnswer = await getAnswerById(serviceKey, semanticHit.answer_cache_id);
     if (cachedAnswer) {
@@ -487,13 +566,31 @@ exports.handler = async function (event) {
       fallbackResponse = await callOpenAI(buildFallbackSystemPrompt(), '', question);
     } catch (e) {
       return jsonResponse(200, {
-        answer: 'I could not find this in your uploaded course materials. Please make sure you have uploaded the relevant lecture or exercise files for this course.',
-        sources: [], confidence: 'low', unsupported: true, cached: false
+        answer:
+          'I could not find this in your uploaded course materials. Please make sure you have uploaded the relevant lecture or exercise files for this course.',
+        sources: [],
+        confidence: 'low',
+        unsupported: true,
+        cached: false
       });
     }
     const fallbackResult = parseOpenAIResponse(fallbackResponse);
-    const fallbackJson = { answer: fallbackResult.answer || '', sources: [], confidence: 'low', unsupported: true, cached: false };
-    storeAnswerCache(serviceKey, user.id, courseId, questionHash, normalizedQ, docVersionHash, fallbackJson).catch(function () {});
+    const fallbackJson = {
+      answer: fallbackResult.answer || '',
+      sources: [],
+      confidence: 'low',
+      unsupported: true,
+      cached: false
+    };
+    storeAnswerCache(
+      serviceKey,
+      user.id,
+      courseId,
+      questionHash,
+      normalizedQ,
+      docVersionHash,
+      fallbackJson
+    ).catch(function () {});
     return jsonResponse(200, fallbackJson);
   }
 
@@ -505,7 +602,13 @@ exports.handler = async function (event) {
   const weakRetrieval = topScore < STRONG_SIMILARITY_THRESHOLD;
 
   // 8. Fetch document file names for citations
-  const uniqueDocIds = [...new Set(rankedChunks.map(function (c) { return c.document_id; }))];
+  const uniqueDocIds = [
+    ...new Set(
+      rankedChunks.map(function (c) {
+        return c.document_id;
+      })
+    )
+  ];
   const docNames = await fetchDocumentNames(serviceKey, uniqueDocIds);
   const knownFileNames = new Set(Object.values(docNames));
 
@@ -524,9 +627,11 @@ exports.handler = async function (event) {
   const result = parseOpenAIResponse(rawResponse);
 
   // Citation validation: remove sources the AI hallucinated that aren't in retrieved chunks
-  const validatedSources = (Array.isArray(result.sources) ? result.sources : []).filter(function (s) {
-    return !s.file_name || knownFileNames.has(s.file_name);
-  });
+  const validatedSources = (Array.isArray(result.sources) ? result.sources : []).filter(
+    function (s) {
+      return !s.file_name || knownFileNames.has(s.file_name);
+    }
+  );
 
   const answerJson = {
     answer: result.answer || '',
@@ -537,10 +642,26 @@ exports.handler = async function (event) {
   };
 
   // 11. Store in cache (fire-and-forget)
-  storeAnswerCache(serviceKey, user.id, courseId, questionHash, normalizedQ, docVersionHash, answerJson)
+  storeAnswerCache(
+    serviceKey,
+    user.id,
+    courseId,
+    questionHash,
+    normalizedQ,
+    docVersionHash,
+    answerJson
+  )
     .then(function (newCacheId) {
       if (newCacheId) {
-        storeQuestionCache(serviceKey, user.id, courseId, question, embedding, newCacheId, docVersionHash);
+        storeQuestionCache(
+          serviceKey,
+          user.id,
+          courseId,
+          question,
+          embedding,
+          newCacheId,
+          docVersionHash
+        );
       }
     })
     .catch(function () {});

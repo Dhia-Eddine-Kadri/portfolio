@@ -64,14 +64,14 @@ const commands = {
 
   keys: () => {
     const memory = loadMemory();
-    const keys = Object.keys(memory).filter(k => !k.startsWith('_'));
+    const keys = Object.keys(memory).filter((k) => !k.startsWith('_'));
     console.log(keys.join('\n'));
     return keys;
-  },
+  }
 };
 
 // CLI
-const [,, command, key, ...valueParts] = process.argv;
+const [, , command, key, ...valueParts] = process.argv;
 const value = valueParts.join(' ');
 
 if (command && commands[command]) {

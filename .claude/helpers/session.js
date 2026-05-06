@@ -22,8 +22,8 @@ const commands = {
         edits: 0,
         commands: 0,
         tasks: 0,
-        errors: 0,
-      },
+        errors: 0
+      }
     };
 
     fs.mkdirSync(SESSION_DIR, { recursive: true });
@@ -105,7 +105,9 @@ const commands = {
     try {
       const session = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8'));
       return key ? (session.context || {})[key] : session.context;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   },
 
   metric: (name) => {
@@ -120,11 +122,11 @@ const commands = {
     }
 
     return session;
-  },
+  }
 };
 
 // CLI
-const [,, command, ...args] = process.argv;
+const [, , command, ...args] = process.argv;
 
 if (command && commands[command]) {
   commands[command](...args);

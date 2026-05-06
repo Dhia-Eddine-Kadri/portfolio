@@ -20,7 +20,6 @@ var PDF_DATA = {
   'Aufgabe_1_3.pdf': 'assets/Aufgabe_1_3.pdf'
 };
 
-
 // ── GLOBAL FUNCTIONS (accessible from inline onclick) ─────────────────────
 
 // copyBubble / fallbackCopy / regenMsg / addBotMsg / addUserMsg / _setAiChipsVisible → features/ai-chat/ai-message-actions.js
@@ -104,7 +103,9 @@ import {
   panelShow as _panelShow,
   panelHide as _panelHide
 } from './core/panels.js';
-window._showFilesView = function () { _showFilesView(); };
+window._showFilesView = function () {
+  _showFilesView();
+};
 
 function showStudip() {
   _showStudip();
@@ -145,7 +146,9 @@ window.saveState = function () {
 };
 
 var _statePersistence = null;
-var restoreState = function () { return _statePersistence && _statePersistence.restoreState(); };
+var restoreState = function () {
+  return _statePersistence && _statePersistence.restoreState();
+};
 
 import {
   renderCourses as _renderCourses,
@@ -242,25 +245,63 @@ var _cameFromStudip = false;
 var _lang = localStorage.getItem('ss_lang') || 'en';
 
 _statePersistence = initStatePersistence({
-  getActiveSemId: function () { return activeSemId; },
-  getActiveCourseId: function () { return activeCourseId; },
-  getActiveFileName: function () { return activeFileName; },
-  getActiveCourseSection: function () { return activeCourseSection || 'files'; },
-  getSems: function () { return window.SEMS; },
-  getCurrentUser: function () { return window._currentUser; },
-  setActiveSemId: function (v) { activeSemId = v; },
-  setActiveCourseId: function (v) { activeCourseId = v; },
-  setSsRestoring: function (v) { _ssRestoring = !!v; },
-  setPendingPortalRestore: function (v) { _pendingPortalRestore = v; },
-  setPendingRestoreCourse: function (v) { window._pendingRestoreCourse = v; },
-  showFilesView: function () { _showFilesView(); },
-  showPortal: function () { showPortal(); },
-  showPortalSection: function (s) { showPortalSection(s); },
-  setNavActive: function (id) { setNavActive(id); },
-  renderCourses: function () { renderCourses(); },
-  panelShow: function (el) { _panelShow(el); },
-  panelHide: function (el) { _panelHide(el); },
-  showCourseSection: function (c, s) { _showCourseSection(c, s); }
+  getActiveSemId: function () {
+    return activeSemId;
+  },
+  getActiveCourseId: function () {
+    return activeCourseId;
+  },
+  getActiveFileName: function () {
+    return activeFileName;
+  },
+  getActiveCourseSection: function () {
+    return activeCourseSection || 'files';
+  },
+  getSems: function () {
+    return window.SEMS;
+  },
+  getCurrentUser: function () {
+    return window._currentUser;
+  },
+  setActiveSemId: function (v) {
+    activeSemId = v;
+  },
+  setActiveCourseId: function (v) {
+    activeCourseId = v;
+  },
+  setSsRestoring: function (v) {
+    _ssRestoring = !!v;
+  },
+  setPendingPortalRestore: function (v) {
+    _pendingPortalRestore = v;
+  },
+  setPendingRestoreCourse: function (v) {
+    window._pendingRestoreCourse = v;
+  },
+  showFilesView: function () {
+    _showFilesView();
+  },
+  showPortal: function () {
+    showPortal();
+  },
+  showPortalSection: function (s) {
+    showPortalSection(s);
+  },
+  setNavActive: function (id) {
+    setNavActive(id);
+  },
+  renderCourses: function () {
+    renderCourses();
+  },
+  panelShow: function (el) {
+    _panelShow(el);
+  },
+  panelHide: function (el) {
+    _panelHide(el);
+  },
+  showCourseSection: function (c, s) {
+    _showCourseSection(c, s);
+  }
 });
 saveState = _statePersistence.saveState;
 window._lang = _lang;
@@ -893,16 +934,12 @@ window.showSelectionBanner = showSelectionBanner;
 
 // getTime → features/ai-chat/ai-message-actions.js (private helper there)
 
-
-
-
 // renderMarkdown → features/ai-chat/ai-markdown.js
 
 // ── MATH RENDERING (KaTeX) ───────────────────────────────────────────────
 
 // _aiMakePdfBlob / _aiDownloadPdf / _ufDestPicker / _glMoveDestPicker / _aiExportToCourse / _aiShowExportModal / _aiResponseActions → features/ai-chat/ai-export.js
 initAiExportBridge();
-
 
 // addBotMsg / addUserMsg / _setAiChipsVisible → features/ai-chat/ai-message-actions.js (bridged at top of file)
 

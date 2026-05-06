@@ -27,11 +27,17 @@ function storageDelete(serviceKey, bucket, storagePath) {
       },
       function (res) {
         let d = '';
-        res.on('data', function (c) { d += c; });
-        res.on('end', function () { resolve(res.statusCode); });
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          resolve(res.statusCode);
+        });
       }
     );
-    req.on('error', function () { resolve(500); });
+    req.on('error', function () {
+      resolve(500);
+    });
     req.write(body);
     req.end();
   });
@@ -39,7 +45,8 @@ function storageDelete(serviceKey, bucket, storagePath) {
 
 exports.handler = async function (event) {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
-  if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST') return fail(405, 'Method not allowed');
+  if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST')
+    return fail(405, 'Method not allowed');
 
   const token = extractBearerToken(event.headers);
   if (!token) return fail(401, 'Missing authorization token');
@@ -48,7 +55,11 @@ exports.handler = async function (event) {
   if (!user) return fail(401, 'Invalid or expired token');
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); } catch (e) { return fail(400, 'Invalid JSON'); }
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return fail(400, 'Invalid JSON');
+  }
 
   const { documentId } = body;
   if (!documentId || typeof documentId !== 'string') return fail(400, 'documentId is required');
@@ -58,7 +69,11 @@ exports.handler = async function (event) {
   // Fetch the document to verify ownership and get storage_path
   const docResult = await supaRequest(
     'GET',
-    'documents?id=eq.' + encodeURIComponent(documentId) + '&user_id=eq.' + user.id + '&select=id,storage_path,course_id&limit=1',
+    'documents?id=eq.' +
+      encodeURIComponent(documentId) +
+      '&user_id=eq.' +
+      user.id +
+      '&select=id,storage_path,course_id&limit=1',
     null,
     serviceKey
   );
@@ -70,11 +85,26 @@ exports.handler = async function (event) {
   const doc = docResult.body[0];
 
   // Delete in order: chunks → pages → cache entries → storage → document row
-  await supaRequest('DELETE', 'document_chunks?document_id=eq.' + documentId + '&user_id=eq.' + user.id, null, serviceKey);
-  await supaRequest('DELETE', 'document_pages?document_id=eq.' + documentId + '&user_id=eq.' + user.id, null, serviceKey);
+  await supaRequest(
+    'DELETE',
+    'document_chunks?document_id=eq.' + documentId + '&user_id=eq.' + user.id,
+    null,
+    serviceKey
+  );
+  await supaRequest(
+    'DELETE',
+    'document_pages?document_id=eq.' + documentId + '&user_id=eq.' + user.id,
+    null,
+    serviceKey
+  );
 
   // Invalidate any retrieval cache for this course (stale after deletion)
-  await supaRequest('DELETE', 'retrieval_cache?user_id=eq.' + user.id + '&course_id=eq.' + encodeURIComponent(doc.course_id), null, serviceKey).catch(function () {});
+  await supaRequest(
+    'DELETE',
+    'retrieval_cache?user_id=eq.' + user.id + '&course_id=eq.' + encodeURIComponent(doc.course_id),
+    null,
+    serviceKey
+  ).catch(function () {});
 
   // Delete from storage
   if (doc.storage_path) {

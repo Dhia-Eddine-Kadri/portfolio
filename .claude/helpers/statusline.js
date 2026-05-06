@@ -20,7 +20,7 @@ const CONFIG = {
   showPerformance: true,
   refreshInterval: 30000,
   maxAgents: 15,
-  topology: 'hierarchical-mesh',
+  topology: 'hierarchical-mesh'
 };
 
 // ANSI colors
@@ -40,7 +40,7 @@ const c = {
   brightBlue: '\x1b[1;34m',
   brightPurple: '\x1b[1;35m',
   brightCyan: '\x1b[1;36m',
-  brightWhite: '\x1b[1;37m',
+  brightWhite: '\x1b[1;37m'
 };
 
 // Get user info
@@ -55,11 +55,22 @@ function getUserInfo() {
   // user input ever reaches these args (defense in depth). Errors are caught
   // and the defaults above remain.
   try {
-    name = execFileSync('git', ['config', 'user.name'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || 'user';
-  } catch { /* not in a repo / no name set — keep default */ }
+    name =
+      execFileSync('git', ['config', 'user.name'], {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      }).trim() || 'user';
+  } catch {
+    /* not in a repo / no name set — keep default */
+  }
   try {
-    gitBranch = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { /* not in a repo — keep empty */ }
+    gitBranch = execFileSync('git', ['branch', '--show-current'], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+  } catch {
+    /* not in a repo — keep empty */
+  }
 
   return { name, gitBranch, modelName };
 }
@@ -69,7 +80,7 @@ function getLearningStats() {
   const memoryPaths = [
     path.join(process.cwd(), '.swarm', 'memory.db'),
     path.join(process.cwd(), '.claude', 'memory.db'),
-    path.join(process.cwd(), 'data', 'memory.db'),
+    path.join(process.cwd(), 'data', 'memory.db')
   ];
 
   let patterns = 0;
@@ -98,7 +109,7 @@ function getLearningStats() {
   const sessionsPath = path.join(process.cwd(), '.claude', 'sessions');
   if (fs.existsSync(sessionsPath)) {
     try {
-      const sessionFiles = fs.readdirSync(sessionsPath).filter(f => f.endsWith('.json'));
+      const sessionFiles = fs.readdirSync(sessionsPath).filter((f) => f.endsWith('.json'));
       sessions = Math.max(sessions, sessionFiles.length);
     } catch (e) {
       // Ignore
@@ -143,7 +154,7 @@ function getSecurityStatus() {
 
   if (fs.existsSync(scanResultsPath)) {
     try {
-      const scans = fs.readdirSync(scanResultsPath).filter(f => f.endsWith('.json'));
+      const scans = fs.readdirSync(scanResultsPath).filter((f) => f.endsWith('.json'));
       // Each successful scan file = 1 CVE addressed
       cvesFixed = Math.min(totalCves, scans.length);
     } catch (e) {
@@ -155,7 +166,7 @@ function getSecurityStatus() {
   const auditPath = path.join(process.cwd(), '.swarm', 'security');
   if (fs.existsSync(auditPath)) {
     try {
-      const audits = fs.readdirSync(auditPath).filter(f => f.includes('audit'));
+      const audits = fs.readdirSync(auditPath).filter((f) => f.includes('audit'));
       cvesFixed = Math.min(totalCves, Math.max(cvesFixed, audits.length));
     } catch (e) {
       // Ignore
@@ -167,7 +178,7 @@ function getSecurityStatus() {
   return {
     status,
     cvesFixed,
-    totalCves,
+    totalCves
   };
 }
 
@@ -177,7 +188,9 @@ function getSwarmStatus() {
   let coordinationActive = false;
 
   try {
-    const ps = execSync('ps aux 2>/dev/null | grep -c agentic-flow || echo "0"', { encoding: 'utf-8' });
+    const ps = execSync('ps aux 2>/dev/null | grep -c agentic-flow || echo "0"', {
+      encoding: 'utf-8'
+    });
     activeAgents = Math.max(0, parseInt(ps.trim()) - 1);
     coordinationActive = activeAgents > 0;
   } catch (e) {
@@ -187,7 +200,7 @@ function getSwarmStatus() {
   return {
     activeAgents,
     maxAgents: CONFIG.maxAgents,
-    coordinationActive,
+    coordinationActive
   };
 }
 
@@ -197,7 +210,10 @@ function getSystemMetrics() {
   let subAgents = 0;
 
   try {
-    const mem = execSync('ps aux | grep -E "(node|agentic|claude)" | grep -v grep | awk \'{sum += \$6} END {print int(sum/1024)}\'', { encoding: 'utf-8' });
+    const mem = execSync(
+      'ps aux | grep -E "(node|agentic|claude)" | grep -v grep | awk \'{sum += \$6} END {print int(sum/1024)}\'',
+      { encoding: 'utf-8' }
+    );
     memoryMB = parseInt(mem.trim()) || 0;
   } catch (e) {
     // Fallback
@@ -215,7 +231,9 @@ function getSystemMetrics() {
 
   // Count active sub-agents from process list
   try {
-    const agents = execSync('ps aux 2>/dev/null | grep -c "claude-flow.*agent" || echo "0"', { encoding: 'utf-8' });
+    const agents = execSync('ps aux 2>/dev/null | grep -c "claude-flow.*agent" || echo "0"', {
+      encoding: 'utf-8'
+    });
     subAgents = Math.max(0, parseInt(agents.trim()) - 1);
   } catch (e) {
     // Ignore
@@ -225,7 +243,7 @@ function getSystemMetrics() {
     memoryMB,
     contextPct,
     intelligencePct,
-    subAgents,
+    subAgents
   };
 }
 
@@ -259,36 +277,50 @@ function generateStatusline() {
   lines.push(`${c.dim}─────────────────────────────────────────────────────${c.reset}`);
 
   // Line 1: DDD Domain Progress
-  const domainsColor = progress.domainsCompleted >= 3 ? c.brightGreen : progress.domainsCompleted > 0 ? c.yellow : c.red;
+  const domainsColor =
+    progress.domainsCompleted >= 3
+      ? c.brightGreen
+      : progress.domainsCompleted > 0
+        ? c.yellow
+        : c.red;
   lines.push(
     `${c.brightCyan}🏗️  DDD Domains${c.reset}    ${progressBar(progress.domainsCompleted, progress.totalDomains)}  ` +
-    `${domainsColor}${progress.domainsCompleted}${c.reset}/${c.brightWhite}${progress.totalDomains}${c.reset}    ` +
-    `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
+      `${domainsColor}${progress.domainsCompleted}${c.reset}/${c.brightWhite}${progress.totalDomains}${c.reset}    ` +
+      `${c.brightYellow}⚡ 1.0x${c.reset} ${c.dim}→${c.reset} ${c.brightYellow}2.49x-7.47x${c.reset}`
   );
 
   // Line 2: Swarm + CVE + Memory + Context + Intelligence
-  const swarmIndicator = swarm.coordinationActive ? `${c.brightGreen}◉${c.reset}` : `${c.dim}○${c.reset}`;
+  const swarmIndicator = swarm.coordinationActive
+    ? `${c.brightGreen}◉${c.reset}`
+    : `${c.dim}○${c.reset}`;
   const agentsColor = swarm.activeAgents > 0 ? c.brightGreen : c.red;
-  let securityIcon = security.status === 'CLEAN' ? '🟢' : security.status === 'IN_PROGRESS' ? '🟡' : '🔴';
-  let securityColor = security.status === 'CLEAN' ? c.brightGreen : security.status === 'IN_PROGRESS' ? c.brightYellow : c.brightRed;
+  let securityIcon =
+    security.status === 'CLEAN' ? '🟢' : security.status === 'IN_PROGRESS' ? '🟡' : '🔴';
+  let securityColor =
+    security.status === 'CLEAN'
+      ? c.brightGreen
+      : security.status === 'IN_PROGRESS'
+        ? c.brightYellow
+        : c.brightRed;
 
   lines.push(
     `${c.brightYellow}🤖 Swarm${c.reset}  ${swarmIndicator} [${agentsColor}${String(swarm.activeAgents).padStart(2)}${c.reset}/${c.brightWhite}${swarm.maxAgents}${c.reset}]  ` +
-    `${c.brightPurple}👥 ${system.subAgents}${c.reset}    ` +
-    `${securityIcon} ${securityColor}CVE ${security.cvesFixed}${c.reset}/${c.brightWhite}${security.totalCves}${c.reset}    ` +
-    `${c.brightCyan}💾 ${system.memoryMB}MB${c.reset}    ` +
-    `${c.brightGreen}📂 ${String(system.contextPct).padStart(3)}%${c.reset}    ` +
-    `${c.dim}🧠 ${String(system.intelligencePct).padStart(3)}%${c.reset}`
+      `${c.brightPurple}👥 ${system.subAgents}${c.reset}    ` +
+      `${securityIcon} ${securityColor}CVE ${security.cvesFixed}${c.reset}/${c.brightWhite}${security.totalCves}${c.reset}    ` +
+      `${c.brightCyan}💾 ${system.memoryMB}MB${c.reset}    ` +
+      `${c.brightGreen}📂 ${String(system.contextPct).padStart(3)}%${c.reset}    ` +
+      `${c.dim}🧠 ${String(system.intelligencePct).padStart(3)}%${c.reset}`
   );
 
   // Line 3: Architecture status
-  const dddColor = progress.dddProgress >= 50 ? c.brightGreen : progress.dddProgress > 0 ? c.yellow : c.red;
+  const dddColor =
+    progress.dddProgress >= 50 ? c.brightGreen : progress.dddProgress > 0 ? c.yellow : c.red;
   lines.push(
     `${c.brightPurple}🔧 Architecture${c.reset}    ` +
-    `${c.cyan}DDD${c.reset} ${dddColor}●${String(progress.dddProgress).padStart(3)}%${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Security${c.reset} ${securityColor}●${security.status}${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Memory${c.reset} ${c.brightGreen}●AgentDB${c.reset}  ${c.dim}│${c.reset}  ` +
-    `${c.cyan}Integration${c.reset} ${swarm.coordinationActive ? c.brightCyan : c.dim}●${c.reset}`
+      `${c.cyan}DDD${c.reset} ${dddColor}●${String(progress.dddProgress).padStart(3)}%${c.reset}  ${c.dim}│${c.reset}  ` +
+      `${c.cyan}Security${c.reset} ${securityColor}●${security.status}${c.reset}  ${c.dim}│${c.reset}  ` +
+      `${c.cyan}Memory${c.reset} ${c.brightGreen}●AgentDB${c.reset}  ${c.dim}│${c.reset}  ` +
+      `${c.cyan}Integration${c.reset} ${swarm.coordinationActive ? c.brightCyan : c.dim}●${c.reset}`
   );
 
   return lines.join('\n');
@@ -305,9 +337,9 @@ function generateJSON() {
     performance: {
       flashAttentionTarget: '2.49x-7.47x',
       searchImprovement: '150x-12,500x',
-      memoryReduction: '50-75%',
+      memoryReduction: '50-75%'
     },
-    lastUpdated: new Date().toISOString(),
+    lastUpdated: new Date().toISOString()
   };
 }
 

@@ -83,7 +83,9 @@ export function initStatePersistence(options) {
             var restFile = st.fileName;
 
             try {
-              var rstCached = JSON.parse(localStorage.getItem('ss_uf_cache_' + course.id) || 'null');
+              var rstCached = JSON.parse(
+                localStorage.getItem('ss_uf_cache_' + course.id) || 'null'
+              );
               if (rstCached && Array.isArray(rstCached.files)) {
                 var rstUid =
                   (options.getCurrentUser() &&

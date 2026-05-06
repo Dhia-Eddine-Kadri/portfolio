@@ -24,10 +24,12 @@ exports.handler = async function (event) {
 
   const result = await supaRequest(
     'GET',
-    'documents?user_id=eq.' + user.id +
-    '&course_id=eq.' + encodeURIComponent(courseId) +
-    '&select=id,file_name,file_type,source_type,processing_status,processing_error,page_count,created_at,updated_at' +
-    '&order=created_at.desc',
+    'documents?user_id=eq.' +
+      user.id +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&select=id,file_name,file_type,source_type,processing_status,processing_error,page_count,created_at,updated_at' +
+      '&order=created_at.desc',
     null,
     serviceKey
   );

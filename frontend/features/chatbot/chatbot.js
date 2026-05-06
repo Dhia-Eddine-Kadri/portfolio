@@ -1108,13 +1108,14 @@
       });
 
     var clearBtn = document.getElementById('aipClearBtn');
-    if (clearBtn) clearBtn.addEventListener('click', function () {
-      if (_currentId) {
-        _confirmDeleteChat(_currentId);
-      } else {
-        _startNew();
-      }
-    });
+    if (clearBtn)
+      clearBtn.addEventListener('click', function () {
+        if (_currentId) {
+          _confirmDeleteChat(_currentId);
+        } else {
+          _startNew();
+        }
+      });
     var newChatBtn = document.getElementById('aipNewChatBtn');
     if (newChatBtn) newChatBtn.addEventListener('click', _startNew);
 

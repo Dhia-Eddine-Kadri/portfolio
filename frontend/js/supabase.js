@@ -335,7 +335,10 @@ function _enterApp(user) {
   var _portalEl = document.getElementById('portal');
   // Determine which section to restore before anything else changes the state
   var _restoreSec = null;
-  try { _restoreSec = sessionStorage.getItem('ss_portal_tab') || localStorage.getItem('ss_last_section'); } catch(e) {}
+  try {
+    _restoreSec =
+      sessionStorage.getItem('ss_portal_tab') || localStorage.getItem('ss_last_section');
+  } catch (e) {}
 
   if (!_inAppAlready) {
     if (_appEl) _appEl.style.display = 'none';
@@ -348,13 +351,25 @@ function _enterApp(user) {
     }
   }
   // Always restore the last section, falling back to dashboard
-  var _targetSec = (_restoreSec && _restoreSec !== 'dashboard') ? _restoreSec : 'dashboard';
-  if (typeof setNavActive === 'function') setNavActive(
-    { chat:'psbChat', editor:'psbEditor', notes:'psbNotes', aipage:'psbAIPage',
-      games:'psbGames', lounge:'psbLounge', notifications:'psbNotifications',
-      profile:'psbProfile', settings:'psbSettings', subscription:'psbSubscription',
-      german:'psbGerman', studip:'pcStudip', admin:'psbAdmin' }[_targetSec] || 'psbDashboard'
-  );
+  var _targetSec = _restoreSec && _restoreSec !== 'dashboard' ? _restoreSec : 'dashboard';
+  if (typeof setNavActive === 'function')
+    setNavActive(
+      {
+        chat: 'psbChat',
+        editor: 'psbEditor',
+        notes: 'psbNotes',
+        aipage: 'psbAIPage',
+        games: 'psbGames',
+        lounge: 'psbLounge',
+        notifications: 'psbNotifications',
+        profile: 'psbProfile',
+        settings: 'psbSettings',
+        subscription: 'psbSubscription',
+        german: 'psbGerman',
+        studip: 'pcStudip',
+        admin: 'psbAdmin'
+      }[_targetSec] || 'psbDashboard'
+    );
   if (typeof showPortalSection === 'function') showPortalSection(_targetSec);
   if (typeof updateAuthIndicator === 'function') updateAuthIndicator(user);
   if (user && typeof loadUserData === 'function') loadUserData(user.id);

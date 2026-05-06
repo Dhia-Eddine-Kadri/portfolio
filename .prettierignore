@@ -3,3 +3,10 @@ frontend/assets/
 docs/
 *.min.js
 *.min.css
+.claude/
+.claude-flow/
+.swarm/
+node_modules/
+.netlify/
+dist/
+build/

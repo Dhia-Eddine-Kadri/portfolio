@@ -52,8 +52,18 @@ export async function uploadCourseDocument(file, courseId, sourceType) {
         });
         var text = await response.text();
         var data;
-        try { data = JSON.parse(text); } catch (e) { reject(new Error('Upload failed (' + response.status + ')')); return; }
-        if (!response.ok) reject(new Error(data.error && data.error.message || 'Upload failed (' + response.status + ')'));
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          reject(new Error('Upload failed (' + response.status + ')'));
+          return;
+        }
+        if (!response.ok)
+          reject(
+            new Error(
+              (data.error && data.error.message) || 'Upload failed (' + response.status + ')'
+            )
+          );
         else resolve(data);
       } catch (err) {
         reject(err);
@@ -68,9 +78,12 @@ export async function uploadCourseDocument(file, courseId, sourceType) {
 export async function listCourseDocuments(courseId) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
-  var response = await fetch(BACKEND_URL + '/api/documents/list?courseId=' + encodeURIComponent(courseId), {
-    headers: { Authorization: 'Bearer ' + token }
-  });
+  var response = await fetch(
+    BACKEND_URL + '/api/documents/list?courseId=' + encodeURIComponent(courseId),
+    {
+      headers: { Authorization: 'Bearer ' + token }
+    }
+  );
   var data = await response.json();
   return data.documents || [];
 }
@@ -85,10 +98,20 @@ export async function indexExistingDocument(courseId, storageName, fileName, sou
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + token
     },
-    body: JSON.stringify({ courseId: courseId, storageName: storageName, fileName: fileName, sourceType: sourceType || 'lecture', folder: folder || null })
+    body: JSON.stringify({
+      courseId: courseId,
+      storageName: storageName,
+      fileName: fileName,
+      sourceType: sourceType || 'lecture',
+      folder: folder || null
+    })
   });
   var text = await response.text();
-  try { return JSON.parse(text); } catch (e) { throw new Error('Index failed (' + response.status + ')'); }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('Index failed (' + response.status + ')');
+  }
 }
 
 // Delete a RAG-indexed document and all its chunks
@@ -116,7 +139,12 @@ export async function submitRagFeedback(courseId, question, rating, answerCacheI
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + token
     },
-    body: JSON.stringify({ courseId: courseId, question: question, rating: rating, answerCacheId: answerCacheId || null })
+    body: JSON.stringify({
+      courseId: courseId,
+      question: question,
+      rating: rating,
+      answerCacheId: answerCacheId || null
+    })
   });
   return response.json();
 }
@@ -126,7 +154,9 @@ export async function courseHasRagDocs(courseId) {
   if (!courseId) return false;
   try {
     var docs = await listCourseDocuments(courseId);
-    return docs.some(function (d) { return d.processing_status === 'ready'; });
+    return docs.some(function (d) {
+      return d.processing_status === 'ready';
+    });
   } catch (e) {
     return false;
   }

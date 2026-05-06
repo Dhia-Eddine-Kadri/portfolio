@@ -51,13 +51,22 @@ class JsonFileBackend {
         if (Array.isArray(data)) {
           for (const entry of data) this.entries.set(entry.id, entry);
         }
-      } catch { /* start fresh */ }
+      } catch {
+        /* start fresh */
+      }
     }
   }
 
-  async shutdown() { this._persist(); }
-  async store(entry) { this.entries.set(entry.id, entry); this._persist(); }
-  async get(id) { return this.entries.get(id) ?? null; }
+  async shutdown() {
+    this._persist();
+  }
+  async store(entry) {
+    this.entries.set(entry.id, entry);
+    this._persist();
+  }
+  async get(id) {
+    return this.entries.get(id) ?? null;
+  }
   async getByKey(key, ns) {
     for (const e of this.entries.values()) {
       if (e.key === key && (!ns || e.namespace === ns)) return e;
@@ -74,18 +83,34 @@ class JsonFileBackend {
     this._persist();
     return e;
   }
-  async delete(id) { return this.entries.delete(id); }
+  async delete(id) {
+    return this.entries.delete(id);
+  }
   async query(opts) {
     let results = [...this.entries.values()];
-    if (opts?.namespace) results = results.filter(e => e.namespace === opts.namespace);
-    if (opts?.type) results = results.filter(e => e.type === opts.type);
+    if (opts?.namespace) results = results.filter((e) => e.namespace === opts.namespace);
+    if (opts?.type) results = results.filter((e) => e.type === opts.type);
     if (opts?.limit) results = results.slice(0, opts.limit);
     return results;
   }
-  async search() { return []; } // No vector search in JSON backend
-  async bulkInsert(entries) { for (const e of entries) this.entries.set(e.id, e); this._persist(); }
-  async bulkDelete(ids) { let n = 0; for (const id of ids) { if (this.entries.delete(id)) n++; } this._persist(); return n; }
-  async count() { return this.entries.size; }
+  async search() {
+    return [];
+  } // No vector search in JSON backend
+  async bulkInsert(entries) {
+    for (const e of entries) this.entries.set(e.id, e);
+    this._persist();
+  }
+  async bulkDelete(ids) {
+    let n = 0;
+    for (const id of ids) {
+      if (this.entries.delete(id)) n++;
+    }
+    this._persist();
+    return n;
+  }
+  async count() {
+    return this.entries.size;
+  }
   async listNamespaces() {
     const ns = new Set();
     for (const e of this.entries.values()) ns.add(e.namespace || 'default');
@@ -94,7 +119,10 @@ class JsonFileBackend {
   async clearNamespace(ns) {
     let n = 0;
     for (const [id, e] of this.entries) {
-      if (e.namespace === ns) { this.entries.delete(id); n++; }
+      if (e.namespace === ns) {
+        this.entries.delete(id);
+        n++;
+      }
     }
     this._persist();
     return n;
@@ -104,7 +132,9 @@ class JsonFileBackend {
       totalEntries: this.entries.size,
       entriesByNamespace: {},
       entriesByType: { semantic: 0, episodic: 0, procedural: 0, working: 0, cache: 0 },
-      memoryUsage: 0, avgQueryTime: 0, avgSearchTime: 0,
+      memoryUsage: 0,
+      avgQueryTime: 0,
+      avgSearchTime: 0
     };
   }
   async healthCheck() {
@@ -113,16 +143,20 @@ class JsonFileBackend {
       components: {
         storage: { status: 'healthy', latency: 0 },
         index: { status: 'healthy', latency: 0 },
-        cache: { status: 'healthy', latency: 0 },
+        cache: { status: 'healthy', latency: 0 }
       },
-      timestamp: Date.now(), issues: [], recommendations: [],
+      timestamp: Date.now(),
+      issues: [],
+      recommendations: []
     };
   }
 
   _persist() {
     try {
       writeFileSync(this.filePath, JSON.stringify([...this.entries.values()], null, 2), 'utf-8');
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
   }
 }
 
@@ -136,7 +170,9 @@ async function loadMemoryPackage() {
   if (existsSync(localDist)) {
     try {
       return await import(`file://${localDist}`);
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   // Strategy 2: Use createRequire for CJS-style resolution (handles nested node_modules
@@ -145,12 +181,16 @@ async function loadMemoryPackage() {
     const { createRequire } = await import('module');
     const require = createRequire(join(PROJECT_ROOT, 'package.json'));
     return require('@claude-flow/memory');
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Strategy 3: ESM import (works when @claude-flow/memory is a direct dependency)
   try {
     return await import('@claude-flow/memory');
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Strategy 4: Walk up from PROJECT_ROOT looking for @claude-flow/memory in any node_modules
   let searchDir = PROJECT_ROOT;
@@ -160,7 +200,9 @@ async function loadMemoryPackage() {
     if (existsSync(candidate)) {
       try {
         return await import(`file://${candidate}`);
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
     searchDir = dirname(searchDir);
   }
@@ -175,9 +217,15 @@ async function loadMemoryPackage() {
 function readConfig() {
   const configPath = join(PROJECT_ROOT, '.claude-flow', 'config.yaml');
   const defaults = {
-    learningBridge: { enabled: true, sonaMode: 'balanced', confidenceDecayRate: 0.005, accessBoostAmount: 0.03, consolidationThreshold: 10 },
+    learningBridge: {
+      enabled: true,
+      sonaMode: 'balanced',
+      confidenceDecayRate: 0.005,
+      accessBoostAmount: 0.03,
+      consolidationThreshold: 10
+    },
     memoryGraph: { enabled: true, pageRankDamping: 0.85, maxNodes: 5000, similarityThreshold: 0.8 },
-    agentScopes: { enabled: true, defaultScope: 'project' },
+    agentScopes: { enabled: true, defaultScope: 'project' }
   };
 
   if (!existsSync(configPath)) return defaults;
@@ -224,7 +272,7 @@ async function doImport() {
 
   const bridgeConfig = {
     workingDir: PROJECT_ROOT,
-    syncMode: 'on-session-end',
+    syncMode: 'on-session-end'
   };
 
   // Wire learning if enabled and available
@@ -233,7 +281,7 @@ async function doImport() {
       sonaMode: config.learningBridge.sonaMode,
       confidenceDecayRate: config.learningBridge.confidenceDecayRate,
       accessBoostAmount: config.learningBridge.accessBoostAmount,
-      consolidationThreshold: config.learningBridge.consolidationThreshold,
+      consolidationThreshold: config.learningBridge.consolidationThreshold
     };
   }
 
@@ -242,7 +290,7 @@ async function doImport() {
     bridgeConfig.graph = {
       pageRankDamping: config.memoryGraph.pageRankDamping,
       maxNodes: config.memoryGraph.maxNodes,
-      similarityThreshold: config.memoryGraph.similarityThreshold,
+      similarityThreshold: config.memoryGraph.similarityThreshold
     };
   }
 
@@ -284,21 +332,21 @@ async function doSync() {
 
   const bridgeConfig = {
     workingDir: PROJECT_ROOT,
-    syncMode: 'on-session-end',
+    syncMode: 'on-session-end'
   };
 
   if (config.learningBridge.enabled && memPkg.LearningBridge) {
     bridgeConfig.learning = {
       sonaMode: config.learningBridge.sonaMode,
       confidenceDecayRate: config.learningBridge.confidenceDecayRate,
-      consolidationThreshold: config.learningBridge.consolidationThreshold,
+      consolidationThreshold: config.learningBridge.consolidationThreshold
     };
   }
 
   if (config.memoryGraph.enabled && memPkg.MemoryGraph) {
     bridgeConfig.graph = {
       pageRankDamping: config.memoryGraph.pageRankDamping,
-      maxNodes: config.memoryGraph.maxNodes,
+      maxNodes: config.memoryGraph.maxNodes
     };
   }
 
@@ -327,7 +375,9 @@ async function doStatus() {
 
   console.log('\n=== Auto Memory Bridge Status ===\n');
   console.log(`  Package:        ${memPkg ? '✅ Available' : '❌ Not found'}`);
-  console.log(`  Store:          ${existsSync(STORE_PATH) ? '✅ ' + STORE_PATH : '⏸ Not initialized'}`);
+  console.log(
+    `  Store:          ${existsSync(STORE_PATH) ? '✅ ' + STORE_PATH : '⏸ Not initialized'}`
+  );
   console.log(`  LearningBridge: ${config.learningBridge.enabled ? '✅ Enabled' : '⏸ Disabled'}`);
   console.log(`  MemoryGraph:    ${config.memoryGraph.enabled ? '✅ Enabled' : '⏸ Disabled'}`);
   console.log(`  AgentScopes:    ${config.agentScopes.enabled ? '✅ Enabled' : '⏸ Disabled'}`);
@@ -336,7 +386,9 @@ async function doStatus() {
     try {
       const data = JSON.parse(readFileSync(STORE_PATH, 'utf-8'));
       console.log(`  Entries:        ${Array.isArray(data) ? data.length : 0}`);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   console.log('');
@@ -353,16 +405,24 @@ process.on('unhandledRejection', () => {});
 
 try {
   switch (command) {
-    case 'import': await doImport(); break;
-    case 'sync': await doSync(); break;
-    case 'status': await doStatus(); break;
+    case 'import':
+      await doImport();
+      break;
+    case 'sync':
+      await doSync();
+      break;
+    case 'status':
+      await doStatus();
+      break;
     default:
       console.log('Usage: auto-memory-hook.mjs <import|sync|status>');
       break;
   }
 } catch (err) {
   // Hooks must never crash Claude Code - fail silently
-  try { dim(`Error (non-critical): ${err.message}`); } catch (_) {}
+  try {
+    dim(`Error (non-critical): ${err.message}`);
+  } catch (_) {}
 }
 // Force clean exit — process.exitCode alone isn't enough if async errors override it
 process.exit(0);

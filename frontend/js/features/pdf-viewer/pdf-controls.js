@@ -36,7 +36,8 @@ export function initPdfControls(options) {
     function () {
       setTimeout(function () {
         var sel = window.getSelection();
-        if (sel && sel.toString().trim().length > 3) options.showSelectionBanner(sel.toString().trim());
+        if (sel && sel.toString().trim().length > 3)
+          options.showSelectionBanner(sel.toString().trim());
       }, 30);
     }
   );
