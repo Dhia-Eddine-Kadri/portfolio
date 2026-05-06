@@ -1,0 +1,275 @@
+// StudySphere auth/bootstrap shell.
+// Runs before supabase.js and loader.js so they can read the boot route.
+
+(function () {
+  var loggedIn = false;
+
+  try {
+    loggedIn = sessionStorage.getItem('ss_logged_in') === 'true';
+  } catch (e) {}
+
+  if (!loggedIn && window.location.hash && window.location.hash.indexOf('access_token') !== -1) {
+    loggedIn = true;
+  }
+
+  if (!loggedIn) {
+    try {
+      var qp = new URLSearchParams(window.location.search);
+      if (
+        qp.get('token') ||
+        qp.get('token_hash') ||
+        qp.get('confirmation_token') ||
+        qp.get('code')
+      ) {
+        loggedIn = true;
+      }
+    } catch (e) {}
+  }
+
+  if (!loggedIn) {
+    try {
+      if (sessionStorage.getItem('ss_force_app') === 'true') {
+        sessionStorage.removeItem('ss_force_app');
+        loggedIn = true;
+      }
+    } catch (e) {}
+  }
+
+  if (!loggedIn) {
+    try {
+      if (localStorage.getItem('sb_token')) loggedIn = true;
+    } catch (e) {}
+  }
+
+  window._ssIsLoggedIn = loggedIn;
+  if (window.StudySphere) {
+    window.StudySphere.setState({ bootLoggedIn: loggedIn });
+    window.StudySphere.emit('auth:boot-route', { loggedIn: loggedIn });
+  }
+
+  try {
+    if (localStorage.getItem('ss_dark') === '0') document.body.classList.remove('night');
+  } catch (e) {}
+
+  if (loggedIn) {
+    var sp = document.getElementById('ss-splash');
+    if (sp) sp.style.display = 'flex';
+  }
+})();
+
+window._onLoginSuccess = function () {
+  try {
+    sessionStorage.setItem('ss_logged_in', 'true');
+    sessionStorage.setItem('ss_last_active', Date.now());
+  } catch (e) {}
+  if (window.StudySphere) window.StudySphere.emit('auth:login-success', {});
+  window.location.reload();
+};
+
+window._ssHideSplash = function () {
+  var sp = document.getElementById('ss-splash');
+  if (!sp || sp.style.display === 'none') return;
+  sp.classList.add('ss-splash-out');
+  setTimeout(function () {
+    sp.style.display = 'none';
+    sp.classList.remove('ss-splash-out');
+  }, 550);
+};
+
+var _CFG = window.StudySphereConfig || {};
+var _GCID = _CFG.googleClientId || window._GCID || '';
+var _SUPA = _CFG.supabaseUrl || window._SUPA || '';
+var _SAKEY = _CFG.supabaseAnonKey || window._SAKEY || '';
+
+var _REDIRECT = (function () {
+  var loc = window.location;
+  var path = loc.pathname;
+  if (!path.match(/\.html?$/i)) path = path.replace(/\/?$/, '/index.html');
+  return loc.origin + path;
+})();
+
+function _oauthFallback() {
+  window.location.href =
+    _SUPA + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(_REDIRECT);
+}
+
+var _oneTapNonce = null;
+
+function _generateNonce() {
+  var arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return Array.from(arr)
+    .map(function (b) {
+      return b.toString(16).padStart(2, '0');
+    })
+    .join('');
+}
+
+function _sha256hex(str) {
+  var buf = new TextEncoder().encode(str);
+  return crypto.subtle.digest('SHA-256', buf).then(function (hash) {
+    return Array.from(new Uint8Array(hash))
+      .map(function (b) {
+        return b.toString(16).padStart(2, '0');
+      })
+      .join('');
+  });
+}
+
+function _handleGoogleCredential(response) {
+  if (window.StudySphere) window.StudySphere.setAuth('checking', { source: 'google-one-tap' });
+  var body = { provider: 'google', id_token: response.credential, gotrue_meta_security: {} };
+  if (_oneTapNonce) body.nonce = _oneTapNonce;
+  fetch(_SUPA + '/auth/v1/token?grant_type=id_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: _SAKEY },
+    body: JSON.stringify(body)
+  })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      if (d && d.access_token) {
+        localStorage.setItem('sb_token', d.access_token);
+        if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
+        if (window.StudySphere)
+          window.StudySphere.setAuth('token-received', { source: 'google-one-tap' });
+        var alreadyIn = false;
+        try {
+          alreadyIn = sessionStorage.getItem('ss_logged_in') === 'true';
+        } catch (e) {}
+        if (!alreadyIn) window._onLoginSuccess();
+      } else {
+        if (window.StudySphere) window.StudySphere.setAuth('failed', { source: 'google-one-tap' });
+        console.warn('[Auth] id_token exchange failed:', d && (d.error || d.msg));
+        _oauthFallback();
+      }
+    })
+    .catch(function (err) {
+      if (window.StudySphere) window.StudySphere.setAuth('failed', { source: 'google-one-tap' });
+      console.warn('[Auth] id_token fetch error, falling back to OAuth:', err);
+      _oauthFallback();
+    });
+}
+
+function _initOneTap() {
+  var parent = document.getElementById('ss-one-tap-parent');
+  if (!parent) {
+    parent = document.createElement('div');
+    parent.id = 'ss-one-tap-parent';
+    parent.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;';
+    document.body.appendChild(parent);
+  }
+
+  var rawNonce = _generateNonce();
+  _oneTapNonce = rawNonce;
+  _sha256hex(rawNonce).then(function (hashedNonce) {
+    google.accounts.id.initialize({
+      client_id: _GCID,
+      callback: _handleGoogleCredential,
+      context: 'signin',
+      cancel_on_tap_outside: false,
+      auto_select: false,
+      itp_support: true,
+      nonce: hashedNonce,
+      prompt_parent_id: 'ss-one-tap-parent'
+    });
+
+    if (!window._ssIsLoggedIn) {
+      google.accounts.id.prompt(function (notification) {
+        if (notification.isNotDisplayed()) {
+          console.warn('[OneTap] not displayed:', notification.getNotDisplayedReason());
+          window._oneTapBlocked = true;
+        } else if (notification.isSkippedMoment()) {
+          console.log('[OneTap] skipped:', notification.getSkippedReason());
+          window._oneTapBlocked = true;
+        } else if (notification.isDismissedMoment()) {
+          var reason = notification.getDismissedReason();
+          console.log('[OneTap] dismissed:', reason);
+          if (reason !== 'credential_returned') window._oneTapBlocked = true;
+        }
+      });
+    }
+  });
+}
+
+window._googleAuth = function () {
+  if (window.StudySphere)
+    window.StudySphere.emit('auth:google-start', {
+      inAppShell: !!document.getElementById('authModal')
+    });
+
+  if (document.getElementById('authModal')) {
+    _oauthFallback();
+    return;
+  }
+
+  if (window._oneTapBlocked) {
+    try {
+      sessionStorage.setItem('ss_force_app', 'true');
+      sessionStorage.setItem('ss_show_auth', 'true');
+    } catch (e) {}
+    window.location.reload();
+    return;
+  }
+
+  var showAuthModal = function () {
+    try {
+      sessionStorage.setItem('ss_force_app', 'true');
+      sessionStorage.setItem('ss_show_auth', 'true');
+    } catch (e) {}
+    window.location.reload();
+  };
+
+  var tryOneTap = function () {
+    google.accounts.id.prompt(function (notification) {
+      if (
+        notification.isNotDisplayed() ||
+        notification.isSkippedMoment() ||
+        (notification.isDismissedMoment() &&
+          notification.getDismissedReason() !== 'credential_returned')
+      ) {
+        window._oneTapBlocked = true;
+        showAuthModal();
+      }
+    });
+  };
+
+  if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+    tryOneTap();
+    return;
+  }
+
+  var attempts = 0;
+  var wait = setInterval(function () {
+    attempts++;
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+      clearInterval(wait);
+      tryOneTap();
+    } else if (attempts >= 30) {
+      clearInterval(wait);
+      showAuthModal();
+    }
+  }, 100);
+};
+
+var _gsiTimer = setInterval(function () {
+  if (typeof google !== 'undefined' && google.accounts) {
+    clearInterval(_gsiTimer);
+    _initOneTap();
+  }
+}, 100);
+
+(function () {
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(function (ev) {
+    document.addEventListener(
+      ev,
+      function () {
+        try {
+          sessionStorage.setItem('ss_last_active', Date.now());
+        } catch (e) {}
+      },
+      { passive: true }
+    );
+  });
+})();

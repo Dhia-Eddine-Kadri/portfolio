@@ -1,0 +1,184 @@
+.settings-block {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.settings-block-title {
+  font-weight: 900;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--on-glass-muted);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-row-new {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--glass-border);
+  gap: 16px;
+}
+.settings-row-new:last-child {
+  border-bottom: none;
+}
+.settings-row-lbl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--on-glass);
+}
+.settings-row-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--card-inner);
+  border: 1px solid var(--card-inner-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-track {
+  width: 42px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  transition: background 0.2s;
+  position: relative;
+}
+body:not(.night) .toggle-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+.toggle input:checked + .toggle-track {
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: left 0.2s;
+}
+.toggle input:checked + .toggle-track::after {
+  left: 21px;
+}
+.settings-select-new {
+  background: var(--row-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--on-glass);
+  outline: none;
+  cursor: pointer;
+}
+
+.music-service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  gap: 14px;
+}
+.music-service-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.music-service-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.music-service-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--on-glass);
+}
+.music-service-status {
+  font-size: 0.72rem;
+  color: var(--on-glass-muted);
+  margin-top: 1px;
+}
+.music-service-status.connected {
+  color: #1db954;
+}
+.music-connect-btn {
+  padding: 7px 16px;
+  border: 1.5px solid rgba(37, 99, 235, 0.3);
+  border-radius: 20px;
+  background: none;
+  color: #60a5fa;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.music-connect-btn:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: #60a5fa;
+}
+.music-connect-btn.connected {
+  border-color: #1db954;
+  color: #1db954;
+}
+.music-service-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 6px 0 14px;
+}
+.music-yt-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.music-yt-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--row-bg);
+  color: var(--on-glass);
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.music-yt-input:focus {
+  border-color: #2563eb;
+}

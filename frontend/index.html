@@ -1,0 +1,45 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StudySphere</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="stylesheet" href="css/base.css?v=5" />
+    <link rel="stylesheet" href="css/theme.css?v=5" />
+    <link rel="stylesheet" href="css/styles.css?v=5" />
+    <link rel="stylesheet" href="css/layout.css?v=5" />
+  </head>
+  <body class="night">
+    <!-- Splash screen shown while the app loads after sign-in -->
+    <div id="ss-splash" style="display: none">
+      <div class="ss-splash-inner">
+        <div class="ss-splash-icon">S</div>
+        <div class="ss-splash-name">StudySphere</div>
+        <div class="ss-splash-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <!-- SECTIONS ARE INJECTED HERE BY loader.js -->
+    <div id="ss-sections-root"></div>
+
+    <script src="js/studysphere.js?v=2"></script>
+    <script src="js/config.js?v=1"></script>
+
+    <!-- Auth/session bootstrap: runs synchronously before supabase.js and loader.js -->
+    <script src="js/auth-bootstrap.js?v=1"></script>
+
+    <!-- Supabase REST client + auth logic (_enterApp, _showModal, _verifyAndEnter) -->
+    <script src="js/supabase.js?v=3"></script>
+
+    <!-- Section loader: fetches and injects HTML sections, fires ss-ready when done -->
+    <script src="js/loader.js?v=4"></script>
+  </body>
+</html>

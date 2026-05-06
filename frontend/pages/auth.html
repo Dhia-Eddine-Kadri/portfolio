@@ -1,0 +1,419 @@
+<!-- AUTH MODAL
+     One Tap is initialised in index.html (_initOneTap / _handleGoogleCredential).
+     Scripts injected via innerHTML never execute, so ALL auth JS lives in index.html.
+     This file contains only the modal markup. -->
+<div
+  id="authModal"
+  style="
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--auth-bg);
+    backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div
+    id="authBox"
+    style="
+      background: var(--auth-box-bg);
+      border: 1px solid var(--auth-box-border);
+      border-radius: 24px;
+      width: min(780px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: row;
+    "
+  >
+    <!-- Left: form -->
+    <div
+      style="
+        flex: 1;
+        padding: 40px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow-y: auto;
+      "
+    >
+      <div style="text-align: center">
+        <div
+          style="
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #c084fc, #f472b6, #fb923c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+          "
+        >
+          StudySphere
+        </div>
+        <div
+          id="authTitle"
+          style="font-size: 0.85rem; color: var(--auth-subtitle); font-weight: 700"
+        >
+          Sign in to your account
+        </div>
+      </div>
+      <div
+        id="authError"
+        style="
+          display: none;
+          background: rgba(255, 107, 55, 0.12);
+          border: 1px solid rgba(255, 107, 55, 0.3);
+          border-radius: 10px;
+          padding: 9px 14px;
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: #ff6b35;
+          text-align: center;
+        "
+      ></div>
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <label
+            style="
+              font-size: 0.7rem;
+              font-weight: 800;
+              color: var(--auth-label);
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            "
+            data-i18n="auth_email_label"
+            >Email</label
+          >
+          <input
+            id="authEmail"
+            type="email"
+            placeholder="your@email.com"
+            style="
+              background: var(--auth-input-bg);
+              border: 1px solid var(--auth-input-border);
+              border-radius: 10px;
+              padding: 11px 14px;
+              font-family: 'Nunito', sans-serif;
+              font-size: 0.85rem;
+              font-weight: 700;
+              color: var(--auth-input-color);
+              outline: none;
+              transition: border-color 0.15s;
+            "
+          />
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <label
+            style="
+              font-size: 0.7rem;
+              font-weight: 800;
+              color: var(--auth-label);
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            "
+            data-i18n="auth_password_label"
+            >Password</label
+          >
+          <div style="position: relative">
+            <input
+              id="authPassword"
+              type="password"
+              placeholder="••••••••"
+              style="
+                background: var(--auth-input-bg);
+                border: 1px solid var(--auth-input-border);
+                border-radius: 10px;
+                padding: 11px 40px 11px 14px;
+                font-family: 'Nunito', sans-serif;
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: var(--auth-input-color);
+                outline: none;
+                transition: border-color 0.15s;
+                width: 100%;
+              "
+            />
+            <button
+              type="button"
+              id="togglePw"
+              style="
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 0.95rem;
+                line-height: 1;
+                padding: 2px 4px;
+                color: var(--auth-toggle-pw);
+              "
+              title="Show/hide password"
+            >
+              👁
+            </button>
+          </div>
+          <!-- Strength bar (shown on signup only) -->
+          <div id="pwStrengthWrap" style="display: none; margin-top: 4px">
+            <div style="display: flex; gap: 4px; margin-bottom: 4px">
+              <div
+                id="pws1"
+                style="
+                  flex: 1;
+                  height: 4px;
+                  border-radius: 4px;
+                  background: var(--auth-pw-bar);
+                  transition: background 0.3s;
+                "
+              ></div>
+              <div
+                id="pws2"
+                style="
+                  flex: 1;
+                  height: 4px;
+                  border-radius: 4px;
+                  background: var(--auth-pw-bar);
+                  transition: background 0.3s;
+                "
+              ></div>
+              <div
+                id="pws3"
+                style="
+                  flex: 1;
+                  height: 4px;
+                  border-radius: 4px;
+                  background: var(--auth-pw-bar);
+                  transition: background 0.3s;
+                "
+              ></div>
+              <div
+                id="pws4"
+                style="
+                  flex: 1;
+                  height: 4px;
+                  border-radius: 4px;
+                  background: var(--auth-pw-bar);
+                  transition: background 0.3s;
+                "
+              ></div>
+            </div>
+            <div
+              id="pwStrengthLabel"
+              style="font-size: 0.68rem; font-weight: 800; color: var(--auth-pw-label)"
+            ></div>
+          </div>
+        </div>
+        <!-- Confirm password (signup only) -->
+        <div id="authConfirmWrap" style="display: none; flex-direction: column; gap: 5px">
+          <label
+            style="
+              font-size: 0.7rem;
+              font-weight: 800;
+              color: var(--auth-label);
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            "
+            data-i18n="auth_confirm_label"
+            >Confirm Password</label
+          >
+          <div style="position: relative">
+            <input
+              id="authConfirm"
+              type="password"
+              placeholder="••••••••"
+              style="
+                background: var(--auth-input-bg);
+                border: 1px solid var(--auth-input-border);
+                border-radius: 10px;
+                padding: 11px 40px 11px 14px;
+                font-family: 'Nunito', sans-serif;
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: var(--auth-input-color);
+                outline: none;
+                transition: border-color 0.15s;
+                width: 100%;
+              "
+            />
+            <button
+              type="button"
+              id="toggleConfirm"
+              style="
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 0.95rem;
+                line-height: 1;
+                padding: 2px 4px;
+                opacity: 0.5;
+              "
+              title="Show/hide password"
+            >
+              👁
+            </button>
+          </div>
+          <div
+            id="authConfirmHint"
+            style="
+              font-size: 0.68rem;
+              font-weight: 800;
+              color: var(--auth-confirm-hint);
+              margin-top: 2px;
+            "
+          ></div>
+        </div>
+      </div>
+      <button
+        id="authSubmit"
+        style="
+          padding: 13px;
+          background: linear-gradient(135deg, #c084fc, #f472b6);
+          border: none;
+          border-radius: 30px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.9rem;
+          color: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(192, 132, 252, 0.4);
+        "
+      >
+        Sign In
+      </button>
+      <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0">
+        <div style="flex: 1; height: 1px; background: var(--auth-divider)"></div>
+        <span style="font-size: 0.72rem; font-weight: 700; color: var(--auth-divider-text)"
+          >or</span
+        >
+        <div style="flex: 1; height: 1px; background: var(--auth-divider)"></div>
+      </div>
+      <button
+        id="googleSignIn"
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 12px;
+          background: var(--auth-google-bg);
+          border: 1px solid var(--auth-google-border);
+          border-radius: 30px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.9rem;
+          color: var(--auth-google-color);
+          cursor: pointer;
+          transition: all 0.2s;
+          width: 100%;
+        "
+      >
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path
+            fill="#FFC107"
+            d="M43.6 20.1H42V20H24v8h11.3C33.6 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.5 6.5 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"
+          />
+          <path
+            fill="#FF3D00"
+            d="M6.3 14.7l6.6 4.8C14.6 16 19 12 24 12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.5 6.5 29.5 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"
+          />
+          <path
+            fill="#4CAF50"
+            d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.5 26.7 36 24 36c-5.2 0-9.7-3.3-11.3-7.9l-6.6 5.1C9.5 39.5 16.3 44 24 44z"
+          />
+          <path
+            fill="#1976D2"
+            d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.4 4.3-4.4 5.6l6.2 5.2C36.9 36.6 44 31 44 24c0-1.3-.1-2.6-.4-3.9z"
+          />
+        </svg>
+        <span data-i18n="auth_google_btn">Continue with Google</span>
+      </button>
+      <label
+        style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none"
+      >
+        <input
+          type="checkbox"
+          id="staySignedIn"
+          style="width: 16px; height: 16px; accent-color: #c084fc; cursor: pointer"
+          checked
+        />
+        <span
+          style="font-size: 0.78rem; font-weight: 700; color: var(--auth-stay)"
+          data-i18n="auth_stay"
+          >Stay signed in</span
+        >
+        <span
+          style="font-size: 0.68rem; color: var(--auth-stay-timeout); margin-left: auto"
+          data-i18n="auth_stay_timeout"
+          >(30 min timeout)</span
+        >
+      </label>
+      <div
+        style="text-align: center; font-size: 0.78rem; color: var(--auth-footer); font-weight: 700"
+      >
+        <span id="authSwitch" style="color: var(--purple); cursor: pointer; font-weight: 800"
+          >Don't have an account? Sign up</span
+        >
+      </div>
+    </div>
+
+    <!-- Right: cat mascot panel -->
+    <div
+      style="
+        width: 300px;
+        flex-shrink: 0;
+        background: linear-gradient(160deg, #3b1d6e, #6d28d9, #a855f7);
+        border-radius: 0 24px 24px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 36px 28px;
+        gap: 20px;
+      "
+    >
+      <img
+        src="assets/cat-mascot.jpg"
+        alt="StudySphere mascot"
+        style="
+          width: 230px;
+          height: 230px;
+          object-fit: cover;
+          border-radius: 50%;
+          box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+          border: 4px solid rgba(255, 255, 255, 0.2);
+        "
+      />
+      <div
+        style="
+          color: #fff;
+          font-family: 'Fredoka One', cursive;
+          font-size: 1.35rem;
+          text-align: center;
+          line-height: 1.3;
+        "
+      >
+        Your 24/7<br />Study Buddy
+      </div>
+      <div
+        style="
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 0.82rem;
+          font-weight: 700;
+          text-align: center;
+          line-height: 1.6;
+        "
+      >
+        Ask questions, get explanations,<br />and ace your degree.
+      </div>
+    </div>
+  </div>
+</div>

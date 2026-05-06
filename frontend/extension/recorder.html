@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 380px;
+        min-height: 130px;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background: linear-gradient(135deg, #0a0812 0%, #110d20 100%);
+        color: #e8e4f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 20px;
+      }
+      #status {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+        line-height: 1.6;
+      }
+      #status code {
+        display: inline-block;
+        margin-top: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      #btn {
+        padding: 10px 28px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #9b5de5, #7b4fc9);
+        color: #fff;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(155, 93, 229, 0.45);
+        transition: opacity 0.15s;
+        width: 100%;
+      }
+      #btn:hover {
+        opacity: 0.88;
+      }
+      #btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+        box-shadow: none;
+      }
+      #timer {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Click to start recording the lecture audio</div>
+    <button id="btn">▶ Start Recording</button>
+    <div id="timer"></div>
+    <script src="recorder.js"></script>
+  </body>
+</html>

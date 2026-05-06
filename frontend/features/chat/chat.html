@@ -1,0 +1,867 @@
+﻿<div class="dc-layout">
+  <!-- LEFT SIDEBAR -->
+  <div class="dc-sidebar">
+    <div class="dc-sidebar-top">
+      <span class="dc-sidebar-title">Chat</span>
+      <div class="dc-sidebar-btns">
+        <button class="dc-top-btn" id="chatCreateRoomBtn">&#x2B; Room</button>
+        <button class="dc-top-btn" id="chatJoinRoomBtn">&#x1F4AC; Join</button>
+        <button class="dc-top-btn" id="chatAddFriendBtn">&#x1F464;+</button>
+      </div>
+    </div>
+    <div class="dc-sidebar-body" id="chatRoomsList"></div>
+    <div class="dc-sidebar-footer">
+      <div class="dc-user-chip">
+        <div class="dc-user-av" id="dcUserAv">?</div>
+        <div class="dc-user-meta">
+          <div class="dc-user-name" id="dcUserName2">You</div>
+          <div class="dc-user-status"><span class="dc-dot online"></span>Online</div>
+        </div>
+        <button
+          class="dc-cog-btn"
+          id="chatSidebarSettingsBtn"
+          title="Settings"
+        >
+          &#x2699;
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- MAIN CHAT AREA -->
+  <div class="dc-main">
+    <div class="dc-main-hdr">
+      <div class="dc-main-hdr-left">
+        <span class="dc-main-room-name" id="chatRoomName">Select a room</span>
+        <span class="dc-main-room-desc" id="chatRoomTopic"></span>
+      </div>
+      <div class="dc-main-hdr-right">
+        <button class="dc-hdr-icon-btn" id="chatSearchToggleBtn" title="Search messages">
+          &#x1F50D;
+        </button>
+        <button
+          class="dc-hdr-icon-btn"
+          id="chatPinsBtn"
+          style="display: none"
+          title="Pinned Messages"
+        >
+          &#x2606;
+        </button>
+        <button
+          class="dc-hdr-icon-btn"
+          id="chatNicknameBtn"
+          style="display: none"
+          title="Set Nickname"
+        >
+          &#x270F;&#xFE0F;
+        </button>
+        <button
+          class="dc-hdr-icon-btn"
+          id="chatCopyInviteHdrBtn"
+          style="display: none"
+          title="Copy Invite Link"
+        >
+          &#x1F517;
+        </button>
+        <button class="dc-hdr-icon-btn" id="chatMembersToggleBtn" title="Members">&#x1F465;</button>
+        <button
+          class="dc-hdr-icon-btn"
+          id="chatRoomSettingsBtn"
+          style="display: none"
+          title="Room Settings"
+        >
+          &#x22EE;
+        </button>
+      </div>
+    </div>
+    <!-- Animated background blobs -->
+    <div class="dc-bg" aria-hidden="true">
+      <div class="dc-blob dc-blob-1"></div>
+      <div class="dc-blob dc-blob-2"></div>
+    </div>
+    <!-- NSFW gate -->
+    <div
+      id="chatNsfwGate"
+      style="
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 50;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(20px);
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+      "
+    >
+      <div style="font-size: 3rem">&#x1F514;</div>
+      <div style="font-family: 'Fredoka One', cursive; font-size: 1.4rem; color: #fff">
+        NSFW Channel
+      </div>
+      <div
+        style="
+          font-size: 0.82rem;
+          color: rgba(255, 255, 255, 0.5);
+          max-width: 280px;
+          text-align: center;
+        "
+      >
+        This room contains content that may not be appropriate for all audiences.
+      </div>
+      <button
+        id="chatNsfwEnterBtn"
+        style="
+          padding: 12px 32px;
+          background: linear-gradient(135deg, #c084fc, #f472b6);
+          border: none;
+          border-radius: 30px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          color: #fff;
+          cursor: pointer;
+          font-size: 0.9rem;
+        "
+      >
+        I&#x2019;m 18+ &#x2014; Enter
+      </button>
+    </div>
+    <!-- Messages -->
+    <div class="dc-msgs" id="chatMsgs">
+      <div class="chat-empty">Select a room to start chatting &#x1F4AC;</div>
+    </div>
+    <!-- Reaction picker -->
+    <div
+      id="chatReactionPicker"
+      style="
+        display: none;
+        position: absolute;
+        z-index: 100;
+        background: var(--dp-modal);
+        border: 1px solid rgba(192, 132, 252, 0.25);
+        border-radius: 14px;
+        padding: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      "
+    >
+      <div style="display: flex; gap: 4px">
+        <span class="chat-react-emoji" data-emoji="&#x1F44D;">&#x1F44D;</span>
+        <span class="chat-react-emoji" data-emoji="&#x2764;&#xFE0F;">&#x2764;&#xFE0F;</span>
+        <span class="chat-react-emoji" data-emoji="&#x1F602;">&#x1F602;</span>
+        <span class="chat-react-emoji" data-emoji="&#x1F62E;">&#x1F62E;</span>
+        <span class="chat-react-emoji" data-emoji="&#x1F622;">&#x1F622;</span>
+        <span class="chat-react-emoji" data-emoji="&#x1F525;">&#x1F525;</span>
+        <span class="chat-react-emoji" data-emoji="&#x2705;">&#x2705;</span>
+        <span class="chat-react-emoji" data-emoji="&#x1F389;">&#x1F389;</span>
+      </div>
+    </div>
+    <!-- Typing indicator -->
+    <div
+      id="chatTypingBar"
+      style="
+        height: 18px;
+        padding: 0 16px;
+        font-size: 0.72rem;
+        color: rgba(192, 132, 252, 0.7);
+        font-weight: 700;
+        font-style: italic;
+        position: relative;
+        z-index: 2;
+      "
+    ></div>
+    <!-- Reply preview bar -->
+    <div
+      id="chatReplyBar"
+      style="
+        display: none;
+        padding: 6px 16px;
+        background: rgba(192, 132, 252, 0.08);
+        border-top: 1px solid rgba(192, 132, 252, 0.15);
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.6);
+        position: relative;
+        z-index: 2;
+      "
+    >
+      <span
+        >&#x21A9;&#xFE0F; Replying to <b id="chatReplyName"></b>:
+        <span id="chatReplyPreview" style="opacity: 0.7"></span
+      ></span>
+      <button
+        id="chatReplyCancelBtn"
+        style="
+          background: none;
+          border: none;
+          color: rgba(255, 255, 255, 0.4);
+          cursor: pointer;
+          font-size: 1rem;
+        "
+      >
+        &#x2715;
+      </button>
+    </div>
+    <!-- Slowmode bar -->
+    <div
+      id="chatSlowmodeBar"
+      style="
+        display: none;
+        padding: 4px 16px;
+        background: rgba(239, 68, 68, 0.08);
+        border-top: 1px solid rgba(239, 68, 68, 0.15);
+        font-size: 0.72rem;
+        color: #ef4444;
+        font-weight: 700;
+        text-align: center;
+        position: relative;
+        z-index: 2;
+      "
+    ></div>
+    <!-- File preview bar -->
+    <div
+      id="chatFilePreviewBar"
+      style="
+        display: none;
+        padding: 6px 16px;
+        background: rgba(192, 132, 252, 0.08);
+        border-top: 1px solid rgba(192, 132, 252, 0.15);
+        align-items: center;
+        gap: 10px;
+        position: relative;
+        z-index: 2;
+      "
+    >
+      <span
+        id="chatFilePreviewName"
+        style="
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: var(--on-glass);
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        "
+      ></span>
+      <button
+        id="chatFileCancelBtn"
+        style="
+          background: none;
+          border: none;
+          color: rgba(255, 255, 255, 0.4);
+          cursor: pointer;
+          font-size: 1rem;
+        "
+      >
+        &#x2715;
+      </button>
+    </div>
+    <!-- GIF search panel -->
+    <div
+      id="chatGifPanel"
+      style="
+        display: none;
+        padding: 8px;
+        border-top: 1px solid rgba(192, 132, 252, 0.1);
+        background: var(--dp-modal);
+        position: relative;
+        z-index: 2;
+      "
+    >
+      <input
+        id="chatGifSearch"
+        type="text"
+        placeholder="Search GIFs..."
+        style="
+          width: 100%;
+          background: var(--row-bg);
+          border: 1px solid rgba(192, 132, 252, 0.2);
+          border-radius: 20px;
+          padding: 7px 14px;
+          font-family: 'Nunito', sans-serif;
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: var(--on-glass);
+          outline: none;
+        "
+      />
+      <div
+        id="chatGifResults"
+        style="
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 8px;
+          max-height: 180px;
+          overflow-y: auto;
+        "
+      ></div>
+    </div>
+    <!-- Search bar -->
+    <div
+      id="chatSearchBar"
+      style="
+        display: none;
+        padding: 8px 12px;
+        border-top: 1px solid rgba(192, 132, 252, 0.1);
+        background: var(--dp-modal);
+        gap: 8px;
+        align-items: center;
+        position: relative;
+        z-index: 2;
+      "
+    >
+      <input
+        id="chatSearchInput"
+        type="text"
+        placeholder="Search messages&#x2026;"
+        style="
+          flex: 1;
+          background: var(--row-bg);
+          border: 1px solid rgba(192, 132, 252, 0.2);
+          border-radius: 20px;
+          padding: 7px 14px;
+          font-family: 'Nunito', sans-serif;
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: var(--on-glass);
+          outline: none;
+          width: 100%;
+        "
+      />
+      <div
+        id="chatSearchResults"
+        style="
+          max-height: 200px;
+          overflow-y: auto;
+          margin-top: 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        "
+      ></div>
+    </div>
+    <!-- Input row -->
+    <div class="dc-input-row">
+      <input
+        type="file"
+        id="chatFileInput"
+        style="display: none"
+        accept=".pdf,.txt,.docx,.png,.jpg,.jpeg"
+      />
+      <button class="dc-input-btn" id="chatAttachBtn" disabled title="Attach file">&#x2B;</button>
+      <button class="dc-input-btn" id="chatGifBtn" disabled title="Send GIF">GIF</button>
+      <div class="dc-input-wrap">
+        <input
+          class="dc-text-input"
+          id="chatInput"
+          type="text"
+          placeholder="Select a room first&#x2026;"
+          maxlength="500"
+          autocomplete="off"
+          disabled
+        />
+        <button class="dc-mic-btn" type="button" title="Voice">&#x1F3A4;</button>
+      </div>
+      <button class="dc-send-btn" id="chatSendBtn" disabled>
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Members panel -->
+  <div class="dc-members-panel" id="chatMembersPanel">
+    <div class="dc-members-section">
+      <div class="dc-members-label">ONLINE &#x2014; <span id="chatOnlineCount">0</span></div>
+      <div id="chatOnlineList"></div>
+    </div>
+    <div class="dc-members-section">
+      <div class="dc-members-label">OFFLINE &#x2014; <span id="chatOfflineCount">0</span></div>
+      <div id="chatOfflineList"></div>
+    </div>
+  </div>
+
+  <!-- Pins panel (kept for JS compatibility) -->
+  <div
+    id="chatPinsPanel"
+    style="
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 260px;
+      z-index: 30;
+      border-left: 1px solid rgba(192, 132, 252, 0.1);
+      flex-direction: column;
+      background: var(--dp-modal);
+      flex-shrink: 0;
+    "
+  >
+    <div
+      style="
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(192, 132, 252, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      "
+    >
+      <span style="font-weight: 800; font-size: 0.88rem; color: var(--on-glass)"
+        >&#x1F4CC; Pinned Messages</span
+      >
+      <button
+        id="chatPinsPanelClose"
+        style="
+          background: none;
+          border: none;
+          color: var(--on-glass-muted);
+          cursor: pointer;
+          font-size: 1rem;
+        "
+      >
+        &#x2715;
+      </button>
+    </div>
+    <div id="chatPinsList" style="flex: 1; overflow-y: auto; padding: 10px"></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<!-- Create/Edit Room Modal -->
+<div
+  id="chatRoomModal"
+  style="
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 210;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="chat-friend-box" style="max-width: 380px; width: 100%">
+    <div class="chat-friend-box-hdr">
+      <span id="chatRoomModalTitle">&#x2B; Create Room</span>
+      <button class="chat-friend-box-close" id="chatRoomModalClose">&#x2715;</button>
+    </div>
+    <input
+      class="chat-friend-search"
+      id="chatRoomNameInput"
+      type="text"
+      placeholder="Room name..."
+      maxlength="40"
+      autocomplete="off"
+    />
+    <input
+      class="chat-friend-search"
+      id="chatRoomDescInput"
+      type="text"
+      placeholder="Description (optional)..."
+      maxlength="100"
+      autocomplete="off"
+    />
+    <input
+      class="chat-friend-search"
+      id="chatRoomTopicInput"
+      type="text"
+      placeholder="Topic (shown at top of chat)..."
+      maxlength="200"
+      autocomplete="off"
+    />
+    <div style="display: flex; gap: 8px; padding: 14px 20px 10px">
+      <button class="chat-vis-btn active" data-vis="public" id="visPublic" type="button">
+        🌐 Public
+      </button>
+      <button class="chat-vis-btn" data-vis="friends" id="visFriends" type="button">
+        👥 Friends
+      </button>
+      <button class="chat-vis-btn" data-vis="invite" id="visInvite" type="button">
+        🔗 Invite only
+      </button>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; padding: 4px 20px 12px">
+      <label
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: 'Nunito', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.5);
+          cursor: pointer;
+          flex: 1;
+        "
+      >
+        <input type="checkbox" id="chatRoomNsfwCheck" style="accent-color: #6c63ff" /> 🔔 NSFW
+      </label>
+      <label
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: 'Nunito', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.5);
+          flex: 2;
+        "
+      >
+        🐌 Slowmode:
+        <select
+          id="chatRoomSlowmodeSelect"
+          style="
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            padding: 5px 10px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.82);
+            cursor: pointer;
+            outline: none;
+          "
+        >
+          <option value="0">Off</option>
+          <option value="5">5s</option>
+          <option value="10">10s</option>
+          <option value="30">30s</option>
+          <option value="60">1 min</option>
+          <option value="300">5 min</option>
+        </select>
+      </label>
+    </div>
+    <div id="chatRoomInviteRow" style="display: none; padding: 0 20px 12px">
+      <button
+        id="chatCopyInviteBtn"
+        style="
+          width: 100%;
+          padding: 10px;
+          background: rgba(108, 99, 255, 0.12);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(108, 99, 255, 0.3);
+          border-radius: 14px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.78rem;
+          color: #a78bfa;
+          cursor: pointer;
+        "
+      >
+        🔗 Copy invite link
+      </button>
+    </div>
+    <div id="chatRoomFriendPicker" style="display: none; padding: 0 20px 12px">
+      <div
+        style="
+          font-size: 0.72rem;
+          font-weight: 800;
+          color: rgba(255, 255, 255, 0.4);
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        "
+      >
+        Add friends to this room
+      </div>
+      <div
+        id="chatRoomFriendList"
+        style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px"
+      ></div>
+    </div>
+    <div
+      id="chatRoomModalErr"
+      style="
+        display: none;
+        color: #f87171;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0 20px 10px;
+      "
+    ></div>
+    <div
+      style="
+        display: flex;
+        gap: 10px;
+        padding: 14px 20px 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      "
+    >
+      <button
+        id="chatRoomSaveBtn"
+        style="
+          flex: 1;
+          padding: 13px;
+          background: linear-gradient(135deg, #6c63ff, #7c3aed);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 14px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.9rem;
+          color: #fff;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(108, 99, 255, 0.45);
+        "
+      >
+        Create →
+      </button>
+      <button
+        id="chatRoomDeleteBtn"
+        style="
+          display: none;
+          padding: 13px 18px;
+          background: rgba(239, 68, 68, 0.12);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(239, 68, 68, 0.28);
+          border-radius: 14px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.9rem;
+          color: #f87171;
+          cursor: pointer;
+        "
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+</div>
+<!-- Nickname Modal -->
+<div
+  id="chatNicknameModal"
+  style="
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 210;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="chat-friend-box" style="max-width: 360px; width: 100%">
+    <div class="chat-friend-box-hdr">
+      <span>&#x270F;&#xFE0F; Set Nickname</span>
+      <button class="chat-friend-box-close" id="chatNicknameModalClose">&#x2715;</button>
+    </div>
+    <p
+      style="
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.5);
+        margin: 0;
+        padding: 10px 20px;
+        line-height: 1.5;
+      "
+    >
+      Change how your name appears in this room only.
+    </p>
+    <input
+      class="chat-friend-search"
+      id="chatNicknameInput"
+      type="text"
+      placeholder="Your nickname..."
+      maxlength="32"
+      autocomplete="off"
+    />
+    <div style="padding: 12px 16px; display: flex; gap: 8px">
+      <button
+        id="chatNicknameSaveBtn"
+        style="
+          flex: 1;
+          padding: 10px;
+          background: linear-gradient(135deg, #c084fc, #f472b6);
+          border: none;
+          border-radius: 30px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.88rem;
+          color: #fff;
+          cursor: pointer;
+        "
+      >
+        Save
+      </button>
+      <button
+        id="chatNicknameClearBtn"
+        style="
+          padding: 10px 16px;
+          background: rgba(239, 68, 68, 0.12);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          border-radius: 30px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.88rem;
+          color: #ef4444;
+          cursor: pointer;
+        "
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+</div>
+<!-- Username Setup Modal -->
+<div
+  id="chatUsernameModal"
+  style="
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 210;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="chat-friend-box" style="max-width: 360px; width: 100%">
+    <div class="chat-friend-box-hdr" style="margin-bottom: 6px">
+      <span>&#x1F464; Choose a Username</span>
+    </div>
+    <p
+      style="
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.5);
+        margin: 0 0 14px;
+        line-height: 1.5;
+      "
+    >
+      Pick a unique username so other students can find and add you in Chat.
+    </p>
+    <input
+      class="chat-friend-search"
+      id="chatUsernameInput"
+      type="text"
+      placeholder="e.g. mohamed_ali"
+      autocomplete="off"
+      maxlength="32"
+      style="margin-bottom: 8px"
+    />
+    <div
+      id="chatUsernameErr"
+      style="
+        display: none;
+        color: #ef4444;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+      "
+    ></div>
+    <button
+      id="chatUsernameSaveBtn"
+      style="
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #c084fc, #f472b6);
+        border: none;
+        border-radius: 30px;
+        font-family: 'Nunito', sans-serif;
+        font-weight: 800;
+        font-size: 0.9rem;
+        color: #fff;
+        cursor: pointer;
+      "
+    >
+      Save Username &#x2192;
+    </button>
+  </div>
+</div>
+<!-- Join Room Modal -->
+<div
+  id="chatJoinRoomModal"
+  style="
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 210;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="chat-friend-box" style="max-width: 400px; width: 100%">
+    <div class="chat-friend-box-hdr">
+      <span>&#x1F50D; Join a Room</span>
+      <button class="chat-friend-box-close" id="chatJoinRoomModalClose">&#x2715;</button>
+    </div>
+    <input
+      class="chat-friend-search"
+      id="chatJoinRoomInput"
+      type="text"
+      placeholder="Paste invite link or type a room name..."
+      autocomplete="off"
+    />
+    <div
+      id="chatJoinRoomResults"
+      style="
+        max-height: 220px;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      "
+    >
+      <div
+        style="font-size: 0.75rem; color: var(--on-glass-faint); font-weight: 700; padding: 6px 4px"
+      >
+        Type a room name to search public rooms, or paste an invite link
+      </div>
+    </div>
+    <div
+      id="chatJoinRoomErr"
+      style="display: none; color: #ef4444; font-size: 0.75rem; font-weight: 700; padding: 8px 16px"
+    ></div>
+  </div>
+</div>
+<!-- Add Friend Modal -->
+<div
+  id="chatFriendModal"
+  style="
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  "
+>
+  <div class="chat-friend-box">
+    <div class="chat-friend-box-hdr">
+      <span>&#x1F50D; Find Students</span>
+      <button class="chat-friend-box-close" id="chatFriendModalClose">&#x2715;</button>
+    </div>
+    <input
+      class="chat-friend-search"
+      id="chatFriendSearchInput"
+      type="text"
+      placeholder="Search by name or email&#x2026;"
+      autocomplete="off"
+    />
+    <div class="chat-friend-results" id="chatFriendResults">
+      <div class="chat-friend-hint">Type a name to search for students</div>
+    </div>
+  </div>
+</div>

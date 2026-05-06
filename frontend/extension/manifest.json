@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "StudySphere Lecture Assistant",
+  "version": "1.2.0",
+  "description": "Watches lectures with you and summarizes them using AI",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "tabCapture"],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://*.opencast.de/*",
+    "https://opencast.tu-braunschweig.de/*",
+    "https://opencast-present.tu-braunschweig.de/*",
+    "https://media.tu-braunschweig.de/*",
+    "https://*.zoom.us/*",
+    "https://studysphere-website.netlify.app/*",
+    "https://cdn.jsdelivr.net/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; connect-src https: blob:; object-src 'self';"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "https://*.opencast.de/*",
+        "https://opencast.tu-braunschweig.de/*",
+        "https://opencast-present.tu-braunschweig.de/*",
+        "https://media.tu-braunschweig.de/*",
+        "https://*.zoom.us/*",
+        "https://studysphere-website.netlify.app/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end",
+      "all_frames": false
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["recorder.html", "recorder.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

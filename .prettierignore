@@ -1,0 +1,5 @@
+node_modules/
+frontend/assets/
+docs/
+*.min.js
+*.min.css

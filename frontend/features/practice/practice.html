@@ -1,0 +1,191 @@
+<!-- GERMAN LEARNER PRACTICE PAGE — injected by features/js/practice.js -->
+<div id="psec-german" class="portal-section" style="display: none">
+  <!-- ── HOME VIEW ── -->
+  <div id="glHome">
+    <!-- Hero banner -->
+    <div class="gl-hero">
+      <div class="gl-hero-flag">&#x1F1E9;&#x1F1EA;</div>
+      <div class="gl-hero-text">
+        <div class="gl-hero-title">Deutsch lernen</div>
+        <div class="gl-hero-sub" id="glTestBadge">Your test · Your level</div>
+      </div>
+      <div class="gl-hero-chip" id="glLevelChip">–</div>
+    </div>
+
+    <!-- Skill cards -->
+    <div class="gl-skill-grid">
+      <button class="gl-skill-card" data-skill="reading">
+        <span class="gl-skill-icon">&#x1F4D6;</span>
+        <span class="gl-skill-name">Leseverstehen</span>
+        <span class="gl-skill-sub">Reading comprehension</span>
+      </button>
+      <button class="gl-skill-card" data-skill="listening">
+        <span class="gl-skill-icon">&#x1F3A7;</span>
+        <span class="gl-skill-name">Hörverstehen</span>
+        <span class="gl-skill-sub">Listening comprehension</span>
+      </button>
+      <button class="gl-skill-card" data-skill="writing">
+        <span class="gl-skill-icon">&#x270F;&#xFE0F;</span>
+        <span class="gl-skill-name">Schreiben</span>
+        <span class="gl-skill-sub">Writing tasks</span>
+      </button>
+      <button class="gl-skill-card" data-skill="speaking">
+        <span class="gl-skill-icon">&#x1F5E3;&#xFE0F;</span>
+        <span class="gl-skill-name">Sprechen</span>
+        <span class="gl-skill-sub">Speaking exercises</span>
+      </button>
+      <button class="gl-skill-card" data-skill="vocab">
+        <span class="gl-skill-icon">&#x1F4CA;</span>
+        <span class="gl-skill-name">Wortschatz</span>
+        <span class="gl-skill-sub">Vocabulary builder</span>
+      </button>
+      <button class="gl-skill-card" data-skill="grammar">
+        <span class="gl-skill-icon">&#x1F9E9;</span>
+        <span class="gl-skill-name">Grammatik</span>
+        <span class="gl-skill-sub">Grammar practice</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SKILL DETAIL VIEW ── -->
+  <div id="glSkillView" style="display: none">
+    <!-- Back + title -->
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px">
+      <button
+        id="glBackBtn"
+        style="
+          background: rgba(255, 255, 255, 0.07);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 20px;
+          padding: 7px 16px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.82rem;
+          color: rgba(255, 255, 255, 0.7);
+          cursor: pointer;
+        "
+      >
+        &#x2190; Back
+      </button>
+      <div>
+        <div
+          id="glSkillTitle"
+          style="
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.3rem;
+            background: linear-gradient(135deg, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+          "
+        ></div>
+        <div
+          id="glSkillSub"
+          style="
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.35);
+            margin-top: 2px;
+          "
+        ></div>
+      </div>
+    </div>
+
+    <!-- Files for this skill -->
+    <div class="widget-card">
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+        "
+      >
+        <div class="widget-title" style="margin: 0">&#x1F4CE; Study Materials</div>
+        <button class="gl-upload-btn" id="glUploadLabel" style="margin: 0; cursor: pointer">
+          &#x2B06; Upload
+        </button>
+        <input type="file" id="glFileInput" accept=".pdf,.txt" multiple style="display: none" />
+      </div>
+      <div id="glUploadProgress" style="display: none; margin-bottom: 8px">
+        <div
+          style="
+            height: 4px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+          "
+        >
+          <div
+            id="glUploadBar"
+            style="
+              height: 100%;
+              border-radius: 4px;
+              background: linear-gradient(90deg, #c084fc, #f472b6);
+              width: 0%;
+              transition: width 0.2s;
+            "
+          ></div>
+        </div>
+        <div
+          id="glUploadStatus"
+          style="
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 4px;
+            text-align: center;
+          "
+        >
+          Uploading…
+        </div>
+      </div>
+      <div
+        id="glFileList"
+        style="display: flex; flex-direction: column; gap: 6px; min-height: 32px"
+      >
+        <div class="gl-file-empty" id="glFileEmpty">
+          No files yet — upload PDFs or text files for this skill
+        </div>
+      </div>
+    </div>
+
+    <!-- File AI results -->
+    <div class="widget-card" id="glAIPanel" style="display: none; margin-top: 8px">
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+        "
+      >
+        <div class="widget-title" id="glAIPanelTitle" style="margin: 0">Result</div>
+        <button
+          id="glAIPanelClose"
+          style="
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 1.1rem;
+            cursor: pointer;
+          "
+        >
+          &#x2715;
+        </button>
+      </div>
+      <div
+        id="glAIMessages"
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          max-height: 340px;
+          overflow-y: auto;
+          padding-right: 4px;
+        "
+      ></div>
+    </div>
+  </div>
+</div>
+<!-- /psec-german -->

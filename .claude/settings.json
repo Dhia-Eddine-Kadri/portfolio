@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"c:/Users/dalim/OneDrive/Documents/personal files/StudyBuddyAI/files\" && netlify deploy --prod 2>/dev/null || true",
+            "async": true,
+            "statusMessage": "Deploying to Netlify..."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(1)",
+      "Bash(awk 'NR>=1920 && NR<=1940' \"c:/Users/dalim/OneDrive/Documents/personal files/StudyBuddyAI/files/app.js\")",
+      "Bash(find 'c:/Users/dalim/OneDrive/Documents/personal files/StudyBuddyAI/files' -name *.sql -o -name schema* -o -name migration*)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "WebFetch(domain:www.reddit.com)",
+      "Bash(node --check \"c:\\\\Users\\\\dalim\\\\OneDrive\\\\Documents\\\\personal files\\\\StudyBuddyAI\\\\files\\\\app.js\")",
+      "Bash(node --check \"c:\\\\Users\\\\dalim\\\\OneDrive\\\\Documents\\\\personal files\\\\StudyBuddyAI\\\\files\\\\supabase.js\")",
+      "Bash(mv styles.css css/)",
+      "Bash(mv loader.js app.js supabase.js js/)",
+      "Bash(mv landing.html auth.html signup.html portal.html studip.html files.html modals.html toast.html pages/)",
+      "Bash(mv manifest.json background.js content.js content.css popup.html popup.js icon16.png icon48.png icon128.png extension/)",
+      "Bash(mv e7md79ypidte1.mp4 assets/)",
+      "Bash(npx @claude-flow*)",
+      "Bash(npx claude-flow*)",
+      "Bash(node .claude/*)",
+      "mcp__claude-flow__:*"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_FLOW_V3_ENABLED": "true",
+    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
+  }
+}

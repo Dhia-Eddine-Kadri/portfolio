@@ -1,0 +1,71 @@
+﻿*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+@keyframes psec-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes psec-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+.psec-entering {
+  animation: psec-in 0.24s cubic-bezier(0.22, 0.68, 0, 1.2) both;
+}
+.psec-leaving {
+  animation: psec-out 0.16s ease forwards;
+  pointer-events: none;
+}
+:root {
+  --purple: #9b5de5;
+  --pink: #ff6fb7;
+  --orange: #ff6b35;
+  --green: #06d6a0;
+  --blue: #4cc9f0;
+  --bg: #f0edf8;
+  --card: #fff;
+  --text: #2d2d2d;
+  --muted: #888;
+  --sb-w: 240px;
+  --sb-collapsed: 58px;
+  --ai-w: 340px;
+  --topbar-h: 54px;
+  --shadow: 0 2px 14px rgba(0, 0, 0, 0.08);
+  --border: #ede8f5;
+  --dp-bg: linear-gradient(135deg, #ede8f8 0%, #f3eeff 40%, #eaefff 100%);
+  --dp-solid: #ede8f8;
+  --dp-modal: linear-gradient(135deg, #ffffff, #f5f0ff);
+  /* adaptive semantic tokens */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(155, 93, 229, 0.2);
+  --glass-border-top: rgba(255, 255, 255, 0.9);
+  --on-glass: rgba(60, 40, 100, 0.82);
+  --on-glass-muted: rgba(100, 80, 140, 0.55);
+  --on-glass-faint: rgba(100, 80, 140, 0.38);
+  --card-inner: rgba(255, 255, 255, 0.7);
+  --card-inner-border: rgba(155, 93, 229, 0.15);
+  --row-bg: rgba(255, 255, 255, 0.5);
+  --row-border: rgba(155, 93, 229, 0.12);
+  --section-label: rgba(100, 80, 140, 0.5);
+  --divider: rgba(155, 93, 229, 0.1);
+  --badge-bg: rgba(155, 93, 229, 0.1);
+  --badge-border: rgba(155, 93, 229, 0.18);
+  --badge-color: rgba(100, 80, 140, 0.7);
+  --slot-bg: rgba(255, 255, 255, 0.55);
+}

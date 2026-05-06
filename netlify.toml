@@ -1,0 +1,126 @@
+[build]
+  publish = "frontend"
+  functions = "backend/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["backend/node_modules/pdf-parse/**"]
+
+[[redirects]]
+  from = "/api/ai"
+  to = "/.netlify/functions/ai"
+  status = 200
+
+[[redirects]]
+  from = "/api/create-checkout"
+  to = "/.netlify/functions/create-checkout"
+  status = 200
+
+[[redirects]]
+  from = "/api/stripe-webhook"
+  to = "/.netlify/functions/stripe-webhook"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin-users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+
+[[redirects]]
+  from = "/api/verify-payment"
+  to = "/.netlify/functions/verify-payment"
+  status = 200
+
+[[redirects]]
+  from = "/api/create-portal"
+  to = "/.netlify/functions/create-portal"
+  status = 200
+
+[[redirects]]
+  from = "/api/activate-paypal-subscription"
+  to = "/.netlify/functions/activate-paypal-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/join-room-by-code"
+  to = "/.netlify/functions/join-room-by-code"
+  status = 200
+
+[[redirects]]
+  from = "/api/send-chat-message"
+  to = "/.netlify/functions/send-chat-message"
+  status = 200
+
+[[redirects]]
+  from = "/api/chat-friends"
+  to = "/.netlify/functions/chat-friends"
+  status = 200
+
+[[redirects]]
+  from = "/api/public-billing-config"
+  to = "/.netlify/functions/public-billing-config"
+  status = 200
+
+[[redirects]]
+  from = "/api/chat-user-search"
+  to = "/.netlify/functions/chat-user-search"
+  status = 200
+
+[[redirects]]
+  from = "/api/chat-username-check"
+  to = "/.netlify/functions/chat-username-check"
+  status = 200
+
+[[redirects]]
+  from = "/api/report-chat-item"
+  to = "/.netlify/functions/report-chat-item"
+  status = 200
+
+[[redirects]]
+  from = "/api/documents/upload"
+  to = "/.netlify/functions/documents-upload"
+  status = 200
+
+[[redirects]]
+  from = "/api/documents/process"
+  to = "/.netlify/functions/documents-process"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/ask"
+  to = "/.netlify/functions/ai-ask"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/feedback"
+  to = "/.netlify/functions/ai-feedback"
+  status = 200
+
+[[redirects]]
+  from = "/api/documents/list"
+  to = "/.netlify/functions/documents-list"
+  status = 200
+
+[[redirects]]
+  from = "/api/documents/delete"
+  to = "/.netlify/functions/documents-delete"
+  status = 200
+
+[[redirects]]
+  from = "/api/documents/index-existing"
+  to = "/.netlify/functions/documents-index-existing"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/evaluate"
+  to = "/.netlify/functions/ai-evaluate"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(self)"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss://*.supabase.co; worker-src 'self' blob: https:; frame-src 'self' https:; form-action 'self'; upgrade-insecure-requests"

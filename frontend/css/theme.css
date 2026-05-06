@@ -1,0 +1,577 @@
+/* ── Light mode auth & modal variables ── */
+:root {
+  --auth-bg: rgba(155, 93, 229, 0.22);
+  --auth-box-bg: linear-gradient(160deg, #fff 0%, #f5f0ff 100%);
+  --auth-box-border: rgba(155, 93, 229, 0.25);
+  --auth-label: rgba(80, 60, 120, 0.65);
+  --auth-input-bg: rgba(242, 238, 255, 1);
+  --auth-input-border: rgba(155, 93, 229, 0.25);
+  --auth-input-color: #2d2d2d;
+  --auth-input-placeholder: rgba(100, 80, 140, 0.4);
+  --auth-divider: rgba(155, 93, 229, 0.2);
+  --auth-divider-text: rgba(100, 80, 140, 0.4);
+  --auth-subtitle: rgba(80, 60, 120, 0.6);
+  --auth-footer: rgba(80, 60, 120, 0.45);
+  --auth-google-bg: rgba(155, 93, 229, 0.08);
+  --auth-google-border: rgba(155, 93, 229, 0.22);
+  --auth-google-color: #3c2e6e;
+  --auth-google-hover: rgba(155, 93, 229, 0.15);
+  --auth-stay: rgba(80, 60, 120, 0.55);
+  --auth-stay-timeout: rgba(100, 80, 140, 0.35);
+  --auth-pw-bar: rgba(155, 93, 229, 0.15);
+  --auth-pw-label: rgba(80, 60, 120, 0.45);
+  --auth-confirm-hint: rgba(80, 60, 120, 0.45);
+  --auth-toggle-pw: rgba(80, 60, 120, 0.45);
+  --studip-bg: var(--dp-bg);
+  --studip-back-bg: rgba(155, 93, 229, 0.1);
+  --studip-back-border: rgba(155, 93, 229, 0.2);
+  --studip-back-color: #7c3aed;
+  --studip-subtitle: rgba(100, 80, 140, 0.5);
+}
+body.night {
+  --auth-bg: rgba(10, 8, 18, 0.85);
+  --auth-box-bg: linear-gradient(135deg, #110d20, #0d0f1e);
+  --auth-box-border: rgba(192, 132, 252, 0.25);
+  --auth-label: rgba(255, 255, 255, 0.4);
+  --auth-input-bg: rgba(255, 255, 255, 0.06);
+  --auth-input-border: rgba(255, 255, 255, 0.1);
+  --auth-input-color: #fff;
+  --auth-input-placeholder: rgba(255, 255, 255, 0.3);
+  --auth-divider: rgba(255, 255, 255, 0.1);
+  --auth-divider-text: rgba(255, 255, 255, 0.25);
+  --auth-subtitle: rgba(255, 255, 255, 0.45);
+  --auth-footer: rgba(255, 255, 255, 0.35);
+  --auth-google-bg: rgba(255, 255, 255, 0.07);
+  --auth-google-border: rgba(255, 255, 255, 0.15);
+  --auth-google-color: #fff;
+  --auth-google-hover: rgba(255, 255, 255, 0.12);
+  --auth-stay: rgba(255, 255, 255, 0.45);
+  --auth-stay-timeout: rgba(255, 255, 255, 0.2);
+  --auth-pw-bar: rgba(255, 255, 255, 0.1);
+  --auth-pw-label: rgba(255, 255, 255, 0.35);
+  --auth-confirm-hint: rgba(255, 255, 255, 0.3);
+  --auth-toggle-pw: rgba(255, 255, 255, 0.5);
+  --studip-bg: linear-gradient(135deg, #0a0812 0%, #110d20 40%, #0d0f1e 100%);
+  --studip-back-bg: rgba(255, 255, 255, 0.08);
+  --studip-back-border: rgba(255, 255, 255, 0.15);
+  --studip-back-color: rgba(255, 255, 255, 0.7);
+  --studip-subtitle: rgba(255, 255, 255, 0.35);
+}
+body.night {
+  --purple: #b47fff;
+  --pink: #ff8ec7;
+  --orange: #ff8c5a;
+  --bg: #0f0e17;
+  --card: #1a1826;
+  --text: #e8e4f0;
+  --muted: #7a748a;
+  --shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+  --border: #2a2640;
+  --dp-bg: linear-gradient(135deg, #0a0812 0%, #110d20 40%, #0d0f1e 100%);
+  --dp-solid: #0a0812;
+  --dp-modal: linear-gradient(135deg, #0f0c1a, #130f22);
+  /* adaptive semantic tokens — dark overrides */
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-top: rgba(255, 255, 255, 0.22);
+  --on-glass: rgba(255, 255, 255, 0.88);
+  --on-glass-muted: rgba(255, 255, 255, 0.45);
+  --on-glass-faint: rgba(255, 255, 255, 0.3);
+  --card-inner: rgba(255, 255, 255, 0.05);
+  --card-inner-border: rgba(255, 255, 255, 0.1);
+  --row-bg: rgba(255, 255, 255, 0.04);
+  --row-border: rgba(255, 255, 255, 0.08);
+  --section-label: rgba(255, 255, 255, 0.35);
+  --divider: rgba(255, 255, 255, 0.07);
+  --badge-bg: rgba(255, 255, 255, 0.08);
+  --badge-border: rgba(255, 255, 255, 0.12);
+  --badge-color: rgba(255, 255, 255, 0.5);
+  --slot-bg: rgba(255, 255, 255, 0.05);
+}
+body.night .pdf-body {
+  background: #1a1a2e;
+}
+body.night .pdf-page-wrap {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+body.night .sem-btn {
+  background: #23203a;
+  border-color: #2a2640;
+}
+body.night .sem-dd {
+  background: #1a1826;
+  border-color: var(--purple);
+}
+body.night .sem-opt {
+  border-bottom-color: #2a2640;
+}
+body.night .sem-opt:hover {
+  background: #23203a;
+}
+body.night .course-row {
+  background: #23203a;
+}
+body.night .file-row {
+  background: #1f1d2e;
+  border-color: #2a2640;
+}
+body.night .tt-slot-sb {
+  background: #23203a;
+}
+body.night .mail-sb {
+  background: #23203a;
+}
+body.night .mail-sb.unread {
+  background: #221d3a;
+}
+body.night .co-card {
+  background: rgba(255, 255, 255, 0.05);
+}
+body.night .co-file {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+body.night .co-nav-btn {
+  color: rgba(255, 255, 255, 0.45);
+}
+body.night .co-nav-btn:hover {
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+body.night .ai-msg.bot {
+  background: #23203a;
+}
+body.night .ai-tip {
+  background: #23203a;
+  border-color: #2a2640;
+}
+body.night .ai-textarea {
+  background: #23203a;
+  border-color: #2a2640;
+  color: var(--text);
+}
+body.night .ai-textarea:focus {
+  border-color: var(--purple);
+  background: #2a2640;
+}
+body.night .ai-sel-banner {
+  background: linear-gradient(135deg, #221d3a, #231d30);
+}
+body.night .fv-preview-card {
+  background: #1a1826;
+}
+body.night .sb-back:hover {
+  background: #23203a;
+}
+body.night .sb-x-btn {
+  background: #23203a;
+}
+body.night .sb-x-btn:hover {
+  background: #2a2640;
+}
+body.night .pdf-tb-btn {
+  background: #23203a;
+  border-color: #2a2640;
+  color: var(--purple);
+}
+body.night .pdf-tb-btn:hover {
+  background: #2a2640;
+}
+body.night .tb-toggle {
+  background: #23203a;
+}
+body.night .tb-toggle:hover {
+  background: #2a2640;
+}
+body.night .tb-portal-btn {
+  background: #23203a;
+  color: var(--purple);
+}
+body.night .tb-portal-btn:hover {
+  background: #2a2640;
+}
+/* ── LIGHT MODE — portal & deep-area overrides ──────────────────────────── */
+body:not(.night) .blob {
+  opacity: 0.09;
+}
+body:not(.night) #portal::before {
+  opacity: 0.015;
+}
+body:not(.night) #courseOverview::before {
+  opacity: 0.012;
+}
+body:not(.night) #courseOverview::after {
+  background: radial-gradient(circle, rgba(155, 93, 229, 0.08) 0%, transparent 70%);
+}
+/* studipDash now uses var(--dp-bg) inline */
+body:not(.night) #authBox {
+  background: linear-gradient(135deg, #ffffff, #f8f4ff) !important;
+  border-color: rgba(155, 93, 229, 0.2) !important;
+}
+body:not(.night) #onboardModal > div {
+  background: linear-gradient(135deg, #ffffff, #f8f4ff) !important;
+  border-color: rgba(155, 93, 229, 0.2) !important;
+}
+body:not(.night) #authModal {
+  background: rgba(155, 93, 229, 0.18);
+  backdrop-filter: blur(20px);
+}
+/* portal header */
+body:not(.night) .p-tag {
+  color: rgba(100, 80, 140, 0.6);
+}
+body:not(.night) .p-uni-badge {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(155, 93, 229, 0.16);
+}
+body:not(.night) .p-uni-name {
+  color: rgba(60, 40, 100, 0.85);
+}
+body:not(.night) .p-uni-city {
+  color: rgba(100, 80, 140, 0.5);
+}
+/* portal grid cards */
+body:not(.night) .pc {
+  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-bottom-color: rgba(155, 93, 229, 0.18);
+  border-right-color: rgba(155, 93, 229, 0.12);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    0 4px 24px rgba(155, 93, 229, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.04);
+}
+body:not(.night) .pc::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.05) 60%);
+}
+body:not(.night) .pc::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+}
+body:not(.night) .pc:hover {
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(155, 93, 229, 0.35);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  box-shadow:
+    0 20px 60px rgba(155, 93, 229, 0.16),
+    0 0 0 1px rgba(155, 93, 229, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.06);
+}
+body:not(.night) .pc-name {
+  color: #2d2d2d;
+}
+body:not(.night) .pc-desc {
+  color: rgba(100, 80, 140, 0.55);
+}
+/* portal nav tabs */
+body:not(.night) .p-nav-bar {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(155, 93, 229, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 8px 32px rgba(155, 93, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.06);
+}
+body:not(.night) .p-nav-bar::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
+}
+body:not(.night) .psb {
+  color: rgba(100, 80, 140, 0.52);
+}
+body:not(.night) .psb::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+}
+body:not(.night) .psb:hover {
+  color: #7c3aed;
+  background: rgba(155, 93, 229, 0.09);
+  border-color: rgba(155, 93, 229, 0.2);
+  box-shadow:
+    0 4px 16px rgba(155, 93, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+body:not(.night) .psb.on {
+  background: linear-gradient(135deg, rgba(155, 93, 229, 0.18), rgba(255, 111, 183, 0.12));
+  color: #7c3aed;
+  border-color: rgba(155, 93, 229, 0.32);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 2px 18px rgba(155, 93, 229, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.07);
+}
+body:not(.night) .psb.on::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.1) 55%);
+}
+body:not(.night) .psb-div {
+  background: rgba(155, 93, 229, 0.15);
+}
+body:not(.night) .psb.ai-link {
+  background: linear-gradient(135deg, rgba(155, 93, 229, 0.14), rgba(255, 111, 183, 0.1));
+  color: #9b5de5;
+  border-color: rgba(155, 93, 229, 0.25);
+  box-shadow:
+    0 2px 10px rgba(155, 93, 229, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+body:not(.night) .psb.ai-link:hover {
+  background: linear-gradient(135deg, rgba(155, 93, 229, 0.22), rgba(255, 111, 183, 0.16));
+  box-shadow:
+    0 4px 18px rgba(155, 93, 229, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+/* course overview tabs */
+body:not(.night) .co-nav {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(155, 93, 229, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 8px 32px rgba(155, 93, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.06);
+}
+body:not(.night) .co-nav::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
+}
+body:not(.night) .co-nav-btn {
+  color: rgba(100, 80, 140, 0.52);
+}
+body:not(.night) .co-nav-btn::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+}
+body:not(.night) .co-nav-btn:hover {
+  color: #7c3aed;
+  background: rgba(155, 93, 229, 0.09);
+  border-color: rgba(155, 93, 229, 0.2);
+  box-shadow:
+    0 4px 16px rgba(155, 93, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+body:not(.night) .co-nav-btn.active {
+  background: linear-gradient(135deg, rgba(155, 93, 229, 0.18), rgba(255, 111, 183, 0.12));
+  color: #7c3aed;
+  border-color: rgba(155, 93, 229, 0.32);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 2px 18px rgba(155, 93, 229, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(155, 93, 229, 0.07);
+}
+body:not(.night) .co-nav-btn.active::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.1) 55%);
+}
+/* course overview content */
+body:not(.night) .co-file:hover {
+  box-shadow:
+    0 8px 24px rgba(155, 93, 229, 0.14),
+    0 0 0 1px rgba(155, 93, 229, 0.15);
+}
+body:not(.night) .ws-title {
+  color: #2d2d2d;
+}
+body:not(.night) .ws-sub {
+  color: rgba(45, 45, 45, 0.75);
+}
+body:not(.night) .ws-hint {
+  background: rgba(155, 93, 229, 0.1);
+  color: rgba(60, 40, 100, 0.7);
+}
+body:not(.night) .co-multi-bar {
+  background: linear-gradient(135deg, rgba(248, 244, 255, 0.98), rgba(252, 248, 255, 0.98));
+  border-top-color: rgba(155, 93, 229, 0.2);
+}
+body:not(.night) .co-multi-count {
+  color: rgba(100, 80, 140, 0.8);
+}
+/* lecture notes */
+/* lecture notes modal */
+body:not(.night) .ln-modal {
+  border-color: rgba(155, 93, 229, 0.2);
+}
+/* multi-summary modal */
+/* studip dashboard */
+/* extension banner */
+body:not(.night) .ext-banner {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(155, 93, 229, 0.2);
+}
+body:not(.night) .ext-banner-text h3 {
+  color: #2d2d2d;
+}
+
+/* auth modal now uses CSS variables — no overrides needed */
+body:not(.night) #authBox {
+  box-shadow: 0 20px 60px rgba(155, 93, 229, 0.15);
+}
+
+/* Onboarding modal */
+body:not(.night) #onboardModal {
+  background: rgba(155, 93, 229, 0.22) !important;
+  backdrop-filter: blur(20px);
+}
+body:not(.night) #onboardModal > div {
+  background: linear-gradient(160deg, #fff 0%, #f5f0ff 100%) !important;
+  border: 1px solid rgba(155, 93, 229, 0.2) !important;
+  box-shadow: 0 20px 60px rgba(155, 93, 229, 0.15) !important;
+}
+body:not(.night) #onboardModal [style*='color:rgba(255,255,255'] {
+  color: #2d2d2d !important;
+}
+body:not(.night) #onboardModal [style*='color:#fff'] {
+  color: #2d2d2d !important;
+}
+body:not(.night) #onboardModal input,
+body:not(.night) #onboardModal select {
+  background: #f2eeff !important;
+  border: 1.5px solid rgba(155, 93, 229, 0.25) !important;
+  color: #2d2d2d !important;
+}
+body:not(.night) #onboardModal label {
+  color: rgba(80, 60, 120, 0.65) !important;
+}
+body:not(.night) #onboardModal [style*='background:rgba(255,255,255,.1)'] {
+  background: rgba(155, 93, 229, 0.15) !important;
+}
+body:not(.night) #onboardModal #obErr1,
+body:not(.night) #onboardModal #obErr2 {
+  background: rgba(255, 107, 55, 0.08) !important;
+  color: #c0400a !important;
+}
+
+/* Auth indicator badge in portal */
+body:not(.night) #authIndicator {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(155, 93, 229, 0.2) !important;
+  backdrop-filter: blur(12px);
+}
+body:not(.night) #authName {
+  color: rgba(60, 40, 100, 0.75) !important;
+}
+
+/* Portal: pc-name / pc-desc are already covered but ensure inline color override */
+body:not(.night) .pc-name {
+  color: #2d2d2d !important;
+}
+body:not(.night) .pc-desc {
+  color: rgba(80, 60, 120, 0.55) !important;
+}
+
+/* Toast styles — moved to features/toast/toast.css */
+
+/* PDF loading text */
+body:not(.night) .pdf-loading {
+  color: #2d2d2d;
+}
+
+/* welcome state text */
+.night-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: #f3eeff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.night-btn:hover {
+  background: #ede0ff;
+}
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+}
+/* Global select dropdown theming — option background/color are the only reliable cross-browser hooks */
+select {
+  color-scheme: dark;
+}
+select option {
+  background-color: #0f1623;
+  color: rgba(255, 255, 255, 0.85);
+}
+body:not(.night) select {
+  color-scheme: light;
+}
+body:not(.night) select option {
+  background-color: #ffffff;
+  color: #222;
+}
+body.landing {
+  overflow-y: auto;
+  height: auto;
+}
+body.page-transitioning {
+  background: var(--dp-solid);
+}
+@keyframes drift {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(28px) scale(1.07);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes dotBounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes confettiDrop {
+  from {
+    transform: translateY(-40px) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+@keyframes popIn {
+  from {
+    transform: scale(0.9) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(155, 93, 229, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(155, 93, 229, 0);
+  }
+}

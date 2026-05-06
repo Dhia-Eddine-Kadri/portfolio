@@ -1,0 +1,160 @@
+.sub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.sub-grid-single {
+  grid-template-columns: 1fr;
+  max-width: 500px;
+  margin: 0 auto;
+  width: 100%;
+}
+.sub-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-top: 1px solid var(--glass-border-top);
+  border-radius: 22px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.sub-card.featured {
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.07);
+}
+.sub-card .sub-badge {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+body:not(.night) .sub-card .sub-badge {
+  background: #d97706;
+  color: #fff;
+}
+.sub-name {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem;
+  color: var(--on-glass);
+}
+.sub-trial-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  font-size: 0.78rem;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 4px;
+  align-self: flex-start;
+}
+.sub-price {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2rem;
+  color: var(--on-glass);
+  line-height: 1;
+}
+.sub-price span {
+  font-size: 0.8rem;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  color: var(--on-glass-muted);
+}
+.sub-features {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.sub-feat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--on-glass-muted);
+}
+.sub-feat::before {
+  content: '\2713';
+  color: #22c55e;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+body:not(.night) .sub-feat::before {
+  color: #16a34a;
+}
+.sub-card .sub-btn,
+.sub-card .sub-btn-current,
+.sub-card .sub-btn-upgrade {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  font-size: 0.83rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s;
+  width: 100%;
+}
+.sub-card .sub-btn:hover,
+.sub-card .sub-btn-current:hover,
+.sub-card .sub-btn-upgrade:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(37, 99, 235, 0.5);
+}
+.sub-card .sub-btn-current {
+  background: var(--row-bg);
+  color: var(--on-glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+}
+.sub-card .sub-btn-current:hover {
+  background: var(--card-inner);
+  box-shadow: none;
+  transform: none;
+}
+.sub-pay-methods {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--on-glass-muted);
+}
+.sub-pay-icons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sub-pay-icon {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--on-glass);
+}
+
+@media (max-width: 768px) {
+  .sub-grid {
+    grid-template-columns: 1fr;
+  }
+}

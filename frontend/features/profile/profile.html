@@ -1,0 +1,85 @@
+<div class="dash-greeting">
+  <h1>&#x1F464; Profile</h1>
+  <p>Manage your account information</p>
+</div>
+<div class="profile-hero">
+  <div class="ph-avatar" id="profileInitial">?</div>
+  <div class="ph-info">
+    <h2>Profile</h2>
+    <p>TU Braunschweig</p>
+  </div>
+</div>
+<div class="widget-card">
+  <div class="widget-title">Personal details</div>
+  <div class="profile-fields">
+    <div class="pf-group">
+      <label class="pf-label">Full name</label>
+      <input class="pf-input" id="profileName" type="text" placeholder="Your name" />
+    </div>
+    <div class="pf-group">
+      <label class="pf-label">Email</label>
+      <input class="pf-input" id="profileEmail" type="text" placeholder="Email" />
+    </div>
+    <div class="pf-group pf-enrolled-field">
+      <label class="pf-label">University</label>
+      <input class="pf-input" id="profileUniversity" type="text" placeholder="University" />
+    </div>
+    <div class="pf-group pf-enrolled-field">
+      <label class="pf-label">Programme</label>
+      <input class="pf-input" id="profileProgramme" type="text" placeholder="Programme" />
+    </div>
+    <div class="pf-group pf-enrolled-field" style="position: relative">
+      <label class="pf-label">Vertiefung (Fachprofil)</label>
+      <input
+        class="pf-input"
+        id="profileVertiefung"
+        type="text"
+        placeholder="e.g. Mechatronik"
+        autocomplete="off"
+      />
+      <div
+        id="pfVertDrop"
+        style="
+          display: none;
+          position: absolute;
+          top: calc(100% + 2px);
+          left: 0;
+          right: 0;
+          border-radius: 10px;
+          border: 1px solid rgba(192, 132, 252, 0.3);
+          background: rgba(17, 13, 32, 0.97);
+          max-height: 190px;
+          overflow-y: auto;
+          z-index: 9600;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        "
+      ></div>
+    </div>
+    <div class="pf-group pf-enrolled-field">
+      <label class="pf-label">Matrikel No.</label>
+      <input class="pf-input" id="profileMatrikel" type="text" placeholder="Matrikel no." />
+    </div>
+    <div class="pf-group pf-learner-field" style="display: none">
+      <label class="pf-label">German Test</label>
+      <input
+        class="pf-input"
+        id="profileGermanTest"
+        type="text"
+        placeholder="e.g. TestDaF"
+        readonly
+      />
+    </div>
+    <div class="pf-group pf-learner-field" style="display: none">
+      <label class="pf-label">Target Level</label>
+      <input
+        class="pf-input"
+        id="profileGermanLevel"
+        type="text"
+        placeholder="e.g. TDN 4"
+        readonly
+      />
+    </div>
+    <div></div>
+    <button class="pf-save profile-save-btn">&#x1F4BE; Save changes</button>
+  </div>
+</div>

@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        width: 360px;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background: linear-gradient(135deg, #0a0812 0%, #110d20 45%, #0d0f1e 100%);
+        color: #e8e4f0;
+        overflow: hidden;
+        border-radius: 16px;
+        position: relative;
+      }
+
+      /* ── Background blobs (give backdrop-filter something to blur over) ── */
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .blob-1 {
+        width: 220px;
+        height: 220px;
+        top: -70px;
+        right: -60px;
+        background: radial-gradient(circle, rgba(155, 93, 229, 0.55) 0%, transparent 65%);
+        filter: blur(45px);
+      }
+      .blob-2 {
+        width: 200px;
+        height: 200px;
+        bottom: -40px;
+        left: -50px;
+        background: radial-gradient(circle, rgba(76, 201, 240, 0.3) 0%, transparent 65%);
+        filter: blur(40px);
+      }
+      .blob-3 {
+        width: 160px;
+        height: 160px;
+        top: 45%;
+        right: -20px;
+        background: radial-gradient(circle, rgba(255, 111, 183, 0.25) 0%, transparent 65%);
+        filter: blur(35px);
+      }
+
+      /* Everything above blobs */
+      .z1 {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Header ── */
+      .hdr {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px 13px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        position: relative;
+        z-index: 1;
+      }
+      .hdr-logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #9b5de5, #6b3fbf);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 14px rgba(155, 93, 229, 0.45);
+      }
+      .hdr-title {
+        flex: 1;
+      }
+      .hdr-title h1 {
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: 0.01em;
+      }
+      .hdr-title p {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.38);
+        margin-top: 2px;
+      }
+      .hdr-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .hdr-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+        backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .hdr-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+      }
+      .hdr-user {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hdr-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #9b5de5, #6b3fbf);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 0 12px rgba(155, 93, 229, 0.5);
+      }
+      .hdr-signout {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 20px;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+        transition: background 0.15s;
+      }
+      .hdr-signout:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+      }
+
+      /* ── Body wrapper ── */
+      .body {
+        padding: 14px;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Auth screen ── */
+      #auth-screen {
+        display: block;
+      }
+      .auth-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #fff;
+        margin-bottom: 4px;
+        text-align: center;
+      }
+      .auth-sub {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+
+      .auth-google {
+        width: 100%;
+        padding: 11px;
+        background: rgba(255, 255, 255, 0.07);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-top-color: rgba(255, 255, 255, 0.22);
+        border-radius: 13px;
+        color: #e8e4f0;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+        margin-bottom: 13px;
+      }
+      .auth-google:hover {
+        background: rgba(155, 93, 229, 0.15);
+        border-color: rgba(155, 93, 229, 0.4);
+      }
+      .auth-google:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 13px;
+      }
+      .auth-divider span {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.22);
+        white-space: nowrap;
+      }
+      .auth-divider::before,
+      .auth-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .auth-field {
+        width: 100%;
+        padding: 10px 13px;
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        color: #e8e4f0;
+        font-family: inherit;
+        font-size: 13px;
+        margin-bottom: 9px;
+        outline: none;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .auth-field:focus {
+        border-color: rgba(155, 93, 229, 0.7);
+        background: rgba(255, 255, 255, 0.09);
+      }
+      .auth-field::placeholder {
+        color: rgba(255, 255, 255, 0.25);
+      }
+
+      .auth-submit {
+        width: 100%;
+        padding: 11px;
+        border: none;
+        border-radius: 13px;
+        background: linear-gradient(135deg, #9b5de5, #7b4fc9);
+        color: #fff;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition:
+          opacity 0.15s,
+          box-shadow 0.15s;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 20px rgba(155, 93, 229, 0.45);
+      }
+      .auth-submit:hover {
+        opacity: 0.88;
+        box-shadow: 0 6px 26px rgba(155, 93, 229, 0.6);
+      }
+      .auth-submit:disabled {
+        opacity: 0.45;
+        cursor: default;
+        box-shadow: none;
+      }
+
+      .auth-switch {
+        text-align: center;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+      .auth-switch a {
+        color: #b47fff;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .auth-switch a:hover {
+        color: #c99fff;
+      }
+      .auth-error {
+        background: rgba(255, 80, 80, 0.1);
+        border: 1px solid rgba(255, 80, 80, 0.22);
+        border-radius: 10px;
+        padding: 8px 11px;
+        font-size: 11px;
+        color: #ff8585;
+        margin-bottom: 10px;
+        display: none;
+        white-space: pre-wrap;
+        word-break: break-all;
+        line-height: 1.5;
+      }
+
+      /* ── App screen ── */
+      #app-screen {
+        display: none;
+      }
+
+      /* Lecture detection card */
+      .detect-card {
+        background: rgba(255, 255, 255, 0.07);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-top-color: rgba(255, 255, 255, 0.22);
+        border-radius: 14px;
+        padding: 13px 14px;
+        margin-bottom: 10px;
+      }
+      .detect-top {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 11px;
+      }
+      .detect-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 21px;
+        flex-shrink: 0;
+      }
+      .detect-right {
+        flex: 1;
+        min-width: 0;
+      }
+      .detect-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(6, 214, 160, 0.12);
+        border: 1px solid rgba(6, 214, 160, 0.25);
+        border-radius: 20px;
+        padding: 3px 9px 3px 7px;
+        font-size: 10px;
+        font-weight: 700;
+        color: #4ade80;
+        margin-bottom: 5px;
+      }
+      .detect-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22c55e;
+        flex-shrink: 0;
+      }
+      #page-status {
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .detect-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #capture-status {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      .wave {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .wave span {
+        width: 3px;
+        border-radius: 2px;
+        background: #b47fff;
+        animation: wv 1.3s ease-in-out infinite;
+      }
+      .wave span:nth-child(1) {
+        height: 5px;
+        animation-delay: 0s;
+      }
+      .wave span:nth-child(2) {
+        height: 12px;
+        animation-delay: 0.15s;
+      }
+      .wave span:nth-child(3) {
+        height: 8px;
+        animation-delay: 0.3s;
+      }
+      .wave span:nth-child(4) {
+        height: 14px;
+        animation-delay: 0.08s;
+      }
+      .wave span:nth-child(5) {
+        height: 6px;
+        animation-delay: 0.22s;
+      }
+      @keyframes wv {
+        0%,
+        100% {
+          transform: scaleY(0.35);
+          opacity: 0.35;
+        }
+        50% {
+          transform: scaleY(1);
+          opacity: 1;
+        }
+      }
+
+      /* Action cards */
+      .ac {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 13px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        font-family: inherit;
+        text-align: left;
+        margin-bottom: 9px;
+        cursor: pointer;
+        transition:
+          opacity 0.15s,
+          transform 0.12s,
+          box-shadow 0.15s;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .ac:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+      }
+      .ac:active {
+        transform: translateY(0);
+      }
+      .ac:disabled {
+        opacity: 0.45;
+        cursor: default;
+        transform: none;
+      }
+      .ac-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .ac-txt {
+        flex: 1;
+      }
+      .ac-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #fff;
+        margin-bottom: 2px;
+      }
+      .ac-sub {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      .ac-arrow {
+        font-size: 18px;
+        color: rgba(255, 255, 255, 0.35);
+        flex-shrink: 0;
+      }
+
+      /* Capture — purple gradient */
+      #btn-capture {
+        background: linear-gradient(135deg, #9b5de5 0%, #7b4fc9 100%);
+        border-color: rgba(155, 93, 229, 0.4);
+        border-top-color: rgba(255, 255, 255, 0.3);
+        box-shadow: 0 4px 22px rgba(155, 93, 229, 0.45);
+      }
+      #btn-capture .ac-icon {
+        background: rgba(255, 255, 255, 0.18);
+      }
+      #btn-capture[data-state='stop'] {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 99, 130, 0.3);
+        box-shadow: none;
+      }
+      #btn-capture[data-state='stop'] .ac-icon {
+        background: rgba(255, 99, 130, 0.15);
+      }
+      #btn-capture[data-state='stop'] .ac-title {
+        color: #ff8ec7;
+      }
+
+      /* Summarize */
+      #btn-summarize {
+        background: rgba(255, 255, 255, 0.06);
+        border-top-color: rgba(255, 255, 255, 0.18);
+      }
+      #btn-summarize .ac-icon {
+        background: rgba(155, 93, 229, 0.2);
+      }
+
+      /* Show Panel */
+      #btn-show {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.1);
+        border-top-color: rgba(255, 255, 255, 0.15);
+      }
+      #btn-show .ac-icon {
+        background: rgba(255, 255, 255, 0.07);
+      }
+      #btn-show .ac-title {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      /* Last summary */
+      #last-summary {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-top-color: rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 9px;
+        display: none;
+      }
+      .ls-hdr {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .ls-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: rgba(155, 93, 229, 0.2);
+        border: 1px solid rgba(155, 93, 229, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+      }
+      .ls-label {
+        flex: 1;
+        font-size: 12px;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.88);
+      }
+      .ls-link {
+        font-size: 11px;
+        color: #b47fff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .ls-link:hover {
+        color: #c99fff;
+      }
+      #last-title {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+        line-height: 1.5;
+        display: block;
+        margin-bottom: 5px;
+      }
+      .ls-meta {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.25);
+      }
+
+      /* Tip */
+      .tip {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 10px 13px;
+        margin-bottom: 11px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.3);
+        line-height: 1.5;
+      }
+      .tip-ic {
+        font-size: 14px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      /* Bottom bar */
+      .bottom-bar {
+        display: flex;
+        align-items: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 2px 8px;
+        position: relative;
+        z-index: 1;
+      }
+      .bb-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.35);
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 9px;
+        border-radius: 8px;
+        transition:
+          color 0.15s,
+          background 0.15s;
+      }
+      .bb-btn:hover {
+        color: rgba(255, 255, 255, 0.75);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .bb-div {
+        width: 1px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.08);
+        flex-shrink: 0;
+      }
+
+      /* Not lecture */
+      #not-lecture {
+        text-align: center;
+        padding: 28px 14px 16px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.32);
+        line-height: 1.7;
+      }
+      #not-lecture .big {
+        font-size: 2.2rem;
+        display: block;
+        margin-bottom: 10px;
+        filter: drop-shadow(0 0 12px rgba(155, 93, 229, 0.4));
+      }
+      #not-lecture b {
+        color: #b47fff;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Background blobs -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div class="hdr">
+      <div class="hdr-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="4" width="13" height="16" rx="2.5" fill="rgba(255,255,255,.95)" />
+          <rect x="7" y="7" width="12" height="14" rx="2.5" fill="rgba(255,255,255,.5)" />
+          <rect x="5.5" y="8.5" width="7" height="1.5" rx=".75" fill="rgba(155,93,229,.9)" />
+          <rect x="5.5" y="11.5" width="9" height="1.5" rx=".75" fill="rgba(155,93,229,.6)" />
+          <rect x="5.5" y="14.5" width="6" height="1.5" rx=".75" fill="rgba(155,93,229,.4)" />
+        </svg>
+      </div>
+      <div class="hdr-title">
+        <h1>StudySphere</h1>
+        <p>Lecture Assistant</p>
+      </div>
+      <div class="hdr-actions" id="hdr-actions">
+        <button class="hdr-btn" title="Help">?</button>
+        <button class="hdr-btn" title="More">⋮</button>
+      </div>
+      <div class="hdr-user" id="hdr-user" style="display: none">
+        <div class="hdr-avatar" id="hdr-avatar">?</div>
+        <button class="hdr-signout" id="btn-signout">Sign out</button>
+      </div>
+    </div>
+
+    <!-- Auth screen -->
+    <div class="body" id="auth-screen">
+      <p class="auth-title">Welcome back 👋</p>
+      <p class="auth-sub">Sign in to use the Lecture Assistant</p>
+      <button class="auth-google" id="btn-google">
+        <svg width="16" height="16" viewBox="0 0 48 48">
+          <path
+            fill="#EA4335"
+            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"
+          />
+          <path
+            fill="#4285F4"
+            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+          />
+          <path
+            fill="#34A853"
+            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+          />
+          <path fill="none" d="M0 0h48v48H0z" />
+        </svg>
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <div class="auth-error" id="auth-error"></div>
+      <input
+        class="auth-field"
+        id="auth-email"
+        type="email"
+        placeholder="Email address"
+        autocomplete="email"
+      />
+      <input
+        class="auth-field"
+        id="auth-password"
+        type="password"
+        placeholder="Password"
+        autocomplete="current-password"
+      />
+      <button class="auth-submit" id="auth-submit">Sign In</button>
+      <p class="auth-switch">Don't have an account? <a id="auth-switch-link">Create one</a></p>
+    </div>
+
+    <!-- Main app screen -->
+    <div id="app-screen">
+      <div class="body">
+        <div id="lecture-ui" style="display: none">
+          <!-- Detection card -->
+          <div class="detect-card">
+            <div class="detect-top">
+              <div class="detect-icon" id="detect-icon">▶</div>
+              <div class="detect-right">
+                <div class="detect-badge">
+                  <span class="detect-dot"></span>
+                  <span id="detect-badge-text">Detected</span>
+                </div>
+                <div id="page-status">Detecting…</div>
+              </div>
+            </div>
+            <div class="detect-bottom">
+              <div id="capture-status">Not capturing</div>
+              <div class="wave">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Start Capturing -->
+          <button class="ac" id="btn-capture">
+            <div class="ac-icon">⏺</div>
+            <div class="ac-txt">
+              <div class="ac-title">Start Capturing</div>
+              <div class="ac-sub">Record audio (Whisper) or capture captions</div>
+            </div>
+            <span class="ac-arrow">›</span>
+          </button>
+
+          <!-- Summarize -->
+          <button class="ac" id="btn-summarize">
+            <div class="ac-icon">✦</div>
+            <div class="ac-txt">
+              <div class="ac-title">Summarize Lecture</div>
+              <div class="ac-sub">Generate summary and key takeaways</div>
+            </div>
+            <span class="ac-arrow">›</span>
+          </button>
+
+          <!-- Show Panel -->
+          <button class="ac" id="btn-show">
+            <div class="ac-icon">👁</div>
+            <div class="ac-txt">
+              <div class="ac-title">Open Study Panel</div>
+              <div class="ac-sub">View the summary on the page</div>
+            </div>
+            <span class="ac-arrow">›</span>
+          </button>
+
+          <!-- Last summary -->
+          <div id="last-summary">
+            <div class="ls-hdr">
+              <div class="ls-icon">📄</div>
+              <span class="ls-label">Last summary</span>
+              <span class="ls-link">View all</span>
+            </div>
+            <span id="last-title"></span>
+            <div class="ls-meta">Just now</div>
+          </div>
+
+          <!-- Tip -->
+          <div class="tip">
+            <span class="tip-ic">💡</span>
+            Tip: Works with headphones — captions are read silently in the background, no audio
+            recording or API costs.
+          </div>
+        </div>
+
+        <!-- Not a lecture page -->
+        <div id="not-lecture" style="display: none">
+          <span class="big">🎬</span>
+          Navigate to a <b>YouTube</b>, <b>Opencast</b> or <b>Zoom</b> lecture video to use the
+          assistant.
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <button class="bb-btn">⚙ Settings</button>
+        <div class="bb-div"></div>
+        <button class="bb-btn">💬 Feedback</button>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

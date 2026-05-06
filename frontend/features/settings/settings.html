@@ -1,0 +1,176 @@
+<div class="dash-greeting">
+  <h1>&#x2699;&#xFE0F; Settings</h1>
+  <p>Customise your experience</p>
+</div>
+<div class="settings-block">
+  <div class="settings-block-title">&#x2728; Appearance</div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x1F319;</div>
+      Dark mode
+    </div>
+    <label class="toggle"
+      ><input type="checkbox" id="settingsDarkMode" />
+      <div class="toggle-track"></div
+    ></label>
+  </div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x1F310;</div>
+      Language
+    </div>
+    <select class="settings-select-new" id="settingsLanguage">
+      <option value="en">&#x1F1EC;&#x1F1E7; English</option>
+      <option value="de">&#x1F1E9;&#x1F1EA; Deutsch</option>
+    </select>
+  </div>
+</div>
+<div class="settings-block">
+  <div class="settings-block-title">&#x1F916; AI Assistant</div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x2728;</div>
+      Auto-open on text select
+    </div>
+    <label class="toggle"
+      ><input type="checkbox" id="settingsAutoOpen" checked />
+      <div class="toggle-track"></div
+    ></label>
+  </div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x1F4AC;</div>
+      Save chat history per PDF
+    </div>
+    <label class="toggle"
+      ><input type="checkbox" id="settingsSaveChat" checked />
+      <div class="toggle-track"></div
+    ></label>
+  </div>
+  <div style="padding-top: 14px">
+    <button class="pf-save" id="saveSettingsBtn">Save Changes</button>
+  </div>
+</div>
+<div class="settings-block" id="musicServicesBlock">
+  <div class="settings-block-title">&#x1F3B5; Music Services</div>
+  <p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 14px; line-height: 1.5">
+    Connect a music service to play your own playlists during study sessions.
+  </p>
+  <div class="music-service-row" id="spotifyRow">
+    <div class="music-service-info">
+      <svg class="music-service-logo" viewBox="0 0 24 24" fill="#1DB954">
+        <path
+          d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"
+        />
+      </svg>
+      <div>
+        <div class="music-service-name">Spotify</div>
+        <div class="music-service-status" id="spotifyStatus">Not connected</div>
+      </div>
+    </div>
+    <button class="music-connect-btn" id="spotifyConnectBtn">Connect</button>
+  </div>
+  <div class="music-player-mini" id="spotifyPlayer" style="display: none">
+    <div class="music-now-playing" id="spotifyNowPlaying">
+      <img class="music-thumb" id="spotifyThumb" src="" alt="" />
+      <div class="music-track-info">
+        <div class="music-track-name" id="spotifyTrackName">-</div>
+        <div class="music-track-artist" id="spotifyArtist">-</div>
+      </div>
+    </div>
+    <div class="music-controls">
+      <button class="music-ctrl-btn" id="spotifyPrev" title="Previous">&#x23EE;</button>
+      <button class="music-ctrl-btn music-play-btn" id="spotifyPlayPause" title="Play/Pause">
+        &#x25B6;
+      </button>
+      <button class="music-ctrl-btn" id="spotifyNext" title="Next">&#x23ED;</button>
+    </div>
+    <button class="music-disconnect-btn" id="spotifyDisconnect">Disconnect</button>
+  </div>
+  <div class="music-service-divider"></div>
+  <div class="music-service-row" id="youtubeRow">
+    <div class="music-service-info">
+      <svg class="music-service-logo" viewBox="0 0 24 24" fill="#FF0000">
+        <path
+          d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+        />
+      </svg>
+      <div>
+        <div class="music-service-name">YouTube Playlists</div>
+        <div class="music-service-status" id="youtubeStatus">No playlists saved</div>
+      </div>
+    </div>
+  </div>
+  <div
+    id="ytPlaylistList"
+    style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px"
+  ></div>
+  <div class="music-yt-add-row">
+    <input
+      class="music-yt-input"
+      id="ytPlaylistName"
+      type="text"
+      placeholder="Name (e.g. Lofi Study)"
+      style="flex: 0.9"
+    />
+    <input
+      class="music-yt-input"
+      id="ytPlaylistUrl"
+      type="text"
+      placeholder="YouTube playlist URL"
+      style="flex: 2"
+    />
+    <button class="music-connect-btn" id="ytSaveBtn">Add</button>
+  </div>
+</div>
+<div class="settings-block">
+  <div class="settings-block-title">&#x1F5D1;&#xFE0F; Data</div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x1F5D1;&#xFE0F;</div>
+      Clear all AI chat history
+    </div>
+    <button class="settings-danger-btn">Clear history</button>
+  </div>
+</div>
+<div class="settings-block">
+  <div class="settings-block-title">&#x1F464; Account</div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x1F6AA;</div>
+      Sign out of StudySphere
+    </div>
+    <button
+      class="settings-danger-btn"
+      id="logoutBtn"
+      style="
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: rgba(239, 68, 68, 0.85);
+      "
+    >
+      Log out
+    </button>
+  </div>
+  <div class="settings-row-new">
+    <div class="settings-row-lbl">
+      <div class="settings-row-ico">&#x26A0;&#xFE0F;</div>
+      <span
+        ><strong>Delete account</strong><br /><span style="font-size: 0.72rem; opacity: 0.55"
+          >Permanently deletes your account and all data. This cannot be undone.</span
+        ></span
+      >
+    </div>
+    <button
+      class="settings-danger-btn"
+      id="deleteAccountBtn"
+      style="
+        background: rgba(239, 68, 68, 0.18);
+        border-color: rgba(239, 68, 68, 0.45);
+        color: rgba(239, 68, 68, 0.95);
+      "
+    >
+      Delete account
+    </button>
+  </div>
+</div>

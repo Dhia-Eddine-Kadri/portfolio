@@ -1,0 +1,18 @@
+{
+  "agents": {
+    "agent-1777998066956-jaxquy": {
+      "agentId": "agent-1777998066956-jaxquy",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic"
+      },
+      "createdAt": "2026-05-05T16:21:06.956Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    }
+  },
+  "version": "3.0.0"
+}

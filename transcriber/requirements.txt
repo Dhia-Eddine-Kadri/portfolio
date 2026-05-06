@@ -1,0 +1,6 @@
+faster-whisper
+flask
+flask-cors
+pystray
+Pillow
+pyinstaller

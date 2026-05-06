@@ -1,0 +1,1372 @@
+﻿<!-- PORTAL -->
+<div id="portal">
+  <div class="blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+  </div>
+
+  <div class="shell">
+    <!-- ════ SIDEBAR ════ -->
+    <nav class="sidebar">
+      <div class="sb-user" id="authIndicator">
+        <div class="sb-avatar" id="authAvatar">?</div>
+        <div class="sb-user-info">
+          <div class="sb-user-name" id="authName">Loading&#x2026;</div>
+          <div class="sb-user-uni" id="sbUserSub">TU Braunschweig</div>
+        </div>
+      </div>
+
+      <div class="sb-nav">
+        <div class="sb-item psb on" id="psbDashboard">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="home"></span></div>
+          <span>Home</span>
+        </div>
+        <div class="sb-item psb" id="pcStudip">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="courses"></span></div>
+          <span>Courses</span>
+        </div>
+        <!-- German learner nav — hidden for enrolled students -->
+        <div class="sb-item psb" id="psbGerman" style="display: none">
+          <div class="sb-item-icon">&#x1F1E9;&#x1F1EA;</div>
+          <span>Practice</span>
+        </div>
+        <div
+          class="sb-item psb"
+          id="psbNotes"
+          style="opacity: 0.5; pointer-events: none; cursor: default"
+        >
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="notes"></span></div>
+          <span>Lecture Notes</span>
+        </div>
+        <div class="sb-item psb" id="psbEditor">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="editor"></span></div>
+          <span>Editor</span>
+        </div>
+        <div class="sb-item psb" id="psbAIPage">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="chatbot"></span></div>
+          <span>Chatbot</span>
+        </div>
+        <div class="sb-item psb" id="psbChat">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="chat"></span></div>
+          <span>Chat</span>
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-item psb" id="psbNotifications">
+          <div class="sb-item-icon">
+            <span class="sb-sprite" data-sprite="notifications"></span>
+          </div>
+          <span>Notifications</span>
+        </div>
+        <div class="sb-item psb" id="psbGames">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="games"></span></div>
+          <span>Games</span>
+        </div>
+        <div class="sb-item psb" id="psbLounge">
+          <div class="sb-item-icon" style="overflow: hidden; padding: 0">
+            <img
+              src="assets/icon-lounge.png"
+              class="sb-icon-img"
+              style="width: 44px; height: 44px; object-fit: cover; mix-blend-mode: multiply"
+            />
+          </div>
+          <span>Study Lounge</span>
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-item psb" id="psbProfile">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="profile"></span></div>
+          <span>Profile</span>
+        </div>
+        <div class="sb-item psb" id="psbSettings">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="settings"></span></div>
+          <span>Settings</span>
+        </div>
+        <div class="sb-item psb" id="psbSubscription">
+          <div class="sb-item-icon"><span class="sb-sprite" data-sprite="subscription"></span></div>
+          <span>Subscription</span>
+        </div>
+        <div class="sb-item psb" id="psbAdmin" style="display: none">
+          <div class="sb-item-icon">&#x1F6E1;&#xFE0F;</div>
+          <span>Admin</span>
+        </div>
+      </div>
+
+      <div class="sb-bottom">
+        <button class="sb-night-btn" id="nightBtn">
+          <span class="sb-night-track" id="nightTrack">
+            <span class="sb-night-track-label" id="nightLabel">Night</span>
+            <span class="sb-night-thumb" id="nightThumb">
+              <span id="nightIcon">🌙</span>
+            </span>
+          </span>
+        </button>
+      </div>
+    </nav>
+    <!-- /sidebar -->
+    <div class="mob-scrim" id="mobScrim"></div>
+
+    <!-- ════ MAIN ════ -->
+    <div class="main">
+      <div class="topbar">
+        <button class="ptb-back-btn" id="goPortal" style="display: none">&#x2190; Back</button>
+        <button id="portalHamburger" aria-label="Open menu">&#x2630;</button>
+        <span class="tb-title" id="topTitle">Dashboard</span>
+        <span class="tb-crumb" id="breadcrumb" style="display: none"></span>
+        <div class="tb-spacer"></div>
+        <button
+          class="st-trigger-btn"
+          id="studyTechBtn"
+          style="display: none"
+          title="Study Techniques"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span>Study</span>
+        </button>
+        <!-- Mini timer widget (shown when timer is running) -->
+        <div class="st-mini-timer" id="stMiniTimer" style="display: none">
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span id="stMiniTime">25:00</span>
+          <span class="st-mini-label" id="stMiniLabel">Focus</span>
+          <button class="st-mini-pause" id="stMiniPause" title="Pause">&#x23F8;</button>
+          <button class="st-mini-stop" id="stMiniStop" title="Stop">&#x25A0;</button>
+        </div>
+      </div>
+
+      <!-- ══ STUDY TECHNIQUES POPUP ══ -->
+      <div class="st-overlay" id="stOverlay" style="display: none">
+        <div class="st-popup" id="stPopup">
+          <div class="st-popup-head">
+            <span class="st-popup-title">Study Techniques</span>
+            <button class="st-popup-close" id="stClose">&#x2715;</button>
+          </div>
+
+          <!-- Technique picker -->
+          <div class="st-techniques" id="stTechniques">
+            <button class="st-tech-card active" data-tech="pomodoro">
+              <span class="st-tech-icon">&#x1F345;</span>
+              <span class="st-tech-name">Pomodoro</span>
+              <span class="st-tech-desc">25 min focus · 5 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="5217">
+              <span class="st-tech-icon">&#x26A1;</span>
+              <span class="st-tech-name">52 / 17</span>
+              <span class="st-tech-desc">52 min focus · 17 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="9020">
+              <span class="st-tech-icon">&#x1F9E0;</span>
+              <span class="st-tech-name">90 / 20</span>
+              <span class="st-tech-desc">90 min focus · 20 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="custom">
+              <span class="st-tech-icon">&#x2699;&#xFE0F;</span>
+              <span class="st-tech-name">Custom</span>
+              <span class="st-tech-desc">Set your own intervals</span>
+            </button>
+          </div>
+
+          <!-- Settings -->
+          <div class="st-settings">
+            <div class="st-setting-row">
+              <label class="st-setting-label">Focus (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="focus" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stFocusVal">25</span>
+                <button class="st-step-btn" data-field="focus" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Short break (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="shortBreak" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stShortVal">5</span>
+                <button class="st-step-btn" data-field="shortBreak" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Long break (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="longBreak" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stLongVal">15</span>
+                <button class="st-step-btn" data-field="longBreak" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Cycles before long break</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="cycles" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stCyclesVal">4</span>
+                <button class="st-step-btn" data-field="cycles" data-dir="1">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Music source picker -->
+          <div class="st-music-section">
+            <div class="st-setting-label" style="padding: 0 16px 8px; display: block">
+              🎵 Music during focus
+            </div>
+            <div class="st-music-sources" id="stMusicSources">
+              <button class="st-music-src active" data-src="lofi">
+                <span class="st-music-src-icon">📻</span>
+                <span>Lo-fi</span>
+              </button>
+              <button class="st-music-src" data-src="youtube">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FF0000">
+                  <path
+                    d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+                  />
+                </svg>
+                <span>YouTube</span>
+              </button>
+              <button class="st-music-src" data-src="spotify">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#1DB954">
+                  <path
+                    d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"
+                  />
+                </svg>
+                <span>Spotify</span>
+              </button>
+              <button class="st-music-src" data-src="none">
+                <span class="st-music-src-icon">🔇</span>
+                <span>None</span>
+              </button>
+            </div>
+            <div class="st-music-src-hint" id="stMusicHint">Lofi Girl radio — always available</div>
+            <!-- Playlist selector — shown when YouTube is active -->
+            <div class="st-playlist-selector" id="stPlaylistSelector" style="display: none">
+              <select class="st-playlist-select" id="stPlaylistSelect"></select>
+            </div>
+          </div>
+
+          <button class="st-start-btn" id="stStart" style="margin-top: 6px">&#x25B6; Start</button>
+        </div>
+      </div>
+
+      <div class="main-scroll">
+        <!-- DASHBOARD — content injected by features/js/dashboard.js -->
+        <div id="psec-dashboard" class="portal-section"></div>
+
+        <!-- PROFILE -->
+        <div id="psec-profile" class="portal-section" style="display: none"></div>
+
+        <!-- SETTINGS -->
+        <div id="psec-settings" class="portal-section" style="display: none"></div>
+
+        <!-- SUBSCRIPTION -->
+        <div id="psec-subscription" class="portal-section" style="display: none"></div>
+
+        <!-- ADMIN -->
+        <div id="psec-admin" class="portal-section" style="display: none">
+          <div class="dash-greeting">
+            <h1>&#x1F6E1;&#xFE0F; Admin</h1>
+            <p>Manage user subscriptions</p>
+          </div>
+          <div style="max-width: 640px; margin: 0 auto">
+            <div style="display: flex; gap: 10px; margin-bottom: 18px">
+              <input
+                id="adminSearchInput"
+                class="chat-friend-search"
+                type="text"
+                placeholder="Search by email..."
+                style="flex: 1"
+              />
+              <button
+                id="adminSearchBtn"
+                class="sub-btn sub-btn-upgrade"
+                style="width: auto; padding: 10px 20px"
+              >
+                Search
+              </button>
+            </div>
+            <div id="adminResults"></div>
+          </div>
+        </div>
+
+        <!-- PAYWALL MODAL -->
+        <div
+          id="paywallModal"
+          style="
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(14px);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+          "
+        >
+          <div
+            style="
+              background: var(--glass-bg);
+              border: 1px solid rgba(192, 132, 252, 0.3);
+              border-radius: 24px;
+              padding: 36px 30px;
+              max-width: 440px;
+              width: 100%;
+              text-align: center;
+              position: relative;
+              box-shadow: 0 0 60px rgba(192, 132, 252, 0.15);
+            "
+          >
+            <div style="font-size: 2.8rem; margin-bottom: 10px">&#x1F393;</div>
+            <h2
+              style="
+                font-family: 'Fredoka One', cursive;
+                font-size: 1.7rem;
+                color: var(--on-glass);
+                margin: 0 0 8px;
+              "
+            >
+              Welcome to StudySphere
+            </h2>
+            <p
+              data-paywall-desc
+              style="font-size: 0.85rem; color: var(--on-glass-muted); margin: 0 0 20px"
+            >
+              To access all features, start your free 7-day trial. No charge until the trial ends.
+            </p>
+            <div class="sub-trial-badge" style="margin-bottom: 14px; display: inline-block">
+              &#x2728; 7-day free trial
+            </div>
+            <div
+              style="
+                font-family: 'Fredoka One', cursive;
+                font-size: 2rem;
+                color: var(--on-glass);
+                margin-bottom: 16px;
+              "
+            >
+              &#x20AC;11.99
+              <span
+                data-after-trial
+                style="
+                  font-size: 0.85rem;
+                  font-family: 'Nunito', sans-serif;
+                  font-weight: 700;
+                  color: var(--on-glass-muted);
+                "
+                >/ month after trial</span
+              >
+            </div>
+            <div
+              style="
+                text-align: left;
+                margin-bottom: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 7px;
+              "
+            >
+              <div class="sub-feat">Unlimited AI messages</div>
+              <div class="sub-feat">PDF reader &amp; lecture notes</div>
+              <div class="sub-feat">Multi-PDF summaries</div>
+              <div class="sub-feat">Chat rooms</div>
+              <div class="sub-feat">Priority support</div>
+            </div>
+            <button
+              id="paywallUpgradeBtn"
+              class="sub-btn sub-btn-upgrade"
+              style="font-size: 0.92rem; padding: 14px"
+            >
+              &#x1F389; Start free 7-day trial
+            </button>
+            <p
+              data-cancel-note
+              style="font-size: 0.72rem; color: var(--on-glass-muted); margin-top: 10px"
+            >
+              Cancel anytime. No charge during trial.
+            </p>
+            <div style="margin-top: 12px">
+              <div id="paywallPaypal"></div>
+            </div>
+            <p
+              style="
+                font-size: 0.7rem;
+                color: var(--on-glass-muted);
+                margin-top: 10px;
+                opacity: 0.6;
+              "
+            >
+              Pay with Card · Klarna · PayPal
+            </p>
+          </div>
+        </div>
+
+        <!-- COURSES -->
+        <div id="psec-studip" class="portal-section" style="display: none">
+          <div style="max-width: 820px; margin: 0 auto; padding: 0 0 80px">
+            <div class="dash-greeting">
+              <h1>&#x1F4DA; My Courses</h1>
+              <p>Add the subjects you&apos;re taking this semester</p>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 24px;
+                flex-wrap: wrap;
+              "
+            >
+              <div style="position: relative; flex-shrink: 0">
+                <button class="sem-btn sd-sem-btn" id="sdSemBtn">
+                  <span class="sem-btn-l"
+                    ><span class="sem-dot" id="sdSemDot" style="background: #06d6a0"></span
+                    ><span id="sdSemLabel">WS 2025/26</span></span
+                  >
+                  <span class="sem-chev" id="sdSemChev">&#x25BC;</span>
+                </button>
+                <div class="sem-dd sd-sem-dd" id="sdSemDD">
+                  <div class="sem-opt sel" data-sid="ws2526" data-col="#06D6A0">
+                    &#x1F7E2; WS 2025/26
+                  </div>
+                  <div class="sem-opt" data-sid="ss25" data-col="#9B5DE5">&#x1F4C1; SS 2025</div>
+                  <div class="sem-opt" data-sid="ws2425" data-col="#FF6FB7">
+                    &#x1F4C1; WS 2024/25
+                  </div>
+                  <div class="sem-opt" data-sid="ss24" data-col="#4CC9F0">&#x1F4C1; SS 2024</div>
+                  <div class="sem-opt" data-sid="ws2324" data-col="#FF6B35">
+                    &#x1F4C1; WS 2023/24
+                  </div>
+                </div>
+              </div>
+              <div
+                style="
+                  flex: 1;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  justify-content: center;
+                  min-width: 200px;
+                "
+              >
+                <div style="position: relative; flex: 1; max-width: 380px">
+                  <input
+                    id="courseSearchInput"
+                    type="text"
+                    placeholder="&#x1F50D; Search subjects..."
+                    autocomplete="off"
+                    style="
+                      width: 100%;
+                      box-sizing: border-box;
+                      padding: 10px 14px;
+                      border-radius: 12px;
+                      border: 1px solid rgba(37, 99, 235, 0.25);
+                      background: rgba(37, 99, 235, 0.07);
+                      color: inherit;
+                      font-size: 0.9rem;
+                      outline: none;
+                    "
+                  />
+                  <div
+                    id="courseSearchDrop"
+                    style="
+                      display: none;
+                      position: absolute;
+                      top: calc(100% + 4px);
+                      left: 0;
+                      right: 0;
+                      border-radius: 12px;
+                      border: 1px solid rgba(37, 99, 235, 0.25);
+                      max-height: 210px;
+                      overflow-y: auto;
+                      z-index: 300;
+                      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                    "
+                  ></div>
+                </div>
+                <button
+                  id="courseAddBtn"
+                  style="
+                    padding: 10px 18px;
+                    border-radius: 12px;
+                    border: none;
+                    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                    color: #fff;
+                    font-size: 0.88rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+                  "
+                >
+                  + Add Subject
+                </button>
+              </div>
+            </div>
+            <div id="sdCourseList" class="sd-course-grid"></div>
+          </div>
+        </div>
+
+        <!-- EDITOR - content injected by features/js/editor.js -->
+        <div
+          id="psec-editor"
+          class="portal-section editor-portal-section"
+          style="display: none"
+        ></div>
+
+        <!-- LECTURE NOTES — content injected by features/js/lecturenotes.js -->
+        <div id="psec-notes" class="portal-section" style="display: none"></div>
+
+        <!-- CHAT -->
+        <!-- CHATBOT PAGE -->
+        <!-- CHATBOT PAGE — content injected by features/chatbot/chatbot.js -->
+        <div
+          id="psec-aipage"
+          class="portal-section"
+          style="display: none; padding: 0; height: 100%"
+        ></div>
+
+        <!-- CHAT — content injected by features/js/chat.js -->
+        <div
+          id="psec-chat"
+          class="portal-section"
+          style="display: none; padding: 0; height: 100%"
+        ></div>
+
+        <!-- NOTIFICATIONS -->
+        <div id="psec-notifications" class="portal-section" style="display: none">
+          <div class="notif-wrap">
+            <div class="notif-header">
+              <div class="notif-header-left">
+                <div class="notif-title-icon">&#x1F514;</div>
+                <div>
+                  <div class="notif-title">Notifications</div>
+                  <div class="notif-subtitle" id="notifCount">All caught up</div>
+                </div>
+              </div>
+              <button class="notif-mark-all" id="notifMarkAll">Mark all read</button>
+            </div>
+            <div class="notif-tabs">
+              <button class="notif-tab active" data-tab="all">All</button>
+              <button class="notif-tab" data-tab="unread">Unread</button>
+            </div>
+            <div class="notif-list" id="notifList">
+              <div class="notif-empty">
+                <div class="notif-empty-icon">&#x1F514;</div>
+                <div class="notif-empty-title">You're all caught up!</div>
+                <div class="notif-empty-sub">New notifications will appear here</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GAMES — content injected by features/js/games.js -->
+        <div id="psec-games" class="portal-section" style="display: none; padding: 0"></div>
+
+        <!-- STUDY LOUNGE -->
+        <div id="psec-lounge" class="portal-section" style="display: none">
+          <div class="dash-greeting">
+            <h1>&#x1F4CA; Study Lounge</h1>
+            <p>Your personal learning overview</p>
+          </div>
+
+          <!-- Streak banner -->
+          <div class="lounge-streak-banner" id="loungeStreakBanner">
+            <div class="lounge-streak-flame">&#x1F525;</div>
+            <div>
+              <div class="lounge-streak-val" id="loungeStreakVal">0</div>
+              <div class="lounge-streak-lbl">day streak</div>
+            </div>
+            <div class="lounge-streak-msg" id="loungeStreakMsg">Start studying today!</div>
+          </div>
+
+          <!-- Main stat cards -->
+          <div class="lounge-stats-grid" id="loungeStatsGrid">
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x23F1;&#xFE0F;</div>
+              <div class="lounge-stat-val" id="lsHours">0h 0m</div>
+              <div class="lounge-stat-lbl">Study Time</div>
+              <div class="lounge-stat-sub" id="lsHoursSub">Total time with files open</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F4C2;</div>
+              <div class="lounge-stat-val" id="lsFiles">0</div>
+              <div class="lounge-stat-lbl">Files Opened</div>
+              <div class="lounge-stat-sub" id="lsFilesSub">Unique PDFs studied</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F393;</div>
+              <div class="lounge-stat-val" id="lsCourses">0</div>
+              <div class="lounge-stat-lbl">Courses</div>
+              <div class="lounge-stat-sub" id="lsCoursesSub">Subjects you've explored</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F916;</div>
+              <div class="lounge-stat-val" id="lsAI">0</div>
+              <div class="lounge-stat-lbl">AI Messages</div>
+              <div class="lounge-stat-sub">Questions asked to AI</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F4DD;</div>
+              <div class="lounge-stat-val" id="lsNotes">0</div>
+              <div class="lounge-stat-lbl">Lecture Notes</div>
+              <div class="lounge-stat-sub">Auto-summaries created</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F3AE;</div>
+              <div class="lounge-stat-val" id="lsGames">0</div>
+              <div class="lounge-stat-lbl">Games Played</div>
+              <div class="lounge-stat-sub">Break sessions</div>
+            </div>
+          </div>
+
+          <!-- Courses list -->
+          <div class="lounge-section-hdr">&#x1F4DA; Courses Studied</div>
+          <div class="lounge-course-chips" id="loungeCourseChips">
+            <div class="lounge-empty-msg">No courses yet — open a subject to get started</div>
+          </div>
+
+          <!-- Recent files -->
+          <div class="lounge-section-hdr">&#x1F4C4; Recently Opened Files</div>
+          <div class="lounge-recent-list" id="loungeRecentList">
+            <div class="lounge-empty-msg">No files opened yet</div>
+          </div>
+
+          <!-- Reset -->
+          <div style="margin-top: 32px; text-align: center">
+            <button
+              class="settings-danger-btn"
+              id="loungeResetBtn"
+              style="font-size: 0.75rem; padding: 7px 18px"
+            >
+              Reset Stats
+            </button>
+          </div>
+        </div>
+
+        <!-- PRACTICE — content injected by features/js/practice.js -->
+        <div id="psec-german" class="portal-section" style="display: none"></div>
+      </div>
+      <!-- /main-scroll -->
+      <!-- FILES / PDF VIEW (inline, no separate overlay) -->
+      <div id="app" style="display: none">
+        <div class="app-body">
+          <!-- PDF VIEWER -->
+          <div class="pdf-viewer-wrap" id="pdfViewerWrap" style="flex-direction: row">
+            <div
+              id="centreContent"
+              style="
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                min-width: 0;
+                position: relative;
+              "
+            >
+              <div
+                id="courseOverview"
+                style="display: none; flex: 1; overflow-y: auto; overflow-x: hidden"
+              ></div>
+              <div class="welcome-state" id="welcomeState">
+                <span class="ws-icon">&#x1F4C2;</span>
+                <div class="ws-title" data-i18n="welcome_title">Select a file to read</div>
+                <div class="ws-sub" data-i18n="welcome_sub">
+                  Open a subject in the sidebar and click any file — it loads here as a real
+                  document.
+                </div>
+                <div class="ws-hint" data-i18n="welcome_hint">
+                  &#x1F4A1; Select any text or formula &#x2192; AI automatically asks if you need
+                  help
+                </div>
+              </div>
+              <div
+                id="pdfView"
+                style="display: none; flex-direction: column; flex: 1; overflow: hidden"
+              >
+                <div class="pdf-toolbar" id="pdfToolbar">
+                  <button class="pdf-tb-btn" id="pdfPrev" style="display: none">&#x25C0;</button>
+                  <span class="pdf-page-info" id="pdfPageInfo" style="display: none"
+                    >Page
+                    <input
+                      id="pdfPageInput"
+                      class="pdf-page-input"
+                      type="number"
+                      min="1"
+                      value="1"
+                    />
+                    / <span id="pdfPageTotal">1</span></span
+                  >
+                  <button class="pdf-tb-btn" id="pdfNext" style="display: none">&#x25B6;</button>
+                  <button class="pdf-tb-btn" id="pdfZoomOut">&#x2212;</button>
+                  <span class="pdf-zoom-pct" id="pdfZoomPct">90%</span>
+                  <button class="pdf-tb-btn" id="pdfZoomIn">+</button>
+                  <button class="pdf-tb-btn" id="pdfFit" data-i18n="pdf_fit">Fit</button>
+                  <button class="pdf-tb-btn" id="pdfAll" data-i18n="pdf_single">Single page</button>
+                  <button
+                    class="pdf-tb-btn"
+                    id="pdfDownload"
+                    title="Download PDF"
+                    data-i18n="pdf_download"
+                  >
+                    &#x2B07; Download
+                  </button>
+                  <span style="flex: 1"></span>
+                  <!-- Annotate toggle -->
+                  <button
+                    class="pdf-tb-btn"
+                    id="pdfAnnotateToggle"
+                    title="Annotate"
+                    style="font-size: 0.8rem; gap: 4px; display: flex; align-items: center"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </svg>
+                    Annotate
+                  </button>
+                  <span
+                    id="pdfFileName"
+                    style="
+                      font-size: 0.73rem;
+                      font-weight: 700;
+                      color: var(--muted);
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      max-width: 220px;
+                    "
+                  ></span>
+                </div>
+
+                <!-- ANNOTATION TOOLBAR -->
+                <div
+                  id="annotToolbar"
+                  style="
+                    display: none;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 6px 14px;
+                    background: var(--glass-bg);
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+                    flex-wrap: wrap;
+                  "
+                >
+                  <!-- Tool buttons -->
+                  <div
+                    style="
+                      display: flex;
+                      gap: 4px;
+                      background: rgba(255, 255, 255, 0.06);
+                      border-radius: 10px;
+                      padding: 3px;
+                    "
+                  >
+                    <button
+                      class="annot-tool-btn active"
+                      id="annotToolPen"
+                      title="Pen"
+                      style="background: rgba(155, 93, 229, 0.35)"
+                    >
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      </svg>
+                    </button>
+                    <button class="annot-tool-btn" id="annotToolHighlight" title="Highlight">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M15.5 2.1L21.9 8.5 8.9 21.5 2.5 21.9 2.1 15.5z" opacity=".3" />
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button class="annot-tool-btn" id="annotToolText" title="Text">
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="4 7 4 4 20 4 20 7" />
+                        <line x1="9" y1="20" x2="15" y2="20" />
+                        <line x1="12" y1="4" x2="12" y2="20" />
+                      </svg>
+                    </button>
+                    <button class="annot-tool-btn" id="annotToolEraser" title="Eraser">
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M20 20H7L3 16l10-10 7 7-3.5 3.5" />
+                        <path d="M6.5 17.5l5-5" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Color swatches -->
+                  <div style="display: flex; gap: 5px; align-items: center">
+                    <div
+                      class="annot-color-swatch active"
+                      data-color="#000000"
+                      style="background: #000000"
+                    ></div>
+                    <div
+                      class="annot-color-swatch"
+                      data-color="#9B5DE5"
+                      style="background: #9b5de5"
+                    ></div>
+                    <div
+                      class="annot-color-swatch"
+                      data-color="#FF6FB7"
+                      style="background: #ff6fb7"
+                    ></div>
+                    <div
+                      class="annot-color-swatch"
+                      data-color="#FF3B30"
+                      style="background: #ff3b30"
+                    ></div>
+                    <div
+                      class="annot-color-swatch"
+                      data-color="#FF9500"
+                      style="background: #ff9500"
+                    ></div>
+                    <div
+                      class="annot-color-swatch"
+                      data-color="#FFD60A"
+                      style="background: #ffd60a"
+                    ></div>
+                    <input
+                      type="color"
+                      id="annotColorPicker"
+                      value="#000000"
+                      title="Custom color"
+                      style="
+                        width: 24px;
+                        height: 24px;
+                        border: none;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        padding: 0;
+                        background: none;
+                        outline: 2px solid rgba(255, 255, 255, 0.2);
+                      "
+                    />
+                  </div>
+
+                  <!-- Thickness -->
+                  <div style="display: flex; align-items: center; gap: 6px">
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      style="opacity: 0.5"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <input
+                      type="range"
+                      id="annotThickness"
+                      min="1"
+                      max="20"
+                      value="3"
+                      style="width: 72px; accent-color: #9b5de5"
+                    />
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      style="opacity: 0.5"
+                    >
+                      <circle cx="12" cy="12" r="6" />
+                    </svg>
+                  </div>
+
+                  <!-- Text controls (shown only in text mode) -->
+                  <div id="annotTextControls" style="display: none; gap: 6px; align-items: center">
+                    <select
+                      id="annotFontSize"
+                      style="
+                        background: rgba(255, 255, 255, 0.08);
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        color: var(--on-glass);
+                        border-radius: 7px;
+                        padding: 3px 6px;
+                        font-size: 0.78rem;
+                      "
+                    >
+                      <option value="12">12</option>
+                      <option value="14">14</option>
+                      <option value="16" selected>16</option>
+                      <option value="18">18</option>
+                      <option value="20">20</option>
+                      <option value="24">24</option>
+                      <option value="28">28</option>
+                      <option value="32">32</option>
+                    </select>
+                    <button class="annot-fmt-btn" id="annotBold" title="Bold"><b>B</b></button>
+                    <button class="annot-fmt-btn" id="annotItalic" title="Italic"><i>I</i></button>
+                  </div>
+
+                  <span style="flex: 1"></span>
+                  <button
+                    class="pdf-tb-btn"
+                    id="annotUndo"
+                    title="Undo"
+                    style="font-size: 0.75rem; padding: 4px 8px"
+                  >
+                    ↩ Undo
+                  </button>
+                  <button
+                    class="pdf-tb-btn"
+                    id="annotClear"
+                    title="Clear page annotations"
+                    style="font-size: 0.75rem; padding: 4px 8px; color: #ff6b6b"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    class="pdf-tb-btn"
+                    id="annotDownload"
+                    title="Download annotated PDF"
+                    style="
+                      font-size: 0.75rem;
+                      padding: 4px 8px;
+                      background: rgba(155, 93, 229, 0.15);
+                      color: #9b5de5;
+                    "
+                  >
+                    ⬇ Save PDF
+                  </button>
+                  <button
+                    class="pdf-tb-btn"
+                    id="annotTransfer"
+                    title="Transfer to course"
+                    style="
+                      font-size: 0.75rem;
+                      padding: 4px 8px;
+                      background: rgba(6, 214, 160, 0.1);
+                      color: #06d6a0;
+                    "
+                  >
+                    ⇢ To course
+                  </button>
+                </div>
+
+                <div class="pdf-body" id="pdfBody"></div>
+              </div>
+              <div id="aiTab">&#x2728;</div>
+              <div id="aiHoverZone"></div>
+            </div>
+            <!-- /centreContent -->
+            <!-- AI PANEL -->
+            <div id="aiPanel">
+              <div id="aiResizeHandle" title="Drag to resize"></div>
+              <div class="ai-hdr">
+                <div class="ai-av-wrap">
+                  <div class="ai-av">&#x1F393;</div>
+                  <div class="ai-status-dot"></div>
+                </div>
+                <div class="ai-hdr-info">
+                  <h3>StudySphere AI</h3>
+                  <p id="aiFileLabel" data-i18n="ai_ready">Ready to help</p>
+                </div>
+                <div class="ai-hdr-actions">
+                  <button class="ai-icon-btn" id="aiClearBtn" title="Clear chat">
+                    &#x1F5D1;&#xFE0F;
+                  </button>
+                  <button class="ai-close" id="aiClose" title="Close">&#x2715;</button>
+                </div>
+              </div>
+              <div class="ai-file-chip-bar">
+                <div class="ai-file-chip empty" id="aiFileChip">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <span id="aiFileChipName" data-i18n="no_file_open">No file open</span>
+                </div>
+              </div>
+              <div class="ai-msgs" id="aiMsgs"></div>
+              <button class="ai-scroll-btn" id="aiScrollBtn" title="Scroll to bottom">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              <div class="ai-input-area">
+                <div class="ai-chips">
+                  <span class="ai-tip" id="chip-summarise" data-i18n="chip_summarise"
+                    >&#x2728; Summarise</span
+                  >
+                  <span class="ai-tip" id="chip-formulas" data-i18n="chip_formulas"
+                    >&#x1F522; Formulas</span
+                  >
+                  <span class="ai-tip" id="chip-quiz" data-i18n="chip_quiz">&#x1F4DD; Quiz me</span>
+                  <span class="ai-tip" id="chip-keyideas" data-i18n="chip_keyideas"
+                    >&#x1F4A1; Key ideas</span
+                  >
+                  <span class="ai-tip" id="chip-analogy" data-i18n="chip_analogy"
+                    >&#x1F517; Analogy</span
+                  >
+                </div>
+                <div class="chip-drawer" id="opts-summarise">
+                  <div class="chip-drawer-inner">
+                    <span class="chip-drawer-label" data-i18n="depth_label">Depth:</span>
+                    <span
+                      class="chip-sub chip-sub-s"
+                      data-type="summarise"
+                      data-level="small"
+                      data-i18n="chip_brief"
+                      >Brief</span
+                    >
+                    <span
+                      class="chip-sub chip-sub-m"
+                      data-type="summarise"
+                      data-level="medium"
+                      data-i18n="chip_standard"
+                      >Standard</span
+                    >
+                    <span
+                      class="chip-sub chip-sub-t"
+                      data-type="summarise"
+                      data-level="thorough"
+                      data-i18n="chip_thorough"
+                      >In-depth</span
+                    >
+                  </div>
+                </div>
+                <div class="chip-drawer" id="opts-quiz">
+                  <div class="chip-drawer-inner">
+                    <span class="chip-drawer-label" data-i18n="level_label">Level:</span>
+                    <span
+                      class="chip-sub chip-sub-e"
+                      data-type="quiz"
+                      data-level="easy"
+                      data-i18n="chip_easy"
+                      >Easy</span
+                    >
+                    <span
+                      class="chip-sub chip-sub-m"
+                      data-type="quiz"
+                      data-level="medium"
+                      data-i18n="chip_medium"
+                      >Medium</span
+                    >
+                    <span
+                      class="chip-sub chip-sub-h"
+                      data-type="quiz"
+                      data-level="hard"
+                      data-i18n="chip_hard"
+                      >Hard</span
+                    >
+                  </div>
+                </div>
+                <div class="ai-input-box">
+                  <div class="ai-img-preview" id="aiImgPreview"></div>
+                  <textarea
+                    class="ai-textarea"
+                    id="aiInput"
+                    data-i18n-ph="ai_placeholder"
+                    placeholder="Ask anything about this document…"
+                    rows="2"
+                  ></textarea>
+                  <div class="ai-bottom-row">
+                    <span class="ai-char-count" id="aiCharCount">0 / 2000</span>
+                    <button class="ai-attach-btn ai-snip-btn" id="aiSnipBtn" title="Snip from PDF">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="6" cy="6" r="3" />
+                        <circle cx="6" cy="18" r="3" />
+                        <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                        <line x1="14.47" y1="14.48" x2="20" y2="20" />
+                        <line x1="8.12" y1="8.12" x2="12" y2="12" />
+                      </svg>
+                    </button>
+                    <input
+                      type="file"
+                      id="aiFileInput"
+                      accept=".png,.jpg,.jpeg"
+                      multiple
+                      style="display: none"
+                    />
+                    <label class="ai-attach-btn" for="aiFileInput" title="Attach image">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                        />
+                      </svg>
+                    </label>
+                    <button class="ai-send" id="aiSend" title="Send">
+                      <span class="ai-btn-icon ai-icon-plane">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path
+                            d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
+                          />
+                        </svg>
+                      </span>
+                      <span class="ai-btn-icon ai-icon-stop">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="4" y="4" width="16" height="16" rx="3" />
+                        </svg>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /aiPanel -->
+          </div>
+          <!-- /pdfViewerWrap -->
+        </div>
+        <!-- /app-body -->
+      </div>
+      <!-- /app -->
+    </div>
+    <!-- /main -->
+  </div>
+  <!-- /shell -->
+</div>
+<!-- /portal -->
+
+<!-- TRANSFER TO COURSE MODAL -->
+<div
+  id="annotTransferModal"
+  style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9990;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  "
+>
+  <div
+    style="
+      background: var(--glass-bg);
+      border: 1px solid rgba(155, 93, 229, 0.3);
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 0 40px rgba(155, 93, 229, 0.15);
+    "
+  >
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      "
+    >
+      <h3
+        style="
+          font-family: 'Fredoka One', cursive;
+          font-size: 1.25rem;
+          color: var(--on-glass);
+          margin: 0;
+        "
+      >
+        Transfer annotated PDF to course
+      </h3>
+      <button
+        id="annotTransferClose"
+        style="
+          background: none;
+          border: none;
+          color: var(--on-glass-muted);
+          font-size: 1.3rem;
+          cursor: pointer;
+          line-height: 1;
+        "
+      >
+        &#x2715;
+      </button>
+    </div>
+    <p style="font-size: 0.82rem; color: var(--on-glass-muted); margin: 0 0 16px">
+      Choose a course to save the annotated PDF into your files.
+    </p>
+    <div
+      id="annotTransferCourseList"
+      style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto"
+    ></div>
+    <div
+      id="annotTransferStatus"
+      style="margin-top: 14px; font-size: 0.8rem; color: var(--on-glass-muted); text-align: center"
+    ></div>
+  </div>
+</div>
+
+<!-- AI response export modal (chatbot page — any course) -->
+<div
+  id="aiExportModal"
+  style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9991;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(10px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  "
+>
+  <div
+    style="
+      background: var(--glass-bg);
+      border: 1px solid rgba(155, 93, 229, 0.3);
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 0 40px rgba(155, 93, 229, 0.15);
+    "
+  >
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      "
+    >
+      <h3
+        style="
+          font-family: 'Fredoka One', cursive;
+          font-size: 1.25rem;
+          color: var(--on-glass);
+          margin: 0;
+        "
+      >
+        Export AI response to course
+      </h3>
+      <button
+        id="aiExportClose"
+        style="
+          background: none;
+          border: none;
+          color: var(--on-glass-muted);
+          font-size: 1.3rem;
+          cursor: pointer;
+          line-height: 1;
+        "
+      >
+        &#x2715;
+      </button>
+    </div>
+    <p style="font-size: 0.82rem; color: var(--on-glass-muted); margin: 0 0 16px">
+      Choose which course to save this PDF into.
+    </p>
+    <div
+      id="aiExportCourseList"
+      style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto"
+    ></div>
+    <div
+      id="aiExportStatus"
+      style="margin-top: 14px; font-size: 0.8rem; color: var(--on-glass-muted); text-align: center"
+    ></div>
+  </div>
+</div>
+
+<!-- Widget panel, FAB and drag ghost — injected by features/js/dashboard.js -->

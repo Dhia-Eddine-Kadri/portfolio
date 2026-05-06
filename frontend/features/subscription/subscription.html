@@ -1,0 +1,65 @@
+<div class="dash-greeting">
+  <h1>&#x2B50; Subscription</h1>
+  <p>Try Pro free for 7 days, then &#x20AC;11.99/month</p>
+</div>
+<div class="sub-grid sub-grid-single">
+  <div class="sub-card featured">
+    <div class="sub-badge">&#x1F525; Most popular</div>
+    <div class="sub-name">Pro</div>
+    <div class="sub-trial-badge">7-day free trial</div>
+    <div class="sub-price">&#x20AC;11.99 <span>/ month after trial</span></div>
+    <div class="sub-features">
+      <div class="sub-feat">Unlimited AI messages</div>
+      <div class="sub-feat">PDF reader</div>
+      <div class="sub-feat">Unlimited lecture notes</div>
+      <div class="sub-feat">Multi-PDF summaries</div>
+      <div class="sub-feat">Priority support</div>
+      <div class="sub-feat">Chat rooms</div>
+    </div>
+    <div
+      id="subProStatus"
+      style="
+        display: none;
+        text-align: center;
+        padding: 10px;
+        background: rgba(134, 239, 172, 0.12);
+        border-radius: 12px;
+        color: #86efac;
+        font-weight: 800;
+        font-size: 0.9rem;
+        margin-bottom: 10px;
+      "
+    >
+      &#x2713; Active subscription
+    </div>
+    <button class="sub-btn sub-btn-upgrade" id="subUpgradeBtn">
+      &#x1F389; Start free 7-day trial
+    </button>
+    <button
+      class="sub-btn sub-btn-current"
+      id="subManageBtn"
+      style="display: none; margin-top: 8px"
+    >
+      &#x2699;&#xFE0F; Manage / Cancel subscription
+    </button>
+    <p
+      style="
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--on-glass-muted);
+        margin: 6px 0 2px;
+      "
+    >
+      Cancel anytime. No charge during trial.
+    </p>
+    <div class="sub-pay-methods" id="subPayMethods">
+      <span>Pay with</span>
+      <div class="sub-pay-icons">
+        <span class="sub-pay-icon">&#x1F4B3; Card</span>
+        <span class="sub-pay-icon">K Klarna</span>
+        <span class="sub-pay-icon">&#x1F17F; PayPal</span>
+      </div>
+    </div>
+    <div id="paypalButtonContainer" style="margin-top: 10px"></div>
+  </div>
+</div>

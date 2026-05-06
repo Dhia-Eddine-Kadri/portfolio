@@ -1,0 +1,55 @@
+<!-- LECTURE NOTES — injected by features/js/lecturenotes.js -->
+<div id="psec-notes" class="portal-section" style="display: none">
+  <div class="ln-section">
+    <div class="ln-header">
+      <div class="ln-title">&#x1F4DD; Lecture Notes</div>
+      <button class="ln-sync-btn" id="lnSyncBtn">
+        <span class="ln-sync-dot" id="lnSyncDot"></span>
+        <span id="lnSyncLabel">Sync notes</span>
+      </button>
+    </div>
+
+    <!-- How-to install steps -->
+    <div style="margin-bottom: 16px">
+      <button
+        style="
+          background: rgba(192, 132, 252, 0.1);
+          border: 1px solid rgba(192, 132, 252, 0.25);
+          border-radius: 20px;
+          padding: 6px 14px;
+          font-family: 'Nunito', sans-serif;
+          font-weight: 800;
+          font-size: 0.76rem;
+          color: rgba(192, 132, 252, 0.8);
+          cursor: pointer;
+        "
+        id="extHowToBtn"
+      >
+        How to install
+      </button>
+      <div
+        id="extHowTo"
+        style="
+          display: none;
+          margin-top: 12px;
+          background: rgba(192, 132, 252, 0.06);
+          border: 1px solid rgba(192, 132, 252, 0.18);
+          border-radius: 14px;
+          padding: 16px 20px;
+          font-size: 0.8rem;
+          color: rgba(255, 255, 255, 0.65);
+          line-height: 1.9;
+        "
+      >
+        <strong style="color: #c084fc">Install the StudySphere Extension:</strong><br />
+        1. Open YouTube or Opencast and start a lecture<br />
+        2. Click the StudySphere icon in your browser toolbar<br />
+        3. Press <strong style="color: #c084fc">✨ Summarize</strong> — your notes appear here
+        automatically
+      </div>
+    </div>
+
+    <!-- Notes grid / empty state -->
+    <div id="lnContent"></div>
+  </div>
+</div>
