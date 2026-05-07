@@ -836,7 +836,7 @@ function normalizeQuestion(q) {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openFileName) {
+function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openFileName, activeDocId) {
   return crypto
     .createHash('sha256')
     .update(
@@ -851,7 +851,9 @@ function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openF
         '|' +
         (mode || 'strict') +
         '|' +
-        (openFileName || '')
+        (openFileName || '') +
+        '|' +
+        (activeDocId || '')
     )
     .digest('hex');
 }
@@ -1174,7 +1176,7 @@ exports.handler = async function (event) {
 
   // 2. Get document version hash (used for cache invalidation)
   const docVersionHash = await getDocumentVersionHash(serviceKey, user.id, courseId);
-  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode, openFileName);
+  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode, openFileName, activeDocId);
 
   // 3. Check exact answer cache
   const exactHit = await getExactCache(

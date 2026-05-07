@@ -81,7 +81,7 @@ export default async function handler(request, context) {
 
       // 2. Doc version hash + question hash (for caching)
       const docVersionHash = await getDocVersionHash(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      const questionHash = await makeQuestionHash(userId, courseId, question, docVersionHash, ragMode, openFileName);
+      const questionHash = await makeQuestionHash(userId, courseId, question, docVersionHash, ragMode, openFileName, activeDocId);
       const normalizedQ = question.toLowerCase().replace(/\s+/g, ' ').trim();
 
       // 3. Check exact answer cache — stream it back quickly if found
@@ -427,10 +427,10 @@ async function getDocVersionHash(userId, courseId, supaUrl, serviceKey) {
   } catch (e) { return 'unknown'; }
 }
 
-async function makeQuestionHash(userId, courseId, question, docVersionHash, mode, openFileName) {
+async function makeQuestionHash(userId, courseId, question, docVersionHash, mode, openFileName, activeDocId) {
   const str = 'v3|' + userId + '|' + courseId + '|' +
     question.toLowerCase().replace(/\s+/g, ' ').trim() + '|' +
-    docVersionHash + '|' + (mode || 'strict') + '|' + (openFileName || '');
+    docVersionHash + '|' + (mode || 'strict') + '|' + (openFileName || '') + '|' + (activeDocId || '');
   return sha256hex(str);
 }
 

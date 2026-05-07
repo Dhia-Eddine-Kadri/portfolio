@@ -15,7 +15,11 @@ export function initAiAskBridge(state) {
   function stopGeneration() {
     state.generationStopped = true;
     state.currentGenId++;
-    // If a stream is in progress, flush queue and do final markdown+KaTeX render
+    // Cancel the in-flight backend streaming request
+    if (typeof window._abortCurrentStream === 'function') {
+      window._abortCurrentStream();
+    }
+    // Flush token queue and do final markdown+KaTeX render
     if (typeof window._activeStreamRender === 'function') {
       window._activeStreamRender();
       window._activeStreamRender = null;
