@@ -135,8 +135,9 @@ function _renderHistoryPairs(pairs, aiMsgs) {
       var _rawA = pair.a;
       function _doRender() {
         if (!_bEl) return;
+        // KaTeX is loaded here (we're inside _ssEnsureKatex().then) — renderMarkdown
+        // renders math directly, so no _renderMath pass needed.
         _bEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(_rawA) : _rawA;
-        if (window._renderMath) window._renderMath(_bEl);
       }
       if (window._ssEnsureKatex) {
         window._ssEnsureKatex().then(_doRender).catch(_doRender);
@@ -462,25 +463,26 @@ export function initAskAI(state) {
             }
 
             function renderBlock(text) {
-              // Render a single completed block with markdown+KaTeX, faded in
               var div = document.createElement('div');
               div.className = 'ss-rendered-block';
               div.style.opacity = '0';
               div.style.transition = 'opacity 0.2s ease';
-              div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
               return div;
             }
 
-            function applyKatexToBlock(div) {
+            function applyKatexToBlock(div, text) {
               if (window._ssEnsureKatex) {
                 window._ssEnsureKatex().then(function () {
-                  if (window._renderMath && div) {
-                    window._renderMath(div);
-                    div.style.opacity = '1';
-                    _autoScroll(aiMsgs);
-                  }
-                }).catch(function () { div.style.opacity = '1'; });
+                  // Render markdown+math together with KaTeX loaded to avoid double-render
+                  div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                  div.style.opacity = '1';
+                  _autoScroll(aiMsgs);
+                }).catch(function () {
+                  div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                  div.style.opacity = '1';
+                });
               } else {
+                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
                 div.style.opacity = '1';
               }
             }
@@ -505,7 +507,7 @@ export function initAskAI(state) {
               while (_renderedBlockCount < completedCount) {
                 var div = renderBlock(blocks[_renderedBlockCount]);
                 bubble.insertBefore(div, typingSpan);
-                applyKatexToBlock(div);
+                applyKatexToBlock(div, blocks[_renderedBlockCount]);
                 _renderedBlockCount++;
               }
 
@@ -516,24 +518,23 @@ export function initAskAI(state) {
             }
 
             // Final render: clear streaming artifacts and do one clean markdown render.
-            // We don't reuse _renderedBlockCount here because finalize may prepend a
-            // warning block to fullAnswer, shifting all block indices vs what was
-            // rendered incrementally. A clean innerHTML replacement is safe at this
-            // point — the streaming typing effect has already been shown.
+            // renderMarkdown is called INSIDE _ssEnsureKatex().then() so KaTeX is always
+            // loaded when it runs — no \[...\] fallbacks are emitted, which prevents
+            // _renderMath from double-processing KaTeX aria annotations and corrupting output.
             function fullRender(text) {
               if (!bubble) return;
               var display = text.replace(metaPattern, '').trim();
               if (!display) return;
-              bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : display;
+              var _doFullRender = function () {
+                if (!bubble) return;
+                bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : display;
+                _autoScroll(aiMsgs);
+              };
               if (window._ssEnsureKatex) {
-                window._ssEnsureKatex().then(function () {
-                  if (window._renderMath && bubble) window._renderMath(bubble);
-                  _autoScroll(aiMsgs);
-                }).catch(function () {});
-              } else if (window._renderMath) {
-                window._renderMath(bubble);
+                window._ssEnsureKatex().then(_doFullRender).catch(_doFullRender);
+              } else {
+                _doFullRender();
               }
-              _autoScroll(aiMsgs);
             }
 
             function drainQueue() {
