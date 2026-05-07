@@ -192,7 +192,7 @@ export default async function handler(request, context) {
       const lang = detectLang(question, ranked);
       const tokenBudget = { exercise: 8000, derivation: 8000, concept: 4000, definition: 2500, formula: 3500, other: 4000 };
       const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
-      const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName);
+      const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName, !!handwrittenImages);
 
       // 11. Stream OpenAI
       // Always use the full model for handwritten docs (vision support required)
@@ -209,7 +209,16 @@ export default async function handler(request, context) {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: handwrittenImages
                 ? [
-                    { type: 'text', text: 'COURSE CONTEXT:\n\n' + contextText + '\n\n---\n\nSTUDENT QUESTION:\n' + question + '\n\n(The open document is handwritten/scanned — pages are provided as images below. Read all handwritten text, equations, and diagrams carefully.)' },
+                    { type: 'text', text:
+                        'COURSE CONTEXT (Formelsammlung and lecture material):\n\n' + contextText +
+                        '\n\n---\n\n' +
+                        'HANDWRITTEN DOCUMENT PAGES (images below): The student has a handwritten or scanned document open. ' +
+                        'These pages ARE the primary source — they contain the exercise statement, given values, and/or the worked solution. ' +
+                        'Read every handwritten value, formula, variable, subscript, and number from the images carefully and accurately. ' +
+                        'Use the exact given values shown in the handwriting (do NOT substitute your own assumptions). ' +
+                        'If the images show a worked solution, follow it step by step exactly.\n\n' +
+                        'STUDENT QUESTION: ' + question
+                    },
                     ...handwrittenImages.map(b64 => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }))
                   ]
                 : 'COURSE CONTEXT:\n\n' + contextText + '\n\n---\n\nSTUDENT QUESTION:\n' + question
@@ -719,7 +728,7 @@ async function fetchSummaryChunks(userId, courseId, supaUrl, serviceKey, embeddi
 }
 
 const TYPE_INSTRUCTIONS = {
-  exercise: '\n\n## Exercise rules\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. **FORMULAS: ONLY use formulas that appear verbatim in the COURSE CONTEXT (Formelsammlung / Zusammenfassung / lecture / solution SOURCE blocks). Do NOT invent, simplify, or substitute your own formulas — even if you think you know them. If the required formula is not in the course context, say: "Die benötigte Formel wurde im Kurs-Material nicht gefunden." and stop.**\n4. If the solution PDF is present, follow it step by step exactly. If it is NOT present, derive the answer yourself using only formulas found in the Formelsammlung source blocks.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the exact formula from the source block (quote the formula, cite the file and page).\n7. Show every algebraic manipulation and number substitution. Do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.',
+  exercise: '\n\n## Exercise rules\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. **FORMULAS: Use formulas from (in priority order): (a) handwritten page images if present, (b) COURSE CONTEXT source blocks (Formelsammlung/lecture/solution). Do NOT invent formulas or substitute your own assumptions. If no formula is found anywhere, say: "Die benötigte Formel wurde nicht gefunden."**\n4. If a handwritten solution is visible in the images, reproduce it step by step exactly with all values. If no handwritten solution is present, use formulas from the Formelsammlung source blocks.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the formula used and its source (image page or source block file/page).\n7. Show every algebraic manipulation and number substitution. Do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.',
   definition: '\n\nQuote the exact definition from the material first. Then explain it in plain language. Then give one example.',
   derivation: '\n\nShow every algebraic step numbered. State the rule applied at each step. Use the professor\'s notation.',
   concept: '\n\nExplain what it is, why it matters, how it works. Use a concrete example from the course material.',
@@ -727,15 +736,19 @@ const TYPE_INSTRUCTIONS = {
   other: ''
 };
 
-function buildPrompt(mode, lang, qType, openFileName) {
+function buildPrompt(mode, lang, qType, openFileName, hasHandwritten) {
   const strict = mode !== 'general';
   const langLine = lang === 'de' ? 'Respond in **German** — the course materials are in German.' : 'Respond in **English**.';
   const openFileLine = openFileName
     ? 'The student is currently reading **' + openFileName + '**. The OPEN FILE block contains the problem/exercise text from that file. Use it to understand exactly what is being asked. Look in ALL other course documents (lectures, solution sheets) for the explanation and full solution.'
     : '';
+  const handwrittenLine = hasHandwritten
+    ? '⚠️ HANDWRITTEN DOCUMENT: The student has a handwritten/scanned PDF open. Page images are included in the user message. These images are the PRIMARY source — they show the exercise, given values, and/or the worked solution. READ THE IMAGES CAREFULLY. Use the exact values, formulas, and steps shown in the handwriting. Do NOT ignore the images or substitute your own assumptions.'
+    : '';
   return [
     'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine,
     openFileLine ? openFileLine : '',
+    handwrittenLine ? handwrittenLine : '',
     '',
     '1. Read ALL source blocks in COURSE CONTEXT before writing anything.',
     '2. Ground every claim in the COURSE CONTEXT. Use the professor\'s exact notation and terminology.',
