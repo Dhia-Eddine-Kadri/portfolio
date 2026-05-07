@@ -652,10 +652,10 @@ function closeDD() {}
 // ── NIGHT MODE ────────────────────────────────────────────────────────────
 // nightOn is declared globally above DOMContentLoaded — sync the button here
 (function () {
-  var _bIcon = document.getElementById('nightIcon');
-  if (_bIcon) _bIcon.textContent = nightOn ? '🌙' : '☀️';
+  var _bIcon = document.getElementById('nightIcon'); //
+  if (_bIcon) _bIcon.textContent = Store.getState().settings.darkMode ? '🌙' : '☀️';
   var _bLbl = document.getElementById('nightLabel');
-  if (_bLbl) _bLbl.textContent = nightOn ? 'Night' : 'Day';
+  if (_bLbl) _bLbl.textContent = Store.getState().settings.darkMode ? 'Night' : 'Day';
 })();
 // nightBtn listener moved to ss-ready
 
@@ -1041,9 +1041,9 @@ function _applyTheme(toNight, originEl) {
   var y = Math.round(rect.top + rect.height / 2);
 
   function _commitTheme() {
-    nightOn = toNight;
-    document.body.classList.toggle('night', toNight);
-    var nb = document.getElementById('nightBtn');
+    Store.setState({ settings: { darkMode: toNight } }); // Update central state
+    // UI update for body class is handled by the Store subscription
+
     var nbIcon = document.getElementById('nightIcon');
     if (nbIcon) {
       nbIcon.textContent = toNight ? '🌙' : '☀️';
@@ -1052,7 +1052,7 @@ function _applyTheme(toNight, originEl) {
     }
     var dm = document.getElementById('settingsDarkMode');
     if (dm) dm.checked = toNight;
-    localStorage.setItem('ss_dark', toNight ? '1' : '0');
+    localStorage.setItem('ss_dark', toNight ? '1' : '0'); // Keep for early loading scripts (e.g., auth-bootstrap.js)
     saveState();
   }
 
@@ -1088,7 +1088,7 @@ function _applyTheme(toNight, originEl) {
 
 // Night mode button
 _bindIf('nightBtn', 'click', function () {
-  _applyTheme(!nightOn, this);
+  _applyTheme(!Store.getState().settings.darkMode, this);
 });
 
 // ── Mobile hamburger menu ──────────────────────────────────────
