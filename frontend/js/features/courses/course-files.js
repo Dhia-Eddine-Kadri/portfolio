@@ -1,5 +1,18 @@
 import { showCourseSection } from './course-view.js';
-import { listCourseDocuments, indexExistingDocument } from '../../services/ai-service.js';
+import {
+  listCourseDocuments,
+  indexExistingDocument,
+  generateStudyTool
+} from '../../services/ai-service.js';
+
+var _coStudyMode = 'quiz';
+var _coQuizItems = [];
+var _coQuizIndex = 0;
+var _coSelectedOption = null;
+var _coCards = [];
+var _coCardIndex = 0;
+var _coCardFlipped = false;
+var _coStudyCourseId = null;
 
 export function bindFileEvents(co, course) {
   var selectMode = false;
@@ -19,6 +32,8 @@ export function bindFileEvents(co, course) {
       btn.textContent = '✨ AI Chat (' + selectedFiles.length + ' files)';
     else btn.textContent = '✨ AI Chat';
   }
+
+  initCourseStudyTools(co, course);
 
   // ── Select toggle ──────────────────────────────────────────────────────────
   var selectToggle = co.querySelector('#coSelectToggle');
@@ -246,6 +261,7 @@ export function bindFileEvents(co, course) {
       if (
         e.target.closest('.co-dl-btn') ||
         e.target.closest('.co-del-btn') ||
+        e.target.closest('.co-reindex-btn') ||
         e.target.closest('.co-rag-status')
       )
         return;
@@ -315,6 +331,99 @@ export function bindFileEvents(co, course) {
       showCourseSection(course, 'files');
     });
   });
+
+  // ── Re-index button ────────────────────────────────────────────────────────
+  co.querySelectorAll('.co-reindex-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var fname = btn.getAttribute('data-fname');
+      var sname = btn.getAttribute('data-sname') || null;
+      var folder = btn.getAttribute('data-folder') || null;
+      if (!sname) return;
+      btn.textContent = '⏳';
+      btn.style.pointerEvents = 'none';
+      indexExistingDocument(course.id, sname, fname, null, folder, Object.assign({}, _guessDocMeta(fname), { forceReindex: true }))
+        .then(function () {
+          btn.textContent = '✓ AI';
+          btn.style.background = 'rgba(6,214,160,.15)';
+          btn.style.color = 'rgba(6,214,160,.9)';
+          btn.style.borderColor = 'rgba(6,214,160,.3)';
+          if (typeof window.showToast === 'function')
+            window.showToast('Re-indexed', '"' + fname + '" is now updated for AI.');
+        })
+        .catch(function () {
+          btn.textContent = '↺ AI';
+          btn.style.pointerEvents = '';
+          if (typeof window.showToast === 'function')
+            window.showToast('Error', 'Re-index failed. Try again.');
+        });
+    });
+  });
+
+  // ── Reindex-all button ─────────────────────────────────────────────────────
+  var reindexAllBtn = co.querySelector('#coReindexAllBtn');
+  if (reindexAllBtn) {
+    reindexAllBtn.addEventListener('click', function () {
+      var targets = [];
+      (course.files || []).forEach(function (f) {
+        if (f._uploaded && f._storageName && /\.pdf$/i.test(f.name)) {
+          targets.push({ fname: f.name, sname: f._storageName, folder: null });
+        }
+      });
+      (course.userFolders || []).forEach(function (fd) {
+        (fd.files || []).forEach(function (f) {
+          if (f._uploaded && f._storageName && /\.pdf$/i.test(f.name)) {
+            targets.push({ fname: f.name, sname: f._storageName, folder: fd.name });
+          }
+        });
+      });
+      if (!targets.length) {
+        if (typeof window.showToast === 'function')
+          window.showToast('Nothing to reindex', 'No uploaded PDFs in this course.');
+        return;
+      }
+      if (!confirm('Re-index ' + targets.length + ' PDF' + (targets.length === 1 ? '' : 's') + ' in this course? This may take a few minutes.')) return;
+
+      reindexAllBtn.disabled = true;
+      var origLabel = reindexAllBtn.textContent;
+      var done = 0, failed = 0;
+      function updateLabel() {
+        reindexAllBtn.textContent = '⏳ ' + done + ' / ' + targets.length;
+      }
+      updateLabel();
+
+      var i = 0;
+      function next() {
+        if (i >= targets.length) {
+          reindexAllBtn.disabled = false;
+          reindexAllBtn.textContent = origLabel;
+          if (typeof window.showToast === 'function') {
+            window.showToast(
+              'Reindex complete',
+              done + ' succeeded' + (failed ? ', ' + failed + ' failed' : '') + '.'
+            );
+          }
+          return;
+        }
+        var t = targets[i++];
+        indexExistingDocument(
+          course.id,
+          t.sname,
+          t.fname,
+          null,
+          t.folder,
+          Object.assign({}, _guessDocMeta(t.fname), { forceReindex: true })
+        )
+          .then(function () { done++; })
+          .catch(function () { failed++; })
+          .finally(function () {
+            updateLabel();
+            next();
+          });
+      }
+      next();
+    });
+  }
 
   // ── RAG status indicators ──────────────────────────────────────────────────
   _bindRagStatus(co, course);
@@ -469,6 +578,340 @@ export function bindFileEvents(co, course) {
       this.value = '';
     });
   }
+}
+
+function escapeHtmlLocal(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sampleCourseQuiz(course) {
+  var label = course && course.name ? course.name : 'Course';
+  return [
+    {
+      category: label,
+      question: 'What should you do first to generate better study tools?',
+      options: {
+        A: 'Upload and index course material',
+        B: 'Delete all course files',
+        C: 'Open the settings page',
+        D: 'Turn off course-only mode'
+      },
+      answer: 'A',
+      explanation:
+        'The generator works best when your uploaded PDFs have been indexed and are ready for AI.'
+    },
+    {
+      category: label,
+      question: 'What is the purpose of flashcards?',
+      options: {
+        A: 'Long-form essay writing',
+        B: 'Active recall of key terms and ideas',
+        C: 'Changing account settings',
+        D: 'Uploading new documents'
+      },
+      answer: 'B',
+      explanation:
+        'Flashcards are designed for active recall: prompt on one side, answer on the other.'
+    }
+  ];
+}
+
+function sampleCourseCards(course) {
+  var label = course && course.name ? course.name : 'Course concept';
+  return [
+    {
+      front: label,
+      back: 'Upload course files and generate cards to replace this sample with material-based flashcards.'
+    },
+    {
+      front: 'Active recall',
+      back: 'A study method where you try to retrieve the answer before checking it.'
+    },
+    {
+      front: 'Spaced review',
+      back: 'Reviewing difficult material again after a delay helps memory stick longer.'
+    }
+  ];
+}
+
+function ensureCourseStudyData(course) {
+  var courseId = course && course.id ? course.id : 'course';
+  if (_coStudyCourseId !== courseId) {
+    _coStudyCourseId = courseId;
+    _coStudyMode = 'quiz';
+    _coQuizItems = [];
+    _coQuizIndex = 0;
+    _coSelectedOption = null;
+    _coCards = [];
+    _coCardIndex = 0;
+    _coCardFlipped = false;
+  }
+  if (!_coQuizItems.length) _coQuizItems = sampleCourseQuiz(course);
+  if (!_coCards.length) {
+    _coCards = sampleCourseCards(course).map(function (card) {
+      return Object.assign({ bookmarked: false, confidence: null }, card);
+    });
+  }
+}
+
+function initCourseStudyTools(co, course) {
+  var quizBody = co.querySelector('#coQuizBody');
+  var flashBody = co.querySelector('#coFlashBody');
+  if (!quizBody || !flashBody) return;
+  ensureCourseStudyData(course);
+
+  co.querySelectorAll('[data-course-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      setCourseStudyMode(co, course, tab.getAttribute('data-course-tab'));
+    });
+  });
+
+  var quizBtn = co.querySelector('#coGenerateQuiz');
+  var flashBtn = co.querySelector('#coGenerateFlashcards');
+
+  if (quizBtn)
+    quizBtn.addEventListener('click', function () {
+      generateCourseStudyTool(co, course, 'quiz');
+    });
+  if (flashBtn)
+    flashBtn.addEventListener('click', function () {
+      generateCourseStudyTool(co, course, 'flashcards');
+    });
+
+  renderCourseStudyTools(co, course);
+}
+
+function setCourseStudyMode(co, course, mode) {
+  var nextMode = ['files', 'quiz', 'flashcards'].includes(mode) ? mode : 'files';
+  if (nextMode !== 'files') _coStudyMode = nextMode;
+  co.querySelectorAll('[data-course-tab]').forEach(function (tab) {
+    var isActive = tab.getAttribute('data-course-tab') === nextMode;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  co.querySelectorAll('[data-course-panel]').forEach(function (panel) {
+    panel.classList.toggle('active', panel.getAttribute('data-course-panel') === nextMode);
+  });
+  renderCourseStudyTools(co, course);
+}
+
+function normalizeQuizItem(item, idx, course) {
+  var rawOptions = item.options || {};
+  var options = {};
+  if (Array.isArray(rawOptions)) {
+    rawOptions.forEach(function (option, i) {
+      var letter = option.id || ['A', 'B', 'C', 'D'][i];
+      if (letter) options[letter] = option.text || option.label || String(option);
+    });
+  } else {
+    ['A', 'B', 'C', 'D'].forEach(function (letter) {
+      if (rawOptions[letter]) options[letter] = rawOptions[letter];
+    });
+  }
+  return {
+    category: item.category || item.source || (course && course.name) || 'Course',
+    question: item.question || 'Question ' + (idx + 1),
+    options: options,
+    answer: item.answer || item.correctOptionId || 'A',
+    explanation: item.explanation || 'Check the correct answer, then continue.'
+  };
+}
+
+function renderCourseStudyTools(co, course) {
+  var quizBody = co.querySelector('#coQuizBody');
+  var flashBody = co.querySelector('#coFlashBody');
+  if (quizBody) renderCourseQuiz(co, course, quizBody);
+  if (flashBody) renderCourseFlashcards(co, course, flashBody);
+}
+
+function renderCourseQuiz(co, course, body) {
+  ensureCourseStudyData(course);
+  var item = normalizeQuizItem(_coQuizItems[_coQuizIndex], _coQuizIndex, course);
+  var answered = !!_coSelectedOption;
+  var optionHtml = ['A', 'B', 'C', 'D']
+    .filter(function (letter) {
+      return item.options[letter];
+    })
+    .map(function (letter) {
+      var state = '';
+      var status = '';
+      if (answered && letter === item.answer) {
+        state = ' correct';
+        status = '<span class="co-option-status">Correct answer</span>';
+      } else if (answered && letter === _coSelectedOption) {
+        state = ' incorrect';
+        status = '<span class="co-option-status">Your answer</span>';
+      }
+      return (
+        '<button class="co-quiz-option' +
+        state +
+        '" type="button" data-option="' +
+        letter +
+        '"' +
+        (answered ? ' disabled' : '') +
+        '>' +
+        '<span class="co-option-letter">' +
+        letter +
+        '</span><span>' +
+        escapeHtmlLocal(item.options[letter]) +
+        '</span>' +
+        status +
+        '</button>'
+      );
+    })
+    .join('');
+  body.innerHTML =
+    '<section class="co-quiz-card" aria-live="polite">' +
+    '<div class="co-quiz-badge">Question ' +
+    (_coQuizIndex + 1) +
+    ' / ' +
+    _coQuizItems.length +
+    '</div>' +
+    '<div class="co-quiz-category">' +
+    escapeHtmlLocal(item.category) +
+    '</div>' +
+    '<div class="co-quiz-question">' +
+    escapeHtmlLocal(item.question) +
+    '</div>' +
+    '<div class="co-quiz-options">' +
+    optionHtml +
+    '</div>' +
+    (answered
+      ? '<div class="co-quiz-explanation"><strong>Explanation:</strong> ' +
+        escapeHtmlLocal(item.explanation) +
+        '</div><button class="co-continue-btn" id="coContinueQuiz" type="button">Got it, keep going</button>'
+      : '') +
+    '</section>';
+
+  body.querySelectorAll('.co-quiz-option').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      _coSelectedOption = btn.getAttribute('data-option');
+      renderCourseStudyTools(co, course);
+    });
+  });
+  var next = body.querySelector('#coContinueQuiz');
+  if (next)
+    next.addEventListener('click', function () {
+      _coQuizIndex = (_coQuizIndex + 1) % _coQuizItems.length;
+      _coSelectedOption = null;
+      renderCourseStudyTools(co, course);
+    });
+}
+
+function renderCourseFlashcards(co, course, body) {
+  ensureCourseStudyData(course);
+  var card = _coCards[_coCardIndex];
+  body.innerHTML =
+    '<section class="co-flash-shell" aria-live="polite">' +
+    '<div class="co-flash-top">' +
+    '<div><div class="co-flash-label">' +
+    (_coCardFlipped ? 'Definition' : 'Term') +
+    '</div><div class="co-study-sub">Card ' +
+    (_coCardIndex + 1) +
+    ' / ' +
+    _coCards.length +
+    '</div></div>' +
+    '<div class="co-flash-icons">' +
+    '<button class="co-flash-icon' +
+    (card.confidence === 'known' ? ' active' : '') +
+    '" type="button" data-feedback="known" title="I know this">+</button>' +
+    '<button class="co-flash-icon review' +
+    (card.confidence === 'review' ? ' active' : '') +
+    '" type="button" data-feedback="review" title="Needs review">-</button>' +
+    '<button class="co-flash-icon bookmark' +
+    (card.bookmarked ? ' active' : '') +
+    '" type="button" data-feedback="bookmark" title="Bookmark">*</button>' +
+    '</div></div>' +
+    '<div class="co-flash-stage"><button class="co-flash-card' +
+    (_coCardFlipped ? ' flipped' : '') +
+    '" id="coFlashCard" type="button" aria-label="Flashcard, ' +
+    (_coCardFlipped ? 'back side visible' : 'front side visible') +
+    '">' +
+    '<span class="co-flash-side front"><span class="co-flash-text">' +
+    escapeHtmlLocal(card.front || card.term || 'Card front') +
+    '</span></span>' +
+    '<span class="co-flash-side back"><span class="co-flash-text">' +
+    escapeHtmlLocal(card.back || card.definition || 'Card back') +
+    '</span></span>' +
+    '</button></div>' +
+    '<div class="co-flash-controls">' +
+    '<button class="co-flash-control" type="button" data-move="-1">Back</button>' +
+    '<button class="co-flash-control" type="button" id="coFlipCard">Flip</button>' +
+    '<button class="co-flash-control" type="button" data-move="1">Next</button>' +
+    '</div>' +
+    '</section>';
+
+  var flashCard = body.querySelector('#coFlashCard');
+  var flipBtn = body.querySelector('#coFlipCard');
+  function flip() {
+    _coCardFlipped = !_coCardFlipped;
+    renderCourseStudyTools(co, course);
+  }
+  if (flashCard) flashCard.addEventListener('click', flip);
+  if (flipBtn) flipBtn.addEventListener('click', flip);
+  body.querySelectorAll('[data-move]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var delta = parseInt(btn.getAttribute('data-move'), 10);
+      _coCardIndex = (_coCardIndex + delta + _coCards.length) % _coCards.length;
+      _coCardFlipped = false;
+      renderCourseStudyTools(co, course);
+    });
+  });
+  body.querySelectorAll('[data-feedback]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var type = btn.getAttribute('data-feedback');
+      if (type === 'bookmark') card.bookmarked = !card.bookmarked;
+      else card.confidence = card.confidence === type ? null : type;
+      renderCourseStudyTools(co, course);
+    });
+  });
+}
+
+async function generateCourseStudyTool(co, course, tool) {
+  setCourseStudyMode(co, course, tool === 'flashcards' ? 'flashcards' : 'quiz');
+  var body = co.querySelector(tool === 'flashcards' ? '#coFlashBody' : '#coQuizBody');
+  if (body)
+    body.innerHTML = '<div class="co-study-empty">Generating from indexed course files...</div>';
+  try {
+    var result = await generateStudyTool(course.id, tool, {
+      count: tool === 'quiz' ? 5 : 8,
+      difficulty: 'medium',
+      topic: course.name || null
+    });
+    if (result && result.items && result.items.length) {
+      if (tool === 'quiz') {
+        _coQuizItems = result.items;
+        _coQuizIndex = 0;
+        _coSelectedOption = null;
+      } else {
+        _coCards = result.items.map(function (card) {
+          return {
+            front: card.front,
+            back: card.back,
+            source: card.source || '',
+            bookmarked: false,
+            confidence: null
+          };
+        });
+        _coCardIndex = 0;
+        _coCardFlipped = false;
+      }
+    } else if (typeof window.showToast === 'function') {
+      window.showToast(
+        'Using sample cards',
+        (result && result.error) || 'Upload indexed PDFs to generate course-specific tools.'
+      );
+    }
+  } catch (e) {
+    if (typeof window.showToast === 'function')
+      window.showToast('Generation failed', 'Showing sample study tools for now.');
+  }
+  renderCourseStudyTools(co, course);
 }
 
 function _guessSourceType(fileName) {
