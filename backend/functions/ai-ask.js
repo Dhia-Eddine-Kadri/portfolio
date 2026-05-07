@@ -265,7 +265,7 @@ async function classifyQuestion(question) {
 function questionTypeInstructions(type) {
   const map = {
     exercise:
-      '\n\n## Exercise instructions\nSolve this step by step. Number each step. State the method and formula used at each step. Show intermediate results. Box or bold the final answer. If you find an official solution in the sources, follow its method exactly.',
+      '\n\n## Exercise instructions\nThe COURSE CONTEXT contains the full solution — read every source block carefully, the answer IS there.\n1. State what is given and what is asked.\n2. Write out the complete solution step by step, numbered.\n3. At each step state the formula or principle used in the professor\'s exact notation.\n4. Show every algebraic manipulation — do NOT skip steps.\n5. **Bold the final answer** with units.\n6. If a solution PDF is cited, follow its steps exactly — reproduce them, not a generic approach.\nNEVER say the solution "is not explicitly provided" when sources from the document are retrieved — the content IS there; read it more carefully.',
     definition:
       '\n\n## Definition instructions\nFirst give the exact definition as stated in the course material (quote it). Then explain it in plain language. Then give one concrete example from the material.',
     derivation:
@@ -563,9 +563,10 @@ function buildSystemPrompt(mode, lang) {
     '4. **Math notation:** Use KaTeX delimiters. Inline math: `$...$`. Display math: `$$...$$`. Examples: `$v_x(t) = -2ct\\sin(\\theta)$` or `$$a_n = \\frac{v^2}{r}$$`. NEVER use `\\(` or `\\[` — only `$` and `$$`. Do NOT use Unicode math letters (𝑎, 𝑣, 𝑥).',
     '5. **Citations:** After every major claim, add an inline citation using the exact FILE and PAGES from the source header: *(filename, p.X)*. If a SECTION_ID is present, include it: *(filename, p.X, Exercise 3b)*.',
     '6. **Confidence:** Set "high" when the COURSE CONTEXT directly supports the answer — even if you added a minor "(not explicitly in uploaded materials)" label for a small detail. Set "medium" ONLY when a substantial portion of the answer relies on general knowledge not in the context. Set "low" when the answer is mostly general knowledge.',
+    '7. **CRITICAL:** Do NOT include confidence indicators, emoji, or source lists anywhere in your markdown answer text. ONLY put them in the JSON response fields (sources, confidence). Never write 🟢🟡🔴 or "Confidence:" in the answer itself.',
     strict
-      ? '7. **Strict mode:** Always write a complete answer — NEVER refuse or say you cannot answer. Use the COURSE CONTEXT as your primary source. If a specific detail is missing from the context, fill the gap using standard academic knowledge for the subject but label it: *"(not explicitly in uploaded materials)"*. Only say "not found" for a specific sub-point, never for the whole answer.'
-      : '7. **General mode:** Use the COURSE CONTEXT first, then supplement freely with outside knowledge. Label outside knowledge clearly: *"(outside knowledge)"*.',
+      ? '8. **Strict mode:** ALWAYS write a COMPLETE, DETAILED answer — never refuse, never truncate. Read ALL source blocks first. Use the COURSE CONTEXT as primary source. If a source is cited it means content was retrieved — use it fully. Only label something "(not explicitly in uploaded materials)" when genuinely absent from ALL sources. Never use that label as an excuse to avoid solving the problem.'
+      : '8. **General mode:** Use the COURSE CONTEXT first, then supplement freely with outside knowledge. Label outside knowledge clearly: *"(outside knowledge)"*.',
     '',
     '## Sources array rules',
     'For EACH source you actually used in the answer, add one entry. Fields:',

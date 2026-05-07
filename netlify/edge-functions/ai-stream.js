@@ -348,7 +348,7 @@ function detectLang(chunks) {
 }
 
 const TYPE_INSTRUCTIONS = {
-  exercise: '\n\nSolve step by step. Number each step. State the formula used. Bold the final answer.',
+  exercise: '\n\n## Exercise rules\nThe COURSE CONTEXT contains the full solution. Read every source block carefully — the answer IS there.\n1. State what is given and what is asked.\n2. Write out the complete solution step by step, numbered.\n3. At each step state the formula or principle used, in the professor\'s exact notation.\n4. Show every algebraic manipulation. Do NOT skip steps.\n5. **Bold the final answer** with units.\n6. If the solution PDF is a source, follow it exactly — reproduce its steps, not a generic approach.\nNEVER say the solution "is not explicitly provided" if sources from the document are retrieved — that means the content IS there; read it more carefully.',
   definition: '\n\nQuote the exact definition from the material first. Then explain it in plain language. Then give one example.',
   derivation: '\n\nShow every algebraic step numbered. State the rule applied at each step. Use the professor\'s notation.',
   concept: '\n\nExplain what it is, why it matters, how it works. Use a concrete example from the course material.',
@@ -361,16 +361,18 @@ function buildPrompt(mode, lang, qType) {
   const langLine = lang === 'de' ? 'Respond in **German** — the course materials are in German.' : 'Respond in **English**.';
   return [
     'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine, '',
-    '1. Ground every claim in the COURSE CONTEXT. Use the professor\'s exact notation and terminology.',
-    '2. Structure your answer clearly in markdown. Start with a direct 1-2 sentence answer.',
-    '3. Math: use KaTeX. Inline: $...$  Display: $$...$$ — NEVER use \\( or \\[. No Unicode math letters.',
-    '4. After each major claim, add inline citation: *(filename, p.X)* or *(filename, p.X, SECTION_ID)*.',
-    strict ? '5. Strict mode: ALWAYS write a complete answer — never refuse. Use COURSE CONTEXT first. Fill gaps with standard academic knowledge but label them: "(not explicitly in uploaded materials)". Never say "not found" for the whole answer, only for specific missing sub-points.'
-           : '5. General mode: use COURSE CONTEXT first, then supplement with outside knowledge. Label outside knowledge clearly.',
-    '6. Set confidence: "high" when the COURSE CONTEXT directly supports the answer — even if you added a minor "(not explicitly in uploaded materials)" label for a small detail. Set "medium" ONLY when a substantial portion of the answer relies on general knowledge not in the context. Set "low" when the answer is mostly general knowledge.',
+    '1. Read ALL source blocks in COURSE CONTEXT before writing anything. The answer is in the sources.',
+    '2. Ground every claim in the COURSE CONTEXT. Use the professor\'s exact notation and terminology.',
+    '3. Structure your answer clearly in markdown. Start with a direct 1-2 sentence answer.',
+    '4. Math: use KaTeX. Inline: $...$  Display: $$...$$ — NEVER use \\( or \\[. No Unicode math letters (𝑎𝑣𝑥 etc.).',
+    '5. After each major claim, add inline citation: *(filename, p.X)* or *(filename, p.X, SECTION_ID)*.',
+    strict ? '6. Strict mode: ALWAYS write a COMPLETE, DETAILED answer — never refuse, never truncate. Use COURSE CONTEXT first. Only label something "(not explicitly in uploaded materials)" when it is genuinely absent from ALL sources. If sources are cited, their content IS available — use it fully.'
+           : '6. General mode: use COURSE CONTEXT first, then supplement with outside knowledge. Label outside knowledge clearly.',
+    '7. Confidence: set "high" when COURSE CONTEXT directly supports the answer (even if one minor detail needed a general-knowledge label). Set "medium" ONLY when substantial portions rely on general knowledge. Set "low" when mostly general knowledge.',
+    '8. CRITICAL: Do NOT include confidence, sources, or any metadata in your markdown answer text. Only put them in the META block at the very end.',
     TYPE_INSTRUCTIONS[qType] || '',
     '',
-    'After your full markdown answer, on its own line output:',
-    '<!--META-->{"sources":[{"file_name":"...","pages":"...","section":"..."}],"confidence":"high|medium|low"}<!--/META-->'
+    'After your full markdown answer, on a new line output ONLY this (fill in real values, no placeholders):',
+    '<!--META-->{"sources":[{"file_name":"exact FILE value","pages":"exact PAGES value","section":"SECTION_ID or empty"}],"confidence":"high|medium|low"}<!--/META-->'
   ].join('\n');
 }
