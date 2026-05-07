@@ -195,8 +195,11 @@ export default async function handler(request, context) {
       const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName, !!handwrittenImages);
 
       // 11. Stream OpenAI
-      // Always use the full model for handwritten docs (vision support required)
-      const selectedModel = handwrittenImages || ['exercise', 'derivation', 'formula'].includes(qType) ? AI_MODEL : AI_NANO_MODEL;
+      // Handwritten images require a vision-capable model — force gpt-4o regardless of AI_MODEL setting
+      // (o3, o4-mini and other reasoning models do not support image inputs)
+      const selectedModel = handwrittenImages
+        ? 'gpt-4o'
+        : ['exercise', 'derivation', 'formula'].includes(qType) ? AI_MODEL : AI_NANO_MODEL;
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
