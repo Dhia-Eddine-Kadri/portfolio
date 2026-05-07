@@ -19,7 +19,7 @@ const { countRecentEvents, rateLimitResponse } = require('../lib/rate-limit');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
-const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o');
+const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-5.4');
 const OPENAI_NANO_MODEL = optionalEnv('AI_NANO_MODEL', 'gpt-4.1-nano');
 const OPENAI_FAST_MODEL = 'gpt-4o-mini'; // used for HyDE + query expansion (cheap, fast)
 const MAX_CHUNKS = 12;

@@ -18,7 +18,7 @@ export default async function handler(request, context) {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
-  const AI_MODEL = Deno.env.get('AI_MODEL') || 'gpt-4o';
+  const AI_MODEL = Deno.env.get('AI_MODEL') || 'gpt-5.4';
   const AI_NANO_MODEL = Deno.env.get('AI_NANO_MODEL') || 'gpt-4.1-nano';
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !OPENAI_API_KEY) {
