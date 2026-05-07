@@ -221,7 +221,7 @@ export default async function handler(request, context) {
       // 10. Build context + prompt
       const { text: contextText } = buildContext(ranked, docNames, effectiveOpenCtx, openFileName);
       const lang = detectLang(question, ranked);
-      const tokenBudget = { exercise: 8000, derivation: 8000, concept: 4000, definition: 2500, formula: 3500, other: 4000 };
+      const tokenBudget = { exercise: 8000, derivation: 8000, concept: 5000, definition: 3000, formula: 5000, other: 5000 };
       const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
       const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName, !!handwrittenImages);
 
@@ -236,7 +236,7 @@ export default async function handler(request, context) {
         headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: selectedModel,
-          max_tokens: tokenBudget[qType] || 2000,
+          max_tokens: tokenBudget[qType] || 5000,
           temperature: tempMap[qType] !== undefined ? tempMap[qType] : 0.1,
           stream: true,
           messages: [
@@ -842,23 +842,35 @@ function buildPrompt(mode, lang, qType, openFileName, hasHandwritten) {
     ? '⚠️ OPEN PDF WITH PAGE IMAGES: The student has a PDF open. Page images are included in the user message. The PDF may have printed text AND handwritten solutions. CRITICAL RULE: If any image shows a worked solution with explicit numerical results (e.g. F_M,min = 90,942.88 N), you MUST reproduce those exact numbers — do NOT recalculate from scratch. Read images carefully for handwritten values, formulas, and subscripts.'
     : '';
   return [
-    'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine,
+    'You are StudySphere AI — a precise, expert-level academic study assistant for engineering students.', langLine,
     openFileLine ? openFileLine : '',
     handwrittenLine ? handwrittenLine : '',
     '',
+    '## CORE ANSWER QUALITY RULES (follow every single one)',
+    '',
     '1. Read ALL source blocks in COURSE CONTEXT before writing anything.',
     '2. Ground every claim in the COURSE CONTEXT. Use the professor\'s exact notation and terminology.',
-    '3. Structure your answer clearly in markdown. Start with a direct 1-2 sentence answer.',
-    '4. Math: use KaTeX. Inline: $...$  Display: $$...$$ — NEVER use \\( or \\[. No Unicode math letters.',
-    '5. After each major claim, add inline citation: *(filename, p.X)* or *(filename, p.X, SECTION_ID)*.',
+    '3. STEP-BY-STEP SOLVING: For any calculation or derivation, never skip steps. Show:',
+    '   - The formula (symbolic, from the course materials)',
+    '   - Every substitution with the actual numbers and units',
+    '   - Each intermediate result',
+    '   - The final result with units and a clear statement of what it means',
+    '   If a sub-question has multiple parts (e.g. first find F, then find M), solve each part fully before proceeding.',
+    '4. PRECISION: Use exact values from the course materials. Do not round intermediate results unless instructed.',
+    '   Always include units. Always verify dimensional consistency.',
+    '5. COMPLETENESS: Do not summarise or skip the derivation. The student needs to understand every step.',
+    '   A short answer is only acceptable for purely conceptual yes/no questions.',
+    '6. Math: use KaTeX. Inline: $...$  Display: $$...$$ — NEVER use \\( or \\[. No Unicode math letters.',
+    '7. Structure: use markdown headings and bullet points to separate Given / Find / Formula / Calculation / Result.',
+    '8. After each major claim, add inline citation: *(filename, p.X)* or *(filename, p.X, SECTION_ID)*.',
     strict
-      ? '6. **COURSE MODE:** Answer from the COURSE CONTEXT. Use formulas from the Formelsammlung/lecture to solve sub-questions even if a solution PDF is not present — do NOT refuse to answer just because the worked solution is missing. Only say materials are missing if you truly have no relevant formulas or definitions at all.'
-      : '6. **TUTOR MODE:** Use COURSE CONTEXT as primary source. You may supplement with general academic knowledge only after exhausting the course materials. Label all general knowledge clearly with *(general knowledge)*.',
-    '7. Confidence: "high" when COURSE CONTEXT directly supports the answer. "medium" when substantial portions rely on general knowledge. "low" when mostly general knowledge.',
-    '8. CRITICAL: Do NOT include confidence, sources, or metadata in your markdown answer text. Only in the META block.',
+      ? '9. **COURSE MODE:** Answer from the COURSE CONTEXT. Use formulas from the Formelsammlung/lecture to solve sub-questions even if a solution PDF is not present — do NOT refuse to answer just because the worked solution is missing. Only say materials are missing if you truly have no relevant formulas or definitions at all.'
+      : '9. **TUTOR MODE:** Use COURSE CONTEXT as primary source. You may supplement with general academic knowledge only after exhausting the course materials. Label all general knowledge clearly with *(general knowledge)*.',
+    '10. Confidence: "high" when COURSE CONTEXT directly supports the answer. "medium" when substantial portions rely on general knowledge. "low" when mostly general knowledge.',
+    '11. CRITICAL: Do NOT include confidence, sources, or metadata in your markdown answer text. Only in the META block.',
     TYPE_INSTRUCTIONS[qType] || '',
     '',
-    '9. FOLLOW-UP NAVIGATION RULE: When the student says "next question", "next one", "weiter", "nächste Aufgabe" etc.:',
+    '12. FOLLOW-UP NAVIGATION RULE: When the student says "next question", "next one", "weiter", "nächste Aufgabe" etc.:',
     '   a) If the CURRENT exercise has remaining sub-questions (b, c, d…), answer the next sub-question directly.',
     '   b) If ALL sub-questions of the current exercise are done, do NOT jump to the next exercise automatically.',
     '      Instead, write a one-sentence summary that the exercise is complete, then ask: "Shall I continue with the next exercise?" (or equivalent in the reply language).',
