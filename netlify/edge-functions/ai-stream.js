@@ -37,11 +37,12 @@ export default async function handler(request, context) {
   // ── Parse body ────────────────────────────────────────────────────────────
   let body;
   try { body = await request.json(); } catch (e) { return new Response('Invalid JSON', { status: 400, headers: corsHeaders() }); }
-  const { courseId, question, mode, documentId, activeFileName, openFileContext, pageImages, forceRefresh } = body;
+  const { courseId, question, mode, documentId, activeFileName, openFileContext, pageImages, forceRefresh, prevQuestion } = body;
   if (!courseId || !question) return new Response('courseId and question required', { status: 400, headers: corsHeaders() });
   const activeDocId = (typeof documentId === 'string' && documentId) ? documentId : null;
   const openFileName = (typeof activeFileName === 'string' && activeFileName) ? activeFileName : null;
   const openCtx = (typeof openFileContext === 'string' && openFileContext.trim()) ? openFileContext.trim() : null;
+  const prevQ = (typeof prevQuestion === 'string' && prevQuestion.trim()) ? prevQuestion.trim() : null;
   const handwrittenImages = Array.isArray(pageImages) && pageImages.length ? pageImages.slice(0, 8) : null;
   if (question.length > 2000) return new Response('Question too long', { status: 400, headers: corsHeaders() });
 
@@ -62,9 +63,15 @@ export default async function handler(request, context) {
       // Build enriched query early — used for base embedding AND all downstream retrieval.
       // If the open PDF context is available, prepend it so every embedding/HyDE call
       // reflects the actual exercise topic rather than just "Löse 13.1".
+      // If the question is a vague follow-up ("now b)", "question c)") with no open file,
+      // prepend the previous question so retrieval searches the right topic.
+      const _isVagueFollowup = !openCtx && prevQ && question.length < 80 &&
+        /\b([a-d])\s*\)?$|\b(?:now|jetzt|weiter|next|question|teil|part|aufgabe|mach|solve|löse)\s+([a-d])\b/i.test(question);
       const enrichedQuestion = openCtx
         ? 'Aufgabe-Kontext: ' + openCtx.slice(0, 2000) + '\n\nFrage: ' + question
-        : question;
+        : _isVagueFollowup
+          ? 'Vorherige Frage: ' + prevQ.slice(0, 400) + '\n\nFolgefrage: ' + question
+          : question;
 
       // 1. Base embedding — embed the enriched question so cache lookups, fetchSummaryChunks,
       //    and all fallback retrievals use the topic-rich query, not the short student message.

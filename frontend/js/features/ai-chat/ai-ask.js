@@ -544,6 +544,20 @@ export function initAskAI(state) {
             var _streamController = new AbortController();
             window._abortCurrentStream = function () { _streamController.abort(); };
 
+            // Grab the last user question from the chat so the backend can
+            // enrich vague follow-ups like "now question b)" with the prior topic.
+            var _prevQuestion = null;
+            try {
+              var _chatMsgs = typeof window.serializeChatDOM === 'function' ? window.serializeChatDOM() : [];
+              // Walk backwards: skip the current question (not yet in DOM), find last user message
+              for (var _ci = _chatMsgs.length - 1; _ci >= 0; _ci--) {
+                if (_chatMsgs[_ci].role === 'user' && _chatMsgs[_ci].text !== question) {
+                  _prevQuestion = _chatMsgs[_ci].text;
+                  break;
+                }
+              }
+            } catch (e) {}
+
             fetch(BACKEND_URL + '/api/ai/stream', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -556,7 +570,8 @@ export function initAskAI(state) {
                 activeFileName: activeFileName || undefined,
                 openFileContext: _openFileCtx || undefined,
                 pageImages: pageImages.length ? pageImages : undefined,
-                forceRefresh: (opts && opts.forceRefresh) ? true : undefined
+                forceRefresh: (opts && opts.forceRefresh) ? true : undefined,
+                prevQuestion: _prevQuestion || undefined
               })
             }).then(function (res) {
               if (!res.ok) { fallbackToRag(); return; }
