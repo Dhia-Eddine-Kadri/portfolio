@@ -71,8 +71,12 @@ function _loadUserCourses(data) {
   } catch (e) {}
   sdRenderCourses();
   restoreState();
-  // If a course was restored before auth completed, refresh its files from network now
-  if (window._pendingRestoreCourse) {
+  // If a course was restored before auth completed, refresh its files from network now.
+  // Skip if _currentUser isn't set yet — the post-auth _loadUserCourses call will handle it.
+  var _prcUid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
+  if (window._pendingRestoreCourse && !_prcUid) {
+    // Auth not ready — leave _pendingRestoreCourse for the next call after auth completes.
+  } else if (window._pendingRestoreCourse) {
     var _prc = window._pendingRestoreCourse;
     window._pendingRestoreCourse = null;
     var _prcCourse = _prc.course;
