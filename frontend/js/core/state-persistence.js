@@ -5,6 +5,14 @@ export function initStatePersistence(options) {
 
   function saveState() {
     try {
+      // If user is currently on a portal-only section, clear any stale course
+      // state so a refresh on that section does not trigger a course restore.
+      var _curTab = null;
+      try { _curTab = sessionStorage.getItem('ss_portal_tab'); } catch (e) {}
+      if (_curTab && _PORTAL_ONLY_SECTIONS.indexOf(_curTab) !== -1) {
+        localStorage.removeItem('ss_state');
+        return;
+      }
       var appEl = document.getElementById('app');
       var pdfEl = document.getElementById('pdfView');
       var appVisible = appEl && appEl.style.display === 'flex';
@@ -21,6 +29,14 @@ export function initStatePersistence(options) {
     } catch (e) {}
   }
 
+  // Portal sections that own the full page — refreshing on these must NOT
+  // trigger a course/file restore even when ss_state still has old course data.
+  var _PORTAL_ONLY_SECTIONS = [
+    'aipage', 'notes', 'chat', 'games', 'lounge', 'editor',
+    'notifications', 'profile', 'settings', 'subscription',
+    'german', 'admin', 'dashboard'
+  ];
+
   function restoreState() {
     if (_stateRestored) return;
     _stateRestored = true;
@@ -30,6 +46,12 @@ export function initStatePersistence(options) {
       if (!raw) return;
       var st = JSON.parse(raw);
       if (!st.inApp) return;
+
+      // If the user's last known tab was a self-contained portal section,
+      // honour that navigation and skip course/file restoration.
+      var _lastTab = null;
+      try { _lastTab = sessionStorage.getItem('ss_portal_tab') || localStorage.getItem('ss_last_section'); } catch (e) {}
+      if (_lastTab && _PORTAL_ONLY_SECTIONS.indexOf(_lastTab) !== -1) return;
 
       if (st.view === 'studip') {
         options.showStudip();
