@@ -24,7 +24,7 @@ const OPENAI_FAST_MODEL = 'gpt-4o-mini'; // used for HyDE + query expansion (che
 const MAX_CHUNKS = 12;
 const MIN_SIMILARITY = 0.18; // raised from 0.12 — rerank now handles fine ordering, so we can be stricter
 const STRONG_SIMILARITY_THRESHOLD = 0.3;
-const MAX_COMPLETION_TOKENS = 3000;
+const MAX_COMPLETION_TOKENS = 8000;
 
 // ─── Circuit breaker for fast LLM calls (HyDE / classify / rerank / verify) ──
 // If 3 calls in a row time out, skip the next 5 fast calls (each module instance).
@@ -46,7 +46,7 @@ function _breakerNoteFailure() {
   }
 }
 
-const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '20'));
+const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '200'));
 const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
 
 // Source type priority boost for ranking (added to cosine similarity)
@@ -1140,7 +1140,7 @@ exports.handler = async function (event) {
     'ai_ask',
     AI_RATE_LIMIT_WINDOW_MS
   );
-  if (recentCount >= AI_RATE_LIMIT_MAX) {
+  if (AI_RATE_LIMIT_MAX > 0 && recentCount >= AI_RATE_LIMIT_MAX) {
     return rateLimitResponse();
   }
 
@@ -1337,7 +1337,7 @@ exports.handler = async function (event) {
   const systemPrompt = buildSystemPrompt(ragMode, lang, openFileName) + questionTypeInstructions(qType);
 
   // Adaptive token budget: exercises/derivations need more room; definitions less
-  const tokenBudget = { exercise: 3000, derivation: 3000, concept: 2000, definition: 1500, formula: 1800, other: 2000 };
+  const tokenBudget = { exercise: 8000, derivation: 8000, concept: 4000, definition: 2500, formula: 3500, other: 4000 };
   const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
   const maxTokens = tokenBudget[qType] || 2000;
   const temperature = tempMap[qType] !== undefined ? tempMap[qType] : 0.1;

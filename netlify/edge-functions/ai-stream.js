@@ -46,11 +46,14 @@ export default async function handler(request, context) {
   const ragMode = mode === 'general' ? 'general' : 'strict';
 
   // ── Rate limiting ─────────────────────────────────────────────────────────
-  const _rateLimitOk = await checkAndRecordRateLimit(userId, SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  if (!_rateLimitOk) {
-    return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
-      status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders() }
-    });
+  const RATE_LIMIT_MAX = Number(Deno.env.get('AI_RATE_LIMIT_MAX') || '200');
+  if (RATE_LIMIT_MAX > 0) {
+    const _rateLimitOk = await checkAndRecordRateLimit(userId, SUPABASE_URL, SUPABASE_SERVICE_KEY, RATE_LIMIT_MAX);
+    if (!_rateLimitOk) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+        status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders() }
+      });
+    }
   }
 
   // ── Build SSE stream ──────────────────────────────────────────────────────
@@ -131,7 +134,7 @@ export default async function handler(request, context) {
           const fbRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: AI_MODEL, max_tokens: 1500, temperature: 0.1, stream: true,
+            body: JSON.stringify({ model: AI_MODEL, max_tokens: 4000, temperature: 0.1, stream: true,
               messages: [{ role: 'system', content: fbSys }, { role: 'user', content: question }] })
           });
           if (fbRes.ok) {
@@ -189,7 +192,7 @@ export default async function handler(request, context) {
       // 10. Build context + prompt
       const { text: contextText } = buildContext(ranked, docNames, effectiveOpenCtx, openFileName);
       const lang = detectLang(ranked);
-      const tokenBudget = { exercise: 3000, derivation: 3000, concept: 2000, definition: 1500, formula: 1800, other: 2000 };
+      const tokenBudget = { exercise: 8000, derivation: 8000, concept: 4000, definition: 2500, formula: 3500, other: 4000 };
       const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
       const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName);
 
@@ -390,8 +393,8 @@ async function sha256hex(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function checkAndRecordRateLimit(userId, supaUrl, serviceKey) {
-  const maxEvents = 20;
+async function checkAndRecordRateLimit(userId, supaUrl, serviceKey, maxEvents) {
+  maxEvents = maxEvents || 200;
   const since = new Date(Date.now() - 3600000).toISOString();
   try {
     const res = await fetch(
