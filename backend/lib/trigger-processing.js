@@ -17,10 +17,18 @@ const { optionalEnv } = require('./env');
 
 function resolveProcessUrl() {
   const explicit = optionalEnv('PROCESS_FUNCTION_URL', '');
-  if (explicit) return explicit;
-  const siteUrl = optionalEnv('URL', '') || optionalEnv('DEPLOY_URL', '');
-  if (!siteUrl) return '';
-  return siteUrl.replace(/\/$/, '') + '/.netlify/functions/documents-process-background';
+  let url;
+  if (explicit) {
+    url = explicit;
+  } else {
+    const siteUrl = optionalEnv('URL', '') || optionalEnv('DEPLOY_URL', '');
+    if (!siteUrl) return '';
+    url = siteUrl.replace(/\/$/, '') + '/.netlify/functions/documents-process-background';
+  }
+  // The function lives at `documents-process-background` (Netlify background
+  // suffix). If a stale env var still points at `documents-process`, rewrite it
+  // so we don't 404 every invocation.
+  return url.replace(/\/documents-process(?!-background)(\?|$|\/)/, '/documents-process-background$1');
 }
 
 function triggerProcessing(documentId, userId) {
