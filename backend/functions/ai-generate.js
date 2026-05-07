@@ -147,18 +147,8 @@ function parseJsonObject(text) {
 
 // ─── Retrieval ────────────────────────────────────────────────────────────────
 
-function retrieveChunks(serviceKey, userId, courseId, embedding, query, docIds) {
+function _rpcChunks(serviceKey, supaUrl, payload) {
   return new Promise(function (resolve) {
-    const supaUrl = requireEnv('SUPABASE_URL');
-    const payload = {
-      p_user_id: userId,
-      p_course_id: courseId,
-      p_embedding: '[' + embedding.join(',') + ']',
-      p_query: query || '',
-      p_match_count: MAX_CHUNKS,
-      p_threshold: MIN_SIMILARITY
-    };
-    if (docIds && docIds.length) payload.p_document_ids = docIds;
     const body = JSON.stringify(payload);
     const req = https.request(
       {
@@ -174,23 +164,48 @@ function retrieveChunks(serviceKey, userId, courseId, embedding, query, docIds) 
       },
       function (res) {
         let d = '';
-        res.on('data', function (c) {
-          d += c;
-        });
+        res.on('data', function (c) { d += c; });
         res.on('end', function () {
           try {
-            resolve(Array.isArray(JSON.parse(d)) ? JSON.parse(d) : []);
-          } catch (e) {
-            resolve([]);
-          }
+            const parsed = JSON.parse(d);
+            // Supabase returns an error object when the parameter is unrecognised
+            resolve(Array.isArray(parsed) ? parsed : []);
+          } catch (e) { resolve([]); }
         });
       }
     );
-    req.on('error', function () {
-      resolve([]);
-    });
+    req.on('error', function () { resolve([]); });
     req.write(body);
     req.end();
+  });
+}
+
+function retrieveChunks(serviceKey, userId, courseId, embedding, query, docIds) {
+  const supaUrl = requireEnv('SUPABASE_URL');
+  const basePayload = {
+    p_user_id: userId,
+    p_course_id: courseId,
+    p_embedding: '[' + embedding.join(',') + ']',
+    p_query: query || '',
+    p_match_count: docIds && docIds.length ? MAX_CHUNKS * 3 : MAX_CHUNKS,
+    p_threshold: MIN_SIMILARITY
+  };
+
+  if (!docIds || !docIds.length) {
+    return _rpcChunks(serviceKey, supaUrl, basePayload);
+  }
+
+  // Try with p_document_ids (migration 010). If the function doesn't know that
+  // parameter yet, Supabase returns an error object instead of an array — fall
+  // back to fetching all chunks and filtering in JS.
+  const filteredPayload = Object.assign({}, basePayload, { p_document_ids: docIds });
+  return _rpcChunks(serviceKey, supaUrl, filteredPayload).then(function (chunks) {
+    if (chunks.length) return chunks;
+    // Fallback: retrieve without filter then keep only the selected documents
+    return _rpcChunks(serviceKey, supaUrl, basePayload).then(function (all) {
+      const idSet = new Set(docIds.map(String));
+      return all.filter(function (c) { return idSet.has(String(c.document_id)); });
+    });
   });
 }
 
