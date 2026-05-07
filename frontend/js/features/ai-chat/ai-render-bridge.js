@@ -21,7 +21,12 @@ export function initAiRenderBridge(options) {
   }
 
   function renderAllMathBubbles() {
-    document.querySelectorAll('.ai-bubble.bot, .aip-bubble.bot').forEach(renderMathIn);
+    document.querySelectorAll('.ai-bubble.bot, .aip-bubble.bot').forEach(function (el) {
+      // Skip bubbles already rendered by renderMarkdown — they contain .katex spans.
+      // Re-running renderMathInElement on KaTeX HTML double-processes annotation text nodes.
+      if (el.querySelector('.katex')) return;
+      renderMathIn(el);
+    });
   }
 
   function scheduleKatexRender() {
