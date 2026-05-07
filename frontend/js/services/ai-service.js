@@ -13,11 +13,13 @@ export async function sendAiRequest(payload) {
 }
 
 // RAG ask — uses uploaded course documents as context
-export async function sendRagRequest(courseId, question, mode, documentId) {
+export async function sendRagRequest(courseId, question, mode, documentId, activeFileName, openFileContext) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
   var payload = { courseId: courseId, question: question, mode: mode || 'strict' };
   if (documentId) payload.documentId = documentId;
+  if (activeFileName) payload.activeFileName = activeFileName;
+  if (openFileContext) payload.openFileContext = openFileContext;
   var response = await fetch(BACKEND_URL + '/api/ai/ask', {
     method: 'POST',
     headers: {

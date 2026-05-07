@@ -36,9 +36,11 @@ export default async function handler(request, context) {
   // ── Parse body ────────────────────────────────────────────────────────────
   let body;
   try { body = await request.json(); } catch (e) { return new Response('Invalid JSON', { status: 400, headers: corsHeaders() }); }
-  const { courseId, question, mode, documentId } = body;
+  const { courseId, question, mode, documentId, activeFileName, openFileContext } = body;
   if (!courseId || !question) return new Response('courseId and question required', { status: 400, headers: corsHeaders() });
   const activeDocId = (typeof documentId === 'string' && documentId) ? documentId : null;
+  const openFileName = (typeof activeFileName === 'string' && activeFileName) ? activeFileName : null;
+  const openCtx = (typeof openFileContext === 'string' && openFileContext.trim()) ? openFileContext.trim() : null;
   if (question.length > 2000) return new Response('Question too long', { status: 400, headers: corsHeaders() });
 
   const ragMode = mode === 'general' ? 'general' : 'strict';
@@ -113,21 +115,27 @@ export default async function handler(request, context) {
         return;
       }
 
-      // 4. Rank + deduplicate
-      const ranked = deduplicate(rank(rawChunks, qType));
+      // 4. Fetch doc names first so we can resolve the open file's document ID for boosting
+      const allDocIds = [...new Set(rawChunks.map(c => c.document_id))];
+      const docNames = await fetchDocNames(allDocIds, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      // Find the document ID that corresponds to the file the student has open
+      const openDocId = openFileName
+        ? Object.entries(docNames).find(([, name]) => name === openFileName || name.toLowerCase() === openFileName.toLowerCase())?.[0] || null
+        : null;
 
-      // 5. Fetch doc names + build context
-      const docIds = [...new Set(ranked.map(c => c.document_id))];
-      const docNames = await fetchDocNames(docIds, SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      const { text: contextText } = buildContext(ranked, docNames);
+      // 5. Rank with open-file boost + deduplicate
+      const ranked = deduplicate(rank(rawChunks, qType, openDocId));
+
+      // 6. Build context (open file excerpt prepended, then RAG chunks)
+      const { text: contextText } = buildContext(ranked, docNames, openCtx, openFileName);
       const lang = detectLang(ranked);
 
-      // 6. Build prompt
+      // 7. Build prompt (includes which file is open)
       const tokenBudget = { exercise: 3000, derivation: 3000, concept: 2000, definition: 1500, formula: 1800, other: 2000 };
       const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
-      const systemPrompt = buildPrompt(ragMode, lang, qType);
+      const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName);
 
-      // 7. Stream OpenAI
+      // 8. Stream OpenAI
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
@@ -288,12 +296,14 @@ function mergeChunks(arrays) {
 
 const SOURCE_BOOST = { solution: 0.08, exercise: 0.08, lecture: 0.1, exam: 0.06, notes: 0.02, summary: -0.03, other: 0.0 };
 
-function rank(chunks, qType) {
+function rank(chunks, qType, openDocId) {
   return chunks.map(c => {
     const sb = SOURCE_BOOST[c.source_type] || 0;
     const ob = c.is_official ? 0.05 : 0;
     const eb = qType === 'exercise' ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : 0) : 0;
-    return { ...c, final_score: c.similarity + sb + ob + eb };
+    // Small boost for the open file so the problem statement stays in context alongside solutions
+    const openBoost = (openDocId && c.document_id === openDocId) ? 0.06 : 0;
+    return { ...c, final_score: c.similarity + sb + ob + eb + openBoost };
   }).sort((a, b) => b.final_score - a.final_score);
 }
 
@@ -320,9 +330,16 @@ async function fetchDocNames(docIds, supaUrl, serviceKey) {
   return map;
 }
 
-function buildContext(chunks, docNames) {
+function buildContext(chunks, docNames, openCtx, openFileName) {
   let total = 0;
   const blocks = [];
+  // Prepend the open file's text excerpt first — this is the problem statement
+  // the student is looking at. The AI must read this to understand the question.
+  if (openCtx && openFileName) {
+    const header = '=== OPEN FILE (student is currently reading this — contains the problem) ===\nFILE: ' + openFileName + '\nTEXT:\n' + openCtx;
+    blocks.push(header);
+    total += Math.ceil(header.length / 4);
+  }
   for (const [i, c] of chunks.entries()) {
     const fn = docNames[c.document_id] || 'Unknown';
     const pg = c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
@@ -356,11 +373,16 @@ const TYPE_INSTRUCTIONS = {
   other: ''
 };
 
-function buildPrompt(mode, lang, qType) {
+function buildPrompt(mode, lang, qType, openFileName) {
   const strict = mode !== 'general';
   const langLine = lang === 'de' ? 'Respond in **German** — the course materials are in German.' : 'Respond in **English**.';
+  const openFileLine = openFileName
+    ? 'The student is currently reading **' + openFileName + '**. The OPEN FILE block contains the problem/exercise text from that file. Use it to understand exactly what is being asked. Look in ALL other course documents (lectures, solution sheets) for the explanation and full solution.'
+    : '';
   return [
-    'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine, '',
+    'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine,
+    openFileLine ? openFileLine : '',
+    '',
     '1. Read ALL source blocks in COURSE CONTEXT before writing anything. The answer is in the sources.',
     '2. Ground every claim in the COURSE CONTEXT. Use the professor\'s exact notation and terminology.',
     '3. Structure your answer clearly in markdown. Start with a direct 1-2 sentence answer.',

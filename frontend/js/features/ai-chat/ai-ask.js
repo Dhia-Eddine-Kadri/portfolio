@@ -245,6 +245,23 @@ export function initAskAI(state) {
           } catch (e) { _hasRag = false; }
         }
 
+        // Extract a focused excerpt from the open PDF around the mentioned exercise/topic.
+        // Sent to the backend so the AI always sees the problem statement even if vector
+        // search returns only solution chunks.
+        var _openFileCtx = '';
+        if (pdfFullText && pdfFullText.trim().length > 50) {
+          var _rawText = pdfFullText;
+          var _match = question.match(/(\d+\.\d+|\baufgabe\s*\d+|\bexercise\s*\d+|\btask\s*\d+)/i);
+          if (_match) {
+            var _idx = _rawText.toLowerCase().indexOf(_match[0].toLowerCase());
+            if (_idx >= 0) {
+              // 200 chars before to capture context, up to 2000 chars of the exercise
+              _openFileCtx = _rawText.slice(Math.max(0, _idx - 200), _idx + 2000);
+            }
+          }
+          if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 2000);
+        }
+
         if (_hasRag) {
           var _modeToggle = document.getElementById('aiModeStrict');
           var _ragMode = !_modeToggle || _modeToggle.checked ? 'strict' : 'general';
@@ -422,7 +439,14 @@ export function initAskAI(state) {
             fetch(BACKEND_URL + '/api/ai/stream', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-              body: JSON.stringify({ courseId: _courseId, question: question, mode: _ragMode, documentId: _activeDocId || undefined })
+              body: JSON.stringify({
+                courseId: _courseId,
+                question: question,
+                mode: _ragMode,
+                documentId: _activeDocId || undefined,
+                activeFileName: activeFileName || undefined,
+                openFileContext: _openFileCtx || undefined
+              })
             }).then(function (res) {
               if (!res.ok) { fallbackToRag(); return; }
               var reader = res.body.getReader();
@@ -466,7 +490,7 @@ export function initAskAI(state) {
                   '<div class="typing-bubble"><span></span><span></span><span></span></div>';
                 aiMsgs.appendChild(thinkWrap);
               }
-              sendRagRequest(_courseId, question, _ragMode, _activeDocId || undefined).then(function (data) {
+              sendRagRequest(_courseId, question, _ragMode, _activeDocId || undefined, activeFileName || undefined, _openFileCtx || undefined).then(function (data) {
                 if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
                 var answer = data.answer || 'No answer found.';
                 var confEmoji = data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';

@@ -454,22 +454,22 @@ function retrieveChunks(serviceKey, userId, courseId, embedding, question, docum
 
 // Apply source priority boost + official-material boost, then re-sort.
 // qType: if 'exercise', heavily boost solution chunks so they appear first.
-function rankChunks(chunks, qType) {
+// openDocId: small boost for chunks from the file the student has open, so the
+//            problem statement text stays in context alongside the solution chunks.
+function rankChunks(chunks, qType, openDocId) {
   return chunks
     .map(function (c) {
       const sourceBoost = SOURCE_BOOST[c.source_type] || 0;
       const officialBoost = c.is_official ? 0.05 : 0;
-      // For exercise questions, strongly prefer solution and exercise source types
       const exerciseBoost = (qType === 'exercise')
         ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : 0)
         : 0;
-      // When LLM rerank is available, weight it dominantly (0.6) and similarity as a tiebreaker (0.4).
-      // Otherwise fall back to similarity alone.
+      const openBoost = (openDocId && c.document_id === openDocId) ? 0.06 : 0;
       const base = (c.rerank_score != null)
         ? (c.rerank_score * 0.6 + c.similarity * 0.4)
         : c.similarity;
       return Object.assign({}, c, {
-        final_score: base + sourceBoost + officialBoost + exerciseBoost
+        final_score: base + sourceBoost + officialBoost + exerciseBoost + openBoost
       });
     })
     .sort(function (a, b) { return b.final_score - a.final_score; });
@@ -537,16 +537,20 @@ function detectLanguage(chunks) {
   return bestRatio > 0.04 ? bestLang : 'en';
 }
 
-function buildSystemPrompt(mode, lang) {
+function buildSystemPrompt(mode, lang, openFileName) {
   const strict = mode !== 'general';
   const langName = _LANG_NAMES[lang] || 'English';
   const langInstruction = lang && lang !== 'en'
     ? 'Respond in **' + langName + '** — the course materials are in ' + langName + ', so your entire answer must be in ' + langName + '.'
     : 'Respond in **English**.';
+  const openFileLine = openFileName
+    ? 'The student is currently reading **' + openFileName + '**. The OPEN FILE block at the top of the context contains the problem text from that file. Use it to understand exactly what is being asked, then look in ALL other course documents (lectures, solution sheets) for the explanation and full solution.'
+    : '';
   return [
     'You are StudySphere AI — a precise, expert-level academic study assistant.',
     'Your job is to give the student an accurate, well-structured answer grounded in their own course materials.',
     langInstruction,
+    openFileLine ? openFileLine : '',
     '',
     '## How to answer',
     '',
@@ -619,10 +623,18 @@ function estimateTokens(text) {
 // Max context tokens we'll send: gpt-4o has 128k context, leave room for system prompt + answer
 const MAX_CONTEXT_TOKENS = 14000;
 
-function buildContextBlock(rankedChunks, docNames) {
-  if (!rankedChunks.length) return 'No relevant course material found.';
+function buildContextBlock(rankedChunks, docNames, openCtx, openFileName) {
   let totalTokens = 0;
   const blocks = [];
+  // Prepend the open file's text excerpt — this is the problem statement the student
+  // is looking at. Ensures the AI sees the full question even when vector search
+  // returns only solution/lecture chunks.
+  if (openCtx && openFileName) {
+    const header = '=== OPEN FILE (student is currently reading this — contains the problem) ===\nFILE: ' + openFileName + '\nTEXT:\n' + openCtx;
+    blocks.push(header);
+    totalTokens += estimateTokens(header);
+  }
+  if (!rankedChunks.length && !blocks.length) return 'No relevant course material found.';
   for (var i = 0; i < rankedChunks.length; i++) {
     var c = rankedChunks[i];
     const fileName = docNames[c.document_id] || 'Unknown file';
@@ -733,11 +745,11 @@ function normalizeQuestion(q) {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode) {
+function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openFileName) {
   return crypto
     .createHash('sha256')
     .update(
-      'v2|' +
+      'v3|' +
         userId +
         '|' +
         courseId +
@@ -746,7 +758,9 @@ function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode) {
         '|' +
         docVersionHash +
         '|' +
-        (mode || 'strict')
+        (mode || 'strict') +
+        '|' +
+        (openFileName || '')
     )
     .digest('hex');
 }
@@ -1046,14 +1060,18 @@ exports.handler = async function (event) {
     return fail(400, 'Invalid JSON body');
   }
 
-  const { courseId, question, mode, documentId } = body;
+  const { courseId, question, mode, documentId, activeFileName, openFileContext } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!question || typeof question !== 'string') return fail(400, 'question is required');
   if (question.length > 2000) return fail(400, 'Question too long (max 2000 characters)');
   const activeDocId = (typeof documentId === 'string' && documentId) ? documentId : null;
+  const openFileName = (typeof activeFileName === 'string' && activeFileName) ? activeFileName : null;
+  const openCtx = (typeof openFileContext === 'string' && openFileContext.trim()) ? openFileContext.trim() : null;
 
   const normalizedQ = normalizeQuestion(question);
   const ragMode = mode === 'general' ? 'general' : 'strict';
+  // openFileName is part of the cache key — same question with a different file open
+  // produces different context and must be cached separately
 
   // 1. Embed question (needed for cache lookups)
   let embedding;
@@ -1065,7 +1083,7 @@ exports.handler = async function (event) {
 
   // 2. Get document version hash (used for cache invalidation)
   const docVersionHash = await getDocumentVersionHash(serviceKey, user.id, courseId);
-  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode);
+  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode, openFileName);
 
   // 3. Check exact answer cache
   const exactHit = await getExactCache(
@@ -1187,16 +1205,23 @@ exports.handler = async function (event) {
   }
 
   // 7. Classify question type early (needed for ranking + prompt).
-  // Reuse the type from the fused HyDE call when available, else fall back to a
-  // dedicated classify call (e.g. on retrieval-cache hit when HyDE was skipped).
   const qType = preClassifiedType || (await classifyQuestion(question));
 
-  // 7b. LLM rerank candidates by true relevance before signal-based ranking.
-  // Falls through gracefully if the rerank call fails or times out.
+  // 7b. Fetch doc names early so we can resolve the open file's document ID for ranking.
+  // We fetch for ALL chunks in rawChunks, not just the final ranked set.
+  const allRawDocIds = [...new Set(rawChunks.map(function (c) { return c.document_id; }))];
+  const allDocNames = await fetchDocumentNames(serviceKey, allRawDocIds);
+  const earlyOpenDocId = openFileName
+    ? (Object.keys(allDocNames).find(function (id) {
+        return allDocNames[id] === openFileName || allDocNames[id].toLowerCase() === openFileName.toLowerCase();
+      }) || null)
+    : null;
+
+  // 7c. LLM rerank candidates by true relevance before signal-based ranking.
   rawChunks = await llmRerank(question, rawChunks);
 
-  // Rank with question-type-aware boosting, then deduplicate overlapping pages
-  const rankedChunks = deduplicateChunks(rankChunks(rawChunks, qType));
+  // Rank with question-type-aware boosting + open-file boost, then deduplicate
+  const rankedChunks = deduplicateChunks(rankChunks(rawChunks, qType, earlyOpenDocId));
 
   // Store retrieval cache for future identical questions (fire-and-forget)
   if (!retrievalHit && rankedChunks.length) {
@@ -1207,21 +1232,14 @@ exports.handler = async function (event) {
   const topScore = rankedChunks[0] ? rankedChunks[0].final_score : 0;
   const weakRetrieval = topScore < STRONG_SIMILARITY_THRESHOLD;
 
-  // 8. Fetch document file names for citations
-  const uniqueDocIds = [
-    ...new Set(
-      rankedChunks.map(function (c) {
-        return c.document_id;
-      })
-    )
-  ];
-  const docNames = await fetchDocumentNames(serviceKey, uniqueDocIds);
+  // 8. Build doc name map for the final ranked set (reuse allDocNames fetched above)
+  const docNames = allDocNames;
   const knownFileNames = new Set(Object.values(docNames));
 
   // 9. Build context + detect language from retrieved chunks
-  const contextBlock = buildContextBlock(rankedChunks, docNames);
+  const contextBlock = buildContextBlock(rankedChunks, docNames, openCtx, openFileName);
   const lang = detectLanguage(rankedChunks);
-  const systemPrompt = buildSystemPrompt(ragMode, lang) + questionTypeInstructions(qType);
+  const systemPrompt = buildSystemPrompt(ragMode, lang, openFileName) + questionTypeInstructions(qType);
 
   // Adaptive token budget: exercises/derivations need more room; definitions less
   const tokenBudget = { exercise: 3000, derivation: 3000, concept: 2000, definition: 1500, formula: 1800, other: 2000 };
