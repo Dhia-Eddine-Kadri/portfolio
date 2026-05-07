@@ -20,38 +20,49 @@
       <option value="score">By best score</option>
       <option value="created">Recently created</option>
     </select>
+
+    <div class="qz-view-toggle" role="tablist" aria-label="View mode">
+      <button class="qz-view-btn active" data-view="grid" type="button" aria-label="Grid view">&#x25A6;</button>
+      <button class="qz-view-btn" data-view="list" type="button" aria-label="List view">&#x2630;</button>
+    </div>
   </div>
 
   <div class="qz-layout">
 
-    <div class="qz-list-pane" id="qzListPane">
-      <div class="qz-list" id="qzList">
+    <div class="qz-deck-pane" id="qzDeckPane">
+      <div class="qz-deck-grid" id="qzDeckGrid">
         <div class="qz-empty">Loading quizzes…</div>
+      </div>
+      <div class="qz-view-all" id="qzViewAllRow">
+        <span class="qz-view-all-icon">&#x1F4CB;</span> View all quizzes
+        <span class="qz-view-all-chev">&#x203A;</span>
       </div>
     </div>
 
-    <div class="qz-take-pane" id="qzTakePane">
-      <div class="qz-take-header">
-        <span class="qz-take-icon">&#x1F4DD;</span>
-        <div class="qz-take-meta">
-          <div class="qz-take-name" id="qzTakeName">Select a quiz</div>
-          <div class="qz-take-count" id="qzTakeCount">0 questions</div>
+    <div class="qz-study-pane" id="qzStudyPane">
+      <div class="qz-study-header">
+        <span class="qz-study-icon">&#x1F4CB;</span>
+        <div class="qz-study-meta">
+          <div class="qz-study-name" id="qzStudyName">Select a quiz</div>
+          <div class="qz-study-count" id="qzStudyCount">0 questions</div>
         </div>
-        <div class="qz-take-score" id="qzTakeScore" hidden>0/0</div>
+        <button class="qz-btn qz-btn-secondary qz-study-settings" id="qzStudySettingsBtn" type="button">
+          <span class="qz-btn-icon">&#x2699;</span> Quiz settings
+        </button>
       </div>
 
-      <div class="qz-question" id="qzQuestion">
-        <div class="qz-question-empty">Pick a quiz to start.</div>
+      <div class="qz-card-stage" id="qzCardStage">
+        <div class="qz-card-empty">Pick a quiz to start.</div>
       </div>
 
       <div class="qz-options" id="qzOptions"></div>
 
-      <div class="qz-progress">
-        <div class="qz-progress-track"><div class="qz-progress-bar" id="qzProgressBar"></div></div>
-        <div class="qz-progress-label" id="qzProgressLabel">0 / 0</div>
+      <div class="qz-study-progress">
+        <div class="qz-study-progress-track"><div class="qz-study-progress-bar" id="qzProgressBar"></div></div>
+        <div class="qz-study-progress-label" id="qzProgressLabel">0 / 0</div>
       </div>
 
-      <div class="qz-controls">
+      <div class="qz-study-controls">
         <button class="qz-btn qz-btn-ghost" id="qzPrevBtn" type="button" disabled>
           <span>&#x25C0;</span> Previous
         </button>
