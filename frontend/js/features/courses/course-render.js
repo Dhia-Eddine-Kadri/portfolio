@@ -25,7 +25,10 @@ export function fileRowHtml(f, inFolder) {
   var ragBtn = isPdf && f._uploaded
     ? '<span class="co-rag-status" data-fname="' + eName + '" style="display:none"></span>'
     : '';
-  var reindexBtn = '';
+  var reindexBtn = isPdf && f._uploaded && f._storageName
+    ? '<span class="co-reindex-btn" data-fname="' + eName + '"' + sna + fa +
+      ' title="Re-index this PDF" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(99,102,241,.13);color:rgba(99,102,241,.9);border:1px solid rgba(99,102,241,.3);cursor:pointer;flex-shrink:0">&#x21BA;</span>'
+    : '';
 
   return (
     '<div class="co-file' + (f._uploaded ? ' co-file-uploaded' : '') +
