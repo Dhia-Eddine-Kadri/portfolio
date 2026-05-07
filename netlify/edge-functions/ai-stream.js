@@ -66,7 +66,7 @@ export default async function handler(request, context) {
       // If the question is a vague follow-up ("now b)", "question c)") with no open file,
       // prepend the previous question so retrieval searches the right topic.
       const _isVagueFollowup = !openCtx && prevQ && question.length < 80 &&
-        /\b([a-d])\s*\)?$|\b(?:now|jetzt|weiter|next|question|teil|part|aufgabe|mach|solve|löse)\s+([a-d])\b/i.test(question);
+        /\b([a-d])\s*\)?$|\b(?:now|jetzt|weiter|next|question|teil|part|aufgabe|mach|solve|löse)\s+([a-d])\b|\b(?:next\s+question|nächste\s+aufgabe|weiter|nächste[sr]?|continue|and\s+(?:now|next)|next\s+(?:one|part|exercise|task))\b/i.test(question);
       const enrichedQuestion = openCtx
         ? 'Aufgabe-Kontext: ' + openCtx.slice(0, 2000) + '\n\nFrage: ' + question
         : _isVagueFollowup
