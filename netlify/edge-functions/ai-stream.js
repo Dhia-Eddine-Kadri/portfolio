@@ -123,11 +123,19 @@ export default async function handler(request, context) {
         ? Object.entries(docNames).find(([, name]) => name === openFileName || name.toLowerCase() === openFileName.toLowerCase())?.[0] || null
         : null;
 
+      // 4b. If the open file is indexed, retrieve focused chunks from it using the question
+      //     embedding — more reliable than browser-extracted text and works for scanned PDFs.
+      let effectiveOpenCtx = openCtx;
+      if (openDocId) {
+        const indexedCtx = await fetchOpenDocChunks(userId, courseId, openDocId, allEmbeddings[0], question, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        if (indexedCtx) effectiveOpenCtx = indexedCtx;
+      }
+
       // 5. Rank with open-file boost + deduplicate
       const ranked = deduplicate(rank(rawChunks, qType, openDocId));
 
       // 6. Build context (open file excerpt prepended, then RAG chunks)
-      const { text: contextText } = buildContext(ranked, docNames, openCtx, openFileName);
+      const { text: contextText } = buildContext(ranked, docNames, effectiveOpenCtx, openFileName);
       const lang = detectLang(ranked);
 
       // 7. Build prompt (includes which file is open)
@@ -316,6 +324,25 @@ function deduplicate(chunks) {
     if (selected.length >= 12) break;
   }
   return selected;
+}
+
+async function fetchOpenDocChunks(userId, courseId, docId, embedding, question, supaUrl, serviceKey) {
+  try {
+    const res = await fetch(supaUrl + '/rest/v1/rpc/match_chunks_hybrid', {
+      method: 'POST',
+      headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        p_user_id: userId, p_course_id: courseId,
+        p_embedding: '[' + embedding.join(',') + ']',
+        p_query: question || '', p_match_count: 5, p_threshold: 0.05,
+        p_document_id: docId
+      })
+    });
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) return null;
+    const texts = data.slice(0, 5).map(c => c.chunk_text || '').filter(Boolean);
+    return texts.length ? texts.join('\n\n') : null;
+  } catch (e) { return null; }
 }
 
 async function fetchDocNames(docIds, supaUrl, serviceKey) {

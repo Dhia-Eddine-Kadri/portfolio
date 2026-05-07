@@ -475,6 +475,46 @@ function rankChunks(chunks, qType, openDocId) {
     .sort(function (a, b) { return b.final_score - a.final_score; });
 }
 
+// Retrieve top chunks from a specific document — used to build the OPEN FILE context block
+// from indexed content instead of browser-extracted raw text (works for scanned PDFs).
+function fetchOpenDocChunks(serviceKey, userId, courseId, docId, embedding, question) {
+  return new Promise(function (resolve) {
+    const supaUrl = requireEnv('SUPABASE_URL');
+    const body = JSON.stringify({
+      p_user_id: userId, p_course_id: courseId,
+      p_embedding: '[' + embedding.join(',') + ']',
+      p_query: question || '', p_match_count: 5, p_threshold: 0.05,
+      p_document_id: docId
+    });
+    const req = https.request(
+      {
+        hostname: new URL(supaUrl).hostname,
+        path: '/rest/v1/rpc/match_chunks_hybrid',
+        method: 'POST',
+        headers: {
+          apikey: serviceKey, Authorization: 'Bearer ' + serviceKey,
+          'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let data = '';
+        res.on('data', function (c) { data += c; });
+        res.on('end', function () {
+          try {
+            const parsed = JSON.parse(data);
+            if (!Array.isArray(parsed) || !parsed.length) return resolve(null);
+            const texts = parsed.slice(0, 5).map(function (c) { return c.chunk_text || ''; }).filter(Boolean);
+            resolve(texts.length ? texts.join('\n\n') : null);
+          } catch (e) { resolve(null); }
+        });
+      }
+    );
+    req.on('error', function () { resolve(null); });
+    req.write(body);
+    req.end();
+  });
+}
+
 // Fetch file_name for each unique document_id so we can cite properly
 function fetchDocumentNames(serviceKey, documentIds) {
   if (!documentIds.length) return Promise.resolve({});
@@ -1217,7 +1257,14 @@ exports.handler = async function (event) {
       }) || null)
     : null;
 
-  // 7c. LLM rerank candidates by true relevance before signal-based ranking.
+  // 7c. If the open file is indexed, retrieve focused chunks from it — works for scanned PDFs
+  let effectiveOpenCtx = openCtx;
+  if (earlyOpenDocId) {
+    const indexedCtx = await fetchOpenDocChunks(serviceKey, user.id, courseId, earlyOpenDocId, embedding, question);
+    if (indexedCtx) effectiveOpenCtx = indexedCtx;
+  }
+
+  // 7d. LLM rerank candidates by true relevance before signal-based ranking.
   rawChunks = await llmRerank(question, rawChunks);
 
   // Rank with question-type-aware boosting + open-file boost, then deduplicate
@@ -1237,7 +1284,7 @@ exports.handler = async function (event) {
   const knownFileNames = new Set(Object.values(docNames));
 
   // 9. Build context + detect language from retrieved chunks
-  const contextBlock = buildContextBlock(rankedChunks, docNames, openCtx, openFileName);
+  const contextBlock = buildContextBlock(rankedChunks, docNames, effectiveOpenCtx, openFileName);
   const lang = detectLanguage(rankedChunks);
   const systemPrompt = buildSystemPrompt(ragMode, lang, openFileName) + questionTypeInstructions(qType);
 
