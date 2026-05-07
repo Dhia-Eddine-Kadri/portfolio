@@ -83,7 +83,7 @@
 
 [[redirects]]
   from = "/api/documents/process"
-  to = "/.netlify/functions/documents-process"
+  to = "/.netlify/functions/documents-process-background"
   status = 200
 
 [[redirects]]

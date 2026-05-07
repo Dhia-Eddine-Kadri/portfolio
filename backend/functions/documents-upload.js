@@ -8,6 +8,7 @@ const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
+const { triggerProcessing } = require('../lib/trigger-processing');
 
 const MAX_BODY_BYTES = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES = { 'application/pdf': 'pdf' };
@@ -55,40 +56,6 @@ function uploadToStorage(serviceKey, storagePath, fileBuffer, mimeType) {
 function insertDocument(serviceKey, row) {
   return supaRequest('POST', 'documents', row, serviceKey, {
     Prefer: 'return=representation'
-  });
-}
-
-function triggerProcessing(documentId, userId) {
-  const processUrl = optionalEnv('PROCESS_FUNCTION_URL', '');
-  if (!processUrl) return Promise.resolve();
-  const body = JSON.stringify({ documentId, userId });
-  return new Promise(function (resolve) {
-    try {
-      const url = new URL(processUrl);
-      const req = https.request(
-        {
-          hostname: url.hostname,
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body),
-            'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
-          }
-        },
-        function () {
-          resolve();
-        }
-      );
-      req.on('error', function () {
-        resolve();
-      });
-      req.write(body);
-      req.end();
-      setTimeout(resolve, 5000);
-    } catch (e) {
-      resolve();
-    }
   });
 }
 

@@ -5,53 +5,16 @@
 //
 // Request body: { courseId, storageName, fileName, sourceType }
 
-const https = require('https');
-const { requireEnv, optionalEnv } = require('../lib/env');
+const { requireEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
+const { triggerProcessing } = require('../lib/trigger-processing');
 
 const SOURCE_BUCKET = 'course-uploads';
 
 function _ufKey(courseId) {
   return courseId.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-// Wait for the request to be fully sent (not the response) before returning,
-// otherwise Netlify kills the socket when the function exits.
-function triggerProcessing(documentId, userId) {
-  const processUrl = optionalEnv('PROCESS_FUNCTION_URL', '');
-  if (!processUrl) return Promise.resolve();
-  const body = JSON.stringify({ documentId, userId });
-  return new Promise(function (resolve) {
-    try {
-      const url = new URL(processUrl);
-      const req = https.request(
-        {
-          hostname: url.hostname,
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body),
-            'x-internal-secret': optionalEnv('INTERNAL_SECRET', '')
-          }
-        },
-        function () {
-          resolve();
-        }
-      ); // resolve when response starts arriving
-      req.on('error', function () {
-        resolve();
-      });
-      req.write(body);
-      req.end();
-      // Safety timeout — don't wait more than 5s for the trigger
-      setTimeout(resolve, 5000);
-    } catch (e) {
-      resolve();
-    }
-  });
 }
 
 exports.handler = async function (event) {
