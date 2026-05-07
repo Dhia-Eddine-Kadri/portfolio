@@ -737,6 +737,10 @@ function setCourseStudyMode(co, course, mode) {
     panel.classList.toggle('active', panel.getAttribute('data-course-panel') === nextMode);
   });
 
+  // Widen the .co-inner container for panels that need more space (JS fallback for :has())
+  var inner = co.closest('.co-inner');
+  if (inner) inner.classList.toggle('co-inner-wide', nextMode === 'quiz' || nextMode === 'flashcards');
+
   // New feature modules take over the flashcards / quiz panels. They mount
   // once per course; the inline renderer below is the legacy fallback.
   if (nextMode === 'flashcards' && typeof window.mountFlashcards === 'function') {

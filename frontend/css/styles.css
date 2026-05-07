@@ -2526,6 +2526,17 @@ body.night .sb-acc-chev-btn {
   flex-direction: column;
   align-items: center;
 }
+/* Quiz and flashcards panels need much more horizontal room for their two-pane layout */
+.co-inner:has(#coQuizPanel.active),
+.co-inner:has(#coFlashPanel.active) {
+  max-width: 1280px;
+  align-items: stretch;
+}
+/* Fallback for browsers without :has() — JS adds .co-inner-wide */
+.co-inner.co-inner-wide {
+  max-width: 1280px;
+  align-items: stretch;
+}
 
 .co-nav {
   display: flex;
