@@ -125,13 +125,14 @@ export default async function handler(request, context) {
           Promise.all(allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || enrichedQuestion, SUPABASE_URL, SUPABASE_SERVICE_KEY, null))),
           fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY, baseEmbedding)
         ]);
-        rawChunks = mergeChunks([...allChunks, summaryInject]);
+        const pinnedSummary = summaryInject.map(c => ({ ...c, _pinned: true }));
+        rawChunks = mergeChunks([...allChunks, pinnedSummary]);
       }
 
       // Always ensure summary/Formelzettel chunks are in the pool for cache-restored paths
       if (skipRerank) {
         const summaryInject = await fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY, baseEmbedding);
-        if (summaryInject.length) rawChunks = mergeChunks([rawChunks, summaryInject]);
+        if (summaryInject.length) rawChunks = mergeChunks([rawChunks, summaryInject.map(c => ({ ...c, _pinned: true }))]);
       }
 
       // 5. No chunks found
@@ -676,10 +677,32 @@ function buildContext(chunks, docNames, openCtx, openFileName) {
     blocks.push(header);
     total += Math.ceil(header.length / 4);
   }
-  for (const [i, c] of chunks.entries()) {
+
+  // Always inject pinned Formelzettel chunks first — regardless of rank score.
+  // These bypass the reranker cutoff so the AI always has the formula sheet.
+  const pinned = chunks.filter(c => c._pinned);
+  const normal = chunks.filter(c => !c._pinned);
+
+  let srcIdx = 1;
+  if (pinned.length) {
+    for (const c of pinned) {
+      const fn = docNames[c.document_id] || 'Unknown';
+      const pg = c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
+      const lines = ['=== FORMELZETTEL ' + srcIdx + ' ===', 'FILE: ' + fn, 'PAGES: ' + pg,
+        c.section_title ? 'SECTION_ID: ' + c.section_title : null, 'TEXT:', c.chunk_text].filter(Boolean);
+      const block = lines.join('\n');
+      const tokens = Math.ceil(block.length / 4);
+      if (total + tokens > 6000) break; // cap Formelzettel at 6k tokens to leave room for exercise chunks
+      blocks.push(block);
+      total += tokens;
+      srcIdx++;
+    }
+  }
+
+  for (const c of normal) {
     const fn = docNames[c.document_id] || 'Unknown';
     const pg = c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
-    const lines = ['=== SOURCE ' + (i + 1) + ' ===', 'FILE: ' + fn, 'PAGES: ' + pg,
+    const lines = ['=== SOURCE ' + srcIdx + ' ===', 'FILE: ' + fn, 'PAGES: ' + pg,
       'TYPE: ' + (c.source_type || 'document'),
       c.section_title ? 'SECTION_ID: ' + c.section_title : null, 'TEXT:', c.chunk_text].filter(Boolean);
     const block = lines.join('\n');
@@ -687,6 +710,7 @@ function buildContext(chunks, docNames, openCtx, openFileName) {
     if (total + tokens > 14000) break;
     blocks.push(block);
     total += tokens;
+    srcIdx++;
   }
   return { text: blocks.join('\n\n') };
 }
