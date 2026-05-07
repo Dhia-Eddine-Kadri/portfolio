@@ -18,7 +18,7 @@ const { supaRequest } = require('../lib/supabase-admin');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
-const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-5.4');
+const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o');
 const OPENAI_NANO_MODEL = optionalEnv('AI_NANO_MODEL', 'gpt-4.1-nano');
 const OPENAI_FAST_MODEL = 'gpt-4o-mini'; // used for HyDE + query expansion (cheap, fast)
 const MAX_CHUNKS = 12;
@@ -556,26 +556,47 @@ const _LANG_NAMES = {
   de: 'German', fr: 'French', es: 'Spanish', it: 'Italian', pt: 'Portuguese', en: 'English'
 };
 
-function detectLanguage(chunks) {
-  const sample = chunks.slice(0, 4).map(function (c) { return c.chunk_text || ''; }).join(' ').toLowerCase();
-  const words = sample.split(/\s+/);
-  const total = Math.min(words.length, 200);
-  if (total === 0) return 'en';
-  const slice = words.slice(0, total);
+function detectLanguage(question, chunks) {
+  // Question is the strongest signal — respond in the student's language
+  const qWords = (question || '').toLowerCase().split(/\s+/);
+  let bestLang = null, bestCount = 0;
+  Object.keys(_LANG_STOPWORDS).forEach(function (lang) {
+    const stopSet = _LANG_STOPWORDS[lang];
+    const count = qWords.filter(function (w) { return stopSet.includes(w); }).length;
+    if (count > bestCount) { bestCount = count; bestLang = lang; }
+  });
+  if (bestCount >= 1) return bestLang;
 
-  let bestLang = 'en';
-  let bestRatio = 0;
+  // Fallback: sample retrieved chunks
+  const sample = chunks.slice(0, 6).map(function (c) { return c.chunk_text || ''; }).join(' ').toLowerCase();
+  const words = sample.split(/\s+/);
+  const total = Math.min(words.length, 300);
+  if (total === 0) return 'de'; // default: German university
+  const slice = words.slice(0, total);
+  let cBestLang = 'de', cBestRatio = 0;
   Object.keys(_LANG_STOPWORDS).forEach(function (lang) {
     const stopSet = _LANG_STOPWORDS[lang];
     const count = slice.filter(function (w) { return stopSet.includes(w); }).length;
     const ratio = count / total;
-    if (ratio > bestRatio) {
-      bestRatio = ratio;
-      bestLang = lang;
-    }
+    if (ratio > cBestRatio) { cBestRatio = ratio; cBestLang = lang; }
   });
-  // Need a minimum signal to avoid noise-driven mislabels
-  return bestRatio > 0.04 ? bestLang : 'en';
+  return cBestRatio > 0.03 ? cBestLang : 'de';
+}
+
+async function fetchSummaryChunks(serviceKey, userId, courseId) {
+  try {
+    const result = await supaRequest(
+      'GET',
+      'document_chunks?user_id=eq.' + userId +
+      '&course_id=eq.' + encodeURIComponent(courseId) +
+      '&source_type=in.(summary,notes)' +
+      '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
+      '&order=chunk_index.asc&limit=10',
+      null, serviceKey
+    );
+    if (!Array.isArray(result.body)) return [];
+    return result.body.map(function (c) { return Object.assign({}, c, { similarity: 0.18 }); });
+  } catch (e) { return []; }
 }
 
 function buildSystemPrompt(mode, lang, openFileName) {
@@ -1216,17 +1237,17 @@ exports.handler = async function (event) {
   );
   if (retrievalHit) {
     const entries = Array.isArray(retrievalHit.chunk_entries) ? retrievalHit.chunk_entries : [];
-    const ids = entries.map(function (e) {
-      return e.id;
-    });
-    const fetchedChunks = await fetchChunksByIds(serviceKey, user.id, courseId, ids);
+    const ids = entries.map(function (e) { return e.id; });
+    const [fetchedChunks, summaryInjectCache] = await Promise.all([
+      fetchChunksByIds(serviceKey, user.id, courseId, ids),
+      fetchSummaryChunks(serviceKey, user.id, courseId)
+    ]);
     const simMap = {};
-    entries.forEach(function (e) {
-      simMap[e.id] = e.similarity;
-    });
-    rawChunks = fetchedChunks.map(function (c) {
-      return Object.assign({}, c, { similarity: simMap[c.id] || 0.5 });
-    });
+    entries.forEach(function (e) { simMap[e.id] = e.similarity; });
+    rawChunks = mergeChunkResults([
+      fetchedChunks.map(function (c) { return Object.assign({}, c, { similarity: simMap[c.id] || 0.5 }); }),
+      summaryInjectCache
+    ]);
   } else {
     // HyDE + multi-query + classify in a single LLM round-trip.
     // Generate hypothetical passage + 2 alternative queries + question type, embed
@@ -1252,8 +1273,11 @@ exports.handler = async function (event) {
       const queryText = textsToEmbed[i] || question;
       return retrieveChunks(serviceKey, user.id, courseId, emb, queryText, activeDocId);
     });
-    const allResults = await Promise.all(retrievalPromises);
-    rawChunks = mergeChunkResults(allResults);
+    const [allResults, summaryInject] = await Promise.all([
+      Promise.all(retrievalPromises),
+      fetchSummaryChunks(serviceKey, user.id, courseId)
+    ]);
+    rawChunks = mergeChunkResults([...allResults, summaryInject]);
   }
 
   // 6. No chunks found
@@ -1325,7 +1349,7 @@ exports.handler = async function (event) {
 
   // 9. Build context + detect language from retrieved chunks
   const contextBlock = buildContextBlock(rankedChunks, docNames, effectiveOpenCtx, openFileName);
-  const lang = detectLanguage(rankedChunks);
+  const lang = detectLanguage(question, rankedChunks);
   const systemPrompt = buildSystemPrompt(ragMode, lang, openFileName) + questionTypeInstructions(qType);
 
   // Adaptive token budget: exercises/derivations need more room; definitions less

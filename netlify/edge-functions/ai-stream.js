@@ -18,7 +18,7 @@ export default async function handler(request, context) {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
-  const AI_MODEL = Deno.env.get('AI_MODEL') || 'gpt-5.4';
+  const AI_MODEL = Deno.env.get('AI_MODEL') || 'gpt-4o';
   const AI_NANO_MODEL = Deno.env.get('AI_NANO_MODEL') || 'gpt-4.1-nano';
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !OPENAI_API_KEY) {
@@ -109,10 +109,17 @@ export default async function handler(request, context) {
           allEmbeddings = textsToEmbed.length > 1 ? await embedBatch(textsToEmbed, OPENAI_API_KEY) : [baseEmbedding];
         } catch (e) { allEmbeddings = [baseEmbedding]; }
 
-        const allChunks = await Promise.all(
-          allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || question, SUPABASE_URL, SUPABASE_SERVICE_KEY, activeDocId))
-        );
-        rawChunks = mergeChunks(allChunks);
+        const [allChunks, summaryInject] = await Promise.all([
+          Promise.all(allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || question, SUPABASE_URL, SUPABASE_SERVICE_KEY, activeDocId))),
+          fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        ]);
+        rawChunks = mergeChunks([...allChunks, summaryInject]);
+      }
+
+      // Always ensure summary/Formelzettel chunks are in the pool for cache-restored paths
+      if (skipRerank) {
+        const summaryInject = await fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        if (summaryInject.length) rawChunks = mergeChunks([rawChunks, summaryInject]);
       }
 
       // 5. No chunks found
@@ -181,7 +188,7 @@ export default async function handler(request, context) {
 
       // 10. Build context + prompt
       const { text: contextText } = buildContext(ranked, docNames, effectiveOpenCtx, openFileName);
-      const lang = detectLang(ranked);
+      const lang = detectLang(question, ranked);
       const tokenBudget = { exercise: 8000, derivation: 8000, concept: 4000, definition: 2500, formula: 3500, other: 4000 };
       const tempMap = { exercise: 0.1, derivation: 0.1, formula: 0.1, definition: 0.1, concept: 0.15, other: 0.1 };
       const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName);
@@ -247,6 +254,14 @@ export default async function handler(request, context) {
 
       // 13. Self-verify + store answer cache in parallel
       const cleanAnswer = fullText.replace(/<!--META-->[\s\S]*?<!--\/META-->/, '').trim();
+
+      // Never cache an empty answer — it would poison every future ask of this question
+      if (!cleanAnswer) {
+        send({ error: 'AI returned an empty response. Please try again.' });
+        await writer.close();
+        return;
+      }
+
       const [verification, cacheId] = await Promise.all([
         verifyClaims(question, contextText, cleanAnswer, OPENAI_API_KEY),
         storeAnswerCache(userId, courseId, questionHash, normalizedQ, docVersionHash, ragMode,
@@ -630,13 +645,47 @@ function buildContext(chunks, docNames, openCtx, openFileName) {
   return { text: blocks.join('\n\n') };
 }
 
-function detectLang(chunks) {
-  const sample = chunks.slice(0, 4).map(c => c.chunk_text || '').join(' ').toLowerCase();
-  const de = ['der', 'die', 'das', 'und', 'ist', 'mit', 'fur', 'eine', 'wird', 'sind', 'auf', 'von', 'den', 'bei', 'als', 'auch', 'sich', 'nicht', 'nach'];
-  const words = sample.split(/\s+/);
-  const total = Math.min(words.length, 200);
-  const count = words.slice(0, total).filter(w => de.includes(w)).length;
-  return total > 0 && count / total > 0.04 ? 'de' : 'en';
+const _DE_WORDS = new Set(['der','die','das','und','ist','ein','eine','mit','für','wie','was','berechne','bestimme','zeige','erkläre','warum','welche','welcher','welches','wenn','dann','gegeben','gesucht','aufgabe','lösung','nicht','auch','sich','nach','von','auf','dem','den','bei','sein','sind','wird','kann','muss','soll','durch','über','wird','haben','dieser','diese','dieses','im','am','zu','zum','zur','ich','sie','er','wir','ihr','bitte','gib','zeig','nenne']);
+const _EN_WORDS = new Set(['the','and','what','is','are','how','why','calculate','explain','show','find','given','solution','problem','prove','determine','which','when','then','can','should','must','through','about','this','that','with','have','for','not','give','tell','list','define','describe','compare']);
+
+function detectLang(question, chunks) {
+  // Question language is the strongest signal — match the student's language
+  const qWords = question.toLowerCase().split(/\s+/);
+  let de = 0, en = 0;
+  for (const w of qWords) {
+    if (_DE_WORDS.has(w)) de++;
+    if (_EN_WORDS.has(w)) en++;
+  }
+  if (de > en) return 'de';
+  if (en > de) return 'en';
+  // Tie or ambiguous (e.g. pure math notation): sample chunks
+  const sample = chunks.slice(0, 6).map(c => c.chunk_text || '').join(' ').toLowerCase().split(/\s+/).slice(0, 300);
+  let cde = 0, cen = 0;
+  for (const w of sample) { if (_DE_WORDS.has(w)) cde++; if (_EN_WORDS.has(w)) cen++; }
+  if (cde > cen) return 'de';
+  if (cen > cde) return 'en';
+  return 'de'; // default: German university context
+}
+
+// Always inject summary/notes chunks (Formelzettel, Zusammenfassung) into the candidate pool.
+// Source-type boosting in rank() can only help chunks that were already retrieved — without
+// this injection, formula sheets with low similarity to the question never reach the AI.
+async function fetchSummaryChunks(userId, courseId, supaUrl, serviceKey) {
+  try {
+    const res = await fetch(
+      supaUrl + '/rest/v1/document_chunks' +
+      '?user_id=eq.' + userId +
+      '&course_id=eq.' + encodeURIComponent(courseId) +
+      '&source_type=in.(summary,notes)' +
+      '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
+      '&order=chunk_index.asc&limit=10',
+      { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+    );
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    // Assign a base similarity so they participate in ranking (boosted further by qType in rank())
+    return data.map(c => ({ ...c, similarity: 0.18 }));
+  } catch (e) { return []; }
 }
 
 const TYPE_INSTRUCTIONS = {

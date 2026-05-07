@@ -593,7 +593,12 @@ export function initAskAI(state) {
 
               // Final rendered text — strip META tag then apply markdown
               var cleanText = rawText.replace(metaPattern, '').trim();
-              if (!cleanText) cleanText = 'No answer received.';
+              if (!cleanText) {
+                // Streaming produced no text — retry via non-streaming endpoint
+                if (ansWrap) { ansWrap.remove(); ansWrap = null; }
+                fallbackToRag();
+                return;
+              }
 
               var confEmoji = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';
               var footer = confEmoji + ' Confidence: ' + confidence;
