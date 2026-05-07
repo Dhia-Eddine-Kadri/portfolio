@@ -37,11 +37,12 @@ export default async function handler(request, context) {
   // ── Parse body ────────────────────────────────────────────────────────────
   let body;
   try { body = await request.json(); } catch (e) { return new Response('Invalid JSON', { status: 400, headers: corsHeaders() }); }
-  const { courseId, question, mode, documentId, activeFileName, openFileContext } = body;
+  const { courseId, question, mode, documentId, activeFileName, openFileContext, pageImages } = body;
   if (!courseId || !question) return new Response('courseId and question required', { status: 400, headers: corsHeaders() });
   const activeDocId = (typeof documentId === 'string' && documentId) ? documentId : null;
   const openFileName = (typeof activeFileName === 'string' && activeFileName) ? activeFileName : null;
   const openCtx = (typeof openFileContext === 'string' && openFileContext.trim()) ? openFileContext.trim() : null;
+  const handwrittenImages = Array.isArray(pageImages) && pageImages.length ? pageImages.slice(0, 8) : null;
   if (question.length > 2000) return new Response('Question too long', { status: 400, headers: corsHeaders() });
 
   const ragMode = mode === 'general' ? 'general' : 'strict';
@@ -194,7 +195,8 @@ export default async function handler(request, context) {
       const systemPrompt = buildPrompt(ragMode, lang, qType, openFileName);
 
       // 11. Stream OpenAI
-      const selectedModel = ['exercise', 'derivation', 'formula'].includes(qType) ? AI_MODEL : AI_NANO_MODEL;
+      // Always use the full model for handwritten docs (vision support required)
+      const selectedModel = handwrittenImages || ['exercise', 'derivation', 'formula'].includes(qType) ? AI_MODEL : AI_NANO_MODEL;
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
@@ -205,7 +207,13 @@ export default async function handler(request, context) {
           stream: true,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: 'COURSE CONTEXT:\n\n' + contextText + '\n\n---\n\nSTUDENT QUESTION:\n' + question }
+            { role: 'user', content: handwrittenImages
+                ? [
+                    { type: 'text', text: 'COURSE CONTEXT:\n\n' + contextText + '\n\n---\n\nSTUDENT QUESTION:\n' + question + '\n\n(The open document is handwritten/scanned — pages are provided as images below. Read all handwritten text, equations, and diagrams carefully.)' },
+                    ...handwrittenImages.map(b64 => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }))
+                  ]
+                : 'COURSE CONTEXT:\n\n' + contextText + '\n\n---\n\nSTUDENT QUESTION:\n' + question
+            }
           ]
         })
       });

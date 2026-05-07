@@ -512,7 +512,8 @@ export function initAskAI(state) {
                 mode: _ragMode,
                 documentId: _activeDocId || undefined,
                 activeFileName: activeFileName || undefined,
-                openFileContext: _openFileCtx || undefined
+                openFileContext: _openFileCtx || undefined,
+                pageImages: pageImages.length ? pageImages : undefined
               })
             }).then(function (res) {
               if (!res.ok) { fallbackToRag(); return; }
