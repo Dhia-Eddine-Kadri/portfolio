@@ -301,6 +301,11 @@ export function initAskAI(state) {
             /\b(\d+\s*[a-z]\s*\))/i,  // 3b)
             /\b(\d+[a-z])\b/i           // 1b, 3b
           ];
+          // Also look for sub-question references in the question ("b)", "question b", "teil b",
+          // "now b", "mach b") — when the student follows up without repeating the exercise number,
+          // reuse the last captured exercise position stored in window._lastExerciseIdx.
+          var _subqPattern = /\b([a-d])\s*\)?$|\b(?:question|teil|part|aufgabe|mach|solve|löse)\s+([a-d])\b/i;
+          var _subqMatch = question.match(_subqPattern);
           var _matchTerm = null;
           for (var _pi = 0; _pi < _exercisePatterns.length; _pi++) {
             var _m = question.match(_exercisePatterns[_pi]);
@@ -332,10 +337,16 @@ export function initAskAI(state) {
               }
             }
             if (_idx >= 0) {
-              _openFileCtx = _rawText.slice(Math.max(0, _idx - 200), _idx + 2000);
+              window._lastExerciseIdx = _idx;
+              _openFileCtx = _rawText.slice(Math.max(0, _idx - 200), _idx + 3000);
             }
           }
-          if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 2000);
+          // Follow-up sub-question ("now b)", "mach b") — reuse last exercise position
+          if (!_openFileCtx && _subqMatch && window._lastExerciseIdx != null) {
+            _openFileCtx = _rawText.slice(Math.max(0, window._lastExerciseIdx - 200), window._lastExerciseIdx + 3000);
+          }
+          // Final fallback: send first 3000 chars of the PDF
+          if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 3000);
         }
 
         if (_hasRag) {
