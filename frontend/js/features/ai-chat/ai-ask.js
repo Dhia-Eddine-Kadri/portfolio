@@ -113,7 +113,10 @@ function _saveCourseHistory(courseId, pairs) {
 
 function _appendCourseHistory(courseId, question, answer) {
   var pairs = _loadCourseHistory(courseId);
-  pairs.push({ q: question, a: answer, ts: Date.now() });
+  // Cap answer size — very long answers (heavy math) can overflow localStorage quota,
+  // causing JSON.parse to return [] on restore and the answer to appear deleted.
+  var _a = answer.length > 8000 ? answer.slice(0, 8000) + '\n\n*(answer truncated for storage)*' : answer;
+  pairs.push({ q: question, a: _a, ts: Date.now() });
   _saveCourseHistory(courseId, pairs);
 }
 
@@ -135,11 +138,19 @@ export function restoreCourseHistory(courseId) {
     var bubble = wrap.querySelector('.ai-bubble.bot');
     if (bubble) {
       bubble.setAttribute('data-raw', pair.a);
-      bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : pair.a;
-      if (window._renderMath) {
-        var _b = bubble;
-        if (window._ssEnsureKatex) window._ssEnsureKatex().then(function () { if (window._renderMath) window._renderMath(_b); }).catch(function () {});
-        else window._renderMath(_b);
+      // Always render inside _ssEnsureKatex so renderMarkdown and renderMath both run
+      // with katex loaded — avoids double-processing when katex arrives after initial render.
+      var _bEl = bubble;
+      var _rawA = pair.a;
+      function _doRender() {
+        if (!_bEl) return;
+        _bEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(_rawA) : _rawA;
+        if (window._renderMath) window._renderMath(_bEl);
+      }
+      if (window._ssEnsureKatex) {
+        window._ssEnsureKatex().then(_doRender).catch(_doRender);
+      } else {
+        _doRender();
       }
     }
     aiMsgs.appendChild(wrap);
