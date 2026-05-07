@@ -20,14 +20,12 @@ export function fileRowHtml(f, inFolder) {
   var eSize = escapeHtml(f.size || '');
   var eDate = escapeHtml(f.date || '');
   var isPdf = f.name.toLowerCase().endsWith('.pdf');
+  // Hidden marker — _bindRagStatus still queries this element to drive
+  // background indexing + auto-retry, but the user never sees it.
   var ragBtn = isPdf && f._uploaded
-    ? '<span class="co-rag-status" data-fname="' + eName + '" title="Preparing for AI…">&#x23F3;</span>'
+    ? '<span class="co-rag-status" data-fname="' + eName + '" style="display:none"></span>'
     : '';
-  var reindexBtn = isPdf && f._uploaded && eSname
-    ? '<span class="co-reindex-btn" data-fname="' + eName + '"' + sna + fa +
-      ' title="Re-index for AI (rebuilds sections and headings)"' +
-      ' style="margin-left:4px;font-size:.69rem;font-weight:800;padding:3px 8px;border-radius:20px;background:rgba(155,93,229,.12);color:rgba(155,93,229,.85);border:1px solid rgba(155,93,229,.25);cursor:pointer;flex-shrink:0">&#x21BA; AI</span>'
-    : '';
+  var reindexBtn = '';
 
   return (
     '<div class="co-file' + (f._uploaded ? ' co-file-uploaded' : '') +
@@ -99,7 +97,6 @@ export function buildFilesContent(course) {
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>' +
           ' Upload files' +
         '</button>' +
-        '<button class="co-reindex-all-btn" id="coReindexAllBtn" title="Re-index every PDF in this course with the latest extractor">&#x21BA; Reindex all</button>' +
       '</div>' +
       foldersHtml +
       '<div id="coFilesList">' + filesHtml + '</div>' +

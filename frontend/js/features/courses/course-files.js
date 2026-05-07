@@ -1059,14 +1059,13 @@ async function _bindRagStatus(co, course) {
 
     if (doc) {
       _setRagStatus(el, doc.processing_status);
-      if (doc.processing_status === 'failed' && doc.processing_error) {
-        el.title = 'Indexing failed: ' + doc.processing_error + ' — click to retry';
-      }
       if (doc.processing_status === 'ready') return;
       if (doc.processing_status === 'failed') {
-        // Auto-retry failed docs once per page load (handles stale storage_path from earlier bugs)
-        if (f && !window['_ragRetried_' + doc.id]) {
-          window['_ragRetried_' + doc.id] = true;
+        // Auto-retry failed docs aggressively — up to 5 attempts per session.
+        var key = '_ragRetries_' + doc.id;
+        var attempts = window[key] || 0;
+        if (f && attempts < 5) {
+          window[key] = attempts + 1;
           _ragEnqueue(function () {
             return _triggerRagIndex(el, fname, f, course, courseId);
           });
@@ -1082,8 +1081,10 @@ async function _bindRagStatus(co, course) {
       // Auto-retry once per page load — the user wants this to be seamless.
       var stuckSince = doc.updated_at || doc.created_at;
       var stuckMs = stuckSince ? Date.now() - new Date(stuckSince).getTime() : 0;
-      if (stuckMs > 7 * 60 * 1000 && f && !window['_ragRetried_' + doc.id]) {
-        window['_ragRetried_' + doc.id] = true;
+      var stuckKey = '_ragStuckRetries_' + doc.id;
+      var stuckAttempts = window[stuckKey] || 0;
+      if (stuckMs > 7 * 60 * 1000 && f && stuckAttempts < 5) {
+        window[stuckKey] = stuckAttempts + 1;
         _ragEnqueue(function () {
           return _triggerRagIndex(el, fname, f, course, courseId);
         });
