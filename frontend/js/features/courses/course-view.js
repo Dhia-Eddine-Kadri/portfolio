@@ -152,10 +152,16 @@ export function showCourseSection(course, section) {
   bindFileEvents(co, course);
   bindFolderEvents(co, course);
 
-  // Activate the requested tab (or restore previous tab if re-rendering)
+  // Activate the requested tab without triggering click handlers (avoids infinite recursion)
   var targetTab = (section !== 'files') ? section : (prevTab && prevTab !== 'files' ? prevTab : null);
   if (targetTab) {
-    var tabBtn = co.querySelector('[data-course-tab="' + targetTab + '"]');
-    if (tabBtn) tabBtn.click();
+    co.querySelectorAll('[data-course-tab]').forEach(function (tab) {
+      var isActive = tab.getAttribute('data-course-tab') === targetTab;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    co.querySelectorAll('[data-course-panel]').forEach(function (panel) {
+      panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
+    });
   }
 }
