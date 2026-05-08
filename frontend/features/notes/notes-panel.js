@@ -1,28 +1,28 @@
 // AI Notes Panel — splits the PDF viewer into a two-column workspace.
-// Loaded after app.js; wires itself into openFile() via a wrapper.
 (function () {
   'use strict';
 
   // ── State ─────────────────────────────────────────────────────────────────
-  var _panelOpen    = false;
-  var _activeTab    = 'notes';   // 'notes' | 'summary'
-  var _dirty        = false;
-  var _currentNote  = null;      // { id, title, type, content_markdown }
-  var _notesByType  = { notes: null, summary: null };
-  var _generating   = false;
-  var _saveTimer    = null;
+  var _panelOpen   = false;
+  var _activeTab   = 'notes';
+  var _dirty       = false;
+  var _currentNote = null;
+  var _notesByType = { notes: null, summary: null };
+  var _generating  = false;
+  var _saveTimer   = null;
+  var _scope       = 'section';          // page | section | range | document
+  var _language    = 'same_as_source';   // same_as_source | en | de | bilingual
 
   // Context set when openFile fires
-  var _ctx = { courseId: null, documentId: null, fileName: null, courseRef: null };
+  var _ctx = { courseId: null, documentId: null, fileName: null };
 
   // ── DOM helpers ───────────────────────────────────────────────────────────
   function $id(id) { return document.getElementById(id); }
 
-  function _supaHeaders() {
+  function _apiHeaders() {
     return {
       'Content-Type': 'application/json',
-      'apikey': window._SAKEY || '',
-      'Authorization': 'Bearer ' + (window._sbToken || '')
+      Authorization: 'Bearer ' + (window._sbToken || '')
     };
   }
 
@@ -45,10 +45,19 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // Converts Markdown to HTML with KaTeX math rendering.
+  function _inlineMd(s) {
+    var r = _renderMath(s);
+    return r
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/_(.+?)_/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
   function _md2html(md) {
     if (!md) return '';
-    // Math first (before any escaping touches $ signs)
     var lines = md.split('\n');
     var out = [];
     var i = 0;
@@ -57,64 +66,44 @@
     while (i < lines.length) {
       var line = lines[i];
 
-      // Fenced code blocks
       if (line.startsWith('```')) {
-        if (!inCode) {
-          inCode = true;
-          out.push('<pre><code>');
-        } else {
-          inCode = false;
-          out.push('</code></pre>');
-        }
-        i++;
-        continue;
+        if (!inCode) { inCode = true; out.push('<pre><code>'); }
+        else          { inCode = false; out.push('</code></pre>'); }
+        i++; continue;
       }
       if (inCode) { out.push(_esc(line) + '\n'); i++; continue; }
 
-      // Headings
       var hm = line.match(/^(#{1,4})\s+(.*)/);
-      if (hm) {
-        var level = hm[1].length;
-        out.push('<h' + level + '>' + _inlineMd(hm[2]) + '</h' + level + '>');
-        i++; continue;
-      }
+      if (hm) { out.push('<h' + hm[1].length + '>' + _inlineMd(hm[2]) + '</h' + hm[1].length + '>'); i++; continue; }
 
-      // Horizontal rule
       if (/^---+$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
-
-      // Blank line
       if (!line.trim()) { out.push('<br>'); i++; continue; }
 
-      // Unordered list items
       if (/^[-*]\s/.test(line)) {
         out.push('<ul>');
         while (i < lines.length && /^[-*]\s/.test(lines[i])) {
           out.push('<li>' + _inlineMd(lines[i].replace(/^[-*]\s+/, '')) + '</li>');
           i++;
         }
-        out.push('</ul>');
-        continue;
+        out.push('</ul>'); continue;
       }
 
-      // Numbered list items
       if (/^\d+\.\s/.test(line)) {
         out.push('<ol>');
         while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
           out.push('<li>' + _inlineMd(lines[i].replace(/^\d+\.\s+/, '')) + '</li>');
           i++;
         }
-        out.push('</ol>');
-        continue;
+        out.push('</ol>'); continue;
       }
 
-      // Table (simple)
       if (line.includes('|') && lines[i + 1] && /^\|?[-: |]+\|?$/.test(lines[i + 1])) {
         out.push('<table><thead><tr>');
         line.split('|').filter(function (c) { return c.trim(); }).forEach(function (c) {
           out.push('<th>' + _inlineMd(c.trim()) + '</th>');
         });
         out.push('</tr></thead><tbody>');
-        i += 2; // skip separator row
+        i += 2;
         while (i < lines.length && lines[i].includes('|')) {
           out.push('<tr>');
           lines[i].split('|').filter(function (c) { return c.trim(); }).forEach(function (c) {
@@ -123,29 +112,13 @@
           out.push('</tr>');
           i++;
         }
-        out.push('</tbody></table>');
-        continue;
+        out.push('</tbody></table>'); continue;
       }
 
-      // Paragraph
       out.push('<p>' + _inlineMd(line) + '</p>');
       i++;
     }
     return out.join('\n');
-  }
-
-  function _inlineMd(s) {
-    // Apply KaTeX before HTML escaping to preserve $ signs
-    var result = _renderMath(s);
-    // Bold/italic/code/links applied to non-math parts — do a naive pass
-    result = result
-      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/__(.+?)__/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/_(.+?)_/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>');
-    return result;
   }
 
   // ── Panel HTML ────────────────────────────────────────────────────────────
@@ -156,20 +129,38 @@
           '<button class="np-tab active" data-tab="notes">Notes</button>',
           '<button class="np-tab" data-tab="summary">Summary</button>',
         '</div>',
-        '<button class="np-close" id="npClose" title="Close notes panel">&#x2715;</button>',
+        '<div class="np-header-actions">',
+          '<button class="np-icon-btn" id="npExport" title="Export as PDF">&#x1F4E4;</button>',
+          '<button class="np-icon-btn" id="npClose" title="Close">&#x2715;</button>',
+        '</div>',
       '</div>',
 
-      '<div class="np-toolbar" id="npToolbar">',
-        '<button class="np-btn np-btn-primary" id="npGenerate">&#x2728; Generate</button>',
-        '<button class="np-btn" id="npRegen" title="Regenerate" style="display:none">&#x21BB;</button>',
-        '<div class="np-sep"></div>',
-        '<button class="np-btn" id="npSave" title="Save">&#x1F4BE; Save</button>',
-        '<div class="np-sep"></div>',
-        '<button class="np-btn" id="npExport" title="Export as PDF">&#x1F4E4; Export</button>',
-        '<div class="np-sep np-spacer"></div>',
+      // Scope + language row
+      '<div class="np-options-row" id="npOptionsRow">',
+        '<div class="np-option-group">',
+          '<span class="np-option-label">Scope:</span>',
+          '<button class="np-opt" data-scope="page">Page</button>',
+          '<button class="np-opt active" data-scope="section">±1 page</button>',
+          '<button class="np-opt" data-scope="document">Whole PDF</button>',
+        '</div>',
+        '<div class="np-option-group">',
+          '<span class="np-option-label">Lang:</span>',
+          '<button class="np-opt active" data-lang="same_as_source">Auto</button>',
+          '<button class="np-opt" data-lang="en">EN</button>',
+          '<button class="np-opt" data-lang="de">DE</button>',
+        '</div>',
+      '</div>',
+
+      // Action bar
+      '<div class="np-action-bar">',
+        '<button class="np-btn-generate" id="npGenerate">&#x2728; Generate</button>',
+        '<button class="np-btn-regen" id="npRegen" title="Regenerate" style="display:none">&#x21BB; Regenerate</button>',
+        '<div class="np-spacer"></div>',
+        '<button class="np-btn-save" id="npSave" style="display:none">&#x1F4BE; Save</button>',
         '<span class="np-status" id="npStatus"></span>',
       '</div>',
 
+      // Content area
       '<div class="np-body" id="npBody">',
         '<div class="np-empty" id="npEmpty">',
           '<div class="np-empty-icon">&#x1F4DD;</div>',
@@ -178,21 +169,23 @@
         '</div>',
 
         '<div class="np-editor-wrap" id="npEditorWrap" style="display:none">',
+          // Title as a proper editable heading
           '<div class="np-title-row">',
-            '<input class="np-title-input" id="npTitle" type="text" placeholder="Note title…">',
+            '<input class="np-title-input" id="npTitle" type="text" placeholder="Note title">',
           '</div>',
-          // Two views: rendered (read mode) and raw textarea (edit mode)
-          '<div class="np-view-toggle">',
-            '<button class="np-vt active" data-view="preview">Preview</button>',
-            '<button class="np-vt" data-view="edit">Edit Markdown</button>',
+          // Preview / Edit tabs
+          '<div class="np-view-tabs">',
+            '<button class="np-view-tab active" data-view="preview">Preview</button>',
+            '<button class="np-view-tab" data-view="edit">Edit</button>',
           '</div>',
           '<div class="np-preview" id="npPreview"></div>',
-          '<textarea class="np-editor" id="npEditor" style="display:none" spellcheck="false" placeholder="Write Markdown here…"></textarea>',
+          '<textarea class="np-editor-ta" id="npEditor" style="display:none" spellcheck="false" placeholder="Markdown…"></textarea>',
         '</div>',
       '</div>',
 
-      '<div class="np-generating-overlay" id="npGenOverlay" style="display:none">',
-        '<div class="np-gen-inner">',
+      // Loading overlay
+      '<div class="np-gen-overlay" id="npGenOverlay" style="display:none">',
+        '<div class="np-gen-box">',
           '<div class="np-gen-spinner"></div>',
           '<div class="np-gen-msg" id="npGenMsg">Generating notes…</div>',
         '</div>',
@@ -203,20 +196,17 @@
   // ── Create DOM ────────────────────────────────────────────────────────────
   function _createPanel() {
     if ($id('pdfNotesPanel')) return;
-
     var panel = document.createElement('div');
     panel.id = 'pdfNotesPanel';
     panel.className = 'pdf-notes-panel';
     panel.style.display = 'none';
     panel.innerHTML = _panelHTML();
-
     var wrap = $id('pdfViewerWrap');
     if (wrap) wrap.appendChild(panel);
-
     _bindEvents(panel);
   }
 
-  // ── Toggle panel open/close ───────────────────────────────────────────────
+  // ── Open / Close ──────────────────────────────────────────────────────────
   function _openPanel() {
     var panel = $id('pdfNotesPanel');
     var pdfView = $id('pdfView');
@@ -234,6 +224,8 @@
     _panelOpen = false;
     panel.style.display = 'none';
     pdfView.classList.remove('pdf-split');
+    var toggleBtn = $id('pdfNotesToggle');
+    if (toggleBtn) toggleBtn.classList.remove('active');
   }
 
   // ── Tab switching ─────────────────────────────────────────────────────────
@@ -253,30 +245,30 @@
     var empty   = $id('npEmpty');
     var wrap    = $id('npEditorWrap');
     var regen   = $id('npRegen');
+    var save    = $id('npSave');
     var preview = $id('npPreview');
     var editor  = $id('npEditor');
     var title   = $id('npTitle');
-
     if (!empty) return;
 
     if (!_currentNote) {
       empty.style.display = 'flex';
-      if (wrap) wrap.style.display = 'none';
+      if (wrap)  wrap.style.display = 'none';
       if (regen) regen.style.display = 'none';
+      if (save)  save.style.display = 'none';
       return;
     }
 
     empty.style.display = 'none';
-    if (wrap) wrap.style.display = 'flex';
+    if (wrap)  wrap.style.display = 'flex';
     if (regen) regen.style.display = '';
-
-    if (title) title.value = _currentNote.title || '';
-    if (editor) editor.value = _currentNote.content_markdown || '';
+    if (save)  save.style.display = '';
+    if (title)   title.value = _currentNote.title || '';
+    if (editor)  editor.value = _currentNote.content_markdown || '';
     if (preview) preview.innerHTML = _md2html(_currentNote.content_markdown || '');
     _setStatus('');
   }
 
-  // ── Status line ───────────────────────────────────────────────────────────
   function _setStatus(msg, cls) {
     var el = $id('npStatus');
     if (!el) return;
@@ -284,34 +276,27 @@
     el.className = 'np-status' + (cls ? ' ' + cls : '');
   }
 
-  // ── Load existing notes for current document ──────────────────────────────
+  // ── Load existing notes ───────────────────────────────────────────────────
   async function _loadNotes() {
     if (!_ctx.documentId || !_ctx.courseId) return;
-    var token = window._sbToken || '';
     try {
       var r = await fetch(
         (window.BACKEND_URL || '') + '/api/notes?courseId=' + encodeURIComponent(_ctx.courseId) +
         '&documentId=' + encodeURIComponent(_ctx.documentId),
-        { headers: _supaHeaders() }
+        { headers: _apiHeaders() }
       );
       var data = r.ok ? await r.json() : {};
       (data.notes || []).forEach(function (n) {
-        if (n.type === 'notes' || n.type === 'summary') {
-          if (!_notesByType[n.type]) {
-            // Store minimal header — full content loaded on demand
-            _notesByType[n.type] = { id: n.id, title: n.title, type: n.type, content_markdown: '' };
-          }
+        if ((n.type === 'notes' || n.type === 'summary') && !_notesByType[n.type]) {
+          _notesByType[n.type] = { id: n.id, title: n.title, type: n.type, content_markdown: '' };
         }
       });
-      // If we have a notes entry, load the full content
-      for (var type of ['notes', 'summary']) {
-        if (_notesByType[type] && _notesByType[type].id && !_notesByType[type].content_markdown) {
-          await _loadNoteContent(_notesByType[type]);
+      for (var t of ['notes', 'summary']) {
+        if (_notesByType[t] && _notesByType[t].id && !_notesByType[t].content_markdown) {
+          await _loadNoteContent(_notesByType[t]);
         }
       }
-    } catch (e) {
-      console.warn('[notes-panel] load error:', e);
-    }
+    } catch (e) { console.warn('[notes-panel] load error:', e); }
     _currentNote = _notesByType[_activeTab];
     if (_panelOpen) _renderCurrentTab();
   }
@@ -320,7 +305,7 @@
     try {
       var r = await fetch(
         (window.BACKEND_URL || '') + '/api/notes?id=' + encodeURIComponent(note.id),
-        { headers: _supaHeaders() }
+        { headers: _apiHeaders() }
       );
       var data = r.ok ? await r.json() : {};
       if (data.note) {
@@ -342,16 +327,28 @@
     var overlay = $id('npGenOverlay');
     var genMsg  = $id('npGenMsg');
     if (overlay) overlay.style.display = 'flex';
-    if (genMsg)  genMsg.textContent = 'Generating ' + (_activeTab === 'summary' ? 'summary' : 'notes') + '…';
+    if (genMsg)  genMsg.textContent = 'Generating ' + (_activeTab === 'summary' ? 'summary' : 'detailed notes') + '…';
 
     try {
+      var currentPage = window.pdfPage || null;
+
       var payload = {
         courseId:    _ctx.courseId,
         documentId:  _ctx.documentId || null,
         tool:        _activeTab,
         fileName:    _ctx.fileName || null,
-        pdfText:     window.pdfFullText || ''
+        pdfText:     window.pdfFullText || '',
+        scope:       _scope,
+        language:    _language,
+        currentPage: currentPage
       };
+
+      // For range scope, use ±2 around current page
+      if (_scope === 'section' && currentPage) {
+        payload.pageRange = { start: Math.max(1, currentPage - 1), end: currentPage + 1 };
+      } else if (_scope === 'page' && currentPage) {
+        payload.pageRange = { start: currentPage, end: currentPage };
+      }
 
       var resp = await fetch((window.BACKEND_URL || '') + '/api/notes/generate', {
         method: 'POST',
@@ -382,25 +379,20 @@
   // ── Save ──────────────────────────────────────────────────────────────────
   async function _save(quiet) {
     if (!_currentNote || !_currentNote.id) return;
-    var editor = $id('npEditor');
+    var editor  = $id('npEditor');
     var titleEl = $id('npTitle');
-    var md = editor ? editor.value : _currentNote.content_markdown;
+    var md    = editor  ? editor.value  : _currentNote.content_markdown;
     var title = titleEl ? titleEl.value : _currentNote.title;
 
     if (md === _currentNote.content_markdown && title === _currentNote.title) {
       if (!quiet) _setStatus('No changes', '');
       return;
     }
-
     _setStatus('Saving…', '');
     try {
       var resp = await fetch(
         (window.BACKEND_URL || '') + '/api/notes?id=' + encodeURIComponent(_currentNote.id),
-        {
-          method: 'PATCH',
-          headers: _supaHeaders(),
-          body: JSON.stringify({ title: title, content_markdown: md })
-        }
+        { method: 'PATCH', headers: _apiHeaders(), body: JSON.stringify({ title: title, content_markdown: md }) }
       );
       if (resp.ok) {
         _currentNote.content_markdown = md;
@@ -408,15 +400,12 @@
         _notesByType[_activeTab] = _currentNote;
         _dirty = false;
         _setStatus('Saved ✓', 'ok');
-        // Refresh preview
         var preview = $id('npPreview');
         if (preview) preview.innerHTML = _md2html(md);
       } else {
         _setStatus('Save failed', 'err');
       }
-    } catch (e) {
-      _setStatus('Save failed', 'err');
-    }
+    } catch (e) { _setStatus('Save failed', 'err'); }
   }
 
   // ── Export as PDF ─────────────────────────────────────────────────────────
@@ -426,19 +415,16 @@
       return;
     }
     var preview = $id('npPreview');
-    var html = preview ? preview.innerHTML : _md2html(_currentNote.content_markdown);
+    var html  = preview ? preview.innerHTML : _md2html(_currentNote.content_markdown);
     var title = _currentNote.title || 'Notes';
-
     var win = window.open('', '_blank', 'width=900,height=700');
     if (!win) return;
-
     win.document.write('<!DOCTYPE html><html><head>' +
       '<meta charset="utf-8"><title>' + _esc(title) + '</title>' +
       '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">' +
       '<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.7;padding:0 20px}' +
       'h1{font-size:1.8rem;border-bottom:2px solid #333;padding-bottom:8px}' +
-      'h2{font-size:1.3rem;margin-top:1.6em;color:#222}' +
-      'h3{font-size:1.1rem;color:#333}' +
+      'h2{font-size:1.3rem;margin-top:1.6em}h3{font-size:1.1rem}' +
       'pre{background:#f4f4f4;padding:12px;border-radius:6px;overflow-x:auto}' +
       'code{background:#f0f0f0;padding:1px 4px;border-radius:3px}' +
       'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px 10px}' +
@@ -449,7 +435,7 @@
     setTimeout(function () { win.print(); }, 600);
   }
 
-  // ── Auto-save on edit ─────────────────────────────────────────────────────
+  // ── Auto-save ─────────────────────────────────────────────────────────────
   function _scheduleSave() {
     _dirty = true;
     if (_saveTimer) clearTimeout(_saveTimer);
@@ -469,12 +455,34 @@
       btn.addEventListener('click', function () { _switchTab(btn.dataset.tab); });
     });
 
-    // View toggle (preview / edit markdown)
+    // Scope options
+    panel.querySelectorAll('[data-scope]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _scope = btn.dataset.scope;
+        panel.querySelectorAll('[data-scope]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.scope === _scope);
+        });
+      });
+    });
+
+    // Language options
+    panel.querySelectorAll('[data-lang]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _language = btn.dataset.lang;
+        panel.querySelectorAll('[data-lang]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.lang === _language);
+        });
+      });
+    });
+
+    // View tabs (Preview / Edit)
     panel.addEventListener('click', function (e) {
-      var btn = e.target.closest('.np-vt');
+      var btn = e.target.closest('.np-view-tab');
       if (!btn) return;
       var view = btn.dataset.view;
-      panel.querySelectorAll('.np-vt').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
+      panel.querySelectorAll('.np-view-tab').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.view === view);
+      });
       var preview = $id('npPreview');
       var editor  = $id('npEditor');
       if (view === 'edit') {
@@ -494,27 +502,23 @@
       }
     });
 
-    // Generate
-    var genBtn = $id('npGenerate');
-    if (genBtn) genBtn.addEventListener('click', _generate);
-    var regenBtn = $id('npRegen');
-    if (regenBtn) regenBtn.addEventListener('click', _generate);
-
-    // Save
-    var saveBtn = $id('npSave');
-    if (saveBtn) saveBtn.addEventListener('click', function () { _save(false); });
-
-    // Export
+    // Generate / Regen / Save / Export
+    var genBtn    = $id('npGenerate');
+    var regenBtn  = $id('npRegen');
+    var saveBtn   = $id('npSave');
     var exportBtn = $id('npExport');
+    if (genBtn)    genBtn.addEventListener('click', _generate);
+    if (regenBtn)  regenBtn.addEventListener('click', _generate);
+    if (saveBtn)   saveBtn.addEventListener('click', function () { _save(false); });
     if (exportBtn) exportBtn.addEventListener('click', _exportPdf);
 
-    // Editor changes → auto-save
-    var editor = $id('npEditor');
-    if (editor) editor.addEventListener('input', _scheduleSave);
+    // Editor auto-save
+    var editor     = $id('npEditor');
     var titleInput = $id('npTitle');
+    if (editor)     editor.addEventListener('input', _scheduleSave);
     if (titleInput) titleInput.addEventListener('input', _scheduleSave);
 
-    // Keyboard shortcut: Ctrl+S to save
+    // Ctrl+S
     document.addEventListener('keydown', function (e) {
       if (_panelOpen && (e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
@@ -523,13 +527,11 @@
     });
   }
 
-  // ── Notes toggle button in PDF toolbar ───────────────────────────────────
+  // ── Toolbar button ────────────────────────────────────────────────────────
   function _injectToolbarButton() {
     if ($id('pdfNotesToggle')) return;
     var toolbar = $id('pdfToolbar');
     if (!toolbar) return;
-
-    // Insert before the spacer (flex:1 span)
     var spacer = toolbar.querySelector('span[style*="flex: 1"], span[style*="flex:1"]');
     var btn = document.createElement('button');
     btn.id = 'pdfNotesToggle';
@@ -537,39 +539,25 @@
     btn.title = 'Toggle AI Notes panel';
     btn.innerHTML = '&#x1F4DD; Notes';
     btn.addEventListener('click', function () {
-      if (_panelOpen) {
-        _closePanel();
-        btn.classList.remove('active');
-      } else {
-        _openPanel();
-        btn.classList.add('active');
-      }
+      if (_panelOpen) { _closePanel(); btn.classList.remove('active'); }
+      else            { _openPanel();  btn.classList.add('active'); }
     });
-    if (spacer) {
-      toolbar.insertBefore(btn, spacer);
-    } else {
-      toolbar.appendChild(btn);
-    }
+    if (spacer) toolbar.insertBefore(btn, spacer);
+    else        toolbar.appendChild(btn);
   }
 
-  // ── Hook into openFile ────────────────────────────────────────────────────
+  // ── File open hook ────────────────────────────────────────────────────────
   function _onFileOpen(fileName, course) {
-    // Reset state for new file
     _notesByType = { notes: null, summary: null };
     _currentNote = null;
     _dirty = false;
     _generating = false;
 
-    // Resolve documentId from the active course's document list
     _ctx.courseId   = (course && course.id) || window.activeCourseId || null;
     _ctx.fileName   = fileName || null;
-    _ctx.courseRef  = course || window.activeCourseRef || null;
     _ctx.documentId = null;
 
-    // Try to find the documentId from indexed docs
     _resolveDocumentId(fileName, _ctx.courseId);
-
-    // Create panel if not yet done
     _createPanel();
     _injectToolbarButton();
 
@@ -598,28 +586,21 @@
     } catch (e) {}
   }
 
-  // ── Wrap openFile ─────────────────────────────────────────────────────────
   function _wrapOpenFile() {
-    var origOpenFile = window.openFile;
+    var orig = window.openFile;
     window.openFile = function (f, course) {
-      if (typeof origOpenFile === 'function') origOpenFile(f, course);
-      // Delay slightly so pdf-viewer.js sets activeFileName first
-      setTimeout(function () {
-        _onFileOpen(f && f.name, course);
-      }, 50);
+      if (typeof orig === 'function') orig(f, course);
+      setTimeout(function () { _onFileOpen(f && f.name, course); }, 50);
     };
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  // Wait for app.js to finish wiring openFile before wrapping it
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _wrapOpenFile);
   } else {
-    // app.js may still be initialising; defer by a tick
     setTimeout(_wrapOpenFile, 0);
   }
 
-  // Expose for debugging
   window._notesPanel = {
     open:  _openPanel,
     close: _closePanel,

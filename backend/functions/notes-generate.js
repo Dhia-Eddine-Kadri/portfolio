@@ -1,7 +1,9 @@
 // POST /api/notes/generate
-// Generates structured AI notes or a summary from an indexed PDF.
-//
-// Body: { courseId, documentId, tool: 'notes'|'summary', pdfText?, fileName? }
+// Body: { courseId, documentId, tool, pdfText?, fileName?,
+//         scope: 'page'|'section'|'range'|'document',
+//         currentPage?, pageRange?: {start,end},
+//         language: 'same_as_source'|'en'|'de'|'bilingual',
+//         detailLevel: 'detailed'|'summary' }
 // Response: { note: { id, title, type, content_markdown, sources } }
 
 'use strict';
@@ -13,74 +15,119 @@ const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-aut
 const { supaRequest } = require('../lib/supabase-admin');
 
 const OPENAI_MODEL = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
-const MAX_CONTEXT_CHARS = 24000; // ~6k tokens of context
+const MAX_CONTEXT_CHARS = 28000;
+
+// ── Language instruction ──────────────────────────────────────────────────────
+
+function langInstr(lang) {
+  if (lang === 'en')        return 'Write the notes in English regardless of the source language.';
+  if (lang === 'de')        return 'Schreibe die Notizen auf Deutsch, unabhängig von der Quellsprache.';
+  if (lang === 'bilingual') return 'Write bilingually: use the source language for content, add English translations in parentheses for key technical terms.';
+  // same_as_source (default)
+  return 'Write the notes in exactly the same language as the source text. If the source is German, write in German. If English, write in English. Do NOT translate.';
+}
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
-function notesPrompt() {
-  return `You are generating structured study notes for a student from a PDF.
+function notesPrompt(lang) {
+  return `You are generating detailed, exam-ready study notes from a PDF lecture slide or page.
 
-Use ONLY the provided PDF excerpts. Do not invent facts, definitions, formulas, or examples.
-If something is unclear in the source, write: *(Not clearly stated in the PDF.)*
+${langInstr(lang)}
 
-Create structured, editable Markdown notes.
+CRITICAL RULES — READ BEFORE GENERATING:
+- Use ONLY the provided PDF text. Do NOT invent facts or use outside knowledge.
+- Do NOT write a generic summary. This is DETAILED NOTES mode.
+- Do NOT write vague bullets like "Overview of methods" or "Various casting techniques".
+- If the PDF contains a list → reproduce the COMPLETE list with ALL items preserved.
+- If the PDF contains a definition-like sentence → include it verbatim or near-verbatim.
+- If the PDF contains a formula → capture it using KaTeX: inline $...$, display $$...$$, explain every variable.
+- If the PDF describes a process → extract every step or characteristic in order.
+- Every important technical term from the source must appear in the notes.
+- Notes must be detailed enough for studying WITHOUT reopening the PDF.
+- If something is unclear in the source, write: *(Nicht klar aus dem PDF.)* or *(Not clearly stated.)*
 
-Include:
-1. A clear **title** (H1) matching the topic
-2. **Main ideas** — what this section is about
-3. **Important definitions** — term: explanation
-4. **Important formulas** — use KaTeX: inline math as $...$, display math as $$...$$
-5. **Explanation of formula variables** (e.g. "where $n$ is the sample size")
-6. **Step-by-step methods** if present in the source
-7. **Key examples** from the PDF with solutions
-8. **Common mistakes or warnings** if the PDF mentions them
-9. **Exam-focused key points** — what to remember
-10. **Source page references** in brackets, e.g. *(p. 3–5)*
+REQUIRED STRUCTURE — include every section that has content in the source:
+
+# [Exact topic title from the slide/page]
+
+## Was ist das? / What is this?
+2–4 sentences of context and explanation.
+
+## Wichtige Definitionen / Important Definitions
+- **Term**: exact explanation from the source
+
+## Technische Begriffe / Technical Terms
+All important technical vocabulary with explanation.
+
+## Formeln / Formulas
+KaTeX formulas with variable explanations.
+
+## Prozessschritte / Process Steps
+Numbered steps or bulleted characteristics — exactly as described in source.
+
+## Listen aus dem PDF / Lists from the PDF
+All lists preserved in FULL with all items. Add a one-line explanation per item if useful.
+
+## Vergleiche / Vergleiche / Comparisons
+Tables or lists for comparisons, advantages/disadvantages if present.
+
+## Prüfungsrelevanz / Exam Focus
+What to memorize. What is likely to be tested.
+
+## Quellenangabe / Source
+Page reference for each section, e.g. *(S. 19)* or *(p. 19)*.
 
 Formatting rules:
-- Use # for title, ## for sections, ### for subsections
+- Use # for title, ## for major sections, ### for subsections
 - Use bullet points and numbered lists
-- Use \`code\` for variable names and symbols
-- Use tables only when comparing multiple items
-- Write inline math with $...$ and display math with $$...$$
-- Do NOT include generic filler sentences
-- Do NOT use outside knowledge — only what is in the excerpts
-
-Respond with Markdown only. No JSON. No preamble.`;
+- Use tables for comparisons
+- Minimum 5–10 useful bullets per main topic
+- Every sentence must add information — no filler`;
 }
 
-function summaryPrompt() {
-  return `You are generating a concise study summary from a PDF.
+function summaryPrompt(lang) {
+  return `You are generating a concise but exam-useful summary from a PDF lecture slide or page.
 
-Use ONLY the provided PDF excerpts. Do not invent missing information.
+${langInstr(lang)}
 
-Create a concise but exam-useful summary.
+Use ONLY the provided PDF text. Do not invent information.
 
 Include:
-1. **What this section is about** (1–2 sentences)
-2. **The most important concepts** as bullet points
-3. **Important formulas** using KaTeX: inline $...$, display $$...$$
-4. **What to remember for the exam** — the 3–5 most important things
-5. **Source page references** in brackets, e.g. *(p. 2–4)*
+1. **Was wird behandelt / What this covers** (1–2 sentences)
+2. **Wichtigste Konzepte / Key concepts** — bullet points, concrete not vague
+3. **Formeln / Formulas** — using KaTeX: inline $...$, display $$...$$
+4. **Technische Begriffe / Key terms** — listed with short explanation
+5. **Prüfungsrelevanz / Exam points** — the 3–5 most important things to remember
+6. **Quelle / Source** — page reference e.g. *(S. 19)*
 
-Keep it shorter than full notes — aim for quick review, not full explanation.
-Use Markdown and KaTeX math. No JSON. No preamble.`;
+Keep it concise — quick review, not full explanation.
+Use Markdown and KaTeX. Do NOT write generic overviews.`;
 }
 
-// ── OpenAI (Markdown mode — no JSON response_format) ─────────────────────────
+function strictNotesPrompt(lang, missingTerms) {
+  return notesPrompt(lang) + `
 
-function callOpenAIMarkdown(systemPrompt, userMessage) {
+ADDITIONAL REQUIREMENT — FINAL CHECK:
+The following terms were found in the source text but are MISSING from your notes. You MUST include all of them:
+${missingTerms.map(function (t) { return '- ' + t; }).join('\n')}
+
+Do not submit notes that omit these terms.`;
+}
+
+// ── OpenAI call ───────────────────────────────────────────────────────────────
+
+function callOpenAI(systemPrompt, userMessage) {
   return new Promise(function (resolve, reject) {
-    const apiKey = requireEnv('OPENAI_API_KEY');
-    const body = JSON.stringify({
+    var apiKey = requireEnv('OPENAI_API_KEY');
+    var body = JSON.stringify({
       model: OPENAI_MODEL,
-      max_tokens: 3600,
+      max_tokens: 4000,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: userMessage }
       ]
     });
-    const req = https.request({
+    var req = https.request({
       hostname: 'api.openai.com',
       path: '/v1/chat/completions',
       method: 'POST',
@@ -90,13 +137,13 @@ function callOpenAIMarkdown(systemPrompt, userMessage) {
         'Content-Length': Buffer.byteLength(body)
       }
     }, function (res) {
-      let d = '';
+      var d = '';
       res.on('data', function (c) { d += c; });
       res.on('end', function () {
         try {
-          const p = JSON.parse(d);
+          var p = JSON.parse(d);
           if (res.statusCode >= 300) return reject(new Error('OpenAI ' + res.statusCode + ': ' + d.slice(0, 200)));
-          const text = p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
+          var text = p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
           if (!text) return reject(new Error('Empty OpenAI response'));
           resolve(text.trim());
         } catch (e) { reject(e); }
@@ -109,21 +156,60 @@ function callOpenAIMarkdown(systemPrompt, userMessage) {
   });
 }
 
+// ── Quality validation ────────────────────────────────────────────────────────
+
+function extractKeyTerms(contextText) {
+  var words = contextText.match(/[A-Za-zÄÖÜäöüß]{5,}/g) || [];
+  var freq = {};
+  for (var i = 0; i < words.length; i++) {
+    var lw = words[i].toLowerCase();
+    freq[lw] = (freq[lw] || 0) + 1;
+  }
+  return Object.keys(freq)
+    .filter(function (w) { return freq[w] >= 2; })
+    .sort(function (a, b) { return freq[b] - freq[a]; })
+    .slice(0, 30);
+}
+
+var FILLER_PHRASES = [
+  'overview of', 'general introduction', 'this section covers', 'various methods',
+  'überblick über', 'einführung in', 'verschiedene methoden', 'allgemeine einführung'
+];
+
+function validateNotes(markdown, contextText) {
+  var issues = [];
+
+  if (markdown.length < 700) issues.push('too_short');
+
+  var keyTerms = extractKeyTerms(contextText);
+  var mdLower = markdown.toLowerCase();
+  var missingTerms = keyTerms.filter(function (t) { return !mdLower.includes(t); });
+  if (keyTerms.length > 0 && missingTerms.length / keyTerms.length > 0.45) {
+    issues.push('missing_terms');
+  }
+
+  for (var i = 0; i < FILLER_PHRASES.length; i++) {
+    if (mdLower.includes(FILLER_PHRASES[i])) { issues.push('generic_filler'); break; }
+  }
+
+  return { valid: issues.length === 0, issues: issues, missingTerms: missingTerms.slice(0, 15) };
+}
+
 // ── Chunk retrieval ───────────────────────────────────────────────────────────
 
-async function fetchChunksForDocument(serviceKey, userId, courseId, documentId, pageStart, pageEnd) {
-  const supaUrl = requireEnv('SUPABASE_URL').replace(/\/$/, '');
-  let url = supaUrl + '/rest/v1/document_chunks' +
+async function fetchChunks(serviceKey, userId, courseId, documentId, pageStart, pageEnd) {
+  var supaUrl = requireEnv('SUPABASE_URL').replace(/\/$/, '');
+  var url = supaUrl + '/rest/v1/document_chunks' +
     '?select=chunk_text,page_start,page_end,section_title,source_type' +
     '&user_id=eq.' + encodeURIComponent(userId) +
     '&course_id=eq.' + encodeURIComponent(courseId) +
     '&document_id=eq.' + encodeURIComponent(documentId) +
     '&order=page_start.asc,id.asc' +
-    '&limit=120';
+    '&limit=80';
   if (pageStart != null) url += '&page_start=gte.' + pageStart;
-  if (pageEnd   != null) url += '&page_end=lte.' + pageEnd;
+  if (pageEnd   != null) url += '&page_end=lte.'   + pageEnd;
 
-  const result = await supaRequest(serviceKey, 'GET', url, null);
+  var result = await supaRequest(serviceKey, 'GET', url, null);
   return Array.isArray(result) ? result : [];
 }
 
@@ -131,65 +217,60 @@ async function fetchChunksForDocument(serviceKey, userId, courseId, documentId, 
 
 function buildContext(chunks, fileName) {
   if (!chunks.length) return null;
-  let ctx = 'SOURCE: ' + (fileName || 'PDF') + '\n\n';
-  let chars = 0;
-  const sources = [];
-  for (const c of chunks) {
-    const pageRef = c.page_start != null
-      ? '[p. ' + c.page_start + (c.page_end && c.page_end !== c.page_start ? '–' + c.page_end : '') + ']'
+  var ctx = 'QUELLE: ' + (fileName || 'PDF') + '\n\n';
+  var chars = 0;
+  var sources = [];
+  for (var i = 0; i < chunks.length; i++) {
+    var c = chunks[i];
+    var pageRef = c.page_start != null
+      ? '[S. ' + c.page_start + (c.page_end && c.page_end !== c.page_start ? '–' + c.page_end : '') + ']'
       : '';
-    const section = c.section_title ? '[' + c.section_title + '] ' : '';
-    const line = section + pageRef + '\n' + c.chunk_text + '\n\n';
+    var section = c.section_title ? '[' + c.section_title + '] ' : '';
+    var line = section + pageRef + '\n' + c.chunk_text + '\n\n';
     if (chars + line.length > MAX_CONTEXT_CHARS) break;
     ctx += line;
     chars += line.length;
     sources.push({ page_start: c.page_start, page_end: c.page_end });
   }
-  return { context: ctx, sources };
+  return { context: ctx, sources: sources };
 }
 
-// ── Save to DB ────────────────────────────────────────────────────────────────
+// ── Save note ─────────────────────────────────────────────────────────────────
 
-async function saveNote(serviceKey, { userId, courseId, documentId, title, type, markdown, sources }) {
-  const supaUrl = requireEnv('SUPABASE_URL').replace(/\/$/, '');
-
-  // Insert note
-  const noteRows = await supaRequest(serviceKey, 'POST',
+async function saveNote(serviceKey, opts) {
+  var supaUrl = requireEnv('SUPABASE_URL').replace(/\/$/, '');
+  var noteRows = await supaRequest(serviceKey, 'POST',
     supaUrl + '/rest/v1/notes?select=id',
     {
-      user_id: userId,
-      course_id: courseId,
-      document_id: documentId || null,
-      title,
-      type,
-      content_markdown: markdown
+      user_id: opts.userId,
+      course_id: opts.courseId,
+      document_id: opts.documentId || null,
+      title: opts.title,
+      type: opts.type,
+      content_markdown: opts.markdown
     },
     { 'Prefer': 'return=representation' }
   );
-  const noteId = noteRows && noteRows[0] && noteRows[0].id;
+  var noteId = noteRows && noteRows[0] && noteRows[0].id;
   if (!noteId) return null;
 
-  // Insert sources (best-effort)
-  if (sources && sources.length && documentId) {
-    const sourceRows = sources
+  if (opts.sources && opts.sources.length && opts.documentId) {
+    var sourceRows = opts.sources
       .filter(function (s) { return s.page_start != null; })
       .map(function (s) {
-        return { note_id: noteId, document_id: documentId, page_start: s.page_start, page_end: s.page_end };
+        return { note_id: noteId, document_id: opts.documentId, page_start: s.page_start, page_end: s.page_end };
       });
     if (sourceRows.length) {
       await supaRequest(serviceKey, 'POST', supaUrl + '/rest/v1/note_sources', sourceRows, { 'Prefer': 'return=minimal' })
         .catch(function () {});
     }
   }
-
   return noteId;
 }
 
-// ── Extract title from markdown ───────────────────────────────────────────────
-
 function extractTitle(markdown, fallback) {
-  const m = markdown.match(/^#\s+(.+)/m);
-  return m ? m[1].replace(/[*_`]/g, '').trim() : (fallback || 'AI Notes');
+  var m = markdown.match(/^#\s+(.+)/m);
+  return m ? m[1].replace(/[*_`]/g, '').trim() : (fallback || 'Notizen');
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -198,67 +279,139 @@ exports.handler = async function (event) {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
   if (event.httpMethod !== 'POST') return fail(405, 'Method not allowed');
 
-  const token = extractBearerToken(event.headers);
+  var token = extractBearerToken(event.headers);
   if (!token) return fail(401, 'Missing authorization token');
 
-  const user = await verifySupabaseToken(token);
+  var user = await verifySupabaseToken(token);
   if (!user) return fail(401, 'Invalid or expired token');
 
-  let body;
+  var body;
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return fail(400, 'Invalid JSON'); }
 
-  const { courseId, documentId, tool, pdfText, fileName, pageStart, pageEnd } = body;
+  var courseId    = body.courseId;
+  var documentId  = body.documentId;
+  var tool        = body.tool;
+  var pdfText     = body.pdfText;
+  var fileName    = body.fileName;
+  var language    = body.language    || 'same_as_source';
+  var scope       = body.scope       || 'section';   // page | section | range | document
+  var currentPage = body.currentPage != null ? Number(body.currentPage) : null;
+  var pageRange   = body.pageRange   || null;         // { start, end }
+
   if (!courseId) return fail(400, 'courseId is required');
   if (!['notes', 'summary'].includes(tool)) return fail(400, 'tool must be notes or summary');
 
-  const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  var serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-  // ── Retrieve indexed chunks ───────────────────────────────────────────────
-  let context = null;
-  let sources = [];
+  // ── Resolve page filter from scope ────────────────────────────────────────
+  var filterStart = null;
+  var filterEnd   = null;
 
-  if (documentId) {
-    const chunks = await fetchChunksForDocument(serviceKey, user.id, courseId, documentId, pageStart, pageEnd);
-    if (chunks.length) {
-      const built = buildContext(chunks, fileName);
-      context = built.context;
-      sources = built.sources;
+  if (scope !== 'document') {
+    if (scope === 'page' && currentPage != null) {
+      filterStart = currentPage;
+      filterEnd   = currentPage;
+    } else if (scope === 'section' && currentPage != null) {
+      filterStart = Math.max(1, currentPage - 1);
+      filterEnd   = currentPage + 1;
+    } else if (scope === 'range' && pageRange) {
+      filterStart = pageRange.start != null ? Number(pageRange.start) : null;
+      filterEnd   = pageRange.end   != null ? Number(pageRange.end)   : null;
     }
   }
 
-  // ── Fallback to pdfText if not indexed ───────────────────────────────────
+  // ── Retrieve indexed chunks ───────────────────────────────────────────────
+  var context        = null;
+  var sources        = [];
+  var rawContextText = '';
+
+  if (documentId) {
+    var chunks = await fetchChunks(serviceKey, user.id, courseId, documentId, filterStart, filterEnd);
+
+    // If scoped fetch is empty, widen to full document as fallback
+    if (!chunks.length && filterStart != null) {
+      chunks = await fetchChunks(serviceKey, user.id, courseId, documentId, null, null);
+    }
+
+    if (chunks.length) {
+      var built = buildContext(chunks, fileName);
+      context        = built.context;
+      sources        = built.sources;
+      rawContextText = chunks.map(function (c) { return c.chunk_text; }).join(' ');
+    }
+  }
+
+  // ── Fallback to pdfText ───────────────────────────────────────────────────
   if (!context) {
     if (pdfText && pdfText.trim().length > 100) {
-      const text = pdfText.slice(0, MAX_CONTEXT_CHARS);
-      context = 'SOURCE: ' + (fileName || 'PDF') + '\n\n' + text;
+      var text = pdfText.slice(0, MAX_CONTEXT_CHARS);
+      context        = 'QUELLE: ' + (fileName || 'PDF') + '\n\n' + text;
+      rawContextText = text;
     } else {
       return jsonResponse(200, {
         error: documentId
-          ? 'This PDF has not been indexed yet. Please wait for indexing to complete or re-upload the file.'
-          : 'No content available. Open a PDF and try again.'
+          ? 'Dieses PDF wurde noch nicht indiziert. Bitte warte bis die Indizierung abgeschlossen ist oder lade die Datei erneut hoch.'
+          : 'Kein Inhalt verfügbar. Öffne zuerst ein PDF.'
       });
     }
   }
 
-  // ── Generate ──────────────────────────────────────────────────────────────
-  const systemPrompt = tool === 'summary' ? summaryPrompt() : notesPrompt();
-  const userMessage = 'PDF CONTENT:\n\n' + context + '\n\nGenerate ' + tool + ' from the above.';
+  // ── Build prompt + user message ───────────────────────────────────────────
+  var systemPrompt = tool === 'summary' ? summaryPrompt(language) : notesPrompt(language);
 
-  let markdown;
+  var pageHint = '';
+  if (filterStart != null) {
+    pageHint = '\n\nFOKUS: ' + (filterStart === filterEnd
+      ? 'Seite ' + filterStart
+      : 'Seiten ' + filterStart + '–' + filterEnd) + ' des PDFs.';
+  }
+
+  var userMessage = 'PDF-INHALT:\n\n' + context + pageHint +
+    '\n\n' + (tool === 'summary'
+      ? 'Erstelle eine prägnante Zusammenfassung aus dem obigen Text.'
+      : 'Erstelle detaillierte Lernnotizen aus dem obigen Text. Erfasse ALLE Definitionen, Listen, Formeln und Prozessschritte.');
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  var markdown;
   try {
-    markdown = await callOpenAIMarkdown(systemPrompt, userMessage);
+    markdown = await callOpenAI(systemPrompt, userMessage);
   } catch (e) {
     console.error('notes-generate OpenAI error:', e.message);
-    return jsonResponse(200, { error: 'AI generation failed: ' + e.message });
+    return jsonResponse(200, { error: 'KI-Generierung fehlgeschlagen: ' + e.message });
+  }
+
+  // ── Quality validation (notes mode only) ─────────────────────────────────
+  if (tool === 'notes') {
+    var validation = validateNotes(markdown, rawContextText);
+    if (!validation.valid) {
+      console.log('[notes-generate] validation failed:', validation.issues, '— regenerating with strict prompt');
+      try {
+        var strictPrompt   = strictNotesPrompt(language, validation.missingTerms);
+        var strictMessage  = userMessage + '\n\nFEHLENDE BEGRIFFE — müssen in den Notizen vorkommen: ' +
+          validation.missingTerms.join(', ');
+        markdown = await callOpenAI(strictPrompt, strictMessage);
+      } catch (e) {
+        console.error('notes-generate strict regen error:', e.message);
+        // keep original markdown
+      }
+    }
   }
 
   // ── Save & return ─────────────────────────────────────────────────────────
-  const title = extractTitle(markdown, (fileName ? fileName.replace(/\.pdf$/i, '') : 'Notes') + ' — ' + (tool === 'summary' ? 'Summary' : 'Notes'));
+  var pageLabel = filterStart != null
+    ? ' — S. ' + filterStart + (filterEnd && filterEnd !== filterStart ? '–' + filterEnd : '')
+    : '';
+  var fallbackTitle = (fileName ? fileName.replace(/\.pdf$/i, '') : 'Notizen') +
+    pageLabel + ' — ' + (tool === 'summary' ? 'Zusammenfassung' : 'Notizen');
 
-  let noteId = null;
+  var title = extractTitle(markdown, fallbackTitle);
+
+  var noteId = null;
   try {
-    noteId = await saveNote(serviceKey, { userId: user.id, courseId, documentId, title, type: tool, markdown, sources });
+    noteId = await saveNote(serviceKey, {
+      userId: user.id, courseId, documentId, title, type: tool, markdown, sources
+    });
   } catch (e) {
     console.error('notes-generate save error:', e.message);
   }
