@@ -15,23 +15,29 @@ setup('authenticate', async ({ page }) => {
   }
 
   await page.goto('/');
-  // Wait for either the auth form OR the portal (if already logged in)
-  const landed = await page.waitForSelector('#authEmail, #portal, #courseList, #welcomeState', {
-    timeout: 20000
-  });
+  await page.waitForLoadState('networkidle');
 
-  const id = await landed.getAttribute('id');
-  const isAuthForm = id === 'authEmail' || await page.locator('#authEmail').isVisible().catch(() => false);
+  // Check if already authenticated (portal loaded)
+  const isLoggedIn = await page.locator('#portal, #courseList, #welcomeState').first()
+    .isVisible({ timeout: 3000 }).catch(() => false);
 
-  if (isAuthForm) {
+  if (!isLoggedIn) {
+    // Not logged in — app shows landing page. Click the Login button to open auth modal.
+    const loginBtn = page.locator('[data-i18n="landing_nav_login"], #landingLoginBtn, button:has-text("Login"), button:has-text("Sign in")').first();
+    await loginBtn.click({ timeout: 10000 });
+
+    // Auth modal opens — #authEmail is inside #authModal
+    await page.waitForSelector('#authEmail', { timeout: 10000 });
     await page.locator('#authEmail').fill(email);
     await page.locator('#authPassword').fill(password);
     await page.locator('#authSubmit').click();
-    await page.waitForSelector('#portal, #courseList, #welcomeState', { timeout: 20000 });
+
+    // Wait for portal to appear after login
+    await page.waitForSelector('#portal, #courseList, #welcomeState', { timeout: 25000 });
   } else {
     console.log('[auth.setup] Already authenticated — saving existing session');
   }
 
   await page.context().storageState({ path: AUTH_FILE });
-  console.log('[auth.setup] Session saved to', AUTH_FILE);
+  console.log('[auth.setup] Session saved');
 });
