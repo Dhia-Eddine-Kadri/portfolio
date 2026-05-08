@@ -321,12 +321,12 @@
     if (texts && start != null) {
       var parts = [];
       for (var p = start; p <= (end || start); p++) {
-        if (texts[p]) parts.push(texts[p]);
+        if (texts[p]) parts.push('[S. ' + p + ']\n' + texts[p]);
       }
       if (parts.length) return parts.join('\n\n');
     }
-    // Fallback: whole pdfFullText (better than nothing)
-    return window.pdfFullText || '';
+    // No page-specific text available — return empty so backend uses indexed chunks only
+    return '';
   }
 
   // ── Generate ──────────────────────────────────────────────────────────────
@@ -344,10 +344,11 @@
     if (genMsg)  genMsg.textContent = 'Generating ' + (_activeTab === 'summary' ? 'summary' : 'detailed notes') + '…';
 
     try {
-      // Use visible page helper (works in scroll/all-pages mode)
-      var currentPage = typeof window._pdfVisiblePage === 'function'
+      // Use visible page helper — works in scroll/all-pages mode
+      var visiblePage = typeof window._pdfVisiblePage === 'function'
         ? window._pdfVisiblePage()
-        : (window.pdfPage || null);
+        : null;
+      var currentPage = visiblePage || window.pdfPage || null;
 
       // Determine page range for this scope
       var rangeStart = null;
@@ -359,9 +360,10 @@
         rangeStart = Math.max(1, currentPage - 1);
         rangeEnd   = currentPage + 1;
       }
-      // _scope === 'document': rangeStart/End stay null (backend uses full document)
+      // _scope === 'document': rangeStart/End stay null
 
-      // Send only the text for the relevant page range as fallback (not whole PDF)
+      // Send page-range text as fallback (empty string if not available —
+      // tells backend to use indexed chunks only, not whole pdfFullText)
       var pdfText = _getPdfTextForRange(rangeStart, rangeEnd);
 
       var payload = {
@@ -378,6 +380,21 @@
       if (rangeStart != null) {
         payload.pageRange = { start: rangeStart, end: rangeEnd };
       }
+
+      // ── Debug log ─────────────────────────────────────────────────────────
+      console.log('[notes generate payload]', {
+        currentPage: currentPage,
+        visiblePage: visiblePage,
+        pdfPage: window.pdfPage,
+        scope: _scope,
+        rangeStart: rangeStart,
+        rangeEnd: rangeEnd,
+        documentId: _ctx.documentId,
+        courseId: _ctx.courseId,
+        hasPdfPageTexts: !!window.pdfPageTexts,
+        pdfPageTextKeys: window.pdfPageTexts ? Object.keys(window.pdfPageTexts).slice(0, 10) : null,
+        fallbackPdfTextPreview: pdfText ? pdfText.slice(0, 300) : null
+      });
 
       var resp = await fetch((window.BACKEND_URL || '') + '/api/notes/generate', {
         method: 'POST',

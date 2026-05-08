@@ -306,6 +306,19 @@ exports.handler = async function (event) {
   if (!courseId) return fail(400, 'courseId is required');
   if (!['notes', 'summary'].includes(tool)) return fail(400, 'tool must be notes or summary');
 
+  // ── Debug log: incoming request ───────────────────────────────────────────
+  console.log('[notes-generate request]', {
+    courseId: courseId,
+    documentId: documentId,
+    currentPage: currentPage,
+    pageRange: pageRange,
+    scope: scope,
+    language: language,
+    tool: tool,
+    pdfTextLength: pdfText ? pdfText.length : 0,
+    pdfTextPreview: pdfText ? pdfText.slice(0, 300) : null
+  });
+
   var serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   // ── Resolve page filter from scope ────────────────────────────────────────
@@ -323,7 +336,14 @@ exports.handler = async function (event) {
       filterStart = pageRange.start != null ? Number(pageRange.start) : null;
       filterEnd   = pageRange.end   != null ? Number(pageRange.end)   : null;
     }
+    // Also apply pageRange if sent alongside scope
+    if (filterStart == null && pageRange) {
+      filterStart = pageRange.start != null ? Number(pageRange.start) : null;
+      filterEnd   = pageRange.end   != null ? Number(pageRange.end)   : null;
+    }
   }
+
+  console.log('[notes-generate page filter]', { filterStart: filterStart, filterEnd: filterEnd, scope: scope, currentPage: currentPage });
 
   // ── Retrieve indexed chunks ───────────────────────────────────────────────
   var context        = null;
@@ -332,6 +352,28 @@ exports.handler = async function (event) {
 
   if (documentId) {
     var chunks = await fetchChunks(serviceKey, user.id, courseId, documentId, filterStart, filterEnd);
+
+    console.log('[notes-generate chunks]', {
+      count: chunks.length,
+      pages: chunks.slice(0, 10).map(function (c) {
+        return { page_start: c.page_start, page_end: c.page_end, preview: (c.chunk_text || '').slice(0, 120) };
+      })
+    });
+
+    // Guard: reject chunks that are entirely outside the requested range
+    if (filterStart != null && filterEnd != null && chunks.length) {
+      var badChunks = chunks.filter(function (c) {
+        return c.page_end < filterStart || c.page_start > filterEnd;
+      });
+      if (badChunks.length) {
+        console.warn('[notes-generate] chunks outside requested range', badChunks.map(function (c) {
+          return { page_start: c.page_start, page_end: c.page_end };
+        }));
+        chunks = chunks.filter(function (c) {
+          return !(c.page_end < filterStart || c.page_start > filterEnd);
+        });
+      }
+    }
 
     if (chunks.length) {
       var built = buildContext(chunks, fileName);
@@ -344,13 +386,26 @@ exports.handler = async function (event) {
   // ── Fallback to pdfText ───────────────────────────────────────────────────
   if (!context) {
     if (pdfText && pdfText.trim().length > 100) {
+      // Noise filter: reject template/title-slide content when a specific page is requested
+      var TEMPLATE_NOISE = ['platzhalter', 'titelfolie', 'bild einsetzen', 'hinter das logo', 'masterfolie', 'vorlage für'];
+      var pdfLower = pdfText.toLowerCase();
+      var isNoise = filterStart != null && filterStart > 3 &&
+        TEMPLATE_NOISE.some(function (t) { return pdfLower.includes(t); });
+
+      if (isNoise) {
+        console.warn('[notes-generate] pdfText looks like title-slide/template noise for page', filterStart, '— rejecting fallback');
+        return jsonResponse(200, {
+          error: 'Die Seiten ' + filterStart + '–' + filterEnd + ' wurden noch nicht indiziert. Bitte warte auf die Indizierung oder wähle "Ganzes PDF".'
+        });
+      }
+
       var text = pdfText.slice(0, MAX_CONTEXT_CHARS);
       context        = 'QUELLE: ' + (fileName || 'PDF') + '\n\n' + text;
       rawContextText = text;
     } else {
       return jsonResponse(200, {
         error: documentId
-          ? 'Dieses PDF wurde noch nicht indiziert. Bitte warte bis die Indizierung abgeschlossen ist oder lade die Datei erneut hoch.'
+          ? 'Keine indizierten Chunks für Seite ' + (filterStart || '?') + ' gefunden. Bitte warte auf die Indizierung.'
           : 'Kein Inhalt verfügbar. Öffne zuerst ein PDF.'
       });
     }
