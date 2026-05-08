@@ -18,12 +18,12 @@ const { supaRequest } = require('./supabase-admin');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const EMBED_MODEL      = 'text-embedding-3-small';
-const EMBED_DIMENSIONS = 1536;
-const OPENAI_MODEL     = optionalEnv('OPENAI_GENERATE_MODEL', 'gpt-4o-mini');
-const MIN_SIMILARITY   = 0.10;
-const CANDIDATE_LIMIT  = 30;  // retrieve this many raw chunks before filtering
-const MAX_CONTEXT_CHUNKS = 14; // feed at most this many to the LLM
+const EMBED_MODEL        = 'text-embedding-3-small';
+const EMBED_DIMENSIONS   = 1536;
+const OPENAI_MODEL_DEFAULT = optionalEnv('OPENAI_GENERATE_MODEL', 'gpt-4o-mini');
+const OPENAI_MODEL_STRONG  = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
+const MIN_SIMILARITY     = 0.10;
+const CANDIDATE_LIMIT    = 60;  // larger pool so scoring has more to work with
 
 // German/English section keywords that indicate high-value study material
 const HIGH_VALUE_SECTIONS = [
@@ -87,11 +87,11 @@ function embedText(text) {
   });
 }
 
-function callOpenAI(systemPrompt, userMessage, maxTokens) {
+function callOpenAI(systemPrompt, userMessage, maxTokens, model) {
   return new Promise(function (resolve, reject) {
     const apiKey = requireEnv('OPENAI_API_KEY');
     const body = JSON.stringify({
-      model: OPENAI_MODEL,
+      model: model || OPENAI_MODEL_DEFAULT,
       max_tokens: maxTokens || 2800,
       response_format: { type: 'json_object' },
       messages: [
@@ -413,6 +413,14 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   const diff       = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
   const queries    = buildQueries(tool, topic);
 
+  // Use the stronger model for hard quizzes — gpt-4o-mini can't reliably produce
+  // multi-step calculation and trap questions at hard difficulty.
+  const useStrongModel = tool === 'quiz' && diff === 'hard';
+  const model = useStrongModel ? OPENAI_MODEL_STRONG : OPENAI_MODEL_DEFAULT;
+
+  // Scale context to item count: more items need more source material to avoid repetition.
+  const maxContextChunks = Math.min(itemCount * 2, 25);
+
   // Step 1: retrieve large candidate pool across multiple queries
   let rawChunks;
   try {
@@ -431,7 +439,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
 
   // Step 3: score for study value, rank, deduplicate
   const ranked    = filterAndRank(rawChunks, docNamesMap);
-  const topChunks = deduplicateChunks(ranked, MAX_CONTEXT_CHUNKS);
+  const topChunks = deduplicateChunks(ranked, maxContextChunks);
 
   if (!topChunks.length) {
     return { items: [], sources: [], error: 'Could not find enough high-value study material. Try indexing more files.' };
@@ -449,11 +457,11 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   const focusPart  = topic ? '\n\n---\nFocus topic: ' + topic : '';
   const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
 
-  const maxTokens = tool === 'flashcards' ? 3200 : tool === 'quiz' ? 3200 : 2000;
+  const maxTokens = tool === 'flashcards' ? 3200 : tool === 'quiz' ? (useStrongModel ? 4096 : 3200) : 2000;
 
   let result;
   try {
-    result = await callOpenAI(systemPrompt, userMessage, maxTokens);
+    result = await callOpenAI(systemPrompt, userMessage, maxTokens, model);
   } catch (e) {
     throw new Error('Generation failed: ' + (e.message || e));
   }
