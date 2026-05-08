@@ -92,7 +92,7 @@ function callOpenAI(systemPrompt, userMessage, maxTokens, model) {
     const apiKey = requireEnv('OPENAI_API_KEY');
     const body = JSON.stringify({
       model: model || OPENAI_MODEL_DEFAULT,
-      max_tokens: maxTokens || 2800,
+      max_tokens: maxTokens || 2000,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -485,12 +485,13 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   const model = useStrongModel ? OPENAI_MODEL_STRONG : OPENAI_MODEL_DEFAULT;
 
   // Scale context to item count: more items need more source material to avoid repetition.
-  const maxContextChunks = Math.min(itemCount * 2, 25);
+  const maxContextChunks = Math.min(itemCount * 2, 18);
 
-  // Step 1: build retrieval queries — use discovered course topics when no topic
-  // is specified so retrieval covers the full course rather than relying on generic queries.
+  // Step 1: build retrieval queries.
+  // Skip topic discovery when scoped to specific documents — the chunks are already
+  // filtered so broad discovery adds latency without improving coverage.
   let queries;
-  if (!topic) {
+  if (!topic && !(docIds && docIds.length)) {
     const discovered = await discoverTopics(serviceKey, userId, courseId, tool, docIds);
     queries = discovered || buildQueries(tool, topic);
   } else {
@@ -540,7 +541,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   const focusPart  = topic ? '\n\n---\nFocus topic: ' + topic : '';
   const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
 
-  const maxTokens = tool === 'flashcards' ? 3200 : tool === 'quiz' ? (useStrongModel ? 4096 : 3200) : 2000;
+  const maxTokens = tool === 'flashcards' ? 2000 : tool === 'quiz' ? (useStrongModel ? 2800 : 2000) : 1600;
 
   let result;
   try {
