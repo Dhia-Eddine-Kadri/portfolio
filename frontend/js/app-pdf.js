@@ -16,6 +16,7 @@ function _pdfVisiblePage() {
   });
   return best;
 }
+window._pdfVisiblePage = _pdfVisiblePage;
 
 function renderPages() {
   if (!pdfDoc) return;
@@ -65,6 +66,9 @@ function renderPages() {
             textDivs: []
           });
           if (rl && rl.promise) rl.promise.catch(function () {});
+          // Store per-page text for AI Notes page-range targeting
+          if (!window.pdfPageTexts) window.pdfPageTexts = {};
+          window.pdfPageTexts[num] = tc.items.map(function (it) { return it.str; }).join(' ');
         });
       textDiv.addEventListener('mouseup', function () {
         setTimeout(function () {

@@ -206,8 +206,10 @@ async function fetchChunks(serviceKey, userId, courseId, documentId, pageStart, 
     '&document_id=eq.' + encodeURIComponent(documentId) +
     '&order=page_start.asc,id.asc' +
     '&limit=80';
-  if (pageStart != null) url += '&page_start=gte.' + pageStart;
-  if (pageEnd   != null) url += '&page_end=lte.'   + pageEnd;
+  // Overlap filter: include chunks that overlap with [pageStart, pageEnd]
+  // chunk overlaps range if chunk.page_start <= pageEnd AND chunk.page_end >= pageStart
+  if (pageEnd   != null) url += '&page_start=lte.' + pageEnd;
+  if (pageStart != null) url += '&page_end=gte.'   + pageStart;
 
   var result = await supaRequest(serviceKey, 'GET', url, null);
   return Array.isArray(result) ? result : [];
@@ -247,7 +249,9 @@ async function saveNote(serviceKey, opts) {
       document_id: opts.documentId || null,
       title: opts.title,
       type: opts.type,
-      content_markdown: opts.markdown
+      content_markdown: opts.markdown,
+      source_page_start: opts.filterStart != null ? opts.filterStart : null,
+      source_page_end:   opts.filterEnd   != null ? opts.filterEnd   : null
     },
     { 'Prefer': 'return=representation' }
   );
@@ -329,11 +333,6 @@ exports.handler = async function (event) {
   if (documentId) {
     var chunks = await fetchChunks(serviceKey, user.id, courseId, documentId, filterStart, filterEnd);
 
-    // If scoped fetch is empty, widen to full document as fallback
-    if (!chunks.length && filterStart != null) {
-      chunks = await fetchChunks(serviceKey, user.id, courseId, documentId, null, null);
-    }
-
     if (chunks.length) {
       var built = buildContext(chunks, fileName);
       context        = built.context;
@@ -410,7 +409,8 @@ exports.handler = async function (event) {
   var noteId = null;
   try {
     noteId = await saveNote(serviceKey, {
-      userId: user.id, courseId, documentId, title, type: tool, markdown, sources
+      userId: user.id, courseId, documentId, title, type: tool, markdown, sources,
+      filterStart: filterStart, filterEnd: filterEnd
     });
   } catch (e) {
     console.error('notes-generate save error:', e.message);

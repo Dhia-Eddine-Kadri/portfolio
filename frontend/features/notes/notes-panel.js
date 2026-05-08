@@ -315,6 +315,20 @@
     } catch (e) {}
   }
 
+  // ── Page-range text helper ────────────────────────────────────────────────
+  function _getPdfTextForRange(start, end) {
+    var texts = window.pdfPageTexts;
+    if (texts && start != null) {
+      var parts = [];
+      for (var p = start; p <= (end || start); p++) {
+        if (texts[p]) parts.push(texts[p]);
+      }
+      if (parts.length) return parts.join('\n\n');
+    }
+    // Fallback: whole pdfFullText (better than nothing)
+    return window.pdfFullText || '';
+  }
+
   // ── Generate ──────────────────────────────────────────────────────────────
   async function _generate() {
     if (_generating) return;
@@ -330,24 +344,39 @@
     if (genMsg)  genMsg.textContent = 'Generating ' + (_activeTab === 'summary' ? 'summary' : 'detailed notes') + '…';
 
     try {
-      var currentPage = window.pdfPage || null;
+      // Use visible page helper (works in scroll/all-pages mode)
+      var currentPage = typeof window._pdfVisiblePage === 'function'
+        ? window._pdfVisiblePage()
+        : (window.pdfPage || null);
+
+      // Determine page range for this scope
+      var rangeStart = null;
+      var rangeEnd   = null;
+      if (_scope === 'page' && currentPage) {
+        rangeStart = currentPage;
+        rangeEnd   = currentPage;
+      } else if (_scope === 'section' && currentPage) {
+        rangeStart = Math.max(1, currentPage - 1);
+        rangeEnd   = currentPage + 1;
+      }
+      // _scope === 'document': rangeStart/End stay null (backend uses full document)
+
+      // Send only the text for the relevant page range as fallback (not whole PDF)
+      var pdfText = _getPdfTextForRange(rangeStart, rangeEnd);
 
       var payload = {
         courseId:    _ctx.courseId,
         documentId:  _ctx.documentId || null,
         tool:        _activeTab,
         fileName:    _ctx.fileName || null,
-        pdfText:     window.pdfFullText || '',
+        pdfText:     pdfText,
         scope:       _scope,
         language:    _language,
         currentPage: currentPage
       };
 
-      // For range scope, use ±2 around current page
-      if (_scope === 'section' && currentPage) {
-        payload.pageRange = { start: Math.max(1, currentPage - 1), end: currentPage + 1 };
-      } else if (_scope === 'page' && currentPage) {
-        payload.pageRange = { start: currentPage, end: currentPage };
+      if (rangeStart != null) {
+        payload.pageRange = { start: rangeStart, end: rangeEnd };
       }
 
       var resp = await fetch((window.BACKEND_URL || '') + '/api/notes/generate', {
