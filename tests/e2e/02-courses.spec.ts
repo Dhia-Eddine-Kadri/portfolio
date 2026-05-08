@@ -9,7 +9,7 @@ test.describe('Course management', () => {
 
     await app.goto();
 
-    await expect(page.locator('#courseAddBtn, #welcomeState')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#portalHamburger')).toBeVisible({ timeout: 10000 });
 
     const crashes = errors.filter(e =>
       !e.includes('ResizeObserver') &&

@@ -23,7 +23,7 @@ export class AppPage {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.loginBtn.click();
-    await this.page.waitForSelector('#courseAddBtn, #welcomeState', { timeout: 20000 });
+    await this.page.waitForSelector('#portalHamburger', { timeout: 20000 });
   }
 
   // ── Courses ───────────────────────────────────────────────────────────────
