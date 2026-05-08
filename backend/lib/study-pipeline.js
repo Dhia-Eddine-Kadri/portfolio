@@ -383,6 +383,73 @@ Respond ONLY with valid JSON:
 {"items":[{"question":"...","options":{"A":"...","B":"...","C":"...","D":"..."},"answer":"A","explanation":"...","difficulty":"medium","question_type":"calculation","why_important":"...","source":"filename, p.X"}]}`;
 }
 
+// ─── Output deduplication ─────────────────────────────────────────────────────
+
+// Jaccard similarity on word sets — catches rephrased duplicates.
+function wordJaccard(a, b) {
+  const wordsOf = function (s) {
+    return new Set(String(s || '').toLowerCase().replace(/[^a-z0-9äöüß\s]/g, ' ').split(/\s+/).filter(Boolean));
+  };
+  const sa = wordsOf(a);
+  const sb = wordsOf(b);
+  if (!sa.size || !sb.size) return 0;
+  let intersection = 0;
+  sa.forEach(function (w) { if (sb.has(w)) intersection++; });
+  return intersection / (sa.size + sb.size - intersection);
+}
+
+// Remove generated items whose question/front text is too similar to an earlier item.
+function deduplicateItems(items) {
+  const THRESHOLD = 0.55;
+  const kept = [];
+  items.forEach(function (item) {
+    const text = item.question || item.front || '';
+    const isDup = kept.some(function (k) {
+      return wordJaccard(text, k.question || k.front || '') >= THRESHOLD;
+    });
+    if (!isDup) kept.push(item);
+  });
+  return kept;
+}
+
+// ─── Topic discovery ──────────────────────────────────────────────────────────
+
+// When no topic is specified, retrieve a broad sample and ask the model to list
+// the main topics — then use those as targeted retrieval queries. This ensures
+// the generated items cover the full course rather than whichever generic queries
+// happen to score highest.
+async function discoverTopics(serviceKey, userId, courseId, tool, docIds) {
+  const broadQueries = [
+    'main topics key concepts overview',
+    'Themen Kapitel Übersicht Inhaltsverzeichnis'
+  ];
+  let chunks;
+  try {
+    chunks = await retrieveMultiQuery(serviceKey, userId, courseId, broadQueries, docIds);
+  } catch (e) {
+    return null;
+  }
+  if (!chunks.length) return null;
+
+  // Take top 10 chunks by similarity for the topic-discovery call
+  const sample = chunks
+    .sort(function (a, b) { return b.similarity - a.similarity; })
+    .slice(0, 10)
+    .map(function (c) { return c.chunk_text; })
+    .join('\n\n---\n\n');
+
+  const systemPrompt =
+    'You are a course analyst. Given excerpts from course materials, list the 4-6 distinct ' +
+    'main topics covered. Return ONLY valid JSON: {"topics":["topic 1","topic 2",...]}. ' +
+    'Each topic should be a short phrase (3-8 words) that would make a good search query.';
+
+  try {
+    const result = await callOpenAI(systemPrompt, sample, 300, OPENAI_MODEL_DEFAULT);
+    if (Array.isArray(result.topics) && result.topics.length) return result.topics;
+  } catch (e) { /* fall through to generic queries */ }
+  return null;
+}
+
 // ─── Retrieval queries by tool ────────────────────────────────────────────────
 
 function buildQueries(tool, topic) {
@@ -411,7 +478,6 @@ function buildQueries(tool, topic) {
 async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, difficulty, docIds }) {
   const itemCount  = Math.min(Math.max(parseInt(count) || 8, 3), 15);
   const diff       = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
-  const queries    = buildQueries(tool, topic);
 
   // Use the stronger model for hard quizzes — gpt-4o-mini can't reliably produce
   // multi-step calculation and trap questions at hard difficulty.
@@ -421,7 +487,17 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   // Scale context to item count: more items need more source material to avoid repetition.
   const maxContextChunks = Math.min(itemCount * 2, 25);
 
-  // Step 1: retrieve large candidate pool across multiple queries
+  // Step 1: build retrieval queries — use discovered course topics when no topic
+  // is specified so retrieval covers the full course rather than relying on generic queries.
+  let queries;
+  if (!topic) {
+    const discovered = await discoverTopics(serviceKey, userId, courseId, tool, docIds);
+    queries = discovered || buildQueries(tool, topic);
+  } else {
+    queries = buildQueries(tool, topic);
+  }
+
+  // Step 2: retrieve large candidate pool across multiple queries
   let rawChunks;
   try {
     rawChunks = await retrieveMultiQuery(serviceKey, userId, courseId, queries, docIds);
@@ -433,11 +509,11 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     return { items: [], sources: [], error: 'No indexed course documents found. Upload and index your course files first.' };
   }
 
-  // Step 2: fetch doc names so we can score formula-sheet files
+  // Step 3: fetch doc names so we can score formula-sheet files
   const uniqueDocIds = [...new Set(rawChunks.map(function (c) { return c.document_id; }))];
   const docNamesMap  = await fetchDocNames(serviceKey, uniqueDocIds);
 
-  // Step 3: score for study value, rank, deduplicate
+  // Step 4: score for study value, rank, deduplicate chunks
   const ranked    = filterAndRank(rawChunks, docNamesMap);
   const topChunks = deduplicateChunks(ranked, maxContextChunks);
 
@@ -445,10 +521,10 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     return { items: [], sources: [], error: 'Could not find enough high-value study material. Try indexing more files.' };
   }
 
-  // Step 4: build context string
+  // Step 5: build context string
   const context = buildContext(topChunks, docNamesMap);
 
-  // Step 5: choose prompt and call OpenAI
+  // Step 6: choose prompt and call OpenAI
   let systemPrompt;
   if (tool === 'flashcards')  systemPrompt = flashcardsSystemPrompt(itemCount);
   else if (tool === 'quiz')   systemPrompt = quizSystemPrompt(itemCount, diff);
@@ -466,6 +542,11 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     throw new Error('Generation failed: ' + (e.message || e));
   }
 
+  // Step 7: deduplicate generated items — the model sometimes produces near-identical
+  // questions/cards when context chunks overlap, especially at lower item counts.
+  const rawItems = result.items || [];
+  const items = deduplicateItems(rawItems);
+
   // Build sources list
   const seenFiles = new Set();
   const sources = topChunks
@@ -482,7 +563,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
       return true;
     });
 
-  return { items: result.items || [], text: result.text || '', sources };
+  return { items, text: result.text || '', sources };
 }
 
 function summarySystemPrompt() {
