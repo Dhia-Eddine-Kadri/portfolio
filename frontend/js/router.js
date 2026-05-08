@@ -77,7 +77,7 @@ function _ssPortalNavId(section) {
       subscription: 'psbSubscription',
       notes: 'psbNotes',
       courses: 'pcStudip',
-      studip: 'pcStudip', // legacy alias
+      studip: 'pcStudip',
       chat: 'psbChat',
       notifications: 'psbNotifications',
       games: 'psbGames',
@@ -201,6 +201,9 @@ var _origShowPortalSection = window.showPortalSection;
 window.showPortalSection = function (sec) {
   var target = sec || 'dashboard';
 
+  // 'courses' is the URL-facing alias for the internal 'studip' section
+  if (target === 'courses') target = 'studip';
+
   if (target === 'dashboard' && window._userType === 'learner' && !_pendingPortalRestore) {
     target = 'german';
     setNavActive('psbGerman');
@@ -231,7 +234,9 @@ window.showPortalSection = function (sec) {
     sessionStorage.setItem('ss_portal_tab', target);
     localStorage.setItem('ss_last_section', target);
   } catch (e) {}
-  _ssPushHistory({ view: 'portal', section: target }, '#portal=' + encodeURIComponent(target));
+  // Show 'courses' in the URL instead of internal name 'studip'
+  var urlSection = target === 'studip' ? 'courses' : target;
+  _ssPushHistory({ view: 'portal', section: target }, '#portal=' + encodeURIComponent(urlSection));
 };
 
 if (!window.location.hash || window.location.hash.indexOf('access_token') === -1) {

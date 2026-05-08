@@ -112,12 +112,12 @@ export function showStudip() {
     portal.style.display = 'block';
   }
   setNavActive('pcStudip');
-  if (typeof window.showPortalSection === 'function') window.showPortalSection('courses');
-  else showPortalSection('courses');
+  if (typeof window.showPortalSection === 'function') window.showPortalSection('studip');
+  else showPortalSection('studip');
   if (typeof window.sdRenderCourses === 'function') window.sdRenderCourses();
   try {
     var st = JSON.parse(localStorage.getItem('ss_state') || '{}');
-    st.view = 'courses';
+    st.view = 'studip';
     st.inApp = false;
     localStorage.setItem('ss_state', JSON.stringify(st));
   } catch (e) {}
