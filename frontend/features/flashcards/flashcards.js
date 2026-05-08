@@ -273,13 +273,112 @@
 
     function renderAll() { renderDeckGrid(); renderStudy(); }
 
+    // ── Generation settings ──
+    var _settingsKey = 'ss_fc_settings_' + courseId;
+    var _historyKey  = 'ss_fc_history_reset_' + courseId;
+
+    function _loadSettings() {
+      try { return JSON.parse(localStorage.getItem(_settingsKey) || '{}'); } catch(e) { return {}; }
+    }
+    function _saveSettings(s) {
+      try { localStorage.setItem(_settingsKey, JSON.stringify(s)); } catch(e) {}
+    }
+    function _getHistoryResetAt() {
+      return parseInt(localStorage.getItem(_historyKey) || '0', 10);
+    }
+    function _resetHistory() {
+      try { localStorage.setItem(_historyKey, String(Date.now())); } catch(e) {}
+    }
+
+    function _seenCards() {
+      var resetAt = _getHistoryResetAt();
+      var seen = [];
+      state.decks.forEach(function(d) {
+        if (resetAt && d.createdAt && d.createdAt < resetAt) return;
+        d.cards.forEach(function(c) { if (c.front) seen.push(c.front); });
+      });
+      return seen.slice(0, 60);
+    }
+
+    function _showSettingsModal(onConfirm) {
+      var existing = document.getElementById('fcSettingsOverlay');
+      if (existing) existing.remove();
+      var s = _loadSettings();
+      var count = s.count || 12;
+      var diff  = s.difficulty || 'medium';
+
+      var overlay = document.createElement('div');
+      overlay.id = 'fcSettingsOverlay';
+      overlay.className = 'qzsp-overlay';
+      overlay.innerHTML =
+        '<div class="qzsp-modal qzsp-settings">' +
+          '<div class="qzsp-head">' +
+            '<span class="qzsp-title">&#x2699;&#xFE0F; Flashcard settings</span>' +
+            '<button class="qzsp-close" type="button">&#x2715;</button>' +
+          '</div>' +
+          '<div class="qzsp-settings-body">' +
+            '<label class="qzsp-label">Number of cards</label>' +
+            '<div class="qzsp-count-row">' +
+              '<input type="range" id="fcCountSlider" min="3" max="15" value="' + count + '" class="qzsp-slider">' +
+              '<span id="fcCountVal" class="qzsp-count-val">' + count + '</span>' +
+            '</div>' +
+            '<label class="qzsp-label">Difficulty</label>' +
+            '<div class="qzsp-diff-row">' +
+              ['easy','medium','hard'].map(function(d) {
+                return '<label class="qzsp-diff-opt' + (diff === d ? ' active' : '') + '">' +
+                  '<input type="radio" name="fcDiff" value="' + d + '"' + (diff === d ? ' checked' : '') + '>' +
+                  d.charAt(0).toUpperCase() + d.slice(1) +
+                '</label>';
+              }).join('') +
+            '</div>' +
+            '<button class="qzsp-btn-ghost qzsp-reset-btn" id="fcResetHistory" type="button">&#x1F504; Reset card history</button>' +
+            '<p class="qzsp-reset-hint">Allows the AI to regenerate cards you\'ve already seen.</p>' +
+          '</div>' +
+          '<div class="qzsp-actions">' +
+            '<button class="qzsp-btn-primary" id="fcSettingsConfirm" type="button">&#x2728; Generate cards</button>' +
+          '</div>' +
+        '</div>';
+
+      document.body.appendChild(overlay);
+
+      var slider = overlay.querySelector('#fcCountSlider');
+      var countVal = overlay.querySelector('#fcCountVal');
+      slider.addEventListener('input', function() { countVal.textContent = slider.value; });
+
+      overlay.querySelectorAll('.qzsp-diff-opt').forEach(function(lbl) {
+        lbl.addEventListener('click', function() {
+          overlay.querySelectorAll('.qzsp-diff-opt').forEach(function(l) { l.classList.remove('active'); });
+          lbl.classList.add('active');
+        });
+      });
+
+      overlay.querySelector('#fcResetHistory').addEventListener('click', function() {
+        _resetHistory();
+        _toast('History reset', 'The AI will generate fresh cards next time.');
+      });
+
+      overlay.querySelector('.qzsp-close').onclick = function() { overlay.remove(); };
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#fcSettingsConfirm').onclick = function() {
+        var selDiff = overlay.querySelector('input[name="fcDiff"]:checked');
+        var settings = {
+          count: parseInt(slider.value, 10),
+          difficulty: selDiff ? selDiff.value : 'medium'
+        };
+        _saveSettings(settings);
+        overlay.remove();
+        onConfirm(settings);
+      };
+    }
+
     // ── Generate ──
     function defaultDeckName() {
       var n = state.decks.length + 1;
       return (course && course.name ? course.name : 'Deck') + ' — Set ' + n;
     }
 
-    function _pickSourcesThenGenerate() {
+    function _pickSourcesThenGenerate(settings) {
       if (!options.generate) { _toast('Generation unavailable', 'Generator function not injected.'); return; }
       var BACKEND_URL = window.BACKEND_URL || '';
       var token = window._sbToken || '';
@@ -290,9 +389,9 @@
         .then(function (data) {
           var docs = (data.documents || []).filter(function (d) { return d.processing_status === 'ready'; });
           if (!docs.length) { _toast('No indexed files', 'Upload and index PDFs first.'); return; }
-          _showSourcePicker(docs, function (selectedIds) { doGenerate(selectedIds); });
+          _showSourcePicker(docs, function (selectedIds) { doGenerate(selectedIds, settings); });
         })
-        .catch(function () { doGenerate(null); });
+        .catch(function () { doGenerate(null, settings); });
     }
 
     function _showSourcePicker(docs, onConfirm) {
@@ -359,21 +458,37 @@
       if (el) el.remove();
     }
 
-    function doGenerate(documentIds) {
+    function doGenerate(documentIds, settings) {
       if (!options.generate) {
         _toast('Generation unavailable', 'Generator function not injected.');
         return;
       }
+      settings = settings || _loadSettings();
       els.generate.disabled = true;
       var origLabel = els.generate.innerHTML;
       els.generate.innerHTML = '<span class="fc-btn-icon">&#x23F3;</span> Generating…';
       _showGeneratingOverlay();
-      var genOpts = { count: 12, difficulty: 'medium', topic: (course && course.name) || null };
+      var genOpts = {
+        count: settings.count || 12,
+        difficulty: settings.difficulty || 'medium',
+        topic: null,
+        seenItems: _seenCards()
+      };
       if (documentIds && documentIds.length) genOpts.documentIds = documentIds;
       options.generate(course.id, 'flashcards', genOpts).then(function (result) {
         if (!result || !result.items || !result.items.length) {
-          _toast('Nothing generated', (result && result.error) || 'No content yet — try indexing a PDF first.');
-          return;
+          var allExisting = [];
+          state.decks.forEach(function(d) { allExisting = allExisting.concat(d.cards); });
+          if (allExisting.length) {
+            var shuffled = allExisting.slice().sort(function() { return Math.random() - 0.5; });
+            result = { items: shuffled.slice(0, genOpts.count).map(function(c) {
+              return { front: c.front, back: c.back, source: c.source || '' };
+            }) };
+            _toast('Shuffled existing cards', 'No new material found — showing a mix of your previous cards.');
+          } else {
+            _toast('Nothing generated', (result && result.error) || 'No content yet — try indexing a PDF first.');
+            return;
+          }
         }
         var deck = {
           id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
@@ -435,7 +550,9 @@
       renderAll();
     });
 
-    if (els.generate) els.generate.addEventListener('click', _pickSourcesThenGenerate);
+    if (els.generate) els.generate.addEventListener('click', function() {
+      _showSettingsModal(function(settings) { _pickSourcesThenGenerate(settings); });
+    });
     if (els.newDeck) els.newDeck.addEventListener('click', function () {
       var name = window.prompt('Name for new (empty) deck', defaultDeckName());
       if (!name) return;

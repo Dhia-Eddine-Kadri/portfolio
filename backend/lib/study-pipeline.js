@@ -475,7 +475,7 @@ function buildQueries(tool, topic) {
 
 // ─── Main pipeline ────────────────────────────────────────────────────────────
 
-async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, difficulty, docIds }) {
+async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, difficulty, docIds, seenItems }) {
   const itemCount  = Math.min(Math.max(parseInt(count) || 8, 3), 15);
   const diff       = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
 
@@ -529,6 +529,13 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
   if (tool === 'flashcards')  systemPrompt = flashcardsSystemPrompt(itemCount);
   else if (tool === 'quiz')   systemPrompt = quizSystemPrompt(itemCount, diff);
   else systemPrompt = summarySystemPrompt();
+
+  // Append seen-items block so the model avoids repeating them
+  const seen = Array.isArray(seenItems) ? seenItems.filter(Boolean).slice(0, 50) : [];
+  if (seen.length) {
+    systemPrompt += '\n\nPREVIOUSLY SHOWN — do NOT generate questions/cards covering the same topic or phrasing as any of these:\n' +
+      seen.map(function (s) { return '- ' + String(s).slice(0, 120); }).join('\n');
+  }
 
   const focusPart  = topic ? '\n\n---\nFocus topic: ' + topic : '';
   const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;

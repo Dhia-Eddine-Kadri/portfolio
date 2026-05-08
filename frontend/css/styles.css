@@ -2716,6 +2716,21 @@ body.night .sb-acc-chev-btn {
 }
 .qzsp-btn-primary:hover { filter: brightness(1.08); }
 
+/* Settings modal additions */
+.qzsp-settings .qzsp-settings-body { padding: 18px 20px 4px; display: flex; flex-direction: column; gap: 10px; }
+.qzsp-label { font-size: 0.78rem; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.06em; }
+.qzsp-count-row { display: flex; align-items: center; gap: 12px; }
+.qzsp-slider { flex: 1; accent-color: #c084fc; cursor: pointer; }
+.qzsp-count-val { min-width: 24px; text-align: center; font-weight: 700; font-size: 1rem; color: #fff; }
+.qzsp-diff-row { display: flex; gap: 8px; }
+.qzsp-diff-opt { flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px; border: 1px solid rgba(155,93,229,0.25); cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #b0b0c0; transition: all 0.15s; user-select: none; }
+.qzsp-diff-opt:hover { border-color: rgba(192,132,252,0.5); color: #fff; }
+.qzsp-diff-opt.active { background: rgba(155,93,229,0.25); border-color: #c084fc; color: #fff; }
+.qzsp-diff-opt input[type="radio"] { display: none; }
+.qzsp-reset-btn { margin-top: 6px; font-size: 0.78rem; padding: 7px 14px; opacity: 0.75; }
+.qzsp-reset-btn:hover { opacity: 1; }
+.qzsp-reset-hint { margin: 0; font-size: 0.72rem; color: #7a7a9a; line-height: 1.4; }
+
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */
 .co-inner.co-inner-wide {
   max-width: 1280px;
