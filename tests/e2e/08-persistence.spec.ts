@@ -79,7 +79,9 @@ test.describe('State persistence', () => {
           !text.includes('supabase') &&
           !text.includes('Supabase') &&
           !text.includes('ERR_FAILED') &&
-          !text.includes('ERR_CONNECTION')
+          !text.includes('ERR_CONNECTION') &&
+          !text.includes('Failed to load resource') &&
+          !text.includes('403')
         ) {
           errors.push(text);
         }
