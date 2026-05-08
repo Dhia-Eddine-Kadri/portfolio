@@ -121,6 +121,16 @@
   to = "/.netlify/functions/ai-evaluate"
   status = 200
 
+[[redirects]]
+  from = "/api/notes/generate"
+  to = "/.netlify/functions/notes-generate"
+  status = 200
+
+[[redirects]]
+  from = "/api/notes"
+  to = "/.netlify/functions/notes-crud"
+  status = 200
+
 
 # API routes: restrict CORS to production origin only.
 # Replace HTTPS://YOUR-PRODUCTION-DOMAIN.COM with the real URL before go-live.

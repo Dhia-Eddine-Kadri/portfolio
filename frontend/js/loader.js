@@ -293,7 +293,8 @@
       'features/settings/settings.css',
       'features/subscription/subscription.css',
       'features/editor/editor.css',
-      'features/games/games.css'
+      'features/games/games.css',
+      'features/notes/notes-panel.css'
     ].forEach(function (href) {
       var link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -373,6 +374,7 @@
           'features/editor/editor.js',
           'features/editor/merger.js',
           'features/editor/writer.js',
+          'features/notes/notes-panel.js',
           'features/games/games-tetris.js',
           'features/games/games-solitaire.js',
           'features/games/games-bird.js',
