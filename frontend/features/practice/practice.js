@@ -185,9 +185,15 @@
       var subEl = document.getElementById('glSkillSub');
       if (titleEl) titleEl.textContent = _glSkillNames[skill] || skill;
       if (subEl) subEl.textContent = _glSkillSubs[skill] || '';
-      var _glCourseForSkill = _glCourse();
+      // Seed activeCourseId/activeCourseRef if not yet set, then load DB tools.
+      var _glCourseForSkill = _glEnsurePracticeCourse();
+      console.log('[practice course]', {
+        activeCourseId: window.activeCourseId,
+        activeCourseRefId: window.activeCourseRef && window.activeCourseRef.id,
+        storageCourse: _glStorageCourse(),
+        ragCourse: _glCourse()
+      });
       if (_glCourseForSkill) {
-        // Real course context — load from DB, show empty state if nothing saved yet
         _glQuizItems = [];
         _glCards = [];
         _glQuizIndex = 0;
@@ -197,7 +203,6 @@
         _glRenderStudyTools();
         _glLoadDbTools(_glCourseForSkill.id);
       } else {
-        // No real course loaded — fall back to sample tools so the panel isn't blank
         _glLoadSampleTools(skill);
         _glRenderStudyTools();
       }
@@ -376,6 +381,21 @@
         name: (window.activeCourseRef && window.activeCourseRef.name) ||
           'German ' + (_glSkillNames[sk] || sk)
       };
+    }
+
+    // Ensures activeCourseId / activeCourseRef are set before generation or DB load.
+    // If a real course is already active, returns it unchanged.
+    // Otherwise seeds globals from the storage course (german-<skill>) so that
+    // learners who upload files under german-* can generate from them immediately.
+    function _glEnsurePracticeCourse() {
+      if (window.activeCourseId || (window.activeCourseRef && window.activeCourseRef.id)) {
+        return _glCourse();
+      }
+      var sc = _glStorageCourse();
+      window.activeCourseId = sc.id;
+      window.activeCourseRef = sc;
+      console.log('[practice course] seeded from storage course', sc.id);
+      return _glCourse(); // will now return sc
     }
 
     // Render inline KaTeX ($...$) and display KaTeX ($$...$$) if window.katex is available.
@@ -770,7 +790,7 @@
     }
 
     async function _glPickSourcesThenGenerate(tool) {
-      var course = _glCourse();
+      var course = _glCourse() || _glEnsurePracticeCourse();
       if (!course || !course.id) {
         if (typeof showToast === 'function')
           showToast('No course selected', 'Open a real course first, then generate quizzes or flashcards from its uploaded files.');
