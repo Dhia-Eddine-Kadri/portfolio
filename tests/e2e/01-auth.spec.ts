@@ -21,19 +21,19 @@ test.describe('Authentication', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const hasLoginForm = await page.locator('input[type="email"]').isVisible({ timeout: 5000 }).catch(() => false);
+    const hasLoginForm = await page.locator('#authEmail').isVisible({ timeout: 5000 }).catch(() => false);
     if (!hasLoginForm) {
       test.skip(true, 'Already authenticated — skip login form test');
       return;
     }
 
-    await page.locator('input[type="email"]').fill('bad@example.com');
-    await page.locator('input[type="password"]').fill('wrongpassword');
-    await page.locator('button[id="loginBtn"], button:has-text("Sign in"), button:has-text("Log in")').first().click();
+    await page.locator('#authEmail').fill('bad@example.com');
+    await page.locator('#authPassword').fill('wrongpassword');
+    await page.locator('#authSubmit').click();
 
     // An error indicator must appear
     await page.waitForSelector('.toast, .ss-toast, [role="alert"], #authError, .auth-error', { timeout: 10000 });
     // Login form still present — not redirected
-    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('#authEmail')).toBeVisible();
   });
 });

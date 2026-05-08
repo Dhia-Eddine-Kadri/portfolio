@@ -13,15 +13,17 @@ export class AppPage {
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  get emailInput() { return this.page.locator('input[type="email"]'); }
-  get passwordInput() { return this.page.locator('input[type="password"]'); }
-  get loginBtn() { return this.page.locator('button[id="loginBtn"], button:has-text("Sign in"), button:has-text("Log in")').first(); }
+  // Real IDs from pages/auth.html (loaded as fragment into index.html)
+  get emailInput() { return this.page.locator('#authEmail'); }
+  get passwordInput() { return this.page.locator('#authPassword'); }
+  get loginBtn() { return this.page.locator('#authSubmit'); }
 
   async login(email: string, password: string) {
+    await this.page.waitForSelector('#authEmail', { timeout: 15000 });
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.loginBtn.click();
-    await this.page.waitForSelector('#welcomeState, #courseOverview, #courseList .course-row', { timeout: 15000 });
+    await this.page.waitForSelector('#portal, #courseList, #welcomeState', { timeout: 20000 });
   }
 
   // ── Courses ───────────────────────────────────────────────────────────────
