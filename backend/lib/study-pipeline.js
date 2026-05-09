@@ -520,7 +520,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     const thisCount   = Math.max(2, remaining);
     // Ask the model for a small buffer so 1-2 deduped items don't leave us short.
     // The final .slice(0, itemCount) trims back to the requested count.
-    const promptCount = fi === 0 ? thisCount + 2 : thisCount;
+    const promptCount = fi === 0 ? thisCount + 3 : thisCount;
 
     // Retrieve chunks for this file using pre-computed embeddings
     let rawChunks;
@@ -555,8 +555,8 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     const focusPart   = topic ? '\n\n---\nFocus topic: ' + topic : '';
     const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
     const maxTokens   = tool === 'flashcards'
-      ? Math.min(8000, 900 + promptCount * 400)
-      : Math.min(6000, 1000 + promptCount * 320);
+      ? Math.min(12000, 900 + promptCount * 550)
+      : Math.min(8000, 1000 + promptCount * 350);
 
     let result;
     try {
