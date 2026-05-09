@@ -351,6 +351,13 @@
             '<div class="qz-explanation">&#x1F4A1; ' + _esc(item.explanation) + '</div>';
         }
 
+        // Render math in question + options
+        if (window.renderMathInElement) {
+          var _katexOpts = { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }], throwOnError: false };
+          if (els.cardStage) try { renderMathInElement(els.cardStage, _katexOpts); } catch(e) {}
+          try { renderMathInElement(els.options, _katexOpts); } catch(e) {}
+        }
+
         if (!isSubmitted) {
           els.options.querySelectorAll('[data-opt-idx]').forEach(function (btn) {
             btn.addEventListener('click', function () {

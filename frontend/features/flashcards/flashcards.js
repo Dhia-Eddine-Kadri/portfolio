@@ -287,6 +287,9 @@
           '<div class="fc-card-progress-pill">Card ' + (idx + 1) + ' / ' + d.cards.length + '</div>' +
           '<div class="fc-card-source">' + _esc(source) + '</div>' +
           '<div class="fc-card-content">' + _esc(content) + '</div>';
+        if (window.renderMathInElement) {
+          try { renderMathInElement(els.cardStage, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }], throwOnError: false }); } catch(e) {}
+        }
       }
       var pct = ((idx + 1) / d.cards.length) * 100;
       if (els.progressBar) els.progressBar.style.width = pct + '%';
