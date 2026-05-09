@@ -178,7 +178,7 @@ window.openCourse = _openCourse;
 window.showCourseSection = _showCourseSection;
 
 // _showFolderPickerPopup → features/courses/course-folders.js
-import { showFolderPickerPopup as _showFolderPickerPopup_ } from './features/courses/course-folders.js';
+import { showFolderPickerPopup as _showFolderPickerPopup_ } from './features/courses/course-folders.js?v=2';
 window._showFolderPickerPopup = _showFolderPickerPopup_;
 
 // _fetchPdfBytes / downloadFile / openFile → services/pdf-service.js + features/pdf-viewer/pdf-viewer.js
