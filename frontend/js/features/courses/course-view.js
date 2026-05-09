@@ -1,5 +1,5 @@
 import { panelShow, panelHide } from '../../core/panels.js';
-import { bindFileEvents } from './course-files.js?v=4';
+import { bindFileEvents } from './course-files.js?v=5';
 import { bindFolderEvents } from './course-folders.js?v=4';
 import { escapeHtml } from '../../utils/escape-html.js';
 

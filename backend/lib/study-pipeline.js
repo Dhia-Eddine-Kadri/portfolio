@@ -548,7 +548,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
 
     const focusPart   = topic ? '\n\n---\nFocus topic: ' + topic : '';
     const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
-    const maxTokens   = tool === 'flashcards' ? 1400 : (useStrongModel ? 1800 : 1400);
+    const maxTokens   = tool === 'flashcards' ? 1400 : Math.min(3200, 900 + thisCount * 190);
 
     let result;
     try {

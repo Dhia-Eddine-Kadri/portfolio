@@ -1,4 +1,4 @@
-import { showCourseSection } from './course-view.js?v=3';
+import { showCourseSection } from './course-view.js?v=5';
 import {
   listCourseDocuments,
   indexExistingDocument,
@@ -709,13 +709,8 @@ function initCourseStudyTools(co, course) {
     });
   });
 
-  var quizBtn = co.querySelector('#coGenerateQuiz');
   var flashBtn = co.querySelector('#coGenerateFlashcards');
 
-  if (quizBtn)
-    quizBtn.addEventListener('click', function () {
-      generateCourseStudyTool(co, course, 'quiz');
-    });
   if (flashBtn)
     flashBtn.addEventListener('click', function () {
       generateCourseStudyTool(co, course, 'flashcards');
@@ -803,9 +798,7 @@ function normalizeQuizItem(item, idx, course) {
 }
 
 function renderCourseStudyTools(co, course) {
-  var quizBody = co.querySelector('#coQuizBody');
   var flashBody = co.querySelector('#coFlashBody');
-  if (quizBody) renderCourseQuiz(co, course, quizBody);
   if (flashBody) renderCourseFlashcards(co, course, flashBody);
 }
 
