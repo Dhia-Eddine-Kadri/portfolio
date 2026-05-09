@@ -173,7 +173,7 @@ function renderMails() {}
 import {
   openCourse as _openCourse,
   showCourseSection as _showCourseSection
-} from './features/courses/course-view.js?v=5';
+} from './features/courses/course-view.js?v=6';
 window.openCourse = _openCourse;
 window.showCourseSection = _showCourseSection;
 

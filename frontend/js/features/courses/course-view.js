@@ -1,5 +1,5 @@
 import { panelShow, panelHide } from '../../core/panels.js';
-import { bindFileEvents } from './course-files.js?v=5';
+import { bindFileEvents } from './course-files.js?v=6';
 import { bindFolderEvents } from './course-folders.js?v=4';
 import { escapeHtml } from '../../utils/escape-html.js';
 
@@ -113,26 +113,8 @@ function buildFilesContent(course) {
         '<button class="co-multi-summarise" id="coMultiSumBtn">&#x2728; AI Chat</button>' +
       '</div>' +
     '</div>' +
-    '<div class="co-course-panel" id="coQuizPanel" data-course-panel="quiz">' +
-      '<div class="co-study-tools co-study-tools-quiz">' +
-        '<div class="co-study-head">' +
-          '<div><div class="co-study-title">Quiz</div>' +
-          '<div class="co-study-sub">Answer course questions and review explanations</div></div>' +
-          '<button class="co-study-generate primary" id="coGenerateQuiz" type="button">Generate quiz</button>' +
-        '</div>' +
-        '<div class="co-study-body" id="coQuizBody"></div>' +
-      '</div>' +
-    '</div>' +
-    '<div class="co-course-panel" id="coFlashPanel" data-course-panel="flashcards">' +
-      '<div class="co-study-tools co-study-tools-flashcards">' +
-        '<div class="co-study-head">' +
-          '<div><div class="co-study-title">Flashcards</div>' +
-          '<div class="co-study-sub">Review generated decks from this course</div></div>' +
-          '<button class="co-study-generate" id="coGenerateFlashcards" type="button">Generate cards</button>' +
-        '</div>' +
-        '<div class="co-study-body" id="coFlashBody"></div>' +
-      '</div>' +
-    '</div>'
+    '<div class="co-course-panel" id="coQuizPanel" data-course-panel="quiz"></div>' +
+    '<div class="co-course-panel" id="coFlashPanel" data-course-panel="flashcards"></div>'
   );
 }
 
@@ -309,5 +291,17 @@ export function showCourseSection(course, section) {
     co.querySelectorAll('[data-course-panel]').forEach(function (panel) {
       panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
     });
+
+    if (targetTab === 'quiz') {
+      var qp = co.querySelector('#coQuizPanel');
+      if (qp && typeof window.mountQuiz === 'function') {
+        window.mountQuiz(qp, course, { generate: window._generateStudyTool });
+      }
+    } else if (targetTab === 'flashcards') {
+      var fp = co.querySelector('#coFlashPanel');
+      if (fp && typeof window.mountFlashcards === 'function') {
+        window.mountFlashcards(fp, course, { generate: window._generateStudyTool });
+      }
+    }
   }
 }
