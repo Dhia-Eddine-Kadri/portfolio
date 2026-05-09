@@ -408,12 +408,54 @@
       var existing = document.getElementById('qzSourcePickerOverlay');
       if (existing) existing.remove();
 
-      var listHtml = docs.map(function (d) {
+      // Group docs by folder using course.userFolders
+      var fileToFolder = {};
+      (course.userFolders || []).forEach(function (fd) {
+        (fd.files || []).forEach(function (f) { fileToFolder[f.name] = fd.name; });
+      });
+
+      var folderMap = {};
+      var folderOrder = [];
+      var ungrouped = [];
+      docs.forEach(function (d) {
+        var fn = d.file_name || d.fileName || '';
+        var folder = fileToFolder[fn];
+        if (folder) {
+          if (!folderMap[folder]) { folderMap[folder] = []; folderOrder.push(folder); }
+          folderMap[folder].push(d);
+        } else {
+          ungrouped.push(d);
+        }
+      });
+
+      function itemHtml(d) {
         return '<label class="qzsp-item">' +
           '<input type="checkbox" class="qzsp-cb" value="' + _esc(d.id) + '" checked>' +
           '<span class="qzsp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
         '</label>';
+      }
+
+      function folderSectionHtml(name, icon, fdDocs, idx) {
+        return '<div class="qzsp-folder" data-fi="' + idx + '">' +
+          '<div class="qzsp-folder-header">' +
+            '<span class="qzsp-folder-toggle">&#x25B8;</span>' +
+            '<span class="qzsp-folder-icon">' + icon + '</span>' +
+            '<span class="qzsp-folder-name">' + _esc(name) + '</span>' +
+            '<span class="qzsp-folder-count">' + fdDocs.length + ' file' + (fdDocs.length !== 1 ? 's' : '') + '</span>' +
+            '<button class="qzsp-folder-selall" type="button">Select all</button>' +
+          '</div>' +
+          '<div class="qzsp-folder-files" style="display:none">' +
+            fdDocs.map(itemHtml).join('') +
+          '</div>' +
+        '</div>';
+      }
+
+      var sectionsHtml = folderOrder.map(function (fn, i) {
+        return folderSectionHtml(fn, '&#x1F4C1;', folderMap[fn], i);
       }).join('');
+      if (ungrouped.length) {
+        sectionsHtml += folderSectionHtml('Other files', '&#x1F4C4;', ungrouped, 'u');
+      }
 
       var overlay = document.createElement('div');
       overlay.id = 'qzSourcePickerOverlay';
@@ -423,7 +465,7 @@
           '<div class="qzsp-head"><span class="qzsp-title">&#x1F4C2; Choose source files</span>' +
             '<button class="qzsp-close" type="button">&#x2715;</button></div>' +
           '<p class="qzsp-sub">Select which indexed files to use for flashcard generation.</p>' +
-          '<div class="qzsp-list">' + listHtml + '</div>' +
+          '<div class="qzsp-list qzsp-folder-list">' + sectionsHtml + '</div>' +
           '<div class="qzsp-actions">' +
             '<button class="qzsp-btn-ghost" id="qzspSelectAll" type="button">Select all</button>' +
             '<button class="qzsp-btn-ghost" id="qzspClearAll" type="button">Clear</button>' +
@@ -433,9 +475,26 @@
 
       document.body.appendChild(overlay);
 
+      overlay.querySelectorAll('.qzsp-folder-header').forEach(function (header) {
+        header.addEventListener('click', function (e) {
+          if (e.target.classList.contains('qzsp-folder-selall')) return;
+          var files = header.nextElementSibling;
+          var open = files.style.display !== 'none';
+          files.style.display = open ? 'none' : 'block';
+          header.querySelector('.qzsp-folder-toggle').innerHTML = open ? '&#x25B8;' : '&#x25BE;';
+          header.classList.toggle('open', !open);
+        });
+      });
+
+      overlay.querySelectorAll('.qzsp-folder-selall').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          btn.closest('.qzsp-folder').querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
+        });
+      });
+
       overlay.querySelector('.qzsp-close').onclick = function () { overlay.remove(); };
       overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
-
       overlay.querySelector('#qzspSelectAll').onclick = function () {
         overlay.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
       };

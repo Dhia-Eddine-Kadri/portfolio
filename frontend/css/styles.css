@@ -2731,6 +2731,30 @@ body.night .sb-acc-chev-btn {
 .qzsp-reset-btn:hover { opacity: 1; }
 .qzsp-reset-hint { margin: 0; font-size: 0.72rem; color: #7a7a9a; line-height: 1.4; }
 
+/* Folder-grouped source picker */
+.qzsp-folder { border: 1px solid rgba(155,93,229,0.18); border-radius: 10px; overflow: hidden; }
+.qzsp-folder-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; cursor: pointer;
+  background: rgba(155,93,229,0.08);
+  transition: background 0.15s; user-select: none;
+}
+.qzsp-folder-header:hover { background: rgba(155,93,229,0.16); }
+.qzsp-folder-header.open { background: rgba(155,93,229,0.14); }
+.qzsp-folder-toggle { font-size: .75rem; color: rgba(255,255,255,.5); flex-shrink: 0; transition: transform .2s; }
+.qzsp-folder-icon { font-size: 1rem; flex-shrink: 0; }
+.qzsp-folder-name { font-size: .88rem; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qzsp-folder-count { font-size: .72rem; color: rgba(255,255,255,.45); font-weight: 600; flex-shrink: 0; }
+.qzsp-folder-selall {
+  font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  background: rgba(192,132,252,.12); color: rgba(192,132,252,.85);
+  border: 1px solid rgba(192,132,252,.25); cursor: pointer; flex-shrink: 0;
+  transition: background .15s;
+}
+.qzsp-folder-selall:hover { background: rgba(192,132,252,.22); }
+.qzsp-folder-files { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 8px; }
+.qzsp-folder-list { display: flex; flex-direction: column; gap: 6px; }
+
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */
 .co-inner.co-inner-wide {
   max-width: 1280px;
