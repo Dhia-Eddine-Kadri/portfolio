@@ -418,8 +418,8 @@ function wordJaccard(a, b) {
   return intersection / (sa.size + sb.size - intersection);
 }
 
-function deduplicateItems(items) {
-  const THRESHOLD = 0.55;
+function deduplicateItems(items, threshold) {
+  const THRESHOLD = threshold !== undefined ? threshold : 0.72;
   const kept = [];
   items.forEach(function (item) {
     const text = item.question || item.front || '';
@@ -584,7 +584,40 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     return { items: [], sources: [], error: 'No indexed course documents found. Upload and index your course files first.' };
   }
 
-  const finalItems = deduplicateItems(allItems).slice(0, itemCount);
+  let finalItems = deduplicateItems(allItems).slice(0, itemCount);
+
+  // ── Repair pass: backfill if deduplication left us short ───────────────────
+  const shortage = itemCount - finalItems.length;
+  if (shortage > 0 && timeLeft() > 5000 && allSources.length) {
+    // Re-use the best context we already retrieved (first source file)
+    const repairDocId = fileIds[0];
+    let repairChunks = [];
+    try {
+      const raw = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, [repairDocId]);
+      repairChunks = deduplicateChunks(filterAndRank(raw, docNamesMap), Math.min(shortage * 2, 10));
+    } catch (e) {}
+
+    if (repairChunks.length) {
+      const repairContext = buildContext(repairChunks, docNamesMap);
+      const alreadyGenerated = finalItems.map(function (it) { return it.question || it.front || ''; }).filter(Boolean);
+      let repairPrompt = tool === 'flashcards'
+        ? flashcardsSystemPrompt(shortage)
+        : quizSystemPrompt(shortage, diff);
+      repairPrompt += '\n\nDO NOT repeat any of these already-generated items:\n' +
+        alreadyGenerated.map(function (s) { return '- ' + s.slice(0, 120); }).join('\n');
+
+      const repairTokens = tool === 'flashcards'
+        ? Math.min(8000, 900 + shortage * 400)
+        : Math.min(6000, 1000 + shortage * 320);
+
+      try {
+        const repairResult = await callOpenAI(repairPrompt, 'COURSE CONTEXT:\n\n' + repairContext, repairTokens, model);
+        const repairItems = deduplicateItems((repairResult.items || []).concat(finalItems)).slice(0, itemCount);
+        if (repairItems.length > finalItems.length) finalItems = repairItems;
+      } catch (e) {}
+    }
+  }
+
   return { items: finalItems, text: '', sources: allSources };
 }
 
