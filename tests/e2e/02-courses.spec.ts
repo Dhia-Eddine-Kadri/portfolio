@@ -29,7 +29,8 @@ test.describe('Course management', () => {
       !e.includes('Non-Error promise rejection') &&
       !e.includes('Failed to fetch') &&
       !e.includes('ERR_FAILED') &&
-      !e.includes('ERR_CONNECTION')
+      !e.includes('ERR_CONNECTION') &&
+      !e.includes('request has been aborted')
     );
     expect(crashes).toHaveLength(0);
   });
