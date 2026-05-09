@@ -740,30 +740,44 @@ function setCourseStudyMode(co, course, mode) {
   var inner = co.closest('.co-inner');
   if (inner) inner.classList.toggle('co-inner-wide', nextMode === 'quiz' || nextMode === 'flashcards');
 
-  // New feature modules take over the flashcards / quiz panels. They mount
-  // once per course; the inline renderer below is the legacy fallback.
-  if (nextMode === 'flashcards' && typeof window.mountFlashcards === 'function') {
-    var flashPanel = co.querySelector('#coFlashPanel');
-    if (flashPanel && !flashPanel.dataset.fcMounted) {
-      flashPanel.dataset.fcMounted = '1';
-      window.mountFlashcards(flashPanel, course, { generate: generateStudyTool });
-    } else if (flashPanel && typeof window.resetFlashcardsToGrid === 'function') {
-      window.resetFlashcardsToGrid(flashPanel);
-    }
-    return;
-  }
-  if (nextMode === 'quiz' && typeof window.mountQuiz === 'function') {
+  // New feature modules take over the quiz / flashcards panels.
+  // If the module script hasn't finished loading yet, retry until it's ready.
+  if (nextMode === 'quiz') {
     var quizPanel = co.querySelector('#coQuizPanel');
-    if (quizPanel && !quizPanel.dataset.qzMounted) {
-      quizPanel.dataset.qzMounted = '1';
-      window.mountQuiz(quizPanel, course, { generate: generateStudyTool });
-    } else if (quizPanel && typeof window.resetQuizToGrid === 'function') {
-      window.resetQuizToGrid(quizPanel);
+    if (quizPanel) {
+      (function tryMountQuiz() {
+        if (typeof window.mountQuiz === 'function') {
+          if (!quizPanel.dataset.qzMounted) {
+            quizPanel.dataset.qzMounted = '1';
+            window.mountQuiz(quizPanel, course, { generate: generateStudyTool });
+          } else if (typeof window.resetQuizToGrid === 'function') {
+            window.resetQuizToGrid(quizPanel);
+          }
+        } else {
+          setTimeout(tryMountQuiz, 80);
+        }
+      })();
     }
     return;
   }
-
-  renderCourseStudyTools(co, course);
+  if (nextMode === 'flashcards') {
+    var flashPanel = co.querySelector('#coFlashPanel');
+    if (flashPanel) {
+      (function tryMountFlashcards() {
+        if (typeof window.mountFlashcards === 'function') {
+          if (!flashPanel.dataset.fcMounted) {
+            flashPanel.dataset.fcMounted = '1';
+            window.mountFlashcards(flashPanel, course, { generate: generateStudyTool });
+          } else if (typeof window.resetFlashcardsToGrid === 'function') {
+            window.resetFlashcardsToGrid(flashPanel);
+          }
+        } else {
+          setTimeout(tryMountFlashcards, 80);
+        }
+      })();
+    }
+    return;
+  }
 }
 
 function normalizeQuizItem(item, idx, course) {

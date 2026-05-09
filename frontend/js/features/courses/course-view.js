@@ -1,6 +1,6 @@
 import { panelShow, panelHide } from '../../core/panels.js';
-import { bindFileEvents } from './course-files.js?v=3';
-import { bindFolderEvents } from './course-folders.js?v=3';
+import { bindFileEvents } from './course-files.js?v=4';
+import { bindFolderEvents } from './course-folders.js?v=4';
 import { escapeHtml } from '../../utils/escape-html.js';
 
 function fileRowHtml(f, inFolder) {
