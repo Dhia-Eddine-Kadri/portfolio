@@ -7,7 +7,7 @@
     "lint:fix": "eslint --fix backend/functions backend/lib frontend/js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test tests/**/*.test.mjs",
+    "test": "node --test --test-reporter=spec \"tests/backend/validation.test.mjs\" \"tests/backend/env.test.mjs\" \"tests/backend/stripe-webhook.test.mjs\" \"tests/backend/ai.test.mjs\" \"tests/backend/create-checkout.test.mjs\" \"tests/backend/ai-generate.test.mjs\" \"tests/backend/study-pipeline.test.mjs\" \"tests/frontend/escape-html.test.mjs\"",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report tests/e2e/report",

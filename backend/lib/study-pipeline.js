@@ -647,4 +647,7 @@ async function runSummaryPipeline({ serviceKey, userId, courseId, tool, topic, d
   return { items: [], text: result.text || '', sources };
 }
 
-module.exports = { runPipeline };
+module.exports = {
+  runPipeline,
+  _testing: { parseJsonSafe, wordJaccard, deduplicateItems, textStudyScore, flashcardsSystemPrompt, quizSystemPrompt }
+};
