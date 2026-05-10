@@ -25,6 +25,14 @@ const {
   TEMPLATE_NOISE_TERMS
 } = require('../lib/summary-prompts');
 
+const {
+  classifyChunk,
+  cleanChunkText,
+  chooseSummaryStrategy,
+  buildSummaryPipeline,
+  LOW_VALUE_CATEGORIES
+} = require('../lib/summary-pipeline');
+
 const OPENAI_MODEL    = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
 const MAX_CONTEXT_CHARS = 28000;
 
@@ -356,6 +364,36 @@ exports.handler = async function (event) {
 
   var serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
+  // ── ANALYZE MODE: classify + group chunks, return topic groups to frontend ─
+  if (mode === 'analyze') {
+    if (!documentId) return jsonResponse(200, { groups: [] });
+
+    var analyzeStart = body.pageRange && body.pageRange.start != null ? Number(body.pageRange.start) : null;
+    var analyzeEnd   = body.pageRange && body.pageRange.end   != null ? Number(body.pageRange.end)   : null;
+
+    var rawChunks = await fetchChunks(serviceKey, user.id, courseId, documentId, analyzeStart, analyzeEnd)
+      .catch(function () { return []; });
+
+    var pipeline = buildSummaryPipeline(rawChunks, false);
+
+    var groups = pipeline.groups.map(function (g) {
+      return {
+        title:     g.title,
+        pageStart: g.pageStart,
+        pageEnd:   g.pageEnd,
+        category:  g.chunks && g.chunks[0] && g.chunks[0]._category
+      };
+    });
+
+    console.log('[notes-generate analyze]', {
+      total: pipeline.totalCount,
+      filtered: pipeline.filteredCount,
+      groups: groups.length
+    });
+
+    return jsonResponse(200, { groups: groups });
+  }
+
   // ── MERGE MODE ────────────────────────────────────────────────────────────
   if (mode === 'merge') {
     var sections = body.sections || [];
@@ -413,12 +451,30 @@ exports.handler = async function (event) {
 
   // ── SECTION MODE ──────────────────────────────────────────────────────────
   if (mode === 'section') {
-    var secStart = body.pageRange && body.pageRange.start != null ? Number(body.pageRange.start) : null;
-    var secEnd   = body.pageRange && body.pageRange.end   != null ? Number(body.pageRange.end)   : null;
+    var secStart    = body.pageRange && body.pageRange.start != null ? Number(body.pageRange.start) : null;
+    var secEnd      = body.pageRange && body.pageRange.end   != null ? Number(body.pageRange.end)   : null;
+    var topicTitle  = body.topicTitle || null;
 
-    var secChunks = documentId
+    var rawSecChunks = documentId
       ? await fetchChunks(serviceKey, user.id, courseId, documentId, secStart, secEnd)
       : [];
+
+    // For summary mode: classify, filter low-value pages, and clean text
+    var secChunks;
+    if (tool === 'summary' && rawSecChunks.length) {
+      secChunks = rawSecChunks
+        .map(function (c) {
+          return Object.assign({}, c, {
+            _category:  classifyChunk(c),
+            chunk_text: cleanChunkText(c.chunk_text)
+          });
+        })
+        .filter(function (c) {
+          return !LOW_VALUE_CATEGORIES.has(c._category) && c.chunk_text.length > 30;
+        });
+    } else {
+      secChunks = rawSecChunks;
+    }
 
     var secContext = null;
     if (secChunks.length) {
@@ -433,7 +489,7 @@ exports.handler = async function (event) {
     }
 
     var secPrompt = tool === 'summary'
-      ? sectionSummaryPrompt(language, detailLevel, secStart, secEnd)
+      ? sectionSummaryPrompt(language, detailLevel, secStart, secEnd, topicTitle)
       : sectionNotesPrompt(language, secStart, secEnd);
     var secInstruction = tool === 'summary'
       ? 'Erstelle eine Zusammenfassung NUR für diesen Abschnitt (S. ' + secStart + '–' + secEnd + ').'
@@ -508,10 +564,26 @@ exports.handler = async function (event) {
     }
 
     if (chunks.length) {
-      var built = buildContext(chunks, fileName);
+      // For summary: classify, filter low-value pages, clean text before building context
+      var contextChunks = chunks;
+      if (tool === 'summary') {
+        contextChunks = chunks
+          .map(function (c) {
+            return Object.assign({}, c, {
+              _category:  classifyChunk(c),
+              chunk_text: cleanChunkText(c.chunk_text)
+            });
+          })
+          .filter(function (c) {
+            return !LOW_VALUE_CATEGORIES.has(c._category) && c.chunk_text.length > 30;
+          });
+        if (!contextChunks.length) contextChunks = chunks; // fallback if everything filtered
+      }
+
+      var built = buildContext(contextChunks, fileName);
       context        = built.context;
       sources        = built.sources;
-      rawContextText = chunks.map(function (c) { return c.chunk_text; }).join(' ');
+      rawContextText = contextChunks.map(function (c) { return c.chunk_text; }).join(' ');
     }
   }
 
@@ -579,7 +651,8 @@ exports.handler = async function (event) {
       }
     }
   } else if (tool === 'summary') {
-    var sumValidation = validateSummary(markdown, rawContextText, detailLevel);
+    var selectedPageCount = (filterStart != null && filterEnd != null) ? filterEnd - filterStart + 1 : 0;
+    var sumValidation = validateSummary(markdown, rawContextText, detailLevel, selectedPageCount);
     if (!sumValidation.valid) {
       console.log('[notes-generate] summary validation failed:', sumValidation.issues, '— regenerating');
       try {

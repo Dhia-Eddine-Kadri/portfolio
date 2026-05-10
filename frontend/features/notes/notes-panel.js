@@ -429,17 +429,49 @@
 
   async function _generateMultiSection(rangeStart, rangeEnd) {
     var pageCount = rangeEnd - rangeStart + 1;
-    var gs = _groupSize(pageCount);
+    var isSummary = _activeTab === 'summary';
+
+    // ── Step 1: for summary mode, ask backend to classify and group pages ──
     var groups = [];
-    for (var p = rangeStart; p <= rangeEnd; p += gs) {
-      groups.push({ start: p, end: Math.min(p + gs - 1, rangeEnd) });
+
+    if (isSummary && _ctx.documentId) {
+      _setGenMsg('Analyzing document structure…');
+      try {
+        var analyzeData = await _notesApi({
+          mode:       'analyze',
+          courseId:   _ctx.courseId,
+          documentId: _ctx.documentId,
+          tool:       'summary',
+          pageRange:  { start: rangeStart, end: rangeEnd }
+        });
+        if (analyzeData.groups && analyzeData.groups.length) {
+          groups = analyzeData.groups.map(function (g) {
+            return { title: g.title || null, start: g.pageStart, end: g.pageEnd };
+          });
+        }
+      } catch (e) {
+        console.warn('[notes-panel] analyze failed, falling back to fixed splits:', e.message);
+      }
     }
 
-    var isSummary = _activeTab === 'summary';
+    // ── Step 2: fallback to fixed page splits if analyze returned nothing ──
+    if (!groups.length) {
+      var gs = _groupSize(pageCount);
+      for (var p = rangeStart; p <= rangeEnd; p += gs) {
+        groups.push({ title: null, start: p, end: Math.min(p + gs - 1, rangeEnd) });
+      }
+    }
+
+    // ── Step 3: generate section summary / notes for each group ───────────
     var sections = [];
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
-      _setGenMsg((isSummary ? 'Summarizing' : 'Generating') + ' section ' + (i + 1) + ' / ' + groups.length + ' (S. ' + g.start + '–' + g.end + ')…');
+      var label = isSummary ? 'Summarizing' : 'Generating';
+      var groupLabel = g.title
+        ? g.title
+        : 'S. ' + g.start + (g.end !== g.start ? '–' + g.end : '');
+      _setGenMsg(label + ' ' + (i + 1) + ' / ' + groups.length + ': ' + groupLabel + '…');
+
       var pdfText = _getPdfTextForRange(g.start, g.end);
       var data = await _notesApi({
         mode:        'section',
@@ -450,17 +482,19 @@
         pdfText:     pdfText,
         language:    _language,
         detailLevel: isSummary ? _detailLevel : undefined,
+        topicTitle:  isSummary ? (g.title || null) : undefined,
         pageRange:   { start: g.start, end: g.end }
       });
       if (data.error) throw new Error(data.error);
       if (!data.empty && data.markdown) {
-        sections.push({ markdown: data.markdown, pageStart: g.start, pageEnd: g.end });
+        sections.push({ markdown: data.markdown, pageStart: g.start, pageEnd: g.end, title: g.title });
       }
     }
 
     if (!sections.length) throw new Error('No content found in selected range.');
 
-    _setGenMsg('Merging ' + sections.length + ' sections…');
+    // ── Step 4: merge sections ────────────────────────────────────────────
+    _setGenMsg('Merging ' + sections.length + ' sections into final summary…');
     return _notesApi({
       mode:        'merge',
       courseId:    _ctx.courseId,
