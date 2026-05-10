@@ -13,6 +13,7 @@
   var _saveTimer   = null;
   var _scope       = 'section';         // page | section | range | document
   var _language    = 'same_as_source';
+  var _detailLevel = 'balanced';        // brief | balanced | detailed | exam
   var _rangeFrom   = 1;
   var _rangeTo     = 1;
 
@@ -141,6 +142,16 @@
         '</div>',
       '</div>',
 
+      '<div class="np-options-row" id="npDetailRow" style="display:none">',
+        '<div class="np-option-group">',
+          '<span class="np-option-label">Detail:</span>',
+          '<button class="np-opt" data-detail="brief">Brief</button>',
+          '<button class="np-opt active" data-detail="balanced">Balanced</button>',
+          '<button class="np-opt" data-detail="detailed">Detailed</button>',
+          '<button class="np-opt" data-detail="exam">Exam</button>',
+        '</div>',
+      '</div>',
+
       '<div class="np-range-row" id="npRangeRow" style="display:none">',
         '<span class="np-option-label">Pages:</span>',
         '<input class="np-range-input" id="npRangeFrom" type="number" min="1" value="1" title="From page">',
@@ -230,8 +241,10 @@
     panel.querySelectorAll('.np-tab').forEach(function (btn) {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-    var actionBar = $id('npActionBar');
-    if (actionBar) actionBar.style.display = (tab === 'saved') ? 'none' : '';
+    var actionBar  = $id('npActionBar');
+    var detailRow  = $id('npDetailRow');
+    if (actionBar)  actionBar.style.display = (tab === 'saved') ? 'none' : '';
+    if (detailRow)  detailRow.style.display  = (tab === 'summary') ? '' : 'none';
     if (tab === 'saved') {
       _renderSavedList();
     } else {
@@ -408,6 +421,7 @@
       pdfText:     pdfText,
       scope:       _scope,
       language:    _language,
+      detailLevel: _activeTab === 'summary' ? _detailLevel : undefined,
       currentPage: currentPage,
       pageRange:   rangeStart != null ? { start: rangeStart, end: rangeEnd } : undefined
     });
@@ -421,10 +435,11 @@
       groups.push({ start: p, end: Math.min(p + gs - 1, rangeEnd) });
     }
 
+    var isSummary = _activeTab === 'summary';
     var sections = [];
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
-      _setGenMsg('Generating section ' + (i + 1) + ' / ' + groups.length + ' (S. ' + g.start + '–' + g.end + ')…');
+      _setGenMsg((isSummary ? 'Summarizing' : 'Generating') + ' section ' + (i + 1) + ' / ' + groups.length + ' (S. ' + g.start + '–' + g.end + ')…');
       var pdfText = _getPdfTextForRange(g.start, g.end);
       var data = await _notesApi({
         mode:        'section',
@@ -434,6 +449,7 @@
         fileName:    _ctx.fileName || null,
         pdfText:     pdfText,
         language:    _language,
+        detailLevel: isSummary ? _detailLevel : undefined,
         pageRange:   { start: g.start, end: g.end }
       });
       if (data.error) throw new Error(data.error);
@@ -446,13 +462,14 @@
 
     _setGenMsg('Merging ' + sections.length + ' sections…');
     return _notesApi({
-      mode:       'merge',
-      courseId:   _ctx.courseId,
-      documentId: _ctx.documentId || null,
-      tool:       _activeTab,
-      fileName:   _ctx.fileName || null,
-      language:   _language,
-      sections:   sections
+      mode:        'merge',
+      courseId:    _ctx.courseId,
+      documentId:  _ctx.documentId || null,
+      tool:        _activeTab,
+      fileName:    _ctx.fileName || null,
+      language:    _language,
+      detailLevel: isSummary ? _detailLevel : undefined,
+      sections:    sections
     });
   }
 
@@ -484,10 +501,12 @@
       }
 
       var pageCount = (rangeStart != null && rangeEnd != null) ? (rangeEnd - rangeStart + 1) : 0;
-      var useMulti  = _activeTab === 'notes' && pageCount > 3 && _ctx.documentId;
+      // Use multi-section pipeline for notes >3 pages or summary >6 pages
+      var useMulti = pageCount > (_activeTab === 'summary' ? 6 : 3) && _ctx.documentId;
 
       if (useMulti) {
-        _setGenMsg('Preparing ' + pageCount + '-page notes (section by section)…');
+        var multiLabel = _activeTab === 'summary' ? 'summary' : 'notes';
+        _setGenMsg('Preparing ' + pageCount + '-page ' + multiLabel + ' — analyzing section by section…');
       } else {
         _setGenMsg('Generating ' + (_activeTab === 'summary' ? 'summary' : 'notes') + '…');
       }
@@ -653,6 +672,16 @@
         _language = btn.dataset.lang;
         panel.querySelectorAll('[data-lang]').forEach(function (b) {
           b.classList.toggle('active', b.dataset.lang === _language);
+        });
+      });
+    });
+
+    // Detail level options (summary tab only)
+    panel.querySelectorAll('[data-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _detailLevel = btn.dataset.detail;
+        panel.querySelectorAll('[data-detail]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.detail === _detailLevel);
         });
       });
     });
