@@ -693,9 +693,13 @@ exports.handler = async function (event) {
     if (!sumValidation.valid) {
       console.log('[notes-generate] summary validation failed:', sumValidation.issues, '— regenerating');
       try {
+        var strictExtras = '';
+        if (sumValidation.issues.includes('false_no_comparison')) {
+          strictExtras += '\n\nKRITISCHER FEHLER: Deine Zusammenfassung behauptet, es gibt keine Vergleiche, obwohl der Quelltext Vergleiche enthält (z.B. Handformguss vs. Maschinenformguss, Warmkammer vs. Kaltkammer, Primär- vs. Sekundäraluminium). Füge eine ## Vergleiche Sektion mit diesen Inhalten hinzu.';
+        }
         markdown = await callOpenAI(
           strictSummaryPrompt(language, detailLevel, sumValidation.missingTerms),
-          userMessage,
+          userMessage + strictExtras,
           maxTokens
         );
       } catch (e) {

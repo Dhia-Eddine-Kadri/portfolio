@@ -45,7 +45,7 @@ const CATEGORY_KEYWORD_SETS = [
   // Order matters: first match wins
   { category: 'literature',        tests: [/\bliteratur\b/i, /bibliographi/i, /quellenverzeichnis/i, /internet.?quellen/i, /\bbildquellen?\b/i] },
   { category: 'advertisement',     tests: [/nächste\s+vorlesung/i, /\bwerbung\b/i, /empfehlen\s+wir/i] },
-  { category: 'research_project',  tests: [/forschungsprojekt/i, /forschungsvorhaben/i, /\bDFG\b/, /\bIGF\b/, /gefördert\s+von/i] },
+  { category: 'research_project',  tests: [/forschungsprojekt/i, /forschungsvorhaben/i, /\bDFG\b/, /\bIGF\b/, /gefördert\s+von/i, /sekundär.?aluminium.*ki|ki.*sekundär.?aluminium/i, /CO2.?reduktion.*gieß|künstliche\s+intelligenz.*prozess/i] },
   { category: 'learning_goals',    tests: [/lernziel/i, /lerninhalt/i, /nach\s+(?:dieser|der)\s+vorlesung/i, /sie\s+(?:können|kennen|verstehen)\s+nach/i] },
   { category: 'classification',    tests: [/\beinteilung\b/i, /\bDIN\s+8580\b/, /hauptgruppen\s+der\s+fertigung/i, /einordnung\s+in\s+die\s+fertigung/i] },
   { category: 'process',           tests: [/\bgießverfahren\b/i, /\bdruckguss\b/i, /\bsandguss\b/i, /\bfeinguss\b/i, /\bkokillenguss\b/i, /\bniederdruckguss\b/i, /\berstarren\b/i, /warmkammer/i, /kaltkammer/i] },

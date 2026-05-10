@@ -267,85 +267,94 @@ STRICT RULES:
 - Use ONLY the content from ${pageRef}. Do NOT reference other pages or invent facts.
 - IGNORE: author names, university logos, copyright notices, semester labels, slide numbers, repeated footers.
 - Do NOT include slide-template text, placeholder text, or PDF metadata noise.
-- Include page references *(S. X)* for important facts.
+- Include page references *(S. X)* for every important fact.
 - Use Markdown. KaTeX for formulas: $...$ inline, $$...$$ display.
-- This is ONE SECTION of a larger summary — do not re-introduce the full lecture context.
-- If the source for these pages is sparse, keep this section short. Do not pad.
-- If a fact is not clearly on these pages, omit it entirely.
+- This is ONE SECTION of a larger summary — begin with the topic heading, not a chapter introduction.
+- Capture EVERYTHING study-relevant on these pages. Do not compress or skip details.
+- If a method or process appears: describe its principle, all listed advantages, all listed disadvantages, materials used, and applications.
+- If a list appears: reproduce it COMPLETELY with ALL items — never shorten.
+- If a definition appears: quote it near-verbatim.
+- If a comparison appears: include it with all compared attributes.
 
 OUTPUT FORMAT:
-## [Abschnittsüberschrift — verwende die tatsächliche Kapitelüberschrift aus dem PDF, falls sichtbar]
+## [Kapitelüberschrift aus dem PDF — exakt wie im Quelldokument, z.B. "Kokillenguss", "Druckguss", "Werkstoffe"]
 
-Decke ab, was auf diesen Seiten vorhanden ist:
-Hauptkonzepte | Definitionen | Technische Begriffe | Verfahren/Prozesse | Formeln | Listen | Vergleiche | Prüfungsrelevanz
+Cover everything present on these pages:
+- Definitionen | Klassifikationen | Verfahrensprinzip | Ablauf | Werkstoffe | Vorteile | Nachteile | Anwendungen | Formeln | Listen | Vergleiche
 
-Seitenreferenzen für jeden wichtigen Punkt angeben. Länge proportional zur Inhaltsdichte.`;
+Add *(S. X)* after every important fact. Length scales with content density — dense pages produce long sections.`;
 }
 
 // ── Merge summary prompt ──────────────────────────────────────────────────────
 
 /**
  * Merge prompt for combining section summaries into one final document.
- * topicGroupTitles: string[] — titles of each topic section that was summarised.
+ * topicGroupTitles: string[] — actual headings of each section (extracted from AI output).
  * targetWords: number — minimum word count for the merged output.
  */
 function mergeSummaryPrompt(lang, detailLevel, targetWords, topicGroupTitles) {
   var h = sectionHeadings(lang);
-  var wordLine = targetWords
-    ? 'MINIMUM LENGTH: ' + targetWords + ' words. A short merged output will be rejected. The merged summary must be longer than any individual section.'
-    : 'The merged summary must be longer than any individual section.';
+  var minWords  = targetWords ? Math.round(targetWords * 0.85) : 1500;
+  var isLargDoc = topicGroupTitles && topicGroupTitles.length >= 5;
 
-  var topicBlock = '';
+  var topicListBlock = '';
   if (topicGroupTitles && topicGroupTitles.length) {
-    topicBlock = `
-REQUIRED SECTIONS — generate one ## section per topic below. Do NOT merge, skip, or compress them:
-${topicGroupTitles.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n')}
-
-Each topic section must include ALL content from the corresponding section summary.
-Do not collapse two separate topics into one bullet — they each need their own ## heading.
-`;
+    topicListBlock =
+      'PFLICHT-ABSCHNITTE — erzeuge genau einen ## Abschnitt pro Thema unten. Kein Thema darf fehlen oder mit einem anderen zusammengefasst werden:\n' +
+      topicGroupTitles.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n') + '\n';
   }
 
-  return `You are merging multiple topic-section summaries from a university lecture PDF into one final structured study summary.
+  var structureBlock = isLargDoc
+    ? topicListBlock +
+      '\nJeder Abschnitt muss enthalten:\n' +
+      '- Hauptidee und Definitionen\n' +
+      '- Alle Verfahrensdetails (Prinzip, Ablauf, Werkstoffe)\n' +
+      '- Vollständige Vor- und Nachteile\n' +
+      '- Anwendungsbeispiele\n' +
+      '- Seitenzitierung *(S. X)*\n'
+    : ('## 1. ' + h.overview + '\n## 2. ' + h.concepts + '\n## 3. ' + h.definitions + '\n' +
+       '## 4. ' + h.terms + '\n## 5. ' + h.methods + '\n## 6. ' + h.formulas + '\n' +
+       '## 7. ' + h.lists + '\n## 8. ' + h.comparisons + '\n## 9. ' + h.exam + '\n## 10. ' + h.sources);
+
+  return `You are merging multiple topic-section summaries from a university lecture chapter into one complete, long study summary.
 
 ${langInstr(lang)}
 ${langHeadingRule(lang)}
 
+MANDATORY MINIMUM LENGTH: ${minWords} words.
+Count your words. If you reach the end and are below ${minWords} words, go back and expand each section with more detail from the provided section summaries. Do NOT return a short output.
+
 ${summaryDetailInstr(detailLevel || 'balanced', targetWords)}
 
-${wordLine}
-${topicBlock}
+STRUCTURE:
+${structureBlock}
+
 MERGE RULES:
-- Preserve ALL important content from ALL sections. Do NOT aggressively shorten.
-- Remove exact duplicates (identical facts stated twice), but keep near-duplicates in different contexts.
-- Keep ALL page references *(S. X)*.
-- Facts must stay attached to the correct topic — do NOT mix details from different processes or materials.
-- Do NOT invent new content — use only what is in the provided section summaries.
-- For each named process/method: include what it is, how it works, advantages, disadvantages, materials used, and applications.
+- Preserve ALL important content from ALL section summaries. Do NOT summarise or compress sections further.
+- Remove exact duplicates (same sentence twice), but keep near-duplicates if context or page differs.
+- Keep ALL page references *(S. X)* — they are critical for studying.
+- Facts MUST stay tied to their correct topic section. Do NOT mix details from Sandguss into Druckguss, etc.
+- Do NOT invent content. Use only what the provided section summaries contain.
+- For every named process/method: what it is, principle, materials used, all advantages, all disadvantages, applications.
 - Reproduce all lists completely — do not shorten them.
-- The final Prüfungsrelevanz section must cover the most important exam points across all sections.
 
-OUTPUT: Complete Markdown document.
+COMPARISON RULE:
+Scan all sections for any comparison-like content: Handformguss vs. Maschinenformguss, Dauerform vs. verlorene Form, Warmkammer vs. Kaltkammer, Primär- vs. Sekundäraluminium, etc.
+If ANY comparison-like content exists → create a ## ${h.comparisons} section and include it.
+Do NOT write "Kein spezifischer Vergleich vorhanden" if comparison content exists in the sections.
 
-# ${h.title}: [Kapitel-/Thementitel aus dem ersten Abschnitt]
-
-${topicGroupTitles && topicGroupTitles.length
-  ? '## [section per required topic above, in order]'
-  : `## 1. ${h.overview}
-## 2. ${h.concepts}
-## 3. ${h.definitions}
-## 4. ${h.terms}
-## 5. ${h.methods}
-## 6. ${h.formulas}
-## 7. ${h.lists}
-## 8. ${h.comparisons}
-## 9. ${h.exam}
-## 10. ${h.sources}`}
-
+FINAL REQUIRED SECTIONS (add these after the topic sections):
 ## ${h.exam}
-## ${h.sources}
+List the 6–12 most exam-relevant facts, definitions, processes, and formulas across all sections.
 
-A long chapter summary should be several pages long — do not produce a short overview.`;
+## ${h.sources}
+All page ranges used: *(S. X–Y)*
+
+OUTPUT: Start with:
+# ${h.title}: [Hauptthema aus dem ersten Abschnitt]
+
+Then all topic sections, then ${h.exam}, then ${h.sources}.
+This document must be substantially longer than any individual section. A short output is wrong.`;
 }
 
 // ── Strict fallback prompt (regeneration after validation failure) ─────────────
@@ -426,9 +435,16 @@ function validateSummary(markdown, contextText, detailLevel, pageCount, targetWo
   }
 
   // ── English-heading check for German source ─────────────────────────────
-  // If the markdown contains "## Big Picture" or "## Key Concepts" those are wrong
   if (/^## (?:Big Picture|Key Concepts|What to Remember|Overview)\b/m.test(markdown)) {
     issues.push('wrong_heading_language');
+  }
+
+  // ── False "no comparisons" check ─────────────────────────────────────────
+  // If source has comparison content but the summary claims none exist
+  var hasCompSourceSignal = /\bvs\.?\b|gegen[üu]ber|handformguss|maschinenform|warmkammer|kaltkammer|prim[äa]r.?aluminium|sekund[äa]r.?aluminium|dauerform|verlorene\s+form/i.test(contextText);
+  var claimsNoComparison  = /kein\s+spezifischer\s+vergleich|keine\s+vergleiche\s+vorhanden/i.test(markdown);
+  if (hasCompSourceSignal && claimsNoComparison) {
+    issues.push('false_no_comparison');
   }
 
   return { valid: issues.length === 0, issues: issues, missingTerms: missingTerms.slice(0, 15) };

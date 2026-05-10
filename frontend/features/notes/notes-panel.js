@@ -491,7 +491,10 @@
       });
       if (data.error) throw new Error(data.error);
       if (!data.empty && data.markdown) {
-        sections.push({ markdown: data.markdown, pageStart: g.start, pageEnd: g.end, title: g.title });
+        // Prefer the heading the AI generated (e.g. "## Sandguss") over the metadata title
+        var mdHeading = data.markdown.match(/^##\s+(.+)/m);
+        var realTitle = mdHeading ? mdHeading[1].replace(/[*_`]/g, '').trim() : (g.title || null);
+        sections.push({ markdown: data.markdown, pageStart: g.start, pageEnd: g.end, title: realTitle });
       }
     }
 
@@ -537,6 +540,9 @@
         rangeStart = Math.max(1, currentPage - 1); rangeEnd = currentPage + 1;
       } else if (_scope === 'range') {
         rangeStart = _rangeFrom; rangeEnd = _rangeTo;
+      } else if (_scope === 'document') {
+        var totalPages = window.pdfDoc ? window.pdfDoc.numPages : null;
+        if (totalPages) { rangeStart = 1; rangeEnd = totalPages; }
       }
 
       var pageCount = (rangeStart != null && rangeEnd != null) ? (rangeEnd - rangeStart + 1) : 0;
