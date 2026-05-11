@@ -62,7 +62,9 @@ async function _activatePayPalSubscription(data, closePaywall) {
 }
 
 function applySubscription(sub) {
-  _userIsPro = sub && sub.plan === 'pro' && (sub.status === 'active' || sub.status === 'trialing');
+  var expiresAt = sub && sub.expires_at ? Date.parse(sub.expires_at) : null;
+  var isExpired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
+  _userIsPro = !!(sub && sub.plan === 'pro' && (sub.status === 'active' || sub.status === 'trialing') && !isExpired);
   if (sub && sub.stripe_customer_id) _stripeCustomerId = sub.stripe_customer_id;
   if (sub && sub.had_trial) _hadTrial = true;
   var proStatus = document.getElementById('subProStatus');
@@ -339,7 +341,7 @@ document.addEventListener(
       try {
         var data = await window._subService.verifyPayment(sessionId);
         if (data.ok) {
-          applySubscription({ plan: 'pro', status: 'active' });
+          applySubscription({ plan: 'pro', status: 'active', expires_at: data.expires_at || null });
           var modal = document.getElementById('paywallModal');
           if (modal) modal.style.display = 'none';
           showToast('âœ… Pro activated!', 'Enjoy unlimited access.');

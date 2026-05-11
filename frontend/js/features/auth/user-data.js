@@ -62,6 +62,9 @@ export async function loadUserData(uid) {
     if (settings && window.applySettings) window.applySettings(settings);
 
     var sub = await _sb.from('subscriptions').select('*').eq('user_id', uid).single();
+    if (sub && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
+      sub = Object.assign({}, sub, { status: 'expired' });
+    }
     if (window.applySubscription) window.applySubscription(sub || {});
 
     // Check admin status before deciding whether to show the paywall.

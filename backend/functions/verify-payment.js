@@ -42,6 +42,25 @@ exports.handler = async function (event) {
     if (!paymentOk) return fail(400, 'Payment not completed');
 
     const userId = callerUser.id;
+    const currentSubRes = await supaRequest(
+      'GET',
+      'subscriptions?user_id=eq.' + encodeURIComponent(userId) +
+        '&select=plan,status,stripe_subscription_id,stripe_customer_id,expires_at&limit=1',
+      null,
+      serviceKey
+    );
+    const currentSub = Array.isArray(currentSubRes.body) && currentSubRes.body[0];
+    const sameStripeSubscription = session.subscription &&
+      currentSub &&
+      currentSub.stripe_subscription_id === session.subscription;
+    const sameStripeCustomer = !session.subscription &&
+      session.customer &&
+      currentSub &&
+      currentSub.stripe_customer_id === session.customer;
+    if (currentSub && currentSub.status === 'active' && (sameStripeSubscription || sameStripeCustomer)) {
+      return jsonResponse(200, { ok: true, alreadyProcessed: true, expires_at: currentSub.expires_at || null });
+    }
+
     const expires = new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString();
     await supaRequest(
       'POST',
@@ -61,7 +80,7 @@ exports.handler = async function (event) {
       { Prefer: 'resolution=merge-duplicates,return=minimal' }
     );
 
-    return jsonResponse(200, { ok: true });
+    return jsonResponse(200, { ok: true, expires_at: expires });
   } catch (e) {
     return fail(500, e.message);
   }

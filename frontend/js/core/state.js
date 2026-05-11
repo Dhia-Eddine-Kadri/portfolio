@@ -20,6 +20,10 @@ export const Store = {
     getState: () => ({ ...state }),
     
     setState: (update) => {
+        if (!update || typeof update !== 'object' || Array.isArray(update)) {
+            console.warn('Store.setState ignored invalid update:', update);
+            return;
+        }
         Object.assign(state, update);
         listeners.forEach(fn => fn(state));
     },

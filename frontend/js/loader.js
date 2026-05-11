@@ -107,11 +107,17 @@
     var badge = root.querySelector('.hero-badge');
     if (badge) {
       var dot = badge.querySelector('.hero-badge-dot');
-      badge.innerHTML = t.badge;
+      badge.textContent = t.badge;
       if (dot) badge.insertBefore(dot, badge.firstChild);
     }
     var h1 = root.querySelector('.hero-text h1');
-    if (h1) h1.innerHTML = t.h1;
+    if (h1) {
+      h1.textContent = '';
+      String(t.h1 || '').split(/<br\s*\/?>/i).forEach(function (part, i) {
+        if (i) h1.appendChild(document.createElement('br'));
+        h1.appendChild(document.createTextNode(part));
+      });
+    }
     var heroPara = root.querySelector('.hero-text > p');
     if (heroPara) heroPara.textContent = t.subtitle;
     var heroCta = root.querySelector('a.hero-cta');

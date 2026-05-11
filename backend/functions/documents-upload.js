@@ -72,6 +72,9 @@ exports.handler = async function (event) {
   if (!user) return fail(401, 'Invalid or expired token');
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  if (Buffer.byteLength(event.body || '', 'utf8') > Math.ceil(MAX_BODY_BYTES * 1.45)) {
+    return fail(413, 'Request too large (max 20 MB file)');
+  }
 
   // Parse body
   let body;
