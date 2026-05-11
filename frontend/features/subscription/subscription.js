@@ -58,7 +58,7 @@ async function _activatePayPalSubscription(data, closePaywall) {
     var modal = document.getElementById('paywallModal');
     if (modal) modal.style.display = 'none';
   }
-  showToast('Ã°Å¸Å½â€° Pro activated!', 'Enjoy unlimited access.');
+  showToast('🚀 Pro activated!', 'Enjoy unlimited access.');
 }
 
 function applySubscription(sub) {
@@ -82,8 +82,8 @@ function applySubscription(sub) {
     if (proStatus) proStatus.style.display = 'none';
     if (upgradeBtn) {
       upgradeBtn.textContent = _hadTrial
-        ? 'ðŸš€ Subscribe â€” â‚¬11.99/month'
-        : 'ðŸŽ‰ Start free 7-day trial';
+        ? '🚀 Subscribe — €11.99/month'
+        : '🎉 Start free 7-day trial';
       upgradeBtn.disabled = false;
       upgradeBtn.style.display = '';
       upgradeBtn.style.opacity = '';
@@ -163,14 +163,14 @@ function _showPaywall() {
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
     btn.textContent = _hadTrial
-      ? 'ðŸš€ Subscribe â€” â‚¬11.99/month'
-      : 'ðŸŽ‰ Start free 7-day trial';
+      ? '🚀 Subscribe — €11.99/month'
+      : '🎉 Start free 7-day trial';
   var modal = document.getElementById('paywallModal');
   if (_hadTrial && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
     var desc = modal.querySelector('[data-paywall-desc]');
-    if (desc) desc.textContent = 'Subscribe to access all StudySphere features for â‚¬11.99/month.';
+    if (desc) desc.textContent = 'Subscribe to access all StudySphere features for €11.99/month.';
     var afterTrial = modal.querySelector('[data-after-trial]');
     if (afterTrial) afterTrial.textContent = '/ month';
     var cancelNote = modal.querySelector('[data-cancel-note]');
@@ -282,12 +282,12 @@ function _bindSubscriptionControls() {
           location.href = data.url;
         } else {
           showToast('Error', data.error || 'Could not start checkout.');
-          this.textContent = 'ðŸš€ Upgrade to Pro';
+          this.textContent = '🚀 Upgrade to Pro';
           this.disabled = false;
         }
       } catch (e) {
         showToast('Error', e.message);
-        this.textContent = 'ðŸš€ Upgrade to Pro';
+        this.textContent = '🚀 Upgrade to Pro';
         this.disabled = false;
       }
     });
@@ -304,7 +304,7 @@ function _bindSubscriptionControls() {
         var data = await window._subService.createCheckoutSession(_hadTrial);
         if (data.url) location.href = data.url;
       } catch (e) {}
-      this.textContent = 'ðŸŽ‰ Start free 7-day trial';
+      this.textContent = '🎉 Start free 7-day trial';
       this.disabled = false;
     });
   }
@@ -346,7 +346,7 @@ document.addEventListener(
   if (params.get('payment') === 'success') {
     var sessionId = params.get('session_id');
     history.replaceState(null, '', location.pathname);
-    showToast('ðŸŽ‰ Payment successful!', 'Activating your Pro plan...');
+    showToast('🎉 Payment successful!', 'Activating your Pro plan...');
     var attempts = 0;
     var verify = setInterval(async function () {
       attempts++;
