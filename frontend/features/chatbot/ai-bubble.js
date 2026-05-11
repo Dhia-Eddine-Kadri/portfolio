@@ -1,29 +1,33 @@
 /* ── AI FLOATING BUBBLE ─────────────────────────────────────────────────────
-   Draggable floating button that opens/closes the existing #aiPanel.
-   No custom panel — the real panel with all its features (copy, regenerate,
-   saved chats, chips, etc.) is used exactly as-is.
+   Draggable bubble that opens/closes the existing #aiPanel.
+   The panel is detached from the DOM flow (position:fixed) and is
+   independently draggable via its header. The bubble always renders
+   on top of the panel.
    ──────────────────────────────────────────────────────────────────────── */
 (function () {
   'use strict';
 
-  var DRAG_THRESHOLD = 6;
-  var SNAP_MARGIN    = 16;
-  var STORAGE_KEY    = 'ss_ai_bubble_pos';
+  var DRAG_THRESHOLD  = 6;
+  var SNAP_MARGIN     = 16;
+  var BUBBLE_KEY      = 'ss_ai_bubble_pos';
+  var PANEL_KEY       = 'ss_ai_panel_pos';
+  var PANEL_SIZE_KEY  = 'ss_ai_panel_size';
+  var PANEL_DEF_W     = 360;
+  var PANEL_MIN_W     = 280;
 
-  var isDragging      = false;
-  var startX          = 0;
-  var startY          = 0;
-  var bubbleStartLeft = 0;
-  var bubbleStartTop  = 0;
-  var totalMovement   = 0;
-  var _initialized    = false;
+  var bubbleDragging      = false;
+  var bStartX = 0, bStartY = 0;
+  var bOriginLeft = 0, bOriginTop = 0;
+  var bTotalMoved = 0;
+  var _initialized = false;
 
-  // ── Inject bubble button ───────────────────────────────────────────────────
+  // ── Inject bubble ──────────────────────────────────────────────────────────
   function injectBubble() {
-    if (document.getElementById('aiBubble')) return;
+    if (document.getElementById('aiBubble')) return document.getElementById('aiBubble');
     var el = document.createElement('div');
     el.id    = 'aiBubble';
     el.title = 'StudySphere AI';
+    el.style.zIndex = '10001'; // always above panel (10000) and #portal (200)
     el.innerHTML =
       '<svg class="ai-bubble-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
         '<rect x="3" y="8" width="18" height="11" rx="3" fill="currentColor" opacity="0.9"/>' +
@@ -40,31 +44,108 @@
     return el;
   }
 
-  // ── Open / close the real AI panel ────────────────────────────────────────
+  // ── Detach #aiPanel from its DOM parent into fixed positioning ────────────
+  function detachPanel() {
+    var panel = document.getElementById('aiPanel');
+    if (!panel || panel._ssDetached) return;
+    panel._ssDetached = true;
+
+    // Move to body so it isn't clipped by pdfViewerWrap's overflow:hidden
+    document.body.appendChild(panel);
+
+    // Override positioning to fixed floating
+    panel.style.position   = 'fixed';
+    panel.style.zIndex     = '10000';
+    panel.style.top        = '';
+    panel.style.right      = '';
+    panel.style.bottom     = '';
+    panel.style.left       = '';
+    panel.style.height     = '';
+    panel.style.transition = 'opacity 0.22s ease, transform 0.22s ease';
+    panel.style.opacity    = '0';
+    panel.style.transform  = 'scale(0.92)';
+    panel.style.borderRadius = '20px';
+    panel.style.overflow   = 'hidden';
+
+    // Width: restore saved or default
+    var savedSize = getSavedPanelSize();
+    panel.style.width = savedSize.w + 'px';
+  }
+
+  // ── Panel open/close ───────────────────────────────────────────────────────
   function isPanelOpen() {
     var panel = document.getElementById('aiPanel');
     return panel ? panel.classList.contains('visible') : false;
   }
 
-  function openPanel() {
-    // Use the bridge's openAI if available, else toggle class directly
-    if (typeof window.openAI === 'function') {
-      window.openAI();
-    } else {
-      var panel = document.getElementById('aiPanel');
-      if (panel) panel.classList.add('visible');
+  function positionPanelNearBubble(panel) {
+    var bubble = document.getElementById('aiBubble');
+    var vW = window.innerWidth;
+    var vH = window.innerHeight;
+    var savedPos = getSavedPanelPos();
+
+    if (savedPos) {
+      // Clamp saved position to viewport
+      var pW = panel.offsetWidth  || parseInt(panel.style.width)  || PANEL_DEF_W;
+      var pH = panel.offsetHeight || 500;
+      var l = Math.max(8, Math.min(savedPos.left, vW - pW - 8));
+      var t = Math.max(8, Math.min(savedPos.top,  vH - pH - 8));
+      panel.style.left = l + 'px';
+      panel.style.top  = t + 'px';
+      return;
     }
+
+    // First open: place next to bubble
+    if (bubble) {
+      var bRect = bubble.getBoundingClientRect();
+      var pW2 = parseInt(panel.style.width) || PANEL_DEF_W;
+      var spaceRight = vW - bRect.right - 12;
+      var spaceLeft  = bRect.left - 12;
+      var left;
+      if (spaceRight >= pW2) {
+        left = bRect.right + 12;
+      } else if (spaceLeft >= pW2) {
+        left = bRect.left - pW2 - 12;
+      } else {
+        left = Math.max(8, vW - pW2 - 8);
+      }
+      var top = Math.max(8, Math.min(bRect.top, vH - 520));
+      panel.style.left = left + 'px';
+      panel.style.top  = top  + 'px';
+    } else {
+      panel.style.right  = (SNAP_MARGIN + 70) + 'px';
+      panel.style.bottom = SNAP_MARGIN + 'px';
+    }
+  }
+
+  function openPanel() {
+    var panel = document.getElementById('aiPanel');
+    if (!panel) return;
+
+    detachPanel();
+    positionPanelNearBubble(panel);
+
+    panel.classList.add('visible');
+    panel.style.opacity   = '1';
+    panel.style.transform = 'scale(1)';
+
     var bubble = document.getElementById('aiBubble');
     if (bubble) bubble.classList.add('expanded');
+
+    // Restore chat history via bridge
+    if (typeof window.openAI === 'function') window.openAI();
   }
 
   function closePanel() {
-    if (typeof window.forceCloseAI === 'function') {
-      window.forceCloseAI();
-    } else {
-      var panel = document.getElementById('aiPanel');
-      if (panel) panel.classList.remove('visible');
-    }
+    var panel = document.getElementById('aiPanel');
+    if (!panel) return;
+
+    panel.style.opacity   = '0';
+    panel.style.transform = 'scale(0.92)';
+    setTimeout(function () {
+      panel.classList.remove('visible');
+    }, 200);
+
     var bubble = document.getElementById('aiBubble');
     if (bubble) bubble.classList.remove('expanded');
   }
@@ -73,12 +154,64 @@
     if (isPanelOpen()) closePanel(); else openPanel();
   }
 
-  // Keep bubble expanded class in sync with panel state ──────────────────────
-  function syncExpandedClass() {
-    var panel  = document.getElementById('aiPanel');
-    var bubble = document.getElementById('aiBubble');
+  // Intercept the bridge's forceCloseAI/closeAI so they animate nicely
+  function hookBridge() {
+    window.addEventListener('ss-ready', function () {
+      var origClose = window.forceCloseAI;
+      window.forceCloseAI = function () {
+        closePanel();
+        if (typeof origClose === 'function') origClose();
+      };
+    });
+  }
+
+  // ── Panel header drag ──────────────────────────────────────────────────────
+  function attachPanelDrag(panel) {
+    // Wait for the header to exist (panel HTML is fetched asynchronously)
+    function tryWire() {
+      var hdr = panel.querySelector('.ai-hdr');
+      if (!hdr) { setTimeout(tryWire, 200); return; }
+      if (hdr._ssPanelDragBound) return;
+      hdr._ssPanelDragBound = true;
+
+      var pdX, pdY, pdL, pdT, pdActive = false;
+
+      hdr.style.cursor = 'move';
+
+      hdr.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('button, .ai-icon-btn, .ai-close, label, input')) return;
+        pdActive = true;
+        pdX = e.clientX;
+        pdY = e.clientY;
+        var rect = panel.getBoundingClientRect();
+        pdL = rect.left;
+        pdT = rect.top;
+        hdr.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      hdr.addEventListener('pointermove', function (e) {
+        if (!pdActive) return;
+        var vW = window.innerWidth, vH = window.innerHeight;
+        var pW = panel.offsetWidth, pH = panel.offsetHeight;
+        var newL = Math.max(0, Math.min(pdL + e.clientX - pdX, vW - pW));
+        var newT = Math.max(0, Math.min(pdT + e.clientY - pdY, vH - pH));
+        panel.style.left = newL + 'px';
+        panel.style.top  = newT + 'px';
+      });
+
+      hdr.addEventListener('pointerup', function () {
+        pdActive = false;
+        savePanelPos(parseFloat(panel.style.left), parseFloat(panel.style.top));
+      });
+    }
+    tryWire();
+  }
+
+  // ── Sync bubble expanded class ─────────────────────────────────────────────
+  function syncExpandedClass(bubble) {
+    var panel = document.getElementById('aiPanel');
     if (!panel || !bubble) return;
-    // Watch for class changes on panel and mirror to bubble
     var obs = new MutationObserver(function () {
       if (panel.classList.contains('visible')) {
         bubble.classList.add('expanded');
@@ -89,44 +222,39 @@
     obs.observe(panel, { attributes: true, attributeFilter: ['class'] });
   }
 
-  // ── Snap logic ─────────────────────────────────────────────────────────────
+  // ── Bubble snap ────────────────────────────────────────────────────────────
   function snapBubble(x, y, bW, bH, vW, vH) {
-    var distL = x, distR = vW - x - bW, distT = y, distB = vH - y - bH;
-    var min = Math.min(distL, distR, distT, distB);
-    if (min === distL) return { left: SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
-    if (min === distR) return { left: vW - bW - SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
-    if (min === distT) return { left: Math.max(SNAP_MARGIN, Math.min(x, vW - bW - SNAP_MARGIN)), top: SNAP_MARGIN + 56 };
-    return { left: Math.max(SNAP_MARGIN, Math.min(x, vW - bW - SNAP_MARGIN)), top: vH - bH - SNAP_MARGIN };
+    var dL = x, dR = vW-x-bW, dT = y, dB = vH-y-bH;
+    var min = Math.min(dL, dR, dT, dB);
+    if (min === dL) return { left: SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH-bH-SNAP_MARGIN)) };
+    if (min === dR) return { left: vW-bW-SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH-bH-SNAP_MARGIN)) };
+    if (min === dT) return { left: Math.max(SNAP_MARGIN, Math.min(x, vW-bW-SNAP_MARGIN)), top: SNAP_MARGIN+56 };
+    return { left: Math.max(SNAP_MARGIN, Math.min(x, vW-bW-SNAP_MARGIN)), top: vH-bH-SNAP_MARGIN };
   }
 
-  // ── Drag ───────────────────────────────────────────────────────────────────
-  function attachDrag(bubble) {
+  // ── Bubble drag ────────────────────────────────────────────────────────────
+  function attachBubbleDrag(bubble) {
     bubble.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
-      isDragging    = false;
-      totalMovement = 0;
-      startX = e.clientX;
-      startY = e.clientY;
-      var rect = bubble.getBoundingClientRect();
-      bubbleStartLeft = rect.left;
-      bubbleStartTop  = rect.top;
+      bubbleDragging = false;
+      bTotalMoved    = 0;
+      bStartX = e.clientX; bStartY = e.clientY;
+      var r = bubble.getBoundingClientRect();
+      bOriginLeft = r.left; bOriginTop = r.top;
       bubble.setPointerCapture(e.pointerId);
       bubble.classList.add('dragging');
     });
 
     bubble.addEventListener('pointermove', function (e) {
       if (!bubble.hasPointerCapture(e.pointerId)) return;
-      var dx = e.clientX - startX;
-      var dy = e.clientY - startY;
-      totalMovement = Math.sqrt(dx * dx + dy * dy);
-      if (totalMovement > DRAG_THRESHOLD) {
-        isDragging = true;
+      var dx = e.clientX - bStartX, dy = e.clientY - bStartY;
+      bTotalMoved = Math.sqrt(dx*dx + dy*dy);
+      if (bTotalMoved > DRAG_THRESHOLD) {
+        bubbleDragging = true;
         e.preventDefault();
         var vW = window.innerWidth, vH = window.innerHeight;
-        var newLeft = Math.max(0, Math.min(bubbleStartLeft + dx, vW - bubble.offsetWidth));
-        var newTop  = Math.max(0, Math.min(bubbleStartTop  + dy, vH - bubble.offsetHeight));
-        bubble.style.left = newLeft + 'px';
-        bubble.style.top  = newTop  + 'px';
+        bubble.style.left = Math.max(0, Math.min(bOriginLeft+dx, vW-bubble.offsetWidth))  + 'px';
+        bubble.style.top  = Math.max(0, Math.min(bOriginTop +dy, vH-bubble.offsetHeight)) + 'px';
       }
     });
 
@@ -135,57 +263,80 @@
       bubble.releasePointerCapture(e.pointerId);
       bubble.classList.remove('dragging');
 
-      if (!isDragging) {
+      if (!bubbleDragging) {
         togglePanel();
       } else {
-        var rect = bubble.getBoundingClientRect();
+        var r = bubble.getBoundingClientRect();
         var vW = window.innerWidth, vH = window.innerHeight;
-        var snapped = snapBubble(rect.left, rect.top, bubble.offsetWidth, bubble.offsetHeight, vW, vH);
+        var snapped = snapBubble(r.left, r.top, bubble.offsetWidth, bubble.offsetHeight, vW, vH);
         bubble.classList.add('snapping');
         bubble.style.left = snapped.left + 'px';
         bubble.style.top  = snapped.top  + 'px';
-        bubble.addEventListener('transitionend', function onSnap() {
+        bubble.addEventListener('transitionend', function done() {
           bubble.classList.remove('snapping');
-          bubble.removeEventListener('transitionend', onSnap);
+          bubble.removeEventListener('transitionend', done);
         });
-        savePosition(snapped.left, snapped.top);
+        saveBubblePos(snapped.left, snapped.top);
       }
-      isDragging = false;
+      bubbleDragging = false;
     });
   }
 
-  // ── Position persistence ───────────────────────────────────────────────────
-  function savePosition(left, top) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: left, top: top })); } catch (e) {}
+  // ── Persistence ────────────────────────────────────────────────────────────
+  function saveBubblePos(l, t)  { try { localStorage.setItem(BUBBLE_KEY,     JSON.stringify({left:l,top:t}));  } catch(e){} }
+  function savePanelPos(l, t)   { try { localStorage.setItem(PANEL_KEY,      JSON.stringify({left:l,top:t}));  } catch(e){} }
+
+  function getSavedPanelPos() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PANEL_KEY) || 'null');
+      if (s && typeof s.left === 'number') return s;
+    } catch(e) {}
+    return null;
   }
 
-  function restorePosition(bubble) {
-    var vW = window.innerWidth,  vH = window.innerHeight;
-    var bW = bubble.offsetWidth  || 60;
-    var bH = bubble.offsetHeight || 60;
+  function getSavedPanelSize() {
     try {
-      var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (saved && saved.left >= 0 && saved.left <= vW - bW && saved.top >= 0 && saved.top <= vH - bH) {
-        bubble.style.left = saved.left + 'px';
-        bubble.style.top  = saved.top  + 'px';
+      var s = JSON.parse(localStorage.getItem(PANEL_SIZE_KEY) || 'null');
+      if (s && s.w) return s;
+    } catch(e) {}
+    return { w: PANEL_DEF_W };
+  }
+
+  function restoreBubblePos(bubble) {
+    var vW = window.innerWidth, vH = window.innerHeight;
+    var bW = bubble.offsetWidth || 60, bH = bubble.offsetHeight || 60;
+    try {
+      var s = JSON.parse(localStorage.getItem(BUBBLE_KEY) || 'null');
+      if (s && s.left >= 0 && s.left <= vW-bW && s.top >= 0 && s.top <= vH-bH) {
+        bubble.style.left = s.left + 'px';
+        bubble.style.top  = s.top  + 'px';
         return;
       }
-    } catch (e) {}
+    } catch(e) {}
     bubble.style.left = (vW - bW - SNAP_MARGIN) + 'px';
     bubble.style.top  = (vH - bH - SNAP_MARGIN - 20) + 'px';
   }
 
-  // ── Viewport resize: keep bubble in bounds ─────────────────────────────────
+  // ── Viewport resize ────────────────────────────────────────────────────────
   function wireResize() {
     window.addEventListener('resize', function () {
       var bubble = document.getElementById('aiBubble');
-      if (!bubble) return;
+      var panel  = document.getElementById('aiPanel');
       var vW = window.innerWidth, vH = window.innerHeight;
-      var left = parseFloat(bubble.style.left) || 0;
-      var top  = parseFloat(bubble.style.top)  || 0;
-      var cL   = Math.max(0, Math.min(left, vW - bubble.offsetWidth));
-      var cT   = Math.max(0, Math.min(top,  vH - bubble.offsetHeight));
-      if (cL !== left || cT !== top) { bubble.style.left = cL + 'px'; bubble.style.top = cT + 'px'; }
+
+      if (bubble) {
+        var l = parseFloat(bubble.style.left)||0, t = parseFloat(bubble.style.top)||0;
+        var cL = Math.max(0, Math.min(l, vW-bubble.offsetWidth));
+        var cT = Math.max(0, Math.min(t, vH-bubble.offsetHeight));
+        if (cL!==l||cT!==t) { bubble.style.left=cL+'px'; bubble.style.top=cT+'px'; }
+      }
+
+      if (panel && isPanelOpen()) {
+        var pL = parseFloat(panel.style.left)||0, pT = parseFloat(panel.style.top)||0;
+        var pW = panel.offsetWidth, pH = panel.offsetHeight;
+        panel.style.left = Math.max(0, Math.min(pL, vW-pW)) + 'px';
+        panel.style.top  = Math.max(0, Math.min(pT, vH-pH)) + 'px';
+      }
     });
   }
 
@@ -202,11 +353,20 @@
     _initialized = true;
 
     var bubble = injectBubble();
-    if (!bubble) return;
+    restoreBubblePos(bubble);
+    attachBubbleDrag(bubble);
 
-    restorePosition(bubble);
-    attachDrag(bubble);
-    syncExpandedClass();
+    // Panel may not exist yet (injected by portal HTML fetch) — poll briefly
+    function wirePanel() {
+      var panel = document.getElementById('aiPanel');
+      if (!panel) { setTimeout(wirePanel, 150); return; }
+      detachPanel();
+      attachPanelDrag(panel);
+      syncExpandedClass(bubble);
+    }
+    wirePanel();
+
+    hookBridge();
     wireResize();
     exposeAPI();
   }
