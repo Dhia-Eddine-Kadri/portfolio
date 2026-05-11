@@ -122,7 +122,7 @@ function callOpenAI(systemPrompt, userMessage, maxTokens, model) {
         } catch (e) { reject(e); }
       });
     });
-    req.setTimeout(18000, function () { req.destroy(new Error('OpenAI timed out')); });
+    req.setTimeout(45000, function () { req.destroy(new Error('OpenAI timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -498,7 +498,8 @@ function normalizeGeneratedItems(tool, items) {
       } else {
         return null;
       }
-      if (letters.some(function (l) { return !options[l]; })) return null;
+      // Fill any missing options rather than discarding the whole item
+      letters.forEach(function (l) { if (!options[l]) options[l] = '—'; });
       const answer = typeof item.answer === 'string'
         ? item.answer.trim().toUpperCase()
         : letters[item.answer] || '';
@@ -653,10 +654,12 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     try {
       result = await callOpenAI(systemPrompt, userMessage, maxTokens, model);
     } catch (e) {
+      console.warn('[study-pipeline] OpenAI call failed:', e && e.message);
       // Timeout or API error — return whatever we have so far
       break;
     }
 
+    console.log('[study-pipeline] OpenAI raw items count:', result && result.items && result.items.length);
     const fileItems = deduplicateItems(normalizeGeneratedItems(tool, result.items || []));
     allItems.push.apply(allItems, fileItems);
 
