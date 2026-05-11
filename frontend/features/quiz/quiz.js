@@ -4,19 +4,10 @@
   // courseId -> { quizzes: [{id,name,items,answers,submitted,createdAt,lastTaken,progress,bestScore,_dbId}], activeId, _loaded }
   var _state = {};
 
-  // ── DB helpers ───────────────────────────────────────────────────────────────
-  function _supaHeaders() {
-    var token = window._sbToken || '';
-    var key = window._SAKEY || '';
-    return { 'Content-Type': 'application/json', 'apikey': key, 'Authorization': 'Bearer ' + token };
-  }
-  function _supaUrl() { return (window._SUPA || '').replace(/\/$/, ''); }
-  function _userId() {
-    try {
-      var p = (window._sbToken || '').split('.')[1];
-      return JSON.parse(atob(p.replace(/-/g,'+').replace(/_/g,'/'))).sub || null;
-    } catch(e) { return null; }
-  }
+  // ── DB helpers (shared via js/utils/db-helpers.js) ──────────────────────────
+  function _supaHeaders() { return window._ssDb.supaHeaders(); }
+  function _supaUrl()     { return window._ssDb.supaUrl(); }
+  function _userId()      { return window._ssDb.userId(); }
 
   function _dbLoadQuizzes(courseId) {
     var url = _supaUrl() + '/rest/v1/quiz_runs?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=50';

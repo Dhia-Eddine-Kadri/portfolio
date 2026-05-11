@@ -23,7 +23,6 @@ var PDF_DATA = {
 
 // ── GLOBAL FUNCTIONS (accessible from inline onclick) ─────────────────────
 
-// copyBubble / fallbackCopy / regenMsg / addBotMsg / addUserMsg / _setAiChipsVisible → features/ai-chat/ai-message-actions.js
 import {
   copyBubble as _copyBubble,
   fallbackCopy as _fallbackCopy,
@@ -82,8 +81,6 @@ var _pendingPortalRestore = null;
 function _ssPushHistory() {}
 function _ssReplaceHistory() {}
 
-// _showFilesView / _hideFilesView → core/panels.js (imported above in navigation block)
-
 // ── NAVIGATION + PANEL FUNCTIONS → core/navigation.js + core/panels.js ───────
 import {
   showPortal as _showPortal,
@@ -134,8 +131,6 @@ function _navTo(navId, sec) {
 function openSB() {}
 function closeSB() {}
 
-// showToast — moved to features/toast/toast.js
-
 var saveState = function () {};
 window.saveState = function () {
   return saveState();
@@ -165,11 +160,6 @@ function renderTT() {}
 function renderMails() {}
 
 // ── Folder picker popup ───────────────────────────────────────────────────
-// _showFolderPickerPopup → features/courses/course-folders.js
-
-// (user storage functions → js/app-storage.js)
-
-// openCourse / showCourseSection → features/courses/course-view.js
 import {
   openCourse as _openCourse,
   showCourseSection as _showCourseSection
@@ -177,11 +167,9 @@ import {
 window.openCourse = _openCourse;
 window.showCourseSection = _showCourseSection;
 
-// _showFolderPickerPopup → features/courses/course-folders.js
 import { showFolderPickerPopup as _showFolderPickerPopup_ } from './features/courses/course-folders.js?v=5';
 window._showFolderPickerPopup = _showFolderPickerPopup_;
 
-// _fetchPdfBytes / downloadFile / openFile → services/pdf-service.js + features/pdf-viewer/pdf-viewer.js
 import {
   fetchPdfBytes as _fetchPdfBytes_,
   downloadFile as _downloadFile
@@ -200,14 +188,7 @@ window._fetchPdfBytes = _fetchPdfBytes;
 window.openFile = openFile;
 window.downloadFile = downloadFile;
 
-// openFile body → features/pdf-viewer/pdf-viewer.js
-// showCourseSection body → features/courses/course-view.js
-
-// (PDF viewer + annotation engine → js/app-pdf.js)
-
 // ── INIT ─────────────────────────────────────────────────────────────────────
-
-// (COLORS, SEMS, MAJOR_LIST, SUBJECT_LIST → js/app-data.js)
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 var activeSemId = 'ws2526',
@@ -639,12 +620,7 @@ document.addEventListener('click', function (e) {
 //    so there's never a gap where the app is visible
 // 3. z-index is adjusted so the visible page always sits on top
 
-// _panelShow / _panelHide → core/panels.js (imported in navigation block)
-
-// nav/portal listeners moved to ss-ready
 // ── SIDEBAR ───────────────────────────────────────────────────────────────
-
-// sidebar listeners moved to ss-ready
 
 // Semester dropdown removed (sidebar removed)
 function closeDD() {}
@@ -657,8 +633,6 @@ function closeDD() {}
   var _bLbl = document.getElementById('nightLabel');
   if (_bLbl) _bLbl.textContent = Store.getState().settings.darkMode ? 'Night' : 'Day';
 })();
-// nightBtn listener moved to ss-ready
-
 // ── COURSES ───────────────────────────────────────────────────────────────
 
 // ── TIMETABLE ─────────────────────────────────────────────────────────────
@@ -708,14 +682,11 @@ var msmCurrentTitle = '';
   }
 );
 
-// runMultiSummary → features/ai-chat/multi-summary.js
 import { runMultiSummary as _runMultiSummary } from './features/ai-chat/multi-summary.js';
 function runMultiSummary(fnames, course) {
   return _runMultiSummary(fnames, course);
 }
 window.runMultiSummary = runMultiSummary;
-
-// downloadFile → services/pdf-service.js (re-exported below with fetchPdfBytes)
 
 // ── PDF ───────────────────────────────────────────────────────────────────
 
@@ -873,23 +844,6 @@ var aiPanel = document.getElementById('aiPanel'),
   aiTab = document.getElementById('aiTab');
 var hoverZone = document.getElementById('aiHoverZone');
 
-// AI panel lifecycle + selection banner now live in features/ai-chat/ai-panel-bridge.js
-
-// Only open on click or direct hover over the tab logo — not the wide hover zone
-// bound via initAiPanelBridge(...)
-
-// bound via initAiPanelBridge(...)
-
-// Reset manual-closed once cursor moves far from right edge (150px)
-// bound via initAiPanelBridge(...)
-
-// bound via initAiPanelBridge(...)
-
-// bound via initAiPanelBridge(...)
-
-// ── SELECTION BANNER ──────────────────────────────────────────────────────
-// showSelectionBanner → features/ai-chat/ai-panel-bridge.js
-
 // ── AI MESSAGES ───────────────────────────────────────────────────────────
 var aiMsgs = document.getElementById('aiMsgs');
 initAiRenderBridge();
@@ -928,16 +882,9 @@ window.forceCloseAI = forceCloseAI;
 window.pinAI = pinAI;
 window.showSelectionBanner = showSelectionBanner;
 
-// getTime → features/ai-chat/ai-message-actions.js (private helper there)
-
-// renderMarkdown → features/ai-chat/ai-markdown.js
-
 // ── MATH RENDERING (KaTeX) ───────────────────────────────────────────────
 
-// _aiMakePdfBlob / _aiDownloadPdf / _ufDestPicker / _glMoveDestPicker / _aiExportToCourse / _aiShowExportModal / _aiResponseActions → features/ai-chat/ai-export.js
 initAiExportBridge();
-
-// addBotMsg / addUserMsg / _setAiChipsVisible → features/ai-chat/ai-message-actions.js (bridged at top of file)
 
 // Welcome message — deferred so _t is defined
 setTimeout(function () {
@@ -946,8 +893,6 @@ setTimeout(function () {
       window._t ? window._t('ai_welcome') : "👋 Hello! Open a PDF and I'll help you study it."
     );
 }, 0);
-
-// askAI / addTyping / pdfToImages → features/ai-chat/ai-ask.js
 
 var _aiState = {
   get generationStopped() {
@@ -982,9 +927,7 @@ askAI = _aiAskBridge.askAI;
 // ── ASK AI ────────────────────────────────────────────────────────────────
 
 // ── SEND BUTTON ───────────────────────────────────────────────────────────
-// chipPrompt / closeAllOpts / chip listeners → features/ai-chat/ai-chips.js
 initAiChipsBridge();
-// ── PER-PDF CHAT PERSISTENCE — moved to features/js/chat.js ─────────────────
 
 // ── CONFETTI ──────────────────────────────────────────────────────────────
 initAiConfettiBridge();
@@ -1005,32 +948,6 @@ initAiConfettiBridge();
 renderCourses();
 renderTT();
 renderMails();
-
-// ── STATE PERSISTENCE ─────────────────────────────────────────────────────
-
-// Flash scroll hint when new message arrives
-
-// ── INTERACTIVE EFFECTS JS ─────────────────────────────────────────
-
-// Ripple effect on any clickable element in AI panel
-
-// ── PORTAL SECTION SWITCHER ───────────────────────────────────────────────
-
-// pc* card listeners moved to ss-ready
-
-// ── SUPABASE AUTH + DATA ─────────────────────────────────────────────────
-// Note: auth DOM elements are injected dynamically by loader.js, so we must
-// wait for 'ss-ready' before querying them — NOT DOMContentLoaded.
-
-// ── END INIT ─────────────────────────────────────────────────────────────────
-
-// ── SS-READY (runs at top level since app.js loads after all HTML) ───────────
-
-// ── DOM LISTENERS (elements injected by loader.js — must be in ss-ready) ────
-
-// Nav buttons
-
-// Sidebar
 
 // ── Theme transition: radial ripple from click origin ────────────────────
 function _applyTheme(toNight, originEl) {
@@ -1156,40 +1073,16 @@ var _authBridge = initAuthBridge({
   }
 });
 
-// _startPresenceHeartbeat / loadUserData / applyProfile / _applyUserTypeUI → features/auth/user-data.js
-
 var _userType = localStorage.getItem('ss_user_type') || 'enrolled';
 var _germanTest = '';
 var _germanLevel = '';
 
-// GERMAN LEARNER PRACTICE -- moved to features/js/practice.js
-
-// LANGUAGE / i18n → features/settings/language.js
 initSettingsBridge();
-
-// applyLanguage → features/settings/language.js
-
-// applySettings → features/settings/settings.js
-
-// ── ADMIN PANEL → features/admin/admin-panel.js ──────────────────────────
 
 // ── LANDING PAGE ─────────────────────────────────────────────────────────
 initLandingAuthBridge({
   authBridge: _authBridge
 });
-
-// ── END SS-READY ─────────────────────────────────────────────────────────────
-
-// ── ONBOARDING → features/auth/onboarding.js ────────────────────────────
-
-// _obBaseInfo / _obSaveAndClose / _obFinish / _obFinishLearner / listeners → features/auth/onboarding.js
-// ?? STUDY LOUNGE ??????????????????????????????????????????????????????????
-
-// ── CHATBOT PAGE — moved to features/chatbot/chatbot.js ──────────────────────
-
-// ── CHAT — moved to features/js/chat.js ──────────────────────────────────────
-// WIDGET DASHBOARD + GOOGLE CALENDAR -- moved to features/js/dashboard.js
-// Music Services -> features/music/music-services.js
 
 // ── Subscription service → services/subscription-service.js ─────────────
 import {
@@ -1207,7 +1100,6 @@ window._subService = {
   loadBillingConfig: _loadBillingConfig
 };
 
-// ── Study Techniques → features/study-timer/study-timer.js ───────────────
 if (window.StudySphere) {
   window.StudySphere.markReady('app-js-evaluated', {});
   window.StudySphere.emit('app:script-evaluated', {});

@@ -373,6 +373,7 @@
           'features/chatbot/ai-bubble.js',
           'features/chat/chat.js',
           'features/dashboard/dashboard.js',
+          'js/utils/db-helpers.js',
           'features/practice/practice.js',
           'features/flashcards/flashcards.js',
           'features/quiz/quiz.js',
