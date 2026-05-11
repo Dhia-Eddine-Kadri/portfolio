@@ -543,22 +543,14 @@
   }
 
   // ── Boot ───────────────────────────────────────────────────────────────────
-  window.addEventListener('ss-ready', init);
-
-  if (document.readyState !== 'loading' && window._ssReady) {
-    init();
-  } else if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    // Fallback: init on DOMContentLoaded if ss-ready never fires
-    if (document.readyState === 'complete') {
-      setTimeout(init, 0);
-    } else {
-      document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(init, 100);
-      });
-    }
+  // ss-ready fires from loader.js before this script loads, so we can't rely on
+  // catching that event. Instead: if DOM is ready, init immediately; otherwise
+  // wait for DOMContentLoaded. The _initialized guard prevents double-init.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    document.addEventListener('DOMContentLoaded', function () {
-      setTimeout(init, 100);
-    });
+    init();
   }
+  // Also listen for ss-ready in case this script somehow loads before it fires.
+  window.addEventListener('ss-ready', init);
 })();
