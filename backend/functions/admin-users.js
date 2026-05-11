@@ -72,13 +72,24 @@ exports.handler = async function (event) {
   if (action === 'search') {
     if (query.length < 2) return fail(400, 'Search query must be at least 2 characters');
 
-    const searchRes = await supaAuthAdminRequest('GET', 'users?per_page=50&page=1', serviceKey);
-    if (searchRes.status < 200 || searchRes.status >= 300) return fail(500, 'User search failed');
-
     const lowerQuery = query.toLowerCase();
-    const allUsers = (searchRes.body.users || []).filter(function (u) {
-      return u.email && u.email.toLowerCase().includes(lowerQuery);
-    });
+    const matchedUsers = [];
+    const PER_PAGE = 50;
+    let page = 1;
+    while (matchedUsers.length < 10) {
+      const searchRes = await supaAuthAdminRequest(
+        'GET', 'users?per_page=' + PER_PAGE + '&page=' + page, serviceKey
+      );
+      if (searchRes.status < 200 || searchRes.status >= 300) return fail(500, 'User search failed');
+      const pageUsers = searchRes.body && searchRes.body.users || [];
+      pageUsers.forEach(function (u) {
+        if (u.email && u.email.toLowerCase().includes(lowerQuery)) matchedUsers.push(u);
+      });
+      if (pageUsers.length < PER_PAGE) break; // no more pages
+      page++;
+      if (page > 20) break; // safety cap: max 1000 users scanned
+    }
+    const allUsers = matchedUsers;
 
     const results = [];
     for (const u of allUsers.slice(0, 10)) {

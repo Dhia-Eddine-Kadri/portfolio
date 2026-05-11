@@ -308,6 +308,21 @@ function _bindSubscriptionControls() {
       this.disabled = false;
     });
   }
+
+  var paywallLogoutBtn = document.getElementById('paywallLogoutBtn');
+  if (paywallLogoutBtn && !paywallLogoutBtn.dataset.bound) {
+    paywallLogoutBtn.dataset.bound = '1';
+    paywallLogoutBtn.addEventListener('click', function () {
+      if (typeof window._sbSignOut === 'function') window._sbSignOut();
+      else if (typeof window._obLogout === 'function') window._obLogout();
+      else {
+        localStorage.removeItem('sb_token');
+        localStorage.removeItem('sb_refresh');
+        sessionStorage.clear();
+        window.location.reload();
+      }
+    });
+  }
 }
 
 document.addEventListener('click', function (e) {

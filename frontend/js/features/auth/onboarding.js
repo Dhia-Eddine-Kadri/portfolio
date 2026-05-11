@@ -47,7 +47,7 @@ function _obBaseInfo() {
   };
 }
 
-async function _obSaveAndClose(profilePayload, cachePayload) {
+async function _obSaveAndClose(profilePayload, cachePayload, onError) {
   var _currentUser = window._currentUser;
   if (_currentUser) {
     try {
@@ -58,11 +58,18 @@ async function _obSaveAndClose(profilePayload, cachePayload) {
         delete fallback.german_test;
         delete fallback.german_level;
         delete fallback.user_type;
-        await window._sb.from('profiles').upsert(fallback);
+        var fallbackRes = await window._sb.from('profiles').upsert(fallback);
+        if (fallbackRes && fallbackRes.error) {
+          console.warn('Profile save error (both attempts failed):', fallbackRes.error);
+          if (typeof onError === 'function') onError();
+          return;
+        }
         console.warn('Profile partial save:', res.error);
       }
     } catch (e) {
       console.warn('Profile save error:', e);
+      if (typeof onError === 'function') onError();
+      return;
     }
     try {
       localStorage.setItem('profile_cache_' + _currentUser.id, JSON.stringify(cachePayload));
@@ -373,6 +380,10 @@ export function initOnboarding() {
     var btn = document.getElementById('obFinish');
     btn.textContent = '⏳ Saving…';
     btn.disabled = true;
+    function _reEnableFinish() {
+      btn.textContent = 'Finish';
+      btn.disabled = false;
+    }
 
     var info = _obBaseInfo();
     var fullName = info.first + ' ' + info.last;
@@ -416,7 +427,7 @@ export function initOnboarding() {
       vertiefung: vertiefung,
       matrikel: matrikel,
       user_type: 'enrolled'
-    });
+    }, _reEnableFinish);
   };
 
   window._obFinishLearner = async function () {
@@ -435,6 +446,10 @@ export function initOnboarding() {
     var btn = document.getElementById('obFinishLearner');
     btn.textContent = '⏳ Saving…';
     btn.disabled = true;
+    function _reEnableFinishLearner() {
+      btn.textContent = 'Finish';
+      btn.disabled = false;
+    }
 
     var info = _obBaseInfo();
     var fullName = info.first + ' ' + info.last;
@@ -462,7 +477,7 @@ export function initOnboarding() {
       user_type: 'learner',
       german_test: _obTest,
       german_level: _obLevel
-    });
+    }, _reEnableFinishLearner);
   };
 
   // Event listeners
