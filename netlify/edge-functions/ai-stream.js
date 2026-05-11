@@ -46,6 +46,16 @@ export default async function handler(request, context) {
   const handwrittenImages = Array.isArray(pageImages) && pageImages.length ? pageImages.slice(0, 8) : null;
   if (question.length > 2000) return new Response('Question too long', { status: 400, headers: corsHeaders() });
 
+  // Verify the courseId belongs to the authenticated user
+  const courseCheckRes = await fetch(
+    SUPABASE_URL + '/rest/v1/courses?id=eq.' + encodeURIComponent(courseId) + '&user_id=eq.' + userId + '&select=id&limit=1',
+    { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY } }
+  );
+  const courseCheck = await courseCheckRes.json();
+  if (!Array.isArray(courseCheck) || !courseCheck.length) {
+    return new Response('Course not found', { status: 403, headers: corsHeaders() });
+  }
+
   const ragMode = mode === 'general' ? 'general' : 'strict';
 
   // ── Build SSE stream ──────────────────────────────────────────────────────
@@ -184,7 +194,7 @@ export default async function handler(request, context) {
         : question;
       const [qTypeResult, docNames] = await Promise.all([
         classifyQuestion(classifyInput, OPENAI_API_KEY),
-        fetchDocNames([...new Set(rawChunks.map(c => c.document_id))], SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        fetchDocNames([...new Set(rawChunks.map(c => c.document_id))], userId, SUPABASE_URL, SUPABASE_SERVICE_KEY)
       ]);
       qType = qTypeResult;
       // Force exercise type when the open PDF clearly contains an exercise — catches short
@@ -640,12 +650,13 @@ async function fetchOpenDocChunks(userId, courseId, docId, embedding, question, 
   } catch (e) { return null; }
 }
 
-async function fetchDocNames(docIds, supaUrl, serviceKey) {
+async function fetchDocNames(docIds, userId, supaUrl, serviceKey) {
   if (!docIds.length) return {};
   const ids = docIds.map(id => '"' + id + '"').join(',');
-  const res = await fetch(supaUrl + '/rest/v1/documents?id=in.(' + ids + ')&select=id,file_name', {
-    headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey }
-  });
+  const res = await fetch(
+    supaUrl + '/rest/v1/documents?id=in.(' + ids + ')&user_id=eq.' + userId + '&select=id,file_name',
+    { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+  );
   const data = await res.json();
   const map = {};
   if (Array.isArray(data)) data.forEach(d => { map[d.id] = d.file_name; });

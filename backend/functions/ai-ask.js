@@ -939,7 +939,7 @@ function touchAnswerCache(serviceKey, cacheId) {
     'ai_answer_cache?id=eq.' + cacheId,
     { last_used_at: new Date().toISOString(), usage_count: null }, // usage_count incremented via DB
     serviceKey
-  ).catch(function () {});
+  ).catch(function (e) { console.error('[ai-ask] cache touch error:', e.message); });
 }
 
 // Look up semantic cache via match_cached_questions RPC
@@ -1057,7 +1057,7 @@ function storeQuestionCache(
     },
     serviceKey,
     { Prefer: 'return=minimal' }
-  ).catch(function () {});
+  ).catch(function (e) { console.error('[ai-ask] question cache store error:', e.message); });
 }
 
 // ─── Retrieval cache ──────────────────────────────────────────────────────────
@@ -1130,7 +1130,7 @@ function storeRetrievalCache(
     },
     serviceKey,
     { Prefer: 'return=minimal' }
-  ).catch(function () {});
+  ).catch(function (e) { console.error('[ai-ask] retrieval cache store error:', e.message); });
 }
 
 // ─── Chunk deduplication ──────────────────────────────────────────────────────
@@ -1456,7 +1456,7 @@ exports.handler = async function (event) {
         );
       }
     })
-    .catch(function () {});
+    .catch(function (e) { console.error('[ai-ask] answer cache store error:', e.message); });
 
   return jsonResponse(200, Object.assign({}, answerJson, { cached: false }));
 };

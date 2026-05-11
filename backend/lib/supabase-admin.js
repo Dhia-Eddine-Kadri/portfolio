@@ -80,4 +80,34 @@ function supaAuthAdminRequest(method, path, serviceKey) {
   });
 }
 
-module.exports = { supaRequest, supaAuthAdminRequest };
+/**
+ * Fetches the user's subscription and returns it only if it is genuinely active
+ * (status = 'active' AND expires_at is either null or in the future).
+ * Returns null if the user has no subscription or if it has expired.
+ */
+async function getActiveSubscription(serviceKey, userId) {
+  const result = await supaRequest(
+    'GET',
+    'subscriptions?user_id=eq.' + encodeURIComponent(userId) +
+    '&select=plan,status,expires_at&limit=1',
+    null,
+    serviceKey
+  );
+  const sub = Array.isArray(result.body) && result.body[0];
+  if (!sub) return null;
+  if (sub.status !== 'active') return null;
+  if (sub.expires_at && new Date(sub.expires_at) < new Date()) {
+    // Subscription has expired — mark it cancelled so future reads are consistent
+    supaRequest(
+      'PATCH',
+      'subscriptions?user_id=eq.' + encodeURIComponent(userId),
+      { status: 'expired', updated_at: new Date().toISOString() },
+      serviceKey,
+      { Prefer: 'return=minimal' }
+    ).catch(function (e) { console.error('[supabase-admin] subscription expiry patch error:', e.message); });
+    return null;
+  }
+  return sub;
+}
+
+module.exports = { supaRequest, supaAuthAdminRequest, getActiveSubscription };

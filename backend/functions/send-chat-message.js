@@ -4,6 +4,10 @@ const { supaRequest } = require('../lib/supabase-admin');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { logSecurityEvent } = require('../lib/logger');
 const { isUuid, cleanText } = require('../lib/validation');
+const { countRecentMessages, rateLimitResponse } = require('../lib/rate-limit');
+
+const CHAT_RATE_LIMIT_MAX    = parseInt(optionalEnv('CHAT_RATE_LIMIT_MAX',    '30'), 10);
+const CHAT_RATE_LIMIT_WINDOW = parseInt(optionalEnv('CHAT_RATE_LIMIT_WINDOW_MS', String(60 * 1000)), 10);
 
 
 function dmUsers(roomId) {
@@ -110,6 +114,12 @@ exports.handler = async function (event) {
   }
 
   try {
+    const msgCount = await countRecentMessages(serviceKey, user.id, CHAT_RATE_LIMIT_WINDOW);
+    if (msgCount >= CHAT_RATE_LIMIT_MAX) {
+      await logSecurityEvent(serviceKey, user.id, 'chat_rate_limited', { room_id: roomId, count: msgCount });
+      return rateLimitResponse(CHAT_RATE_LIMIT_WINDOW, 'You are sending messages too quickly. Please wait a moment.');
+    }
+
     const canSend = await userCanSendToRoom(user.id, roomId, serviceKey);
     if (!canSend) {
       await logSecurityEvent(serviceKey, user.id, 'chat_send_denied', { room_id: roomId });

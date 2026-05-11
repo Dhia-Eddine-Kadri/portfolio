@@ -104,7 +104,7 @@ exports.handler = async function (event) {
     'retrieval_cache?user_id=eq.' + user.id + '&course_id=eq.' + encodeURIComponent(doc.course_id),
     null,
     serviceKey
-  ).catch(function () {});
+  ).catch(function (e) { console.error('[documents-delete] cache purge error:', e.message); });
 
   // Delete from storage
   if (doc.storage_path) {

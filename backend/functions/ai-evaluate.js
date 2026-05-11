@@ -106,7 +106,7 @@ async function saveResult(serviceKey, ev, answer, verdict) {
       run_at: new Date().toISOString()
     },
     serviceKey
-  ).catch(function () {});
+  ).catch(function (e) { console.error('[ai-evaluate] store result error:', e.message); });
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────

@@ -320,7 +320,7 @@ async function saveNote(serviceKey, opts) {
       });
     if (sourceRows.length) {
       await supaRequest('POST', 'note_sources', sourceRows, serviceKey, { 'Prefer': 'return=minimal' })
-        .catch(function () {});
+        .catch(function (e) { console.error('[notes-generate] note_sources insert error:', e.message); });
     }
   }
   return noteId;
