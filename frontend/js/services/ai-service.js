@@ -28,6 +28,7 @@ export async function sendRagRequest(courseId, question, mode, documentId, activ
     },
     body: JSON.stringify(payload)
   });
+  if (!response.ok) throw new Error('HTTP ' + response.status);
   return response.json();
 }
 

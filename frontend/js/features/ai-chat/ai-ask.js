@@ -676,9 +676,10 @@ export function initAskAI(state) {
                 }
                 answer += '\n\n' + confEmoji + ' Confidence: ' + (data.confidence || 'medium');
                 resolve({ content: [{ text: answer }], _ragData: data });
-              }).catch(function () {
+              }).catch(function (err) {
                 if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
-                resolve({ content: [{ text: '❌ Could not reach the AI. Please try again.' }] });
+                var msg = err && err.message ? ' (' + err.message + ')' : '';
+                resolve({ content: [{ text: '❌ Could not reach the AI' + msg + '. Please try again.' }] });
               });
             }
 
