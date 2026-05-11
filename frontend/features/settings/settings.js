@@ -43,6 +43,11 @@ async function saveSettings(patch) {
   if (!_currentUser) return;
   var data = Object.assign({ id: _currentUser.id, updated_at: new Date().toISOString() }, patch);
   var result = await _sb.from('settings').upsert(data);
+  if (result && result.error && Object.prototype.hasOwnProperty.call(data, 'dark_mode')) {
+    var fallback = Object.assign({}, data);
+    delete fallback.dark_mode;
+    result = await _sb.from('settings').upsert(fallback);
+  }
   if (result && result.error) console.error('saveSettings error:', result.error);
 }
 
@@ -156,6 +161,7 @@ async function saveSettings(patch) {
         'en';
       var autoOpen = !!(document.getElementById('settingsAutoOpen') || {}).checked;
       var saveChat = !!(document.getElementById('settingsSaveChat') || {}).checked;
+      var darkMode = !!(document.getElementById('settingsDarkMode') || {}).checked;
       if (!saveChat) {
         Object.keys(localStorage)
           .filter(function (k) {
@@ -165,7 +171,12 @@ async function saveSettings(patch) {
             localStorage.removeItem(k);
           });
       }
-      await saveSettings({ language: lang, auto_open_ai: autoOpen, save_chat_history: saveChat });
+      await saveSettings({
+        language: lang,
+        auto_open_ai: autoOpen,
+        save_chat_history: saveChat,
+        dark_mode: darkMode
+      });
       showToast(_t('toast_settings_saved'), _t('toast_settings_saved_sub'));
     });
   }

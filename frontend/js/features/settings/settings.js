@@ -1,4 +1,13 @@
 export function applySettings(s) {
+  s = s || {};
+  if (typeof s.dark_mode === 'boolean') {
+    if (typeof window._applyTheme === 'function' && window.nightOn !== s.dark_mode) {
+      window._applyTheme(s.dark_mode);
+    } else {
+      document.body.classList.toggle('night', s.dark_mode);
+      localStorage.setItem('ss_dark', s.dark_mode ? '1' : '0');
+    }
+  }
   var dm = document.getElementById('settingsDarkMode');
   if (dm) dm.checked = window.nightOn;
 

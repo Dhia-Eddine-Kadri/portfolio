@@ -192,50 +192,7 @@
         );
       }
       if (type === 'mail')
-        return (
-          '<div class="mw-badge">3 unread</div>' +
-          [
-            {
-              av: 'P',
-              from: 'Prof. M\xFCller',
-              subj: '\xDCbungsblatt 5 â€” Abgabe Freitag',
-              t: '10:34',
-              g: 'linear-gradient(135deg,#2563EB,#7C3AED)'
-            },
-            {
-              av: 'S',
-              from: 'Stud.IP System',
-              subj: 'New material in Mathematik III',
-              t: '09:12',
-              g: 'linear-gradient(135deg,#7C3AED,#22C55E)'
-            },
-            {
-              av: 'T',
-              from: 'TU Braunschweig',
-              subj: 'Semesterticket Verl\xE4ngerung',
-              t: 'Ges.',
-              g: 'linear-gradient(135deg,#F59E0B,#2563EB)'
-            }
-          ]
-            .map(function (m) {
-              return (
-                '<div class="mw-row"><div class="mw-av" style="background:' +
-                m.g +
-                '">' +
-                m.av +
-                '</div>' +
-                '<div class="mw-info"><div class="mw-from">' +
-                m.from +
-                '</div><div class="mw-subj">' +
-                m.subj +
-                '</div></div>' +
-                '<div class="mw-t">' +
-                m.t +
-                '</div></div>'
-              );
-            })
-            .join('')
-        );
+        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">Mail sync is not connected yet.</div>';
       if (type === 'notes')
         return (
           '<div class="nw-list"></div>' +
@@ -248,36 +205,28 @@
           '</div>' +
           '<button class="nw-add-btn" style="margin-top:8px;width:100%;padding:8px;background:rgba(192,132,252,.1);border:1px dashed rgba(192,132,252,.35);border-radius:10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:rgba(192,132,252,.8);cursor:pointer">+ Add note</button>'
         );
-      if (type === 'stats')
+      if (type === 'stats') {
+        var fileCount = 0;
+        Object.keys(SEMS || {}).forEach(function (semId) {
+          ((SEMS[semId] && SEMS[semId].courses) || []).forEach(function (course) {
+            fileCount += (course.files || []).length;
+            (course.userFolders || []).forEach(function (folder) {
+              fileCount += (folder.files || []).length;
+            });
+          });
+        });
         return (
-          '<div class="sw-chips"><div class="sw-chip"><div class="sw-val">12</div><div class="sw-lbl">PDFs</div></div>' +
-          '<div class="sw-chip"><div class="sw-val">28</div><div class="sw-lbl">AI chats</div></div>' +
-          '<div class="sw-chip"><div class="sw-val">14h</div><div class="sw-lbl">This week</div></div></div>' +
-          '<div class="sw-bar-row"><span>Weekly goal</span><span>70%</span></div>' +
-          '<div class="sw-bar"><div class="sw-bar-fill" style="width:70%"></div></div>'
+          '<div class="sw-chips"><div class="sw-chip"><div class="sw-val">' + fileCount + '</div><div class="sw-lbl">Files</div></div>' +
+          '<div class="sw-chip"><div class="sw-val">' + ((window._qnNotes || []).length) + '</div><div class="sw-lbl">Notes</div></div>' +
+          '<div class="sw-chip"><div class="sw-val">0h</div><div class="sw-lbl">This week</div></div></div>' +
+          '<div class="sw-bar-row"><span>Weekly goal</span><span>Not set</span></div>' +
+          '<div class="sw-bar"><div class="sw-bar-fill" style="width:0%"></div></div>'
         );
+      }
       if (type === 'deadlines')
-        return [
-          { c: '#ef4444', n: '\xDCbungsblatt 5 Abgabe', d: 'Fri 28 Mar' },
-          { c: '#F59E0B', n: 'Praktikumsbericht', d: '2 Apr' },
-          { c: '#22C55E', n: 'Klausur Anmeldung', d: '15 Apr' },
-          { c: '#7C3AED', n: 'Seminararbeit', d: '30 Apr' }
-        ]
-          .map(function (x) {
-            return (
-              '<div class="dlw-row"><span class="dlw-dot" style="background:' +
-              x.c +
-              '"></span>' +
-              '<span class="dlw-name">' +
-              x.n +
-              '</span><span class="dlw-date">' +
-              x.d +
-              '</span></div>'
-            );
-          })
-          .join('');
+        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">No deadline source connected yet.</div>';
       if (type === 'weather')
-        return '<div class="ww-temp">12\xB0</div><div class="ww-desc">â›… Partly cloudy</div><div class="ww-loc">Braunschweig</div>';
+        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">Weather data is not connected yet.</div>';
       if (type === 'ai')
         return (
           '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anythingâ€¦"/><button class="aw-btn">â†’</button></div>' +

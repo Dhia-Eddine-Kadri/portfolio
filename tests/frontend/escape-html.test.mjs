@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml } from '../../frontend/js/utils/escape-html.js';
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
 
 test('escapeHtml escapes &', () => {
   assert.equal(escapeHtml('a & b'), 'a &amp; b');

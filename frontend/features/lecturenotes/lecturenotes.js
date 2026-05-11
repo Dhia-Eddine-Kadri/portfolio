@@ -39,11 +39,21 @@
       }
     }
 
+    function lnEscapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function lnRenderMarkdown(text) {
+      text = lnEscapeHtml(text);
       text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       text = text.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-      text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
       text = text.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+      text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
       text = text.replace(/((?:^[•\-\*] .+$\n?)+)/gm, function (block) {
         return (
           '<ul>' + block.replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>').replace(/\n/g, '') + '</ul>'
@@ -106,16 +116,16 @@
           '">' +
           '<div class="ln-card-hdr">' +
           '<div class="ln-card-title">' +
-          s.title +
+          lnEscapeHtml(s.title) +
           '</div>' +
           '<div class="ln-card-meta"><span class="ln-card-date">' +
-          lnFormatDate(s.date) +
+          lnEscapeHtml(lnFormatDate(s.date)) +
           '</span><span class="ln-card-badge">' +
-          source +
+          lnEscapeHtml(source) +
           '</span></div>' +
           '</div>' +
           '<div class="ln-card-preview">' +
-          preview +
+          lnEscapeHtml(preview) +
           '…</div>' +
           '</div>';
       });

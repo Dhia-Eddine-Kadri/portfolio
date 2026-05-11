@@ -404,7 +404,10 @@
             var s = document.createElement('script');
             s.src = src + '?v=' + _v;
             s.onload = res;
-            s.onerror = res; // don't block ss-ready on a failed feature script
+            s.onerror = function () {
+              console.error('Failed to load feature script:', src);
+              res();
+            };
             document.body.appendChild(s);
           });
         });

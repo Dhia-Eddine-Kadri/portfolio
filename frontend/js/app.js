@@ -17,10 +17,6 @@ import { initAiPanelBridge } from './features/ai-chat/ai-panel-bridge.js';
 import { initSemesterDropdown } from './features/courses/semester-dropdown.js';
 import { initPdfControls } from './features/pdf-viewer/pdf-controls.js';
 
-var PDF_DATA = {
-  'Aufgabe_1_3.pdf': 'assets/Aufgabe_1_3.pdf'
-};
-
 // ── GLOBAL FUNCTIONS (accessible from inline onclick) ─────────────────────
 
 import {

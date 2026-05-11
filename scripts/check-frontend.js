@@ -21,9 +21,15 @@ function rel(file) {
 }
 
 function checkJs(file) {
-  const result = spawnSync(process.execPath, ['--check', file], {
+  const source = fs.readFileSync(file, 'utf8');
+  const isFrontend = file.startsWith(path.join(root, 'frontend'));
+  const isModule =
+    isFrontend && /^\s*(import|export)\s/m.test(source);
+  const args = isModule ? ['--check', '--input-type=module'] : ['--check', file];
+  const result = spawnSync(process.execPath, args, {
     cwd: root,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    input: isModule ? source : undefined
   });
   if (result.status !== 0) {
     return (result.stderr || result.stdout || '').trim();
