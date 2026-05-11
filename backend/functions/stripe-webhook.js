@@ -3,14 +3,19 @@ const { requireEnv } = require('../lib/env');
 const { supaRequest } = require('../lib/supabase-admin');
 
 function verifyStripeSignature(payload, sigHeader, secret) {
+  if (!sigHeader || typeof sigHeader !== 'string') return false;
   const parts = sigHeader.split(',').reduce(function (acc, p) {
-    const [k, v] = p.split('=');
-    acc[k] = v;
+    const eq = p.indexOf('=');
+    if (eq !== -1) acc[p.slice(0, eq)] = p.slice(eq + 1);
     return acc;
   }, {});
+  if (!parts.t || !parts.v1) return false;
   const signed = parts.t + '.' + payload;
   const expected = crypto.createHmac('sha256', secret).update(signed).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(parts.v1 || ''), Buffer.from(expected));
+  const expectedBuf = Buffer.from(expected, 'hex');
+  const receivedBuf = Buffer.from(parts.v1, 'hex');
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return crypto.timingSafeEqual(receivedBuf, expectedBuf);
 }
 
 exports.handler = async function (event) {

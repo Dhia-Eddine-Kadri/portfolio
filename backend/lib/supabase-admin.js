@@ -39,6 +39,7 @@ function supaRequest(method, path, body, serviceKey, extraHeaders) {
         });
       }
     );
+    req.setTimeout(12000, function () { req.destroy(new Error('Supabase REST request timed out')); });
     req.on('error', reject);
     if (bodyStr) req.write(bodyStr);
     req.end();
@@ -73,6 +74,7 @@ function supaAuthAdminRequest(method, path, serviceKey) {
         });
       }
     );
+    req.setTimeout(12000, function () { req.destroy(new Error('Supabase Auth request timed out')); });
     req.on('error', reject);
     req.end();
   });

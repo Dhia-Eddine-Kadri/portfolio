@@ -27,23 +27,20 @@ const STRONG_SIMILARITY_THRESHOLD = 0.3;
 const MAX_COMPLETION_TOKENS = 8000;
 
 // ─── Circuit breaker for fast LLM calls (HyDE / classify / rerank / verify) ──
-// If 3 calls in a row time out, skip the next 5 fast calls (each module instance).
-// Prevents wasting time on repeated 6s timeouts during OpenAI degradation.
-const _fastBreaker = { failures: 0, skipsRemaining: 0 };
-function _breakerShouldSkip() {
-  if (_fastBreaker.skipsRemaining > 0) {
-    _fastBreaker.skipsRemaining--;
-    return true;
-  }
+// Per-request: created in the handler and passed into callFastOpenAI.
+// If 3 consecutive fast calls time out within one request, the remaining
+// fast calls for that request are skipped. No cross-user state pollution.
+function _makeBreaker() {
+  return { failures: 0, skipsRemaining: 0 };
+}
+function _breakerShouldSkip(b) {
+  if (b.skipsRemaining > 0) { b.skipsRemaining--; return true; }
   return false;
 }
-function _breakerNoteSuccess() { _fastBreaker.failures = 0; }
-function _breakerNoteFailure() {
-  _fastBreaker.failures++;
-  if (_fastBreaker.failures >= 3) {
-    _fastBreaker.skipsRemaining = 5;
-    _fastBreaker.failures = 0;
-  }
+function _breakerNoteSuccess(b) { b.failures = 0; }
+function _breakerNoteFailure(b) {
+  b.failures++;
+  if (b.failures >= 3) { b.skipsRemaining = 5; b.failures = 0; }
 }
 
 
@@ -111,9 +108,8 @@ function embedQuestion(question) {
 // Multi-query: also generate 2 alternative phrasings, retrieve for each,
 // then merge results. Catches chunks that one phrasing misses.
 
-function callFastOpenAI(systemPrompt, userMsg, maxTokens) {
-  // Circuit breaker: skip the call entirely when consecutive failures spike.
-  if (_breakerShouldSkip()) return Promise.resolve('');
+function callFastOpenAI(systemPrompt, userMsg, maxTokens, breaker) {
+  if (breaker && _breakerShouldSkip(breaker)) return Promise.resolve('');
   return new Promise(function (resolve, reject) {
     const apiKey = requireEnv('OPENAI_API_KEY');
     const body = JSON.stringify({
@@ -146,10 +142,10 @@ function callFastOpenAI(systemPrompt, userMsg, maxTokens) {
             const p = JSON.parse(d);
             const text =
               p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
-            if (text) _breakerNoteSuccess(); else _breakerNoteFailure();
+            if (text) _breakerNoteSuccess(breaker); else _breakerNoteFailure(breaker);
             resolve(text || '');
           } catch (e) {
-            _breakerNoteFailure();
+            if (breaker) _breakerNoteFailure(breaker);
             resolve('');
           }
         });
@@ -157,11 +153,11 @@ function callFastOpenAI(systemPrompt, userMsg, maxTokens) {
     );
     req.setTimeout(6000, function () {
       req.destroy();
-      _breakerNoteFailure();
+      if (breaker) _breakerNoteFailure(breaker);
       resolve('');
     });
     req.on('error', function () {
-      _breakerNoteFailure();
+      if (breaker) _breakerNoteFailure(breaker);
       resolve('');
     });
     req.write(body);
@@ -169,7 +165,7 @@ function callFastOpenAI(systemPrompt, userMsg, maxTokens) {
   });
 }
 
-async function generateHydeAndQueries(question) {
+async function generateHydeAndQueries(question, breaker) {
   // Single fast LLM call: returns hypothetical passage + 2 query variants + question type.
   // Fusing classification into HyDE saves one round-trip vs a separate classifyQuestion call.
   const sysPrompt = [
@@ -182,7 +178,7 @@ async function generateHydeAndQueries(question) {
     'Output ONLY valid JSON. No markdown, no explanation.'
   ].join('\n');
 
-  const raw = await callFastOpenAI(sysPrompt, question, 400);
+  const raw = await callFastOpenAI(sysPrompt, question, 400, breaker);
   const validTypes = ['exercise', 'definition', 'derivation', 'concept', 'formula', 'other'];
   try {
     const parsed = JSON.parse(raw);
@@ -251,10 +247,10 @@ function embedBatch(texts) {
 // Types: "exercise" | "definition" | "derivation" | "concept" | "formula" | "other"
 // Runs in parallel with HyDE — adds ~0ms net latency on cache miss.
 
-async function classifyQuestion(question) {
+async function classifyQuestion(question, breaker) {
   const sys =
     'Classify this student question into exactly one of these types: exercise, definition, derivation, concept, formula, other.\nExercise: asks to solve a specific numbered problem or compute a value.\nDefinition: asks what something is or means.\nDerivation: asks to show, prove, or derive a formula or result.\nConcept: asks how/why something works.\nFormula: asks for a specific formula or equation.\nOther: anything else.\nRespond with ONLY the type word, nothing else.';
-  const result = await callFastOpenAI(sys, question, 10);
+  const result = await callFastOpenAI(sys, question, 10, breaker);
   const type = (result || '').trim().toLowerCase();
   const valid = ['exercise', 'definition', 'derivation', 'concept', 'formula', 'other'];
   return valid.includes(type) ? type : 'other';
@@ -284,7 +280,7 @@ function questionTypeInstructions(type) {
 // - Are citations plausible (right file, right page range)?
 // Returns { ok: true } or { ok: false, issues: "..." }
 
-async function verifyClaims(question, contextBlock, answerText) {
+async function verifyClaims(question, contextBlock, answerText, breaker) {
   const sys = [
     'You are a strict academic fact-checker.',
     'You will receive: (1) a student question, (2) the source context used to answer it, (3) a generated answer.',
@@ -300,7 +296,7 @@ async function verifyClaims(question, contextBlock, answerText) {
     contextBlock.slice(0, 3000) +
     '\n\nGENERATED ANSWER:\n' +
     answerText.slice(0, 1500);
-  const raw = await callFastOpenAI(sys, userMsg, 120);
+  const raw = await callFastOpenAI(sys, userMsg, 120, breaker);
   try {
     const parsed = JSON.parse(raw);
     return { ok: parsed.ok !== false, issues: parsed.issues || null };
@@ -337,7 +333,7 @@ function _rerankCacheKey(question, chunks) {
   return crypto.createHash('sha1').update((question || '') + '|' + ids).digest('hex');
 }
 
-async function llmRerank(question, chunks) {
+async function llmRerank(question, chunks, breaker) {
   if (!chunks || chunks.length <= 1) return chunks;
   const cacheKey = _rerankCacheKey(question, chunks);
   const cached = _rerankCache.get(cacheKey);
@@ -362,7 +358,7 @@ async function llmRerank(question, chunks) {
   const user = 'QUESTION: ' + question + '\n\nPASSAGES:\n' + lines.join('\n');
   let raw;
   try {
-    raw = await callFastOpenAI(sys, user, 400);
+    raw = await callFastOpenAI(sys, user, 400, breaker);
   } catch (e) {
     return chunks;
   }
@@ -1187,6 +1183,7 @@ exports.handler = async function (event) {
 
   const normalizedQ = normalizeQuestion(question);
   const ragMode = mode === 'general' ? 'general' : 'strict';
+  const breaker = _makeBreaker(); // per-request circuit breaker — no cross-user state
   // openFileName is part of the cache key — same question with a different file open
   // produces different context and must be cached separately
 
@@ -1277,7 +1274,7 @@ exports.handler = async function (event) {
     // HyDE + multi-query + classify in a single LLM round-trip.
     // Generate hypothetical passage + 2 alternative queries + question type, embed
     // queries in one batch, retrieve for each, then merge. Falls back gracefully.
-    const hydeResult = await generateHydeAndQueries(question);
+    const hydeResult = await generateHydeAndQueries(question, breaker);
     if (hydeResult.question_type) preClassifiedType = hydeResult.question_type;
 
     const textsToEmbed = [question];
@@ -1334,7 +1331,7 @@ exports.handler = async function (event) {
   }
 
   // 7. Classify question type early (needed for ranking + prompt).
-  const qType = preClassifiedType || (await classifyQuestion(question));
+  const qType = preClassifiedType || (await classifyQuestion(question, breaker));
 
   // 7b. Fetch doc names early so we can resolve the open file's document ID for ranking.
   // We fetch for ALL chunks in rawChunks, not just the final ranked set.
@@ -1357,7 +1354,7 @@ exports.handler = async function (event) {
   }
 
   // 7d. LLM rerank candidates by true relevance before signal-based ranking.
-  rawChunks = await llmRerank(question, rawChunks);
+  rawChunks = await llmRerank(question, rawChunks, breaker);
 
   // Rank with question-type-aware boosting + open-file boost, then deduplicate
   const rankedChunks = deduplicateChunks(rankChunks(rawChunks, qType, earlyOpenDocId));
@@ -1408,7 +1405,7 @@ exports.handler = async function (event) {
   let verifiedConfidence = result.confidence || (weakRetrieval ? 'medium' : 'high');
   let verifierIssues = null;
   if (result.answer && result.answer.length > 100) {
-    const verification = await verifyClaims(question, contextBlock, result.answer);
+    const verification = await verifyClaims(question, contextBlock, result.answer, breaker);
     if (!verification.ok) {
       verifierIssues = verification.issues || null;
       // Only downgrade confidence when retrieval was already weak. When retrieval
