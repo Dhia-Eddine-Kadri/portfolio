@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in StudySphere, please **do not** open a public GitHub issue.
+If you discover a security vulnerability in Minallo, please **do not** open a public GitHub issue.
 
 Instead, email: **dalimovich2004@gmail.com**
 

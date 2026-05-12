@@ -1,5 +1,5 @@
 """
-StudySphere Transcriber — local Whisper server
+Minallo Transcriber — local Whisper server
 Runs silently in the system tray. The Chrome extension sends audio here.
 """
 
@@ -25,9 +25,9 @@ model = None
 
 def load_model():
     global model
-    update_tray_title('StudySphere — Loading model…')
+    update_tray_title('Minallo — Loading model…')
     model = WhisperModel('tiny', device='cpu', compute_type='int8')
-    update_tray_title('StudySphere — Ready ✓')
+    update_tray_title('Minallo — Ready ✓')
 
 def convert_to_wav(input_path):
     output_path = input_path + '.wav'
@@ -43,7 +43,7 @@ def transcribe():
     if 'file' not in request.files:
         return jsonify({'error': 'No audio file'}), 400
 
-    update_tray_title('StudySphere — Transcribing…')
+    update_tray_title('Minallo — Transcribing…')
 
     audio_file = request.files['file']
     with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp:
@@ -55,10 +55,10 @@ def transcribe():
         wav_path = convert_to_wav(webm_path)
         segments, info = model.transcribe(wav_path, beam_size=5)
         text = ' '.join(seg.text.strip() for seg in segments)
-        update_tray_title('StudySphere — Ready ✓')
+        update_tray_title('Minallo — Ready ✓')
         return jsonify({'text': text, 'language': info.language})
     except Exception as e:
-        update_tray_title('StudySphere — Ready ✓')
+        update_tray_title('Minallo — Ready ✓')
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(webm_path): os.unlink(webm_path)
@@ -105,13 +105,13 @@ def setup_tray(icon):
 def main():
     global tray_icon
     menu = pystray.Menu(
-        Item('StudySphere Transcriber', None, enabled=False),
+        Item('Minallo Transcriber', None, enabled=False),
         Item('Quit', on_quit)
     )
     tray_icon = pystray.Icon(
-        'StudySphere',
+        'Minallo',
         make_icon(),
-        'StudySphere — Loading…',
+        'Minallo — Loading…',
         menu
     )
     tray_icon.run(setup=setup_tray)

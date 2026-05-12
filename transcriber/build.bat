@@ -3,11 +3,11 @@ echo Installing dependencies...
 pip install -r requirements.txt
 
 echo.
-echo Building StudySphere Transcriber.exe...
+echo Building Minallo Transcriber.exe...
 pyinstaller ^
   --onefile ^
   --windowed ^
-  --name "StudySphere Transcriber" ^
+  --name "Minallo Transcriber" ^
   --icon icon.ico ^
   --add-binary "ffmpeg.exe;." ^
   --hidden-import="faster_whisper" ^

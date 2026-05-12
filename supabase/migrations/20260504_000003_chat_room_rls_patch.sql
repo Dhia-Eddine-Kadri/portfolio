@@ -1,5 +1,5 @@
--- StudySphere Chat Room RLS Patch
--- Run this in Supabase SQL Editor after studysphere_rls_hardening.sql.
+-- Minallo Chat Room RLS Patch
+-- Run this in Supabase SQL Editor after Minallo_rls_hardening.sql.
 --
 -- Why:
 -- The first hardening pass protected UUID-backed custom rooms, but the app also

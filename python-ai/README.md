@@ -66,7 +66,7 @@ See [`.env.example`](.env.example) for the full list. Naming matches the existin
 The browser **never** talks to this service. The flow is:
 
 ```
-browser  →  minallo-website.netlify.app/api/ai/*  (verifies Supabase JWT)
+browser  →  minallo.de/api/ai/*  (verifies Supabase JWT)
          →  Netlify proxy injects trusted user_id + INTERNAL_SECRET
          →  AI_SERVICE_URL  (this service)
 ```

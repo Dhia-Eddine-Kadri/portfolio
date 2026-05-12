@@ -1,4 +1,4 @@
--- StudySphere Chat Reports Setup
+-- Minallo Chat Reports Setup
 -- Run this in the Supabase SQL Editor.
 --
 -- Purpose:

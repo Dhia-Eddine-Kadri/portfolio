@@ -1,4 +1,4 @@
-# StudySphere — Python AI/RAG Migration Plan
+# Minallo — Python AI/RAG Migration Plan
 
 Status: **Phase 1 in progress** (FastAPI skeleton + Supabase wiring).
 Branch: `python-ai-rag-service` (forked off `main`).
@@ -95,7 +95,7 @@ Existing tables in `supabase/migrations/` (canonical) and `backend/migrations/` 
 
 **Why proxy through Netlify, not direct browser → Python:**
 - JWT verification stays in one place.
-- Browser only talks to `studysphere-website.netlify.app` (CORS stays simple).
+- Browser only talks to `minallo.de` (CORS stays simple).
 - Python service can be swapped (Fly → Render → VPS) by changing one env var.
 - Flip JS ↔ Python with `USE_PYTHON_AI` during cutover without touching frontend.
 

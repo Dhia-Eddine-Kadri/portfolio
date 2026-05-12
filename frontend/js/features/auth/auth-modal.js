@@ -157,7 +157,7 @@ export function initAuthModal(options) {
         var signUpResult = await sb.auth.signUp(
           email,
           password,
-          'https://minallo-website.netlify.app/'
+          'https://minallo.de/'
         );
 
         if (signUpResult.error || signUpResult.error_description) {

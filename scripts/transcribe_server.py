@@ -1,5 +1,5 @@
 """
-StudySphere local transcription server.
+Minallo local transcription server.
 Uses speech_recognition + local Whisper — no API calls, runs on your machine.
 
 Setup (one time):
@@ -74,6 +74,6 @@ def health():
     return jsonify({'ok': True})
 
 if __name__ == '__main__':
-    print('StudySphere transcription server running at http://localhost:5050')
+    print('Minallo transcription server running at http://localhost:5050')
     print('Using local Whisper — no API calls, completely free.')
     app.run(host='127.0.0.1', port=5050, debug=False)

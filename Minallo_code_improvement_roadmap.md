@@ -1,10 +1,10 @@
-# StudySphere Code Improvement Roadmap
+# Minallo Code Improvement Roadmap
 
-This document summarizes the recommended improvements for the `frontend` and `backend` parts of the StudySphere repository.
+This document summarizes the recommended improvements for the `frontend` and `backend` parts of the Minallo repository.
 
 ## Overall Assessment
 
-StudySphere is already moving in a good direction. The project is functional, ambitious, and has a clearer folder structure than before. The current structure shows that the app is growing beyond a simple static website, especially with AI, PDF handling, subscriptions, backend functions, and possible future real-time features.
+Minallo is already moving in a good direction. The project is functional, ambitious, and has a clearer folder structure than before. The current structure shows that the app is growing beyond a simple static website, especially with AI, PDF handling, subscriptions, backend functions, and possible future real-time features.
 
 The main goal now is to make the codebase easier to maintain, safer, easier to deploy, and more professional.
 
@@ -546,7 +546,7 @@ better separation between frontend, backend, and workers
 ### Suggested Future Structure
 
 ```txt
-studysphere/
+Minallo/
 ├── frontend/
 ├── backend/
 ├── transcriber/
@@ -599,7 +599,7 @@ Do Docker in stages:
 
 WebSockets are useful, but only for features that need live updates.
 
-### Good WebSocket Use Cases for StudySphere
+### Good WebSocket Use Cases for Minallo
 
 ```txt
 live file upload status
@@ -1019,7 +1019,7 @@ export function renderSidebarCourses(state, handlers) {
 }
 
 export function renderDashboardCourses(state, handlers) {
-  // Render main StudySphere course cards.
+  // Render main Minallo course cards.
 }
 ```
 
@@ -1781,7 +1781,7 @@ utils files: tiny reusable helpers
 
 ## Final Verdict
 
-StudySphere has a strong foundation and is becoming a serious full-stack student productivity project.
+Minallo has a strong foundation and is becoming a serious full-stack student productivity project.
 
 The most important next step is not adding more features immediately. The priority should be making the existing codebase easier to maintain, safer, and easier to deploy.
 

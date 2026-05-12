@@ -1,6 +1,6 @@
-# StudySphere Security Hardening Notes
+# Minallo Security Hardening Notes
 
-This document summarizes what has already been done and what still needs to be done before making StudySphere public for many students.
+This document summarizes what has already been done and what still needs to be done before making Minallo public for many students.
 
 ---
 
@@ -1580,7 +1580,7 @@ File uploads must be restricted and private.
 User-generated text must be safely rendered.
 ```
 
-If those principles are followed, StudySphere will be much safer for public student usage.
+If those principles are followed, Minallo will be much safer for public student usage.
 
 ---
 
@@ -1732,7 +1732,7 @@ Checklist:
 
 ## 39. Add Moderation and Abuse Controls
 
-Because StudySphere includes chat/social features, add abuse controls:
+Because Minallo includes chat/social features, add abuse controls:
 
 ```txt
 report message/user

@@ -1,4 +1,4 @@
--- StudySphere Storage Security Setup
+-- Minallo Storage Security Setup
 -- Run this in the Supabase SQL Editor.
 --
 -- This hardens the main course upload bucket. Objects must live under:

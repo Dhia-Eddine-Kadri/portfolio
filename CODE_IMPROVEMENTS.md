@@ -1,4 +1,4 @@
-# StudySphere Code Improvements Walkthrough
+# Minallo Code Improvements Walkthrough
 
 ## Overview
 This document outlines 7 critical code improvements with specific implementation steps for each. Work through them in the recommended priority order.
