@@ -11,7 +11,7 @@ def _stub_env() -> None:
     os.environ.setdefault("SUPABASE_URL", "https://stub.supabase.co")
     os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
     os.environ.setdefault("OPENAI_API_KEY", "stub")
-    os.environ.setdefault("AI_SERVICE_INTERNAL_TOKEN", "stub")
+    os.environ.setdefault("INTERNAL_SECRET", "stub")
 
 
 def test_chunk_pages_emits_chunks_in_page_order() -> None:

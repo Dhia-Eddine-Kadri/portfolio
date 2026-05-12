@@ -14,7 +14,7 @@ def _stub_env() -> None:
     os.environ.setdefault("SUPABASE_URL", "https://stub.supabase.co")
     os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub-service-role-key")
     os.environ.setdefault("OPENAI_API_KEY", "stub-openai-key")
-    os.environ.setdefault("AI_SERVICE_INTERNAL_TOKEN", "stub-internal-token")
+    os.environ.setdefault("INTERNAL_SECRET", "stub-internal-token")
     # Clear the cached settings so the stubbed env is picked up.
     from app.config import get_settings  # noqa: WPS433
 

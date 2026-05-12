@@ -17,7 +17,7 @@ const { triggerProcessing } = require('../lib/trigger-processing');
 function triggerPythonIndexing(documentId, userId, courseId, storagePath) {
   return new Promise(function (resolve) {
     const serviceUrl = optionalEnv('AI_SERVICE_URL', '');
-    const internalToken = optionalEnv('AI_SERVICE_INTERNAL_TOKEN', '');
+    const internalToken = optionalEnv('INTERNAL_SECRET', '');
     if (!serviceUrl || !internalToken) {
       return resolve({ ok: false, reason: 'AI service not configured' });
     }

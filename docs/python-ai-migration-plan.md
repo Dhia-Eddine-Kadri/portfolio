@@ -83,7 +83,7 @@ Existing tables in `supabase/migrations/` (canonical) and `backend/migrations/` 
 - A thin **proxy layer** (`ai-proxy.js`) that:
   1. verifies the Supabase JWT,
   2. injects `user_id` from the token (so client can't spoof),
-  3. signs the request with `AI_SERVICE_INTERNAL_TOKEN`,
+  3. signs the request with `INTERNAL_SECRET (existing Netlify var, reused)`,
   4. forwards to `$AI_SERVICE_URL`,
   5. streams the response back.
 
@@ -134,7 +134,7 @@ Adds only:
 - `python-ai/app/main.py` — FastAPI app + `/health`.
 - `python-ai/app/config.py` — env loading.
 - `python-ai/app/supabase_client.py` — service-role client.
-- `python-ai/app/auth.py` — `AI_SERVICE_INTERNAL_TOKEN` check (shared secret between Netlify and Python).
+- `python-ai/app/auth.py` — `INTERNAL_SECRET (existing Netlify var, reused)` check (shared secret between Netlify and Python).
 - `python-ai/Dockerfile`, `.dockerignore`.
 - `python-ai/README.md`.
 - `python-ai/.env.example`.
@@ -169,7 +169,7 @@ Alternatives ranked: Render → Railway → VPS.
 
 **New env vars:**
 - `AI_SERVICE_URL` (set in Netlify) — base URL of the Python service.
-- `AI_SERVICE_INTERNAL_TOKEN` — shared secret, set in **both** Netlify and Fly.
+- `INTERNAL_SECRET (existing Netlify var, reused)` — shared secret, set in **both** Netlify and Fly.
 - `USE_PYTHON_AI` (Netlify, "true"/"false") — global feature flag during cutover.
 
 **Reused env vars (no renames):**
@@ -197,7 +197,7 @@ Alternatives ranked: Render → Railway → VPS.
 - Every retrieval query filters by `user_id` AND `course_id`.
 - Every document query verifies the caller owns / has access.
 - `SUPABASE_SERVICE_ROLE_KEY` and `OPENAI_API_KEY` never reach the browser.
-- Python ↔ Netlify auth via `AI_SERVICE_INTERNAL_TOKEN`; the Python service never trusts a raw user-supplied `user_id` — Netlify proxy derives it from the verified JWT and includes it in the signed request.
+- Python ↔ Netlify auth via `INTERNAL_SECRET (existing Netlify var, reused)`; the Python service never trusts a raw user-supplied `user_id` — Netlify proxy derives it from the verified JWT and includes it in the signed request.
 
 ---
 

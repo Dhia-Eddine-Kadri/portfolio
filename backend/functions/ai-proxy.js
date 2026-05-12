@@ -51,7 +51,7 @@ exports.handler = async function (event) {
 
   // ── 3. Build the upstream payload ─────────────────────────────────────
   const serviceUrl = optionalEnv('AI_SERVICE_URL', '');
-  const internalToken = optionalEnv('AI_SERVICE_INTERNAL_TOKEN', '');
+  const internalToken = optionalEnv('INTERNAL_SECRET', '');
   if (!serviceUrl || !internalToken) {
     return fail(503, 'AI service not configured');
   }

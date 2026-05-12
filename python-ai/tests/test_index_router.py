@@ -19,7 +19,7 @@ def _stub_env() -> None:
     os.environ.setdefault("SUPABASE_URL", "https://stub.supabase.co")
     os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
     os.environ.setdefault("OPENAI_API_KEY", "stub")
-    os.environ["AI_SERVICE_INTERNAL_TOKEN"] = "test-token"
+    os.environ["INTERNAL_SECRET"] = "test-token"
 
     from app.config import get_settings  # noqa: WPS433
     get_settings.cache_clear()

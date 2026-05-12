@@ -23,7 +23,7 @@ Verify:
 curl http://localhost:8080/health
 # → {"status":"ok","service":"studysphere-ai",...}
 
-curl -H "X-Internal-Token: $AI_SERVICE_INTERNAL_TOKEN" \
+curl -H "X-Internal-Token: $INTERNAL_SECRET" \
      http://localhost:8080/internal/db-smoke
 # → {"ok":true,"documents_count":<n>}
 ```
@@ -58,7 +58,7 @@ See [`.env.example`](.env.example) for the full list. Naming matches the existin
 | `OPENAI_API_KEY` | existing | embeddings + chat completions |
 | `OPENAI_GENERATE_MODEL` / `..._STRONG` | existing | chat models |
 | `OPENAI_EMBEDDING_MODEL` | new (default `text-embedding-3-small`) | embedding model — must match existing chunks (1536 dim) |
-| `AI_SERVICE_INTERNAL_TOKEN` | **new** | shared secret with Netlify proxy |
+| `INTERNAL_SECRET` | **new** | shared secret with Netlify proxy |
 | `LOG_LEVEL`, `ENVIRONMENT` | new | observability |
 
 ## Security model
@@ -67,7 +67,7 @@ The browser **never** talks to this service. The flow is:
 
 ```
 browser  →  studysphere-website.netlify.app/api/ai/*  (verifies Supabase JWT)
-         →  Netlify proxy injects trusted user_id + AI_SERVICE_INTERNAL_TOKEN
+         →  Netlify proxy injects trusted user_id + INTERNAL_SECRET
          →  AI_SERVICE_URL  (this service)
 ```
 

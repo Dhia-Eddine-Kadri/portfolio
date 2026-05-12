@@ -28,9 +28,12 @@ class Settings(BaseSettings):
     )
     openai_embedding_dim: int = Field(1536, alias="OPENAI_EMBEDDING_DIM")
 
-    # --- Shared secret between Netlify proxy and this service.
-    # Every request must arrive with `X-Internal-Token: <this value>`.
-    ai_service_internal_token: str = Field(..., alias="AI_SERVICE_INTERNAL_TOKEN")
+    # --- Shared secret between Netlify and this service.
+    # Same env var the existing Netlify trigger-processing flow already uses
+    # (see backend/lib/trigger-processing.js) so we don't introduce a second
+    # secret to rotate. Every internal request must arrive with
+    # `X-Internal-Token: <this value>`.
+    ai_service_internal_token: str = Field(..., alias="INTERNAL_SECRET")
 
     # --- Misc
     log_level: str = Field("INFO", alias="LOG_LEVEL")
