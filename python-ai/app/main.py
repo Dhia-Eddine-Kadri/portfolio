@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI
 
 from .auth import require_internal_token
 from .config import get_settings
+from .routers import ask as ask_router
 from .routers import index as index_router
 from .supabase_client import get_supabase
 
@@ -21,11 +22,12 @@ log = logging.getLogger("studysphere-ai")
 
 app = FastAPI(
     title="StudySphere AI Service",
-    version="0.2.0",
+    version="0.3.0",
     description="PDF indexing, retrieval, and grounded answer generation.",
 )
 
 app.include_router(index_router.router)
+app.include_router(ask_router.router)
 
 
 @app.get("/health")

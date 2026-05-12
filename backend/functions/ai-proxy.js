@@ -26,7 +26,9 @@ const { extractBearerToken, verifySupabaseToken } = require('../lib/supabase-aut
 const ALLOWED_ENDPOINTS = new Set([
   'index-document',
   'document-index-status',
-  // Phase 3+ will extend this list (ask, retrieve-context, generate-quiz, …).
+  'retrieve-context',
+  'ask',
+  // Phase 4+ will add generate-quiz / generate-flashcards / generate-notes.
 ]);
 
 exports.handler = async function (event) {
