@@ -2207,16 +2207,40 @@
           _savePdfState();
         });
 
-      // Undo — restores full annotation snapshot
+      // Undo — restores full annotation snapshot. Pushes the *current*
+      // state onto the redo stack first so Redo can return to it.
+      var _redoStack = [];
       document.querySelectorAll('.epdf-undo-btn').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!_undoStack.length) return;
+          _redoStack.push(JSON.parse(JSON.stringify(_annotations)));
+          if (_redoStack.length > 60) _redoStack.shift();
           _annotations = _undoStack.pop();
           renderCurrentPage();
           _edPdfRenderLayerPanel();
           _savePdfState();
         });
       });
+      // Redo — inverse of Undo. Restores the most recently undone state
+      // and pushes the current state back onto the undo stack.
+      document.querySelectorAll('.epdf-redo-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!_redoStack.length) return;
+          _undoStack.push(JSON.parse(JSON.stringify(_annotations)));
+          if (_undoStack.length > 60) _undoStack.shift();
+          _annotations = _redoStack.pop();
+          renderCurrentPage();
+          _edPdfRenderLayerPanel();
+          _savePdfState();
+        });
+      });
+      // A fresh user edit invalidates the redo branch — clear it whenever
+      // a new undo snapshot is pushed.
+      var _origPushUndo = _edPdfPushUndo;
+      _edPdfPushUndo = function () {
+        _redoStack.length = 0;
+        return _origPushUndo();
+      };
 
       // Color swatches
       document.querySelectorAll('.epdf-color').forEach(function (sw) {
@@ -2255,11 +2279,21 @@
         });
       }
 
-      // Blend mode
+      // Blend mode — apply both to the default for new annotations *and*
+      // retroactively to every existing annotation, then re-render so the
+      // change is immediately visible.
       var blendSel = document.getElementById('edPdfBlendMode');
       if (blendSel) {
         blendSel.addEventListener('change', function () {
           _edPdfBlendMode = this.value;
+          if (typeof _edPdfPushUndo === 'function') _edPdfPushUndo();
+          Object.keys(_annotations).forEach(function (pg) {
+            (_annotations[pg] || []).forEach(function (a) {
+              a.blendMode = _edPdfBlendMode;
+            });
+          });
+          renderCurrentPage();
+          _savePdfState();
         });
       }
 
