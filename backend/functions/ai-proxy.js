@@ -28,7 +28,9 @@ const ALLOWED_ENDPOINTS = new Set([
   'document-index-status',
   'retrieve-context',
   'ask',
-  // Phase 4+ will add generate-quiz / generate-flashcards / generate-notes.
+  'generate-quiz',
+  'generate-flashcards',
+  'generate-notes',
 ]);
 
 exports.handler = async function (event) {
