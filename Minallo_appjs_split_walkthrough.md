@@ -29,7 +29,7 @@ frontend/js/
 ├── auth-bootstrap.js
 ├── loader.js
 ├── router.js
-├── minallo.js
+├── Minallo.js
 ├── supabase.js
 ├── config/
 ├── core/

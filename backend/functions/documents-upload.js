@@ -10,6 +10,51 @@ const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-aut
 const { supaRequest } = require('../lib/supabase-admin');
 const { triggerProcessing } = require('../lib/trigger-processing');
 
+// Flag-gated handoff to the Python AI service. When USE_PYTHON_AI=true and
+// AI_SERVICE_URL is configured, we call the Python indexer instead of the
+// JS background processor. Anything else falls back to the existing flow
+// so production behaviour is unchanged until the flag is flipped.
+function triggerPythonIndexing(documentId, userId, courseId, storagePath) {
+  return new Promise(function (resolve) {
+    const serviceUrl = optionalEnv('AI_SERVICE_URL', '');
+    const internalToken = optionalEnv('INTERNAL_SECRET', '');
+    if (!serviceUrl || !internalToken) {
+      return resolve({ ok: false, reason: 'AI service not configured' });
+    }
+    const target = new URL(serviceUrl.replace(/\/$/, '') + '/index-document');
+    const payload = JSON.stringify({
+      userId: userId,
+      courseId: courseId,
+      documentId: documentId,
+      storagePath: storagePath
+    });
+    const req = https.request(
+      {
+        hostname: target.hostname,
+        port: target.port || 443,
+        path: target.pathname,
+        method: 'POST',
+        headers: {
+          'X-Internal-Token': internalToken,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          Accept: 'application/json'
+        }
+      },
+      function (res) {
+        // The Python endpoint returns 200 once the background task is queued;
+        // we don't need to wait for indexing to finish here.
+        res.on('data', function () {});
+        res.on('end', function () { resolve({ ok: res.statusCode < 400 }); });
+      }
+    );
+    req.setTimeout(8000, function () { req.destroy(new Error('ai service timeout')); });
+    req.on('error', function (err) { resolve({ ok: false, reason: String(err && err.message) }); });
+    req.write(payload);
+    req.end();
+  });
+}
+
 const MAX_BODY_BYTES = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES = { 'application/pdf': 'pdf' };
 const STORAGE_BUCKET = optionalEnv('RAG_STORAGE_BUCKET', 'course-documents');
@@ -126,7 +171,17 @@ exports.handler = async function (event) {
 
   const document = Array.isArray(insertResult.body) ? insertResult.body[0] : insertResult.body;
 
-  await triggerProcessing(document.id, user.id);
+  // Route indexing to whichever pipeline is enabled. Default = the existing
+  // JS one; flip USE_PYTHON_AI=true once the Python service is healthy.
+  const usePythonAi = (optionalEnv('USE_PYTHON_AI', 'false') || '').toLowerCase() === 'true';
+  if (usePythonAi) {
+    const py = await triggerPythonIndexing(document.id, user.id, courseId, storagePath);
+    // Always fall back to the JS background processor if Python is unreachable
+    // — better to over-index than to leave a document in `uploaded` forever.
+    if (!py.ok) await triggerProcessing(document.id, user.id);
+  } else {
+    await triggerProcessing(document.id, user.id);
+  }
 
   return jsonResponse(201, {
     document: {

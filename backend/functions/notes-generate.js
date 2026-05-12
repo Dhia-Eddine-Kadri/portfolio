@@ -13,6 +13,7 @@ const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
+const { shouldUsePythonAI, forwardToPython } = require('../lib/python-ai-proxy');
 const {
   langInstr,
   getMaxTokens,
@@ -533,6 +534,35 @@ exports.handler = async function (event) {
 
   // ── GENERATE MODE ─────────────────────────────────────────────────────────
   console.log('[notes-generate]', { mode, scope, currentPage, pageRange, tool, detailLevel });
+
+  // Flag-gated Python AI handoff. Only the whole-document generate path uses
+  // it — section / merge / analyze modes stay on the existing JS pipeline
+  // because the Python service doesn't have equivalents yet.
+  if (shouldUsePythonAI() && scope === 'document') {
+    var upstream = await forwardToPython('generate-notes', {
+      userId: user.id,
+      courseId: courseId,
+      documentIds: documentId ? [documentId] : null,
+      topic: body.topic || null,
+      title: body.title || (fileName ? ('Notes — ' + fileName) : 'AI study notes'),
+      save: true
+    });
+    if (upstream.ok) {
+      var py = upstream.body || {};
+      return jsonResponse(200, {
+        note: {
+          id: py.noteId || null,
+          title: body.title || (fileName ? ('Notes — ' + fileName) : 'AI study notes'),
+          type: tool,
+          content_markdown: py.text || '',
+          sources: py.groundedSources || []
+        },
+        _viaPython: true,
+        warning: py.warning || null
+      });
+    }
+    console.warn('[notes-generate] Python generate-notes failed (status ' + upstream.status + '), falling back to JS');
+  }
 
   var filterStart = null;
   var filterEnd   = null;

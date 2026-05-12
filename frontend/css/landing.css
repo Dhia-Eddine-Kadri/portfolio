@@ -331,8 +331,7 @@ nav {
   max-width: none;
   height: auto;
   margin-right: -14%;
-  filter: hue-rotate(-52deg) saturate(1.15) brightness(1.04)
-    drop-shadow(0 0 28px rgba(37, 99, 235, 0.22)) drop-shadow(0 0 72px rgba(37, 99, 235, 0.16))
+  filter: drop-shadow(0 0 28px rgba(37, 99, 235, 0.22)) drop-shadow(0 0 72px rgba(37, 99, 235, 0.16))
     drop-shadow(0 42px 90px rgba(15, 23, 42, 0.28));
   animation: floatArt 6s ease-in-out infinite alternate;
   transform-origin: 60% 58%;

@@ -15,6 +15,7 @@ const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
+const { shouldUsePythonAI, forwardToPython } = require('../lib/python-ai-proxy');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
@@ -1173,10 +1174,55 @@ exports.handler = async function (event) {
     return fail(400, 'Invalid JSON body');
   }
 
-  const { courseId, question, mode, documentId, activeFileName, openFileContext } = body;
+  const { courseId, question, mode, documentId, activeFileName, openFileContext, documentIds } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!question || typeof question !== 'string') return fail(400, 'question is required');
   if (question.length > 2000) return fail(400, 'Question too long (max 2000 characters)');
+
+  // ── Flag-gated Python AI handoff ───────────────────────────────────────────
+  // When USE_PYTHON_AI=true and AI_SERVICE_URL is set, forward to the Python
+  // RAG service. On any upstream failure we fall through to the existing JS
+  // pipeline so production never breaks even if Python is down.
+  if (shouldUsePythonAI()) {
+    // Build doc-filter array: prefer explicit documentIds, then a single
+    // documentId field, then leave unset to retrieve over the whole course.
+    let pyDocIds = null;
+    if (Array.isArray(documentIds) && documentIds.length) pyDocIds = documentIds;
+    else if (typeof documentId === 'string' && documentId) pyDocIds = [documentId];
+
+    const upstream = await forwardToPython('ask', {
+      userId: user.id,
+      courseId: courseId,
+      documentIds: pyDocIds,
+      question: question
+    });
+    if (upstream.ok) {
+      const py = upstream.body || {};
+      // Map Python's response shape onto the existing JS contract the
+      // frontend expects: { answer, sources, confidence, unsupported }.
+      const sources = (py.groundedSources || []).map(function (s) {
+        return {
+          fileName: s.fileName,
+          pageStart: s.pageStart,
+          pageEnd: s.pageEnd,
+          sectionTitle: s.sectionTitle || null
+        };
+      });
+      const mappedMode = py.retrievalMode === 'strong' ? 'strict' : 'general';
+      return jsonResponse(200, {
+        answer: py.answer || '',
+        sources: sources,
+        confidence: py.retrievalMode === 'strong' ? 'high' : 'low',
+        unsupported: py.retrievalMode !== 'strong',
+        mode: mappedMode,
+        cacheHit: !!py.cacheHit,
+        model: py.model || null,
+        _viaPython: true
+      });
+    }
+    // Upstream failed — log and fall through to the JS pipeline below.
+    console.warn('[ai-ask] Python upstream failed (status ' + upstream.status + '), falling back to JS');
+  }
   const activeDocId = (typeof documentId === 'string' && documentId) ? documentId : null;
   const openFileName = (typeof activeFileName === 'string' && activeFileName) ? activeFileName : null;
   const openCtx = (typeof openFileContext === 'string' && openFileContext.trim()) ? openFileContext.trim() : null;
