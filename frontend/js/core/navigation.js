@@ -211,6 +211,21 @@ export function showStudipResume() {
   }
 
   clearResumeFile();
+
+  // CRITICAL: the underlying openFile assumes the file view (#app) is
+  // already visible — it only toggles #pdfView. We're currently inside a
+  // portal section (Editor/Settings/etc.) where #app is hidden, so call
+  // showFilesView first or the URL updates but the view stays in the
+  // portal section.
+  showFilesView(typeof window._stRunning !== 'undefined' ? window._stRunning : false);
+
+  // showPortalSection hides the AI panel/tab/bubble when we navigate to
+  // any non-studip section. Bring them back now that we're back on a file.
+  var aiTab    = document.getElementById('aiTab');
+  var aiBubble = document.getElementById('aiBubble');
+  if (aiTab)    aiTab.style.display = '';
+  if (aiBubble) aiBubble.style.display = '';
+
   window.openFile(hit.file, hit.course);
   return true;
 }
