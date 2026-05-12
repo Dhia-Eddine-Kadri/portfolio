@@ -288,16 +288,15 @@ nav {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: min(62vw, 680px);
-  overflow: hidden;
-  isolation: isolate;
+  min-height: 760px;
+  overflow: visible;
 }
 .hero-img-wrap::before {
   content: '';
   position: absolute;
-  width: min(68vw, 920px);
-  height: min(68vw, 920px);
-  right: -8%;
+  width: min(86vw, 1220px);
+  height: min(86vw, 1220px);
+  right: -14%;
   top: 50%;
   transform: translateY(-50%);
   border-radius: 50%;
@@ -314,9 +313,9 @@ nav {
 .hero-img-wrap::after {
   content: '';
   position: absolute;
-  width: min(62vw, 820px);
-  height: min(46vw, 620px);
-  right: 0;
+  width: min(78vw, 1020px);
+  height: min(58vw, 760px);
+  right: -4%;
   bottom: 3%;
   background:
     radial-gradient(circle at 42% 42%, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0) 20%),
@@ -328,14 +327,11 @@ nav {
 .hero-3d-img {
   position: relative;
   z-index: 2;
-  width: min(54vw, 760px);
-  max-width: 100%;
+  width: min(78vw, 1320px);
+  max-width: none;
   height: auto;
-  margin-right: 0;
-  mix-blend-mode: multiply;
-  -webkit-mask-image: radial-gradient(ellipse at 68% 58%, #000 0 42%, rgba(0, 0, 0, 0.72) 54%, transparent 74%);
-  mask-image: radial-gradient(ellipse at 68% 58%, #000 0 42%, rgba(0, 0, 0, 0.72) 54%, transparent 74%);
-  filter: saturate(1.65) brightness(1.95) contrast(1.08)
+  margin-right: -14%;
+  filter: hue-rotate(-52deg) saturate(1.15) brightness(1.04)
     drop-shadow(0 0 28px rgba(37, 99, 235, 0.22)) drop-shadow(0 0 72px rgba(37, 99, 235, 0.16))
     drop-shadow(0 42px 90px rgba(15, 23, 42, 0.28));
   animation: floatArt 6s ease-in-out infinite alternate;

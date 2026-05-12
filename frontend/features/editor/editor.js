@@ -620,6 +620,120 @@
         _startY = 0,
         _penPoints = [];
 
+      // Clipboard for the right-click Copy/Paste menu. Lives for the lifetime
+      // of the PDF editor sub-tab.
+      var _edPdfClipboard = null;
+      var _edPdfCtxMenu = null;
+
+      function _edPdfBuildCtxMenu() {
+        if (_edPdfCtxMenu) return _edPdfCtxMenu;
+        _edPdfCtxMenu = document.createElement('div');
+        _edPdfCtxMenu.id = '_edPdfRightClickMenu';
+        _edPdfCtxMenu.style.cssText =
+          'position:fixed;z-index:99999;display:none;min-width:160px;padding:6px;' +
+          'background:#1a1a2e;border:1px solid rgba(255,255,255,.12);' +
+          'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
+          'font-size:.78rem;font-weight:600;color:#e2d9f3;user-select:none';
+        ['copy','paste','duplicate','delete'].forEach(function (action) {
+          var item = document.createElement('div');
+          item.dataset.action = action;
+          item.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+          item.style.cssText =
+            'padding:8px 12px;border-radius:6px;cursor:pointer';
+          item.addEventListener('mouseenter', function () {
+            if (item.style.pointerEvents !== 'none')
+              item.style.background = 'rgba(167,139,250,.15)';
+          });
+          item.addEventListener('mouseleave', function () { item.style.background = ''; });
+          item.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+          item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _edPdfHandleCtx(action);
+            _edPdfHideCtx();
+          });
+          _edPdfCtxMenu.appendChild(item);
+        });
+        document.body.appendChild(_edPdfCtxMenu);
+        return _edPdfCtxMenu;
+      }
+
+      function _edPdfShowCtx(x, y) {
+        var menu = _edPdfBuildCtxMenu();
+        var hasSel  = _selAnnotIdx >= 0;
+        var hasClip = !!_edPdfClipboard;
+        Array.prototype.forEach.call(menu.children, function (item) {
+          var a = item.dataset.action;
+          var ok = (a === 'paste') ? hasClip : hasSel;
+          item.style.opacity = ok ? '1' : '0.35';
+          item.style.pointerEvents = ok ? 'auto' : 'none';
+        });
+        menu.style.left = x + 'px';
+        menu.style.top  = y + 'px';
+        menu.style.display = 'block';
+        var r = menu.getBoundingClientRect();
+        if (r.right  > window.innerWidth)  menu.style.left = (x - r.width)  + 'px';
+        if (r.bottom > window.innerHeight) menu.style.top  = (y - r.height) + 'px';
+      }
+      function _edPdfHideCtx() { if (_edPdfCtxMenu) _edPdfCtxMenu.style.display = 'none'; }
+
+      function _edPdfHandleCtx(action) {
+        var annots = getPageAnnotations(_currentPage);
+        var ov = window._edPdfOverlayCanvas;
+        var ovCtx = ov && ov.getContext ? ov.getContext('2d') : null;
+        function redraw() {
+          if (!ov || !ovCtx) return;
+          ovCtx.clearRect(0, 0, ov.width, ov.height);
+          replayAnnotations(ovCtx, getPageAnnotations(_currentPage));
+        }
+        if (action === 'copy') {
+          if (_selAnnotIdx < 0) return;
+          _edPdfClipboard = JSON.parse(JSON.stringify(annots[_selAnnotIdx]));
+          return;
+        }
+        if (action === 'paste') {
+          if (!_edPdfClipboard) return;
+          if (typeof _edPdfPushUndo === 'function') _edPdfPushUndo();
+          var clone = JSON.parse(JSON.stringify(_edPdfClipboard));
+          if (typeof clone.x === 'number') clone.x += 20;
+          if (typeof clone.y === 'number') clone.y += 20;
+          annots.push(clone);
+          _selAnnotIdx = annots.length - 1;
+          redraw();
+          if (typeof _savePdfState === 'function') _savePdfState();
+          return;
+        }
+        if (action === 'duplicate') {
+          if (_selAnnotIdx < 0) return;
+          if (typeof _edPdfPushUndo === 'function') _edPdfPushUndo();
+          var dup = JSON.parse(JSON.stringify(annots[_selAnnotIdx]));
+          if (typeof dup.x === 'number') dup.x += 20;
+          if (typeof dup.y === 'number') dup.y += 20;
+          annots.push(dup);
+          _selAnnotIdx = annots.length - 1;
+          redraw();
+          if (typeof _savePdfState === 'function') _savePdfState();
+          return;
+        }
+        if (action === 'delete') {
+          if (_selAnnotIdx < 0) return;
+          if (typeof _edPdfPushUndo === 'function') _edPdfPushUndo();
+          annots.splice(_selAnnotIdx, 1);
+          _selAnnotIdx = -1;
+          redraw();
+          if (typeof _savePdfState === 'function') _savePdfState();
+        }
+      }
+
+      // Dismiss on outside click / Escape / scroll
+      document.addEventListener('mousedown', function (e) {
+        if (_edPdfCtxMenu && _edPdfCtxMenu.style.display === 'block' &&
+            !_edPdfCtxMenu.contains(e.target)) _edPdfHideCtx();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') _edPdfHideCtx();
+      });
+      window.addEventListener('scroll', _edPdfHideCtx, true);
+
       function updateZoomLabel() {
         if (zoomLbl) zoomLbl.textContent = Math.round(_scale * 100) + '%';
       }
@@ -1167,6 +1281,22 @@
               replayAnnotations(ovCtx, annots);
               _savePdfState();
             });
+          });
+
+          // Right-click → Copy / Paste / Duplicate / Delete menu. Selects the
+          // annotation under the cursor (if any) before showing the menu so
+          // the actions apply to what the user actually right-clicked on.
+          ov.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            var p = getPos(e);
+            var annots2 = getPageAnnotations(_currentPage);
+            var idx2 = _annotHitTest(annots2, p);
+            if (idx2 >= 0) {
+              _selAnnotIdx = idx2;
+              ovCtx.clearRect(0, 0, ov.width, ov.height);
+              replayAnnotations(ovCtx, annots2);
+            }
+            _edPdfShowCtx(e.clientX, e.clientY);
           });
 
           ov.addEventListener('mousedown', function (e) {
