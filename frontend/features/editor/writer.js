@@ -2370,6 +2370,149 @@
       });
       _wire('edDeselectBtn', _edDeselectObj);
 
+      // ── Right-click context menu ───────────────────────────────────────────
+      // Build a small Copy / Paste / Duplicate / Delete menu that appears on
+      // right-click anywhere inside the editor canvas. Clipboard is shared
+      // across the whole writer session (cleared on page reload).
+      var _edClipboard = null;
+      var _edCtxMenu = null;
+
+      function _edBuildCtxMenu() {
+        if (_edCtxMenu) return _edCtxMenu;
+        _edCtxMenu = document.createElement('div');
+        _edCtxMenu.id = '_edRightClickMenu';
+        _edCtxMenu.style.cssText =
+          'position:fixed;z-index:9999;display:none;min-width:160px;padding:6px;' +
+          'background:#1a1a2e;border:1px solid rgba(255,255,255,.12);' +
+          'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
+          'font-size:.78rem;font-weight:600;color:#e2d9f3;user-select:none';
+        ['copy','paste','duplicate','delete'].forEach(function (action) {
+          var item = document.createElement('div');
+          item.dataset.action = action;
+          item.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+          item.style.cssText =
+            'padding:8px 12px;border-radius:6px;cursor:pointer;' +
+            'display:flex;align-items:center;gap:8px';
+          item.addEventListener('mouseenter', function () {
+            item.style.background = 'rgba(167,139,250,.15)';
+          });
+          item.addEventListener('mouseleave', function () {
+            item.style.background = '';
+          });
+          item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _edHandleCtxAction(action);
+            _edHideCtxMenu();
+          });
+          _edCtxMenu.appendChild(item);
+        });
+        document.body.appendChild(_edCtxMenu);
+        return _edCtxMenu;
+      }
+
+      function _edShowCtxMenu(x, y) {
+        var menu = _edBuildCtxMenu();
+        // Enable/disable items based on selection + clipboard state
+        var hasSel = !!_ed.selObj;
+        var hasClip = !!_edClipboard;
+        Array.prototype.forEach.call(menu.children, function (item) {
+          var a = item.dataset.action;
+          var enabled = (a === 'paste') ? hasClip : hasSel;
+          item.style.opacity = enabled ? '1' : '0.35';
+          item.style.pointerEvents = enabled ? 'auto' : 'none';
+        });
+        // Position, then clamp to viewport
+        menu.style.left = x + 'px';
+        menu.style.top  = y + 'px';
+        menu.style.display = 'block';
+        var r = menu.getBoundingClientRect();
+        if (r.right > window.innerWidth)  menu.style.left = (x - r.width)  + 'px';
+        if (r.bottom > window.innerHeight) menu.style.top  = (y - r.height) + 'px';
+      }
+
+      function _edHideCtxMenu() {
+        if (_edCtxMenu) _edCtxMenu.style.display = 'none';
+      }
+
+      function _edHandleCtxAction(action) {
+        if (!_ed.doc) return;
+        if (action === 'copy') {
+          if (!_ed.selObj) return;
+          var pg0 = _ed.doc.pages[_ed.selObj.pageIdx];
+          var src = (pg0.objects || []).find(function (o) { return o.id === _ed.selObj.id; });
+          if (src) _edClipboard = _edClone(src);
+          return;
+        }
+        if (action === 'paste') {
+          if (!_edClipboard) return;
+          _edPushUndo();
+          var pg1 = _ed.doc.pages[_ed.pageIdx];
+          if (!pg1.objects) pg1.objects = [];
+          var paste = _edClone(_edClipboard);
+          paste.id = _edId();
+          paste.x = (paste.x || 0) + 20;
+          paste.y = (paste.y || 0) + 20;
+          pg1.objects.push(paste);
+          _edRenderAllPages();
+          _edSelectObj(_ed.pageIdx, paste.id);
+          _edScheduleAutoSave();
+          return;
+        }
+        if (action === 'duplicate') {
+          if (!_ed.selObj) return;
+          _edPushUndo();
+          var pg2 = _ed.doc.pages[_ed.selObj.pageIdx];
+          var src2 = (pg2.objects || []).find(function (o) { return o.id === _ed.selObj.id; });
+          if (!src2) return;
+          var dup = _edClone(src2);
+          dup.id = _edId();
+          dup.x = (dup.x || 0) + 20;
+          dup.y = (dup.y || 0) + 20;
+          pg2.objects.push(dup);
+          _edRenderAllPages();
+          _edSelectObj(_ed.selObj.pageIdx, dup.id);
+          _edScheduleAutoSave();
+          return;
+        }
+        if (action === 'delete') {
+          if (!_ed.selObj) return;
+          _edPushUndo();
+          var pg3 = _ed.doc.pages[_ed.selObj.pageIdx];
+          pg3.objects = (pg3.objects || []).filter(function (o) { return o.id !== _ed.selObj.id; });
+          _edDeselectObj();
+          _edRenderAllPages();
+          _edScheduleAutoSave();
+        }
+      }
+
+      var canvasForCtx = document.getElementById('editorMain');
+      if (canvasForCtx) {
+        canvasForCtx.addEventListener('contextmenu', function (e) {
+          if (!_ed.doc) return;
+          // Only intercept right-clicks on a page (the white doc area) or an
+          // object; let native menu handle outside areas.
+          var pageEl = e.target.closest && e.target.closest('.ed-page');
+          if (!pageEl) return;
+          e.preventDefault();
+          var objEl = e.target.closest && e.target.closest('.ed-obj');
+          if (objEl) {
+            var oid  = objEl.getAttribute('data-obj-id');
+            var pidx = parseInt(pageEl.getAttribute('data-page-idx'));
+            if (!isNaN(pidx) && oid) _edSelectObj(pidx, oid);
+          }
+          _edShowCtxMenu(e.clientX, e.clientY);
+        });
+      }
+      // Dismiss on outside click / scroll / Escape
+      document.addEventListener('mousedown', function (e) {
+        if (_edCtxMenu && _edCtxMenu.style.display === 'block' &&
+            !_edCtxMenu.contains(e.target)) _edHideCtxMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') _edHideCtxMenu();
+      });
+      window.addEventListener('scroll', _edHideCtxMenu, true);
+
       // Global keyboard
       document.addEventListener('keydown', _edHandleKeyboard);
       document.addEventListener('selectionchange', _edUpdateTextToolbarState);

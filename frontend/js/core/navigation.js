@@ -122,7 +122,60 @@ export function showPortal() {
   } catch (e) {}
 }
 
+// Try to re-open the file the user was viewing when they navigated to a
+// portal section. Looks up the file in the user's course list by name and
+// invokes window.openFile(file, course). Returns true if a restore was
+// attempted, false otherwise.
+function _tryResumeOpenFile() {
+  try {
+    var raw = sessionStorage.getItem('ss_resume_file');
+    if (!raw) return false;
+    var resume = JSON.parse(raw);
+    sessionStorage.removeItem('ss_resume_file');
+    if (!resume || !resume.courseId || !resume.fileName) return false;
+
+    var sems = (window.SEMS || window._SEMS || {});
+    var activeSemId = window.activeSemesterId || window._activeSemesterId;
+    var course = null;
+    if (activeSemId && sems[activeSemId]) {
+      course = (sems[activeSemId].courses || []).find(function (c) {
+        return c.id === resume.courseId;
+      });
+    }
+    // Fall back to scanning every semester
+    if (!course) {
+      Object.keys(sems).some(function (sid) {
+        var c = (sems[sid].courses || []).find(function (cc) { return cc.id === resume.courseId; });
+        if (c) { course = c; return true; }
+        return false;
+      });
+    }
+    if (!course || !Array.isArray(course.files)) return false;
+
+    var file = course.files.find(function (f) { return f.name === resume.fileName; });
+    if (!file) {
+      // Maybe nested in a user folder
+      (course.userFolders || []).some(function (fd) {
+        var hit = (fd.files || []).find(function (f) { return f.name === resume.fileName; });
+        if (hit) { file = hit; return true; }
+        return false;
+      });
+    }
+    if (!file || typeof window.openFile !== 'function') return false;
+
+    window.openFile(file, course);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 export function showStudip() {
+  // If the user navigated away from an open file and is now coming back via
+  // the Courses nav button, jump straight back to that file instead of the
+  // course list.
+  if (_tryResumeOpenFile()) return;
+
   hideFilesView();
   var portal = document.getElementById('portal');
   if (portal) {
@@ -150,6 +203,19 @@ export function navTo(navId, section) {
   var fromFiles = appEl && appEl.style.display !== 'none';
   var studipEl = document.getElementById('studipDash');
   var fromStudip = studipEl && studipEl.style.display !== 'none';
+
+  // Remember the open file so a later click on Courses (showStudip) can jump
+  // straight back to it. Cleared after a successful restore, or naturally on
+  // tab close. sessionStorage so it doesn't outlive the browser session.
+  if (fromFiles && window.activeFileName && window.activeCourseId) {
+    try {
+      sessionStorage.setItem('ss_resume_file', JSON.stringify({
+        courseId: window.activeCourseId,
+        fileName: window.activeFileName
+      }));
+    } catch (e) {}
+  }
+
   if (fromFiles || fromStudip) showPortal();
   setNavActive(navId);
   // Use window.showPortalSection so router wrapper runs (URL update + section save)
