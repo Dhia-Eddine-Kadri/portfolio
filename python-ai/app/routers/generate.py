@@ -52,7 +52,9 @@ class GenerateQuizRequest(BaseModel):
     userId: str
     courseId: str
     documentIds: list[str] | None = None
-    requestedCount: int = Field(10, ge=1, le=20)
+    # Hard cap at 10 — generating more reliably exceeds Netlify's 30s function
+    # timeout. Lift after we parallelise the LLM calls.
+    requestedCount: int = Field(10, ge=1, le=10)
     difficulty: str = "medium"             # easy | medium | hard | mixed
     questionTypes: list[str] | None = None  # subset of ['mcq','true_false','short_answer']
     save: bool = True
@@ -118,7 +120,8 @@ class GenerateFlashcardsRequest(BaseModel):
     userId: str
     courseId: str
     documentIds: list[str] | None = None
-    requestedCount: int = Field(10, ge=1, le=30)
+    # Hard cap at 12 — generating more reliably exceeds Netlify's 30s timeout.
+    requestedCount: int = Field(10, ge=1, le=12)
     save: bool = True
     name: str | None = None
 

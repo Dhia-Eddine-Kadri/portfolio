@@ -372,7 +372,7 @@
           '<div class="qzsp-settings-body">' +
             '<label class="qzsp-label">Number of cards</label>' +
             '<div class="qzsp-count-row">' +
-              '<input type="range" id="fcCountSlider" min="3" max="15" value="' + count + '" class="qzsp-slider">' +
+              '<input type="range" id="fcCountSlider" min="3" max="12" value="' + Math.min(count, 12) + '" class="qzsp-slider">' +
               '<span id="fcCountVal" class="qzsp-count-val">' + count + '</span>' +
             '</div>' +
             '<label class="qzsp-label">Difficulty</label>' +

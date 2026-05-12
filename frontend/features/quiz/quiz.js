@@ -517,7 +517,7 @@
           '<div class="qzsp-settings-body">' +
             '<label class="qzsp-label">Number of questions</label>' +
             '<div class="qzsp-count-row">' +
-              '<input type="range" id="qzCountSlider" min="3" max="15" value="' + count + '" class="qzsp-slider">' +
+              '<input type="range" id="qzCountSlider" min="3" max="10" value="' + Math.min(count, 10) + '" class="qzsp-slider">' +
               '<span id="qzCountVal" class="qzsp-count-val">' + count + '</span>' +
             '</div>' +
             '<label class="qzsp-label">Difficulty</label>' +

@@ -106,7 +106,9 @@ def generate_flashcards(
     requested_count: int,
     doc_names: dict[str, str],
 ) -> dict[str, Any]:
-    requested = max(1, min(int(requested_count or 1), 30))
+    # Capped at 12 to fit within Netlify's 30s function timeout. Flashcards
+    # are shorter than quiz items so we can do a couple more than quiz (10).
+    requested = max(1, min(int(requested_count or 1), 12))
 
     chunks = retrieve_chunks(
         user_id=user_id, course_id=course_id,

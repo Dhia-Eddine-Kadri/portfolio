@@ -219,7 +219,10 @@ def generate_quiz(
     question_types: list[str] | None,
     doc_names: dict[str, str],
 ) -> dict[str, Any]:
-    requested = max(1, min(int(requested_count or 1), 20))
+    # Capped at 10 to fit comfortably within Netlify's 30s function timeout.
+    # Raising this without first parallelising the LLM calls will intermittently
+    # produce Sandbox.Timedout errors on the proxy.
+    requested = max(1, min(int(requested_count or 1), 10))
     diff = difficulty if difficulty in ("easy", "medium", "hard", "mixed") else "medium"
     types = [t for t in (question_types or _DEFAULT_TYPES) if t in _VALID_TYPES] or _DEFAULT_TYPES
 
