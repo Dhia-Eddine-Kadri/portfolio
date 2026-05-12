@@ -1909,3 +1909,58 @@ body:not(.night) .editor-wordcount {
   border-color: rgba(120, 150, 255, 0.35) !important;
   color: #fff !important;
 }
+
+/* ── Bottom Open PDF button — primary CTA with subtle pulse + hover ── */
+#edPdfChooseBtn {
+  /* Bigger, more CTA-shaped than the small chip it was */
+  padding: 11px 22px !important;
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  border-radius: 16px !important;
+  /* Same gradient family as the active tool + the writer's primary buttons */
+  background: linear-gradient(135deg, #4f7cff, #7c5cff) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 0 0 0 rgba(95, 86, 255, 0.45),
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms ease,
+              filter 220ms ease;
+  animation: epdfChoosePulse 2.6s ease-in-out infinite;
+}
+#edPdfChooseBtn svg {
+  width: 16px !important;
+  height: 16px !important;
+  transition: transform 220ms ease;
+}
+#edPdfChooseBtn:hover {
+  transform: translateY(-2px) scale(1.04);
+  filter: brightness(1.08);
+  box-shadow:
+    0 0 0 6px rgba(95, 86, 255, 0.10),
+    0 14px 32px rgba(95, 86, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  animation-play-state: paused;
+}
+#edPdfChooseBtn:hover svg {
+  transform: translateY(2px);
+}
+#edPdfChooseBtn:active {
+  transform: translateY(-1px) scale(1.01);
+}
+@keyframes epdfChoosePulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(95, 86, 255, 0.0),
+      0 10px 28px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(95, 86, 255, 0.10),
+      0 10px 28px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+}

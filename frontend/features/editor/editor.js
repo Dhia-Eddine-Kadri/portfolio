@@ -605,7 +605,9 @@
       var zoomLbl = document.getElementById('edPdfZoomLabel');
       var fname = document.getElementById('edPdfFileName');
 
-      if (!openBtn || _edPdfEditorInited) return;
+      // The old "Open PDF" button in the top toolbar was removed; use the
+      // file input as the existence anchor instead.
+      if (!input || _edPdfEditorInited) return;
       _edPdfEditorInited = true;
 
       var _pdf = null,
@@ -2739,9 +2741,11 @@
         document.body.appendChild(modal);
       };
 
-      openBtn.addEventListener('click', function () {
-        input.click();
-      });
+      if (openBtn) {
+        openBtn.addEventListener('click', function () {
+          input.click();
+        });
+      }
       input.addEventListener('change', function () {
         if (this.files[0]) loadPdf(this.files[0]);
         this.value = '';
