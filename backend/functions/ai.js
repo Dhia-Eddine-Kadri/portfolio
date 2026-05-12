@@ -3,12 +3,18 @@ const { requireEnv } = require('../lib/env');
 const { fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { logSecurityEvent } = require('../lib/logger');
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+// Netlify Functions accept up to 6 MB synchronously. We leave headroom for
+// auth headers + JSON overhead → 5.5 MB ceiling for the request body.
+// Pasted screenshots are base64-encoded so they're ~33% larger than the raw
+// image; this comfortably covers a ~3.5 MB screenshot.
+const MAX_BODY_BYTES = 5.5 * 1024 * 1024;
 const MAX_MESSAGES = 200;
 const MAX_SYSTEM_CHARS = 120000;
 const MAX_TEXT_CHARS = 120000;
 const MAX_IMAGE_BLOCKS = 5;
-const MAX_IMAGE_BASE64_CHARS = 1500000;
+// Per-image base64 cap raised to match the new body limit — a single 3.5 MB
+// screenshot becomes ~4.7 MB encoded.
+const MAX_IMAGE_BASE64_CHARS = 5000000;
 const MAX_COMPLETION_TOKENS = 2048;
 const ALLOWED_ROLES = { user: true, assistant: true, system: true };
 const ALLOWED_IMAGE_MEDIA_TYPES = {

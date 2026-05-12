@@ -451,6 +451,48 @@
     });
   }
 
+  /**
+   * Downscale a large image File so it fits comfortably inside the AI
+   * endpoint's body limit (Netlify caps at 6 MB; base64 inflates by ~33%).
+   * Re-encodes as JPEG at the given quality, capping the longest edge
+   * at maxDim. Returns the original file unchanged if anything fails.
+   */
+  function _downscaleImage(file, maxDim, quality) {
+    return new Promise(function (resolve) {
+      try {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          var w = img.naturalWidth;
+          var h = img.naturalHeight;
+          var scale = Math.min(1, maxDim / Math.max(w, h));
+          var cw = Math.round(w * scale);
+          var ch = Math.round(h * scale);
+          var canvas = document.createElement('canvas');
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, cw, ch);
+          canvas.toBlob(function (blob) {
+            URL.revokeObjectURL(url);
+            if (!blob) return resolve(file);
+            var ext = blob.type === 'image/png' ? 'png' : 'jpg';
+            var base = (file.name || 'pasted-image').replace(/\.[a-zA-Z0-9]+$/, '');
+            try {
+              resolve(new File([blob], base + '.' + ext, { type: blob.type }));
+            } catch (e) {
+              resolve(blob);
+            }
+          }, 'image/jpeg', quality || 0.85);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+        img.src = url;
+      } catch (e) {
+        resolve(file);
+      }
+    });
+  }
+
   function _handleFileSelect(e) {
     var files = Array.from(e.target.files || []);
     var canAdd = 10 - _pendingFiles.length;
@@ -1137,32 +1179,38 @@
       // Accept image/file paste — Ctrl+V / Cmd+V from a screenshot, browser
       // drag, etc. Each clipboard image becomes a File and is routed through
       // the same handler the file-picker uses, so previews + validation
-      // behave identically.
+      // behave identically. Pasted screenshots are downscaled to fit within
+      // Netlify's 5.5 MB body cap before they reach the upload pipeline.
       chatInput.addEventListener('paste', function (e) {
         var cd = e.clipboardData || window.clipboardData;
         if (!cd || !cd.items) return;
-        var pastedFiles = [];
+        var pendingItems = [];
         for (var i = 0; i < cd.items.length; i++) {
           var item = cd.items[i];
-          if (item && item.kind === 'file') {
-            var f = item.getAsFile();
-            if (f) {
-              // Pasted images from a screenshot have no filename. Give them
-              // a stable one so the dedup-by-name check in _handleFileSelect
-              // doesn't collapse multiple pastes into one entry.
-              if (!f.name || f.name === 'image.png') {
-                var ext = (f.type && f.type.split('/')[1]) || 'png';
-                try {
-                  f = new File([f], 'pasted-' + Date.now() + '-' + i + '.' + ext, { type: f.type });
-                } catch (err) { /* old browsers: stick with original */ }
-              }
-              pastedFiles.push(f);
-            }
-          }
+          if (item && item.kind === 'file') pendingItems.push({ item: item, idx: i });
         }
-        if (!pastedFiles.length) return;   // nothing useful — let the text paste through
+        if (!pendingItems.length) return;   // text paste — let the browser handle it
         e.preventDefault();
-        _handleFileSelect({ target: { files: pastedFiles, value: '' } });
+
+        Promise.all(pendingItems.map(function (entry) {
+          var f = entry.item.getAsFile();
+          if (!f) return null;
+          var hasGoodName = f.name && f.name !== 'image.png';
+          if (!hasGoodName) {
+            var ext = (f.type && f.type.split('/')[1]) || 'png';
+            try {
+              f = new File([f], 'pasted-' + Date.now() + '-' + entry.idx + '.' + ext, { type: f.type });
+            } catch (err) { /* old browser — keep original */ }
+          }
+          // Compress images >1.5 MB; leave smaller files untouched.
+          if (f.type && f.type.startsWith('image/') && f.size > 1.5 * 1024 * 1024) {
+            return _downscaleImage(f, 1920, 0.85);
+          }
+          return Promise.resolve(f);
+        })).then(function (files) {
+          var ok = files.filter(Boolean);
+          if (ok.length) _handleFileSelect({ target: { files: ok, value: '' } });
+        });
       });
     }
     var chatSend = document.getElementById('aipSend');
