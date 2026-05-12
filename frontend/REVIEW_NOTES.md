@@ -1,4 +1,4 @@
-# StudySphere — Remaining Work
+# Minallo — Remaining Work
 
 ## Assets
 

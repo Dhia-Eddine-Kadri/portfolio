@@ -4,11 +4,11 @@
     html: 'features/subscription/subscription.html',
     css: 'features/subscription/subscription.css'
   };
-  if (window.StudySphere) {
-    window.StudySphere.registerFeature('subscription', feature);
+  if (window.Minallo) {
+    window.Minallo.registerFeature('subscription', feature);
   } else {
-    window.StudySphereFeatures = window.StudySphereFeatures || {};
-    window.StudySphereFeatures.subscription = feature;
+    window.MinalloFeatures = window.MinalloFeatures || {};
+    window.MinalloFeatures.subscription = feature;
   }
 
   var section = document.getElementById('psec-subscription');
@@ -35,7 +35,7 @@ function _loadBillingConfig() {
 
 function _ensurePayPalPlanId() {
   if (_paypalPlanId) return Promise.resolve(_paypalPlanId);
-  var cfg = window.StudySphereConfig || {};
+  var cfg = window.MinalloConfig || {};
   if (cfg.paypalPlanId) {
     _paypalPlanId = String(cfg.paypalPlanId);
     return Promise.resolve(_paypalPlanId);
@@ -43,7 +43,7 @@ function _ensurePayPalPlanId() {
   return _loadBillingConfig().then(function (payload) {
     _paypalPlanId = String((payload && payload.paypalPlanId) || '').trim();
     if (!_paypalPlanId) throw new Error('Missing PayPal plan configuration');
-    window.StudySphereConfig = Object.assign({}, window.StudySphereConfig || {}, {
+    window.MinalloConfig = Object.assign({}, window.MinalloConfig || {}, {
       paypalPlanId: _paypalPlanId
     });
     return _paypalPlanId;

@@ -1,9 +1,9 @@
 // ── Minallo Lecture Assistant — Content Script ────────────────────────
 (function () {
-  if (window.__studySphereInjected) return;
-  window.__studySphereInjected = true;
+  if (window.__minalloInjected) return;
+  window.__minalloInjected = true;
 
-  const BACKEND = 'https://studysphere-website.netlify.app';
+  const BACKEND = 'https://minallo.de';
 
   // ── State ──────────────────────────────────────────────────────────────
   let transcript = [];

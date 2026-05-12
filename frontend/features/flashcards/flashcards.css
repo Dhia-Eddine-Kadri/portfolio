@@ -1,7 +1,7 @@
 /* ── Flashcards feature ─────────────────────────────────────────────────────
    Used inside a course's flashcards tab. Layout follows the mockup: deck
    grid on the left, study preview on the right; toolbar on top.
-   Colors stay in the studysphere purple/teal palette.                          */
+   Colors stay in the Minallo purple/teal palette.                          */
 
 .fc-root {
   display: flex;

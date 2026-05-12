@@ -1,4 +1,4 @@
-// StudySphere router/history layer. Loaded after app.js so it can wrap app globals.
+// Minallo router/history layer. Loaded after app.js so it can wrap app globals.
 
 function _bindIf(id, event, handler) {
   var el = document.getElementById(id);

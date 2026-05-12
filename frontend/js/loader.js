@@ -1,11 +1,11 @@
-// ── StudySphere Section Loader ────────────────────────────────────────────────
+// ── Minallo Section Loader ────────────────────────────────────────────────────
 // Fetches each HTML section file and injects it into the DOM in order,
 // then loads app.js and fires 'ss-ready' so supabase.js can do auth init.
 // All JS runs in the same window scope — no iframes, no module boundaries.
 
 (function () {
   // ── Session routing ──────────────────────────────────────────────────────
-  var SS = window.StudySphere;
+  var SS = window.Minallo;
   var root = document.getElementById('ss-sections-root');
   if (SS) SS.emit('loader:start', { loggedIn: !!window._ssIsLoggedIn });
 
@@ -41,7 +41,7 @@
         'Row-level security via Supabase. Only you can see your notes, settings and profile. Always.',
       cta2_title: 'Ready to study smarter?',
       cta2_desc:
-        'Join thousands of students already using StudySphere to save time, understand more and stress less.',
+        'Join thousands of students already using Minallo to save time, understand more and stress less.',
       cta2_btn: 'Create your free account →',
       stats_rating: 'Average rating',
       stats_students: 'Students',
@@ -79,7 +79,7 @@
         'Zeilensicherheit über Supabase. Nur du kannst deine Notizen, Einstellungen und dein Profil sehen. Immer.',
       cta2_title: 'Bereit, klüger zu studieren?',
       cta2_desc:
-        'Schließe dich Tausenden von Studierenden an, die bereits StudySphere nutzen, um Zeit zu sparen und mehr zu verstehen.',
+        'Schließe dich Tausenden von Studierenden an, die bereits Minallo nutzen, um Zeit zu sparen und mehr zu verstehen.',
       cta2_btn: 'Kostenloses Konto erstellen →',
       stats_rating: 'Durchschnittsbewertung',
       stats_students: 'Studierende',
@@ -257,10 +257,10 @@
         root.innerHTML =
           '<div style="display:flex;align-items:center;justify-content:center;' +
           'height:100vh;font-family:Nunito,sans-serif;color:#3b82f6;font-size:1.1rem">' +
-          'StudySphere — ' +
+          'Minallo — ' +
           '<button id="landingFallbackGoogleBtn" ' +
           'style="margin-left:12px;padding:10px 24px;' +
-          'background:linear-gradient(90deg,#b87bff,#ef79c4);' +
+          'background:linear-gradient(90deg,#2563eb,#0ea5e9);' +
           'border:none;border-radius:999px;color:#fff;font-weight:800;cursor:pointer">' +
           'Sign in with Google</button></div>';
       });

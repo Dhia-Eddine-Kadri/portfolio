@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
-var AI_CFG = (window.StudySphereConfig && window.StudySphereConfig.ai) || {};
+var AI_CFG = (window.MinalloConfig && window.MinalloConfig.ai) || {};
 var _aiUserScrolled = false; // true when user has manually scrolled up during generation
 var _attachedImages = []; // array of { data: base64string, mediaType: string }, max AI_IMG_MAX
 var AI_IMG_MAX = AI_CFG.imageMax || 5; // max images per message (keeps token budget sane)

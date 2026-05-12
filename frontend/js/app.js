@@ -1,4 +1,4 @@
-// StudySphere app.js ? build 1774335018 ? async fixes
+// Minallo app.js ? build 1774335018 ? async fixes
 
 import { escapeHtml } from './utils/escape-html.js';
 import { Store } from './core/state.js';
@@ -1111,7 +1111,7 @@ window._subService = {
   loadBillingConfig: _loadBillingConfig
 };
 
-if (window.StudySphere) {
-  window.StudySphere.markReady('app-js-evaluated', {});
-  window.StudySphere.emit('app:script-evaluated', {});
+if (window.Minallo) {
+  window.Minallo.markReady('app-js-evaluated', {});
+  window.Minallo.emit('app:script-evaluated', {});
 }

@@ -1,5 +1,5 @@
 /**
- * Centralized State Management for StudySphere
+ * Centralized State Management for Minallo
  */
 const state = {
     user: null,

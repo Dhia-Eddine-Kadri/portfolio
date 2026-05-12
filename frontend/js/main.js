@@ -1,4 +1,4 @@
-// StudySphere frontend entry point.
+// Minallo frontend entry point.
 //
 // Imports app.js (compatibility bridge) which bootstraps all feature modules.
 // As app.js shrinks, the init calls will move here and app.js will be removed.
@@ -14,11 +14,11 @@ import { initMusicServices } from './features/music/music-services.js';
 import { initStudyTimer } from './features/study-timer/study-timer.js';
 
 window.addEventListener('error', function (event) {
-  console.error('[StudySphere] Unhandled error:', event.error || event.message);
+  console.error('[Minallo] Unhandled error:', event.error || event.message);
 });
 
 window.addEventListener('unhandledrejection', function (event) {
-  console.error('[StudySphere] Unhandled promise rejection:', event.reason);
+  console.error('[Minallo] Unhandled promise rejection:', event.reason);
 });
 
 initSidebarIcons();

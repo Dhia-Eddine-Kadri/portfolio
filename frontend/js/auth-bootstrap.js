@@ -1,4 +1,4 @@
-// StudySphere auth/bootstrap shell.
+// Minallo auth/bootstrap shell.
 // Runs before supabase.js and loader.js so they can read the boot route.
 
 (function () {
@@ -42,9 +42,9 @@
   }
 
   window._ssIsLoggedIn = loggedIn;
-  if (window.StudySphere) {
-    window.StudySphere.setState({ bootLoggedIn: loggedIn });
-    window.StudySphere.emit('auth:boot-route', { loggedIn: loggedIn });
+  if (window.Minallo) {
+    window.Minallo.setState({ bootLoggedIn: loggedIn });
+    window.Minallo.emit('auth:boot-route', { loggedIn: loggedIn });
   }
 
   try {
@@ -62,7 +62,7 @@ window._onLoginSuccess = function () {
     sessionStorage.setItem('ss_logged_in', 'true');
     sessionStorage.setItem('ss_last_active', Date.now());
   } catch (e) {}
-  if (window.StudySphere) window.StudySphere.emit('auth:login-success', {});
+  if (window.Minallo) window.Minallo.emit('auth:login-success', {});
   window.location.reload();
 };
 
@@ -76,7 +76,7 @@ window._ssHideSplash = function () {
   }, 550);
 };
 
-var _CFG = window.StudySphereConfig || {};
+var _CFG = window.MinalloConfig || {};
 var _GCID = _CFG.googleClientId || window._GCID || '';
 var _SUPA = _CFG.supabaseUrl || window._SUPA || '';
 var _SAKEY = _CFG.supabaseAnonKey || window._SAKEY || '';
@@ -117,7 +117,7 @@ function _sha256hex(str) {
 }
 
 function _handleGoogleCredential(response) {
-  if (window.StudySphere) window.StudySphere.setAuth('checking', { source: 'google-one-tap' });
+  if (window.Minallo) window.Minallo.setAuth('checking', { source: 'google-one-tap' });
   var body = { provider: 'google', id_token: response.credential, gotrue_meta_security: {} };
   if (_oneTapNonce) body.nonce = _oneTapNonce;
   fetch(_SUPA + '/auth/v1/token?grant_type=id_token', {
@@ -132,21 +132,21 @@ function _handleGoogleCredential(response) {
       if (d && d.access_token) {
         localStorage.setItem('sb_token', d.access_token);
         if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
-        if (window.StudySphere)
-          window.StudySphere.setAuth('token-received', { source: 'google-one-tap' });
+        if (window.Minallo)
+          window.Minallo.setAuth('token-received', { source: 'google-one-tap' });
         var alreadyIn = false;
         try {
           alreadyIn = sessionStorage.getItem('ss_logged_in') === 'true';
         } catch (e) {}
         if (!alreadyIn) window._onLoginSuccess();
       } else {
-        if (window.StudySphere) window.StudySphere.setAuth('failed', { source: 'google-one-tap' });
+        if (window.Minallo) window.Minallo.setAuth('failed', { source: 'google-one-tap' });
         console.warn('[Auth] id_token exchange failed:', d && (d.error || d.msg));
         _oauthFallback();
       }
     })
     .catch(function (err) {
-      if (window.StudySphere) window.StudySphere.setAuth('failed', { source: 'google-one-tap' });
+      if (window.Minallo) window.Minallo.setAuth('failed', { source: 'google-one-tap' });
       console.warn('[Auth] id_token fetch error, falling back to OAuth:', err);
       _oauthFallback();
     });
@@ -194,8 +194,8 @@ function _initOneTap() {
 }
 
 window._googleAuth = function () {
-  if (window.StudySphere)
-    window.StudySphere.emit('auth:google-start', {
+  if (window.Minallo)
+    window.Minallo.emit('auth:google-start', {
       inAppShell: !!document.getElementById('authModal')
     });
 

@@ -19,13 +19,13 @@
 })();
 
 // ── Supabase REST client (no SDK needed) ──────────────────────────────────
-var _SBCFG = window.StudySphereConfig || {};
+var _SBCFG = window.MinalloConfig || {};
 var SUPA_URL = _SBCFG.supabaseUrl || window._SUPA || '';
 var SUPA_KEY = _SBCFG.supabaseAnonKey || window._SAKEY || '';
 var _sbToken = null; // access token after login
 var _currentUser = null;
 var _sbAuthCallbacks = [];
-var _SS = window.StudySphere;
+var _SS = window.Minallo;
 
 function _ssAuth(status, detail) {
   if (!_SS || typeof _SS.setAuth !== 'function') return;

@@ -4,11 +4,11 @@
     html: 'features/settings/settings.html',
     css: 'features/settings/settings.css'
   };
-  if (window.StudySphere) {
-    window.StudySphere.registerFeature('settings', feature);
+  if (window.Minallo) {
+    window.Minallo.registerFeature('settings', feature);
   } else {
-    window.StudySphereFeatures = window.StudySphereFeatures || {};
-    window.StudySphereFeatures.settings = feature;
+    window.MinalloFeatures = window.MinalloFeatures || {};
+    window.MinalloFeatures.settings = feature;
   }
 
   var section = document.getElementById('psec-settings');
