@@ -1,5 +1,5 @@
 """
-StudySphere Dev Agents
+Minallo Dev Agents
 ======================
 These agents are invoked BY Claude Code during development — not by the user.
 

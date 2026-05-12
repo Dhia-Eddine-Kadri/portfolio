@@ -157,7 +157,7 @@ export function initAuthModal(options) {
         var signUpResult = await sb.auth.signUp(
           email,
           password,
-          'https://studysphere-website.netlify.app/'
+          'https://minallo.de/'
         );
 
         if (signUpResult.error || signUpResult.error_description) {
@@ -244,7 +244,7 @@ export function initAuthModal(options) {
   function handleAuthClick() {
     var currentUser = getCurrentUser();
     if (currentUser) {
-      if (confirm('Sign out of StudySphere?')) {
+      if (confirm('Sign out of Minallo?')) {
         sb.auth.signOut().then(function () {
           var authAvatar = document.getElementById('authAvatar');
           var authName = document.getElementById('authName');

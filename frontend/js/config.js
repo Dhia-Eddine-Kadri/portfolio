@@ -15,10 +15,10 @@
     }
   };
 
-  window.StudySphereConfig = Object.assign({}, window.StudySphereConfig || {}, cfg);
+  window.MinalloConfig = Object.assign({}, window.MinalloConfig || {}, cfg);
 
   // Backwards-compatible globals used by existing feature files.
-  window._GCID = window.StudySphereConfig.googleClientId;
-  window._SUPA = window.StudySphereConfig.supabaseUrl;
-  window._SAKEY = window.StudySphereConfig.supabaseAnonKey;
+  window._GCID = window.MinalloConfig.googleClientId;
+  window._SUPA = window.MinalloConfig.supabaseUrl;
+  window._SAKEY = window.MinalloConfig.supabaseAnonKey;
 })();

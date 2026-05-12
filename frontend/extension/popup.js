@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? 'Create account ✨'
       : 'Welcome back 👋';
     document.querySelector('.auth-sub').textContent = isSignUp
-      ? 'Join StudySphere to get started'
+      ? 'Join Minallo to get started'
       : 'Sign in to use the Lecture Assistant';
     switchLink.parentElement.innerHTML = isSignUp
       ? 'Already have an account? <a id="auth-switch-link">Sign in</a>'

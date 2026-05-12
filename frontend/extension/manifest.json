@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "StudySphere Lecture Assistant",
+  "name": "Minallo Lecture Assistant",
   "version": "1.2.0",
   "description": "Watches lectures with you and summarizes them using AI",
   "permissions": ["activeTab", "scripting", "storage", "tabs", "tabCapture"],
@@ -11,7 +11,7 @@
     "https://opencast-present.tu-braunschweig.de/*",
     "https://media.tu-braunschweig.de/*",
     "https://*.zoom.us/*",
-    "https://studysphere-website.netlify.app/*",
+    "https://minallo.de/*",
     "https://cdn.jsdelivr.net/*"
   ],
   "content_security_policy": {
@@ -34,7 +34,7 @@
         "https://opencast-present.tu-braunschweig.de/*",
         "https://media.tu-braunschweig.de/*",
         "https://*.zoom.us/*",
-        "https://studysphere-website.netlify.app/*"
+        "https://minallo.de/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

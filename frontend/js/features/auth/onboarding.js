@@ -97,7 +97,7 @@ export function showOnboarding(email) {
   _obTest = '';
   _obLevel = '';
   _obShowStep('1');
-  document.getElementById('obTitle').textContent = 'Welcome to StudySphere!';
+  document.getElementById('obTitle').textContent = 'Welcome to Minallo!';
   document.getElementById('obSub').textContent = "Let's set up your profile — step 1 of 3";
   document.getElementById('obEmoji').textContent = '👋';
   var emailField = document.getElementById('obEmail');
@@ -327,7 +327,7 @@ export function initOnboarding() {
   window._obBack = function (fromStep) {
     if (fromStep === 1 || fromStep === undefined) {
       _obShowStep('1');
-      document.getElementById('obTitle').textContent = 'Welcome to StudySphere!';
+      document.getElementById('obTitle').textContent = 'Welcome to Minallo!';
       document.getElementById('obSub').textContent = "Let's set up your profile — step 1 of 3";
       document.getElementById('obEmoji').textContent = '👋';
     } else {

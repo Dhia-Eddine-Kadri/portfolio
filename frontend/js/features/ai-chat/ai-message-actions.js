@@ -73,7 +73,7 @@ export function addBotMsg(text) {
   var t = getTime();
   var _botHtml = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(text) : text;
   wrap.innerHTML =
-    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
     '<div class="msg-body">' +
     '<div class="ai-bubble bot">' +
     _botHtml +

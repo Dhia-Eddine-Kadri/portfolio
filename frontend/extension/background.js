@@ -6,7 +6,7 @@ let authTabId = null;
 let originWinId = null;
 
 function startGoogleAuth() {
-  const redirectTo = 'https://studysphere-website.netlify.app/';
+  const redirectTo = 'https://minallo.de/';
   const authUrl = `${SUPA_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
   chrome.windows.getCurrent({}, (win) => {
     originWinId = win.id;

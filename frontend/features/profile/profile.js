@@ -4,11 +4,11 @@
     html: 'features/profile/profile.html',
     css: 'features/profile/profile.css'
   };
-  if (window.StudySphere) {
-    window.StudySphere.registerFeature('profile', feature);
+  if (window.Minallo) {
+    window.Minallo.registerFeature('profile', feature);
   } else {
-    window.StudySphereFeatures = window.StudySphereFeatures || {};
-    window.StudySphereFeatures.profile = feature;
+    window.MinalloFeatures = window.MinalloFeatures || {};
+    window.MinalloFeatures.profile = feature;
   }
 
   var section = document.getElementById('psec-profile');

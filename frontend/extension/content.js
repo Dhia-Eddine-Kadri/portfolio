@@ -1,9 +1,9 @@
-// ── StudySphere Lecture Assistant — Content Script ────────────────────────
+// ── Minallo Lecture Assistant — Content Script ────────────────────────
 (function () {
-  if (window.__studySphereInjected) return;
-  window.__studySphereInjected = true;
+  if (window.__minalloInjected) return;
+  window.__minalloInjected = true;
 
-  const BACKEND = 'https://studysphere-website.netlify.app';
+  const BACKEND = 'https://minallo.de';
 
   // ── State ──────────────────────────────────────────────────────────────
   let transcript = [];
@@ -22,7 +22,7 @@
   const isZoom = location.hostname.includes('zoom.us');
   const isLecturePage = isYouTube || isOpencast || isZoom;
 
-  // ── Website postMessage bridge (runs on all pages, including StudySphere) ─
+  // ── Website postMessage bridge (runs on all pages, including Minallo) ─
   const KNOWN_TYPES = ['SS_REQUEST_SUMMARIES', 'SS_DELETE_SUMMARY'];
   window.addEventListener('message', function (e) {
     if (!e.data) return;
@@ -577,7 +577,7 @@
           model: 'gpt-4o',
           max_tokens: 2000,
           system:
-            'You are StudySphere, an AI tutor for TU Braunschweig engineering students. Analyze the lecture transcript and produce a structured study summary. Use the same language as the transcript (German or English).',
+            'You are Minallo, an AI tutor for TU Braunschweig engineering students. Analyze the lecture transcript and produce a structured study summary. Use the same language as the transcript (German or English).',
           messages: [
             {
               role: 'user',

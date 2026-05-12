@@ -1,5 +1,5 @@
 (function () {
-  if (window.StudySphere && window.StudySphere.version) return;
+  if (window.Minallo && window.Minallo.version) return;
 
   var state = {};
   var events = {};
@@ -38,10 +38,10 @@
       try {
         handler(payload);
       } catch (err) {
-        console.error('StudySphere event handler failed:', name, err);
+        console.error('Minallo event handler failed:', name, err);
       }
     });
-    document.dispatchEvent(new CustomEvent('studysphere:' + name, { detail: payload }));
+    document.dispatchEvent(new CustomEvent('minallo:' + name, { detail: payload }));
   }
 
   function setState(patch) {
@@ -98,7 +98,7 @@
     return !!ready[name];
   }
 
-  window.StudySphere = {
+  window.Minallo = {
     version: '1.0.0',
     on: on,
     off: off,

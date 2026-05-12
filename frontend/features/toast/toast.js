@@ -3,7 +3,7 @@ var toastTimer = null;
 function showToast(title, sub) {
   var toast = document.getElementById('ss-toast');
   document.getElementById('ss-toast-title').textContent = title;
-  document.getElementById('ss-toast-sub').textContent = sub || 'From StudySphere Extension';
+  document.getElementById('ss-toast-sub').textContent = sub || 'From Minallo Extension';
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function () {

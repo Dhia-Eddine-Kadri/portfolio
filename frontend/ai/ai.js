@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  ai/ai.js — StudySphere AI Engine
+//  ai/ai.js — Minallo AI Engine
 //  Loaded after app.js; overrides askAI, chipPrompt, and runMultiSummary.
 //  Edit this file to change model, prompts, token limits, or response style.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
-var AI_CFG = (window.StudySphereConfig && window.StudySphereConfig.ai) || {};
+var AI_CFG = (window.MinalloConfig && window.MinalloConfig.ai) || {};
 var _aiUserScrolled = false; // true when user has manually scrolled up during generation
 var _attachedImages = []; // array of { data: base64string, mediaType: string }, max AI_IMG_MAX
 var AI_IMG_MAX = AI_CFG.imageMax || 5; // max images per message (keeps token budget sane)
@@ -26,7 +26,7 @@ function _buildSystemPrompt() {
     : '(no document loaded — answer from general knowledge and note the document is not available)';
 
   return (
-    'You are StudySphere, an expert academic tutor for university engineering students.\n' +
+    'You are Minallo, an expert academic tutor for university engineering students.\n' +
     'The student is reading "' +
     (activeFileName || 'a document') +
     '"' +
@@ -110,7 +110,7 @@ askAI = function (question, skipUserBubble) {
   var thinkWrap = document.createElement('div');
   thinkWrap.className = 'ai-msg-wrap typing-wrap';
   thinkWrap.innerHTML =
-    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
     '<div class="typing-bubble"><span></span><span></span><span></span></div>';
   aiMsgs.appendChild(thinkWrap);
   aiMsgs.scrollTop = aiMsgs.scrollHeight;
@@ -169,7 +169,7 @@ askAI = function (question, skipUserBubble) {
       ansWrap.className = 'ai-msg-wrap';
       var t = getTime();
       ansWrap.innerHTML =
-        '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+        '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
         '<div class="msg-body">' +
         '<div class="ai-bubble bot" style="min-height:20px"></div>' +
         '<div class="msg-meta" style="display:none">' +
@@ -468,7 +468,7 @@ async function runMultiSummary(fnames, course) {
         model: AI_MODEL,
         max_tokens: AI_MAX_TOK,
         system:
-          'You are StudySphere, an expert AI tutor for university engineering students. ' +
+          'You are Minallo, an expert AI tutor for university engineering students. ' +
           'The student has selected multiple related course files and needs a single unified study guide. ' +
           'Synthesise all content into one coherent document written in explanatory prose — not bullet lists. ' +
           'Respond ENTIRELY in ' +

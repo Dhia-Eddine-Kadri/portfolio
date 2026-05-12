@@ -137,7 +137,7 @@
 [[headers]]
   for = "/api/*"
   [headers.values]
-    Access-Control-Allow-Origin = "https://studysphere-website.netlify.app"
+    Access-Control-Allow-Origin = "https://minallo.de"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
     Access-Control-Max-Age = "86400"

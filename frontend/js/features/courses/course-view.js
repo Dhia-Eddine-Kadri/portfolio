@@ -263,7 +263,7 @@ export function showCourseSection(course, section) {
   co.style.display = 'block';
   co.innerHTML =
     '<div class="co-inner">' +
-    '<div class="co-logo">📚 StudySphere</div>' +
+    '<div class="co-logo">📚 Minallo</div>' +
     (course.meta ? '<p class="co-tag">' + course.name + ' · ' + course.meta + '</p>' : '') +
     '<div class="co-card" style="margin-top:0">' +
     buildFilesContent(course) +

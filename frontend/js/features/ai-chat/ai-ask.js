@@ -82,7 +82,7 @@ export function addTyping() {
   var wrap = document.createElement('div');
   wrap.className = 'ai-msg-wrap typing-wrap';
   wrap.innerHTML =
-    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
     '<div class="typing-bubble"><span></span><span></span><span></span></div>';
   aiMsgs.appendChild(wrap);
   // Initial typing dots appear: stick to bottom unless user already scrolled up
@@ -126,7 +126,7 @@ function _renderHistoryPairs(pairs, aiMsgs) {
     wrap.className = 'ai-msg-wrap';
     wrap.setAttribute('data-restored', 'true');
     wrap.innerHTML =
-      '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+      '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
       '<div class="msg-body"><div class="ai-bubble bot restored-answer"></div></div>';
     var bubble = wrap.querySelector('.ai-bubble.bot');
     if (bubble) {
@@ -231,7 +231,7 @@ export function initAskAI(state) {
     var thinkWrap = document.createElement('div');
     thinkWrap.className = 'ai-msg-wrap typing-wrap';
     thinkWrap.innerHTML =
-      '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+      '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
       '<div class="typing-bubble"><span></span><span></span><span></span></div>';
     aiMsgs.appendChild(thinkWrap);
     aiMsgs.scrollTop = aiMsgs.scrollHeight;
@@ -244,7 +244,7 @@ export function initAskAI(state) {
     var _MATH_PROMPT = window._MATH_PROMPT || '';
     var sysPrompt =
       (window._userType === 'learner'
-        ? 'You are StudySphere, a German language tutor helping a student prepare for ' +
+        ? 'You are Minallo, a German language tutor helping a student prepare for ' +
           (window._germanTest || 'a German exam') +
           (window._germanLevel ? ' at level ' + window._germanLevel : '') +
           '. Always reply in ' +
@@ -252,7 +252,7 @@ export function initAskAI(state) {
           '. The student is reading "' +
           activeFileName +
           '". ALWAYS base your answers on the actual document content below. Be thorough but concise.'
-        : 'You are StudySphere, a friendly tutor for TU Braunschweig engineering students. Always reply in ' +
+        : 'You are Minallo, a friendly tutor for TU Braunschweig engineering students. Always reply in ' +
           (_lang === 'de' ? 'German' : 'English') +
           '. The student is reading "' +
           activeFileName +
@@ -571,7 +571,7 @@ export function initAskAI(state) {
               ansWrap = document.createElement('div');
               ansWrap.className = 'ai-msg-wrap';
               ansWrap.innerHTML =
-                '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+                '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
                 '<div class="msg-body"><div class="ai-bubble bot" style="min-height:20px"></div></div>';
               aiMsgs.appendChild(ansWrap);
               _autoScroll(aiMsgs);
@@ -658,7 +658,7 @@ export function initAskAI(state) {
               if (thinkWrap && !thinkWrap.parentNode) {
                 thinkWrap.className = 'ai-msg-wrap typing-wrap';
                 thinkWrap.innerHTML =
-                  '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+                  '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
                   '<div class="typing-bubble"><span></span><span></span><span></span></div>';
                 aiMsgs.appendChild(thinkWrap);
               }
@@ -818,7 +818,7 @@ export function initAskAI(state) {
         ansWrap.className = 'ai-msg-wrap';
         var t = _getTime();
         ansWrap.innerHTML =
-          '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+          '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
           '<div class="msg-body">' +
           '<div class="ai-bubble bot" style="min-height:20px"></div>' +
           '<div class="msg-meta" style="display:none">' +

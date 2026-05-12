@@ -1,4 +1,4 @@
-# StudySphere exact quiz/flashcard count fix
+# Minallo exact quiz/flashcard count fix
 
 ## Problem
 

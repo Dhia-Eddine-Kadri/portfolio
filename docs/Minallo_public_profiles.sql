@@ -1,4 +1,4 @@
--- StudySphere Public Profiles View
+-- Minallo Public Profiles View
 -- Run this in the Supabase SQL Editor after the profile RLS setup.
 --
 -- Purpose:

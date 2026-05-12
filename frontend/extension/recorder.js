@@ -55,8 +55,8 @@ async function startRecording() {
   const serverOk = await checkServer();
   if (!serverOk) {
     statusEl.innerHTML =
-      '⚠️ StudySphere Transcriber is not running.<br><br>' +
-      '<small>Download it once from your StudySphere dashboard,<br>' +
+      '⚠️ Minallo Transcriber is not running.<br><br>' +
+      '<small>Download it once from your Minallo dashboard,<br>' +
       'then double-click it — it runs silently in your system tray.</small>';
     btn.disabled = false;
     return;

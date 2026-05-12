@@ -142,7 +142,7 @@
         row.className = 'aip-msg-row ' + (m.role === 'user' ? 'user' : 'bot');
         row.innerHTML =
           '<div class="aip-sender">' +
-          (m.role === 'user' ? 'You' : 'StudySphere AI') +
+          (m.role === 'user' ? 'You' : 'Minallo AI') +
           '</div>' +
           '<div class="aip-bubble ' +
           (m.role === 'user' ? 'user' : 'bot') +
@@ -276,7 +276,7 @@
     row.className = 'aip-msg-row ' + role;
     row.innerHTML =
       '<div class="aip-sender">' +
-      (role === 'user' ? 'You' : 'StudySphere AI') +
+      (role === 'user' ? 'You' : 'Minallo AI') +
       '</div>' +
       '<div class="aip-bubble ' +
       role +
@@ -294,7 +294,7 @@
     var row = document.createElement('div');
     row.className = 'aip-msg-row bot';
     row.innerHTML =
-      '<div class="aip-sender">StudySphere AI</div>' +
+      '<div class="aip-sender">Minallo AI</div>' +
       '<div class="aip-thinking"><span></span><span></span><span></span></div>';
     msgs.appendChild(row);
     msgs.scrollTop = msgs.scrollHeight;
@@ -998,7 +998,7 @@
         model: 'claude-sonnet-4-6',
         max_tokens: 6000,
         system:
-          'You are StudySphere AI, a friendly and knowledgeable assistant for university students. Always reply in ' +
+          'You are Minallo AI, a friendly and knowledgeable assistant for university students. Always reply in ' +
           (window._lang === 'de' ? 'German' : 'English') +
           ". Answer any question clearly and helpfully. Be concise but thorough.\n\nIMPORTANT: When the user's message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags." +
           _MATH_PROMPT,
@@ -1030,7 +1030,7 @@
         var row = document.createElement('div');
         row.className = 'aip-msg-row bot';
         row.innerHTML =
-          '<div class="aip-sender">StudySphere AI</div><div class="aip-bubble bot"></div>';
+          '<div class="aip-sender">Minallo AI</div><div class="aip-bubble bot"></div>';
         var msgsEl = document.getElementById('aipMsgs');
         if (msgsEl) {
           msgsEl.appendChild(row);

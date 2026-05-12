@@ -1,4 +1,4 @@
-# StudySphere — Edit Log
+# Minallo — Edit Log
 
 ## Session: 2026-03-26 — Persist Portal Section Across Refresh
 

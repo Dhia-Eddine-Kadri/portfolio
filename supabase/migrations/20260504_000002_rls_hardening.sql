@@ -1,4 +1,4 @@
--- StudySphere RLS Hardening Pass
+-- Minallo RLS Hardening Pass
 -- Run this script in the Supabase SQL Editor.
 --
 -- Purpose:

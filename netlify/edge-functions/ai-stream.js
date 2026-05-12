@@ -170,7 +170,7 @@ export default async function handler(request, context) {
         if (ragMode === 'strict') {
           send({ t: "I couldn't find relevant information in your uploaded course materials for this question. Please make sure the relevant lecture, exercise, or solution files are indexed for this course." });
         } else {
-          const fbSys = 'You are StudySphere AI — a knowledgeable academic tutor. No uploaded course documents matched this question. Answer from general academic knowledge. Start with: "⚠️ *No matching course material found — answering from general knowledge.*" Math: use KaTeX $...$ and $$...$$.';
+          const fbSys = 'You are Minallo AI — a knowledgeable academic tutor. No uploaded course documents matched this question. Answer from general academic knowledge. Start with: "⚠️ *No matching course material found — answering from general knowledge.*" Math: use KaTeX $...$ and $$...$$.';
           const fbRes = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + OPENAI_API_KEY, 'Content-Type': 'application/json' },
@@ -868,7 +868,7 @@ function buildPrompt(mode, lang, qType, openFileName, hasHandwritten) {
     ? '⚠️ OPEN PDF WITH PAGE IMAGES: The student has a PDF open. Page images are included in the user message. The PDF may have printed text AND handwritten solutions. CRITICAL RULE: If any image shows a worked solution with explicit numerical results (e.g. F_M,min = 90,942.88 N), you MUST reproduce those exact numbers — do NOT recalculate from scratch. Read images carefully for handwritten values, formulas, and subscripts.'
     : '';
   return [
-    'You are StudySphere AI — a precise, expert-level academic study assistant for engineering students.', langLine,
+    'You are Minallo AI — a precise, expert-level academic study assistant for engineering students.', langLine,
     openFileLine ? openFileLine : '',
     handwrittenLine ? handwrittenLine : '',
     '',

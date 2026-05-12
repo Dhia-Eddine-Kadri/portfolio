@@ -1,4 +1,4 @@
-# StudySphere Supabase Migrations
+# Minallo Supabase Migrations
 
 This folder mirrors the security SQL that has been applied manually in Supabase.
 

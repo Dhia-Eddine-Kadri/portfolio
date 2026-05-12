@@ -1,14 +1,14 @@
-﻿(function () {
+(function () {
   var feature = {
     sectionId: 'psec-subscription',
     html: 'features/subscription/subscription.html',
     css: 'features/subscription/subscription.css'
   };
-  if (window.StudySphere) {
-    window.StudySphere.registerFeature('subscription', feature);
+  if (window.Minallo) {
+    window.Minallo.registerFeature('subscription', feature);
   } else {
-    window.StudySphereFeatures = window.StudySphereFeatures || {};
-    window.StudySphereFeatures.subscription = feature;
+    window.MinalloFeatures = window.MinalloFeatures || {};
+    window.MinalloFeatures.subscription = feature;
   }
 
   var section = document.getElementById('psec-subscription');
@@ -35,7 +35,7 @@ function _loadBillingConfig() {
 
 function _ensurePayPalPlanId() {
   if (_paypalPlanId) return Promise.resolve(_paypalPlanId);
-  var cfg = window.StudySphereConfig || {};
+  var cfg = window.MinalloConfig || {};
   if (cfg.paypalPlanId) {
     _paypalPlanId = String(cfg.paypalPlanId);
     return Promise.resolve(_paypalPlanId);
@@ -43,7 +43,7 @@ function _ensurePayPalPlanId() {
   return _loadBillingConfig().then(function (payload) {
     _paypalPlanId = String((payload && payload.paypalPlanId) || '').trim();
     if (!_paypalPlanId) throw new Error('Missing PayPal plan configuration');
-    window.StudySphereConfig = Object.assign({}, window.StudySphereConfig || {}, {
+    window.MinalloConfig = Object.assign({}, window.MinalloConfig || {}, {
       paypalPlanId: _paypalPlanId
     });
     return _paypalPlanId;
@@ -58,7 +58,7 @@ async function _activatePayPalSubscription(data, closePaywall) {
     var modal = document.getElementById('paywallModal');
     if (modal) modal.style.display = 'none';
   }
-  showToast('🚀 Pro activated!', 'Enjoy unlimited access.');
+  showToast('?? Pro activated!', 'Enjoy unlimited access.');
 }
 
 function applySubscription(sub) {
@@ -82,8 +82,8 @@ function applySubscription(sub) {
     if (proStatus) proStatus.style.display = 'none';
     if (upgradeBtn) {
       upgradeBtn.textContent = _hadTrial
-        ? '🚀 Subscribe — €11.99/month'
-        : '🎉 Start free 7-day trial';
+        ? '?? Subscribe � �11.99/month'
+        : '?? Start free 7-day trial';
       upgradeBtn.disabled = false;
       upgradeBtn.style.display = '';
       upgradeBtn.style.opacity = '';
@@ -163,14 +163,14 @@ function _showPaywall() {
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
     btn.textContent = _hadTrial
-      ? '🚀 Subscribe — €11.99/month'
-      : '🎉 Start free 7-day trial';
+      ? '?? Subscribe � �11.99/month'
+      : '?? Start free 7-day trial';
   var modal = document.getElementById('paywallModal');
   if (_hadTrial && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
     var desc = modal.querySelector('[data-paywall-desc]');
-    if (desc) desc.textContent = 'Subscribe to access all StudySphere features for €11.99/month.';
+    if (desc) desc.textContent = 'Subscribe to access all Minallo features for �11.99/month.';
     var afterTrial = modal.querySelector('[data-after-trial]');
     if (afterTrial) afterTrial.textContent = '/ month';
     var cancelNote = modal.querySelector('[data-cancel-note]');
@@ -261,7 +261,7 @@ function _bindSubscriptionControls() {
       } catch (e) {
         showToast('Error', e.message);
       }
-      this.textContent = 'âš™ï¸ Manage / Cancel subscription';
+      this.textContent = '⚙️ Manage / Cancel subscription';
       this.disabled = false;
     });
   }
@@ -282,12 +282,12 @@ function _bindSubscriptionControls() {
           location.href = data.url;
         } else {
           showToast('Error', data.error || 'Could not start checkout.');
-          this.textContent = '🚀 Upgrade to Pro';
+          this.textContent = '?? Upgrade to Pro';
           this.disabled = false;
         }
       } catch (e) {
         showToast('Error', e.message);
-        this.textContent = '🚀 Upgrade to Pro';
+        this.textContent = '?? Upgrade to Pro';
         this.disabled = false;
       }
     });
@@ -304,7 +304,7 @@ function _bindSubscriptionControls() {
         var data = await window._subService.createCheckoutSession(_hadTrial);
         if (data.url) location.href = data.url;
       } catch (e) {}
-      this.textContent = '🎉 Start free 7-day trial';
+      this.textContent = '?? Start free 7-day trial';
       this.disabled = false;
     });
   }
@@ -346,7 +346,7 @@ document.addEventListener(
   if (params.get('payment') === 'success') {
     var sessionId = params.get('session_id');
     history.replaceState(null, '', location.pathname);
-    showToast('🎉 Payment successful!', 'Activating your Pro plan...');
+    showToast('?? Payment successful!', 'Activating your Pro plan...');
     var attempts = 0;
     var verify = setInterval(async function () {
       attempts++;
@@ -359,7 +359,7 @@ document.addEventListener(
           applySubscription({ plan: 'pro', status: 'active', expires_at: data.expires_at || null });
           var modal = document.getElementById('paywallModal');
           if (modal) modal.style.display = 'none';
-          showToast('âœ… Pro activated!', 'Enjoy unlimited access.');
+          showToast('✅ Pro activated!', 'Enjoy unlimited access.');
         }
       } catch (e) {
         console.warn('Verify payment error:', e);

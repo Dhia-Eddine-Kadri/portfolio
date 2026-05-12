@@ -26,7 +26,7 @@
     if (document.getElementById('aiBubble')) return document.getElementById('aiBubble');
     var el = document.createElement('div');
     el.id    = 'aiBubble';
-    el.title = 'StudySphere AI';
+    el.title = 'Minallo AI';
     el.style.zIndex = '10001'; // always above panel (10000) and #portal (200)
     el.innerHTML =
       '<svg class="ai-bubble-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +

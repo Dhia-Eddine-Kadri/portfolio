@@ -95,7 +95,7 @@
       lnSummaries = summaries || [];
       if (lnSummaries.length === 0) {
         content.innerHTML =
-          '<div class="ln-empty"><span class="ln-empty-icon">🎓</span>No lecture summaries yet.<br>Install the <strong style="color:rgba(59,130,246,.7)">StudySphere Extension</strong>, watch a lecture on YouTube or Opencast,<br>then press <strong style="color:rgba(59,130,246,.7)">✨ Summarize</strong> — your notes will appear here automatically.</div>';
+          '<div class="ln-empty"><span class="ln-empty-icon">🎓</span>No lecture summaries yet.<br>Install the <strong style="color:rgba(59,130,246,.7)">Minallo Extension</strong>, watch a lecture on YouTube or Opencast,<br>then press <strong style="color:rgba(59,130,246,.7)">✨ Summarize</strong> — your notes will appear here automatically.</div>';
         return;
       }
       var html = '<div class="ln-grid">';

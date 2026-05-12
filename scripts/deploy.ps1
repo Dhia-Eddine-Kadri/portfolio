@@ -3,8 +3,8 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $root
 
-Write-Host "Running StudySphere checks..."
+Write-Host "Running Minallo checks..."
 node scripts\check-frontend.js
 
-Write-Host "Deploying StudySphere to Netlify production..."
+Write-Host "Deploying Minallo to Netlify production..."
 netlify deploy --prod

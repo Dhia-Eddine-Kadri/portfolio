@@ -1,6 +1,6 @@
-# StudySphere AI Training, RAG, and Caching Plan
+# Minallo AI Training, RAG, and Caching Plan
 
-This document explains how StudySphere should handle uploaded lecture files, exercises, professor-specific course material, repeated questions, token usage, and the idea of “training” the AI.
+This document explains how Minallo should handle uploaded lecture files, exercises, professor-specific course material, repeated questions, token usage, and the idea of “training” the AI.
 
 The most important idea:
 
@@ -11,13 +11,13 @@ Use:
 RAG + strict user/course filtering + caching + strict prompting + citations + evaluation + optional fine-tuning later.
 ```
 
-For StudySphere, “training” should mainly mean building a course-specific knowledge system around the AI. The AI should not permanently memorize every PDF. Instead, StudySphere should extract, organize, search, and retrieve the right parts of the student’s uploaded material whenever the student asks a question.
+For Minallo, “training” should mainly mean building a course-specific knowledge system around the AI. The AI should not permanently memorize every PDF. Instead, Minallo should extract, organize, search, and retrieve the right parts of the student’s uploaded material whenever the student asks a question.
 
 ---
 
 ## 1. Core Product Idea
 
-StudySphere should be a personal file-based AI tutor.
+Minallo should be a personal file-based AI tutor.
 
 The student uploads their own study material, such as:
 
@@ -50,7 +50,7 @@ The AI should answer using only the files uploaded by that student for the activ
 
 A simple product promise:
 
-> Upload your course materials and ask questions. StudySphere answers from your own files, explains concepts clearly, gives examples, and shows exactly where the answer came from.
+> Upload your course materials and ask questions. Minallo answers from your own files, explains concepts clearly, gives examples, and shows exactly where the answer came from.
 
 The key trust rule:
 
@@ -100,9 +100,9 @@ This distinction matters because it affects architecture, cost, privacy, reliabi
 
 ---
 
-## 3. Why RAG Is the Right Approach for StudySphere
+## 3. Why RAG Is the Right Approach for Minallo
 
-RAG is better than fine-tuning for StudySphere because:
+RAG is better than fine-tuning for Minallo because:
 
 ```txt
 each student uploads different files
@@ -128,9 +128,9 @@ the topics actually covered in class
 
 ---
 
-## 4. What StudySphere Should Not Be
+## 4. What Minallo Should Not Be
 
-StudySphere should not be described as a general chatbot.
+Minallo should not be described as a general chatbot.
 
 Bad positioning:
 
@@ -188,7 +188,7 @@ Never answer unsupported course-specific questions as if they were found in the 
 
 ---
 
-## 6. Ideal StudySphere AI Architecture
+## 6. Ideal Minallo AI Architecture
 
 The full system should have these layers:
 
@@ -330,7 +330,7 @@ CSV or spreadsheets for data-heavy courses
 Important rule:
 
 ```txt
-If text extraction quality is poor, StudySphere should warn the user.
+If text extraction quality is poor, Minallo should warn the user.
 ```
 
 Example warning:
@@ -542,7 +542,7 @@ less custom control over ranking, filtering, and database behavior
 
 This gives more control.
 
-Good for StudySphere because you already use Supabase and need:
+Good for Minallo because you already use Supabase and need:
 
 ```txt
 strict user filtering
@@ -681,7 +681,7 @@ answer validation
 System prompt idea:
 
 ```txt
-You are StudySphere AI.
+You are Minallo AI.
 
 Answer only using the provided course context.
 The context contains excerpts from the student's uploaded lecture files, exercises, notes, and solutions.
@@ -1130,7 +1130,7 @@ Example:
 
 ```txt
 SYSTEM:
-You are StudySphere AI...
+You are Minallo AI...
 Rules...
 Output format...
 ```
@@ -1197,7 +1197,7 @@ Generated summaries should not outrank original lecture files.
 
 ## 31. Generated Study Tools
 
-StudySphere can also generate study tools from uploaded files.
+Minallo can also generate study tools from uploaded files.
 
 Useful features:
 
@@ -1303,7 +1303,7 @@ use German/English depending on course
 format math cleanly
 generate flashcards in your exact style
 generate quizzes in your exact style
-follow StudySphere answer structure
+follow Minallo answer structure
 ```
 
 Do not fine-tune on every lecture file.
@@ -1416,7 +1416,7 @@ The backend should enforce access rules before retrieval.
 
 ## 36. Shared Courses Later
 
-Later, StudySphere may support shared course material.
+Later, Minallo may support shared course material.
 
 Example:
 
@@ -1518,7 +1518,7 @@ Cache invalidation tests
 
 ```txt
 Collect ideal examples
-Fine-tune for StudySphere answer behavior
+Fine-tune for Minallo answer behavior
 Keep RAG as knowledge source
 Evaluate before production
 ```
@@ -1757,7 +1757,7 @@ The backend should handle retrieval, caching, citations, and answer generation.
 ## 41. Example Backend Pseudocode
 
 ```ts
-async function askStudySphereAI({ userId, courseId, question, mode }) {
+async function askMinalloAI({ userId, courseId, question, mode }) {
   await verifyCourseAccess(userId, courseId);
 
   const documentVersionHash = await getDocumentVersionHash(userId, courseId);
@@ -2119,4 +2119,4 @@ If new documents are uploaded:
   invalidate old cache and retrieve from the new document version.
 ```
 
-That is the architecture needed for a professor-specific, document-grounded, token-efficient StudySphere AI.
+That is the architecture needed for a professor-specific, document-grounded, token-efficient Minallo AI.

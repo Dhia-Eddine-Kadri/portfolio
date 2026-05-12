@@ -1,4 +1,4 @@
--- StudySphere public profile surface for cross-user features.
+-- Minallo public profile surface for cross-user features.
 
 drop view if exists public.public_profiles;
 

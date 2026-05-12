@@ -1,4 +1,4 @@
--- StudySphere RLS Performance Indexes
+-- Minallo RLS Performance Indexes
 -- Run this in the Supabase SQL Editor after the RLS hardening scripts.
 --
 -- Purpose:

@@ -1,4 +1,4 @@
--- StudySphere Admin Security Setup
+-- Minallo Admin Security Setup
 -- Run this in the Supabase SQL Editor before relying on /api/admin-users.
 --
 -- This moves admin authorization from a frontend/email convention to a

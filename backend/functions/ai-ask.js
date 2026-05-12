@@ -598,7 +598,7 @@ function buildSystemPrompt(mode, lang, openFileName) {
     ? 'The student is currently reading **' + openFileName + '**. The OPEN FILE block at the top of the context contains the problem text from that file. Use it to understand exactly what is being asked, then look in ALL other course documents (lectures, solution sheets) for the explanation and full solution.'
     : '';
   return [
-    'You are StudySphere AI — a precise, expert-level academic study assistant.',
+    'You are Minallo AI — a precise, expert-level academic study assistant.',
     'Your job is to give the student an accurate, well-structured answer grounded in their own course materials.',
     langInstruction,
     openFileLine ? openFileLine : '',
@@ -643,7 +643,7 @@ function buildSystemPrompt(mode, lang, openFileName) {
 
 function buildFallbackSystemPrompt() {
   return [
-    'You are StudySphere AI — a knowledgeable academic study assistant.',
+    'You are Minallo AI — a knowledgeable academic study assistant.',
     '',
     'No uploaded course documents matched this question.',
     'You MUST still give a complete, helpful answer using your general academic knowledge.',

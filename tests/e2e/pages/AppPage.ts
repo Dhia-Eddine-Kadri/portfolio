@@ -5,7 +5,7 @@ import { Page, expect } from '@playwright/test';
  *
  * Important:
  * Do NOT wait for Playwright `networkidle` in this app.
- * StudySphere loads Supabase/auth/API/Sentry/background requests, so the network may never
+ * Minallo loads Supabase/auth/API/Sentry/background requests, so the network may never
  * become fully idle even when the UI is ready. Wait for real app UI instead.
  */
 export class AppPage {

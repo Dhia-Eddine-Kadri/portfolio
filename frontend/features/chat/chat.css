@@ -810,7 +810,7 @@
 }
 
 /* ----------------------------------------------------------------
-   MOBILE RESPONSIVE — StudySphere
+   MOBILE RESPONSIVE — Minallo
    Breakpoints: 768px tablet  |  480px phone  |  360px small phone
    ---------------------------------------------------------------- */
 
@@ -1687,7 +1687,7 @@
   padding: 6px 14px;
   border: none;
   border-radius: 20px;
-  background: linear-gradient(135deg, var(--purple), var(--pink));
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
   color: #fff;
   font-size: 0.78rem;
   font-weight: 700;
@@ -1930,7 +1930,7 @@ body.night .st-step-val {
   padding: 12px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--purple), var(--pink));
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 800;
@@ -2113,7 +2113,7 @@ body.night .st-done-title {
   transform: translateY(-1px);
 }
 .st-done-primary {
-  background: linear-gradient(135deg, var(--purple), var(--pink));
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
   color: #fff;
 }
 .st-done-secondary {
@@ -2610,7 +2610,7 @@ body.night .music-yt-input {
   width: 72px;
   height: 72px;
   border-radius: 20px;
-  background: linear-gradient(135deg, var(--purple), var(--pink));
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2622,7 +2622,7 @@ body.night .music-yt-input {
 .ss-splash-name {
   font-family: 'Fredoka One', sans-serif;
   font-size: 1.75rem;
-  background: linear-gradient(90deg, var(--purple), var(--pink));
+  background: linear-gradient(90deg, #60a5fa, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -2636,8 +2636,7 @@ body.night .music-yt-input {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--purple);
-  opacity: 0.5;
+  background: #60a5fa;`r`n  opacity: 0.5;
   animation: ss-dot-pulse 1.4s ease-in-out infinite;
 }
 .ss-splash-dots span:nth-child(2) {

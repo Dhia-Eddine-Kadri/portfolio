@@ -1,6 +1,6 @@
-# StudySphere `app.js` Split Walkthrough
+# Minallo `app.js` Split Walkthrough
 
-This walkthrough explains how to continue splitting `frontend/js/app.js` in the current StudySphere repository.
+This walkthrough explains how to continue splitting `frontend/js/app.js` in the current Minallo repository.
 
 The goal is to move from a large compatibility/controller file toward a cleaner frontend architecture where:
 
@@ -29,7 +29,7 @@ frontend/js/
 ├── auth-bootstrap.js
 ├── loader.js
 ├── router.js
-├── studysphere.js
+├── minallo.js
 ├── supabase.js
 ├── config/
 ├── core/
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initAdminPanel();
 
-  window.StudySphere?.markReady?.('main-js-ready', {});
+  window.Minallo?.markReady?.('main-js-ready', {});
 });
 ```
 

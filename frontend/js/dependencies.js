@@ -119,7 +119,7 @@
 
   function ensurePayPalSdk() {
     if (window.paypal) return Promise.resolve();
-    var cfg = window.StudySphereConfig || {};
+    var cfg = window.MinalloConfig || {};
     return loadScriptOnce(cfg.paypalSdkUrl, { 'data-sdk-integration-source': 'button-factory' });
   }
 

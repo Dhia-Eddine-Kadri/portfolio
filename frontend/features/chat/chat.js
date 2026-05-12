@@ -129,7 +129,7 @@
             var wrap = document.createElement('div');
             wrap.className = 'ai-msg-wrap';
             wrap.innerHTML =
-              '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+              '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
               '<div class="msg-body">' +
               '<div class="ai-bubble bot"></div>' +
               '<div class="msg-meta">' +

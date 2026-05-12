@@ -56,7 +56,7 @@ foreach ($relativePath in $watchPaths) {
   $watchers += $watcher
 }
 
-Write-Host "Watching StudySphere for changes. Press Ctrl+C to stop."
+Write-Host "Watching Minallo for changes. Press Ctrl+C to stop."
 Write-Host "Initial deploy will run after a short debounce."
 
 while ($true) {

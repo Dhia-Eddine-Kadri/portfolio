@@ -231,7 +231,7 @@
         return (
           '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anything…"/><button class="aw-btn">→</button></div>' +
           '<div class="aw-response" style="flex:1;overflow-y:auto;font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.8);padding:4px 2px;display:none"></div>' +
-          '<div class="aw-hint">Powered by StudySphere AI</div>'
+          '<div class="aw-hint">Powered by Minallo AI</div>'
         );
       if (type === 'gcal')
         return '<div class="gcw-root" id="gcwRoot"><div class="gcw-connect"><button class="gcw-connect-btn" id="gcwConnectBtn">Connect Google Calendar</button><div class="gcw-connect-sub">Sign in with Google to view and edit your events</div></div></div>';

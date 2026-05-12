@@ -1,6 +1,6 @@
-# StudySphere
+# Minallo
 
-StudySphere is a student workspace built around courses, files, AI study tools, chat, notes, and subscriptions.
+Minallo is a student workspace built around courses, files, AI study tools, chat, notes, and subscriptions.
 
 The app is currently a Netlify-hosted frontend with Supabase for auth, database, and storage, plus Netlify Functions for AI, payments, admin actions, and a few chat/security-sensitive flows.
 
@@ -104,7 +104,7 @@ frontend/
       escape-html.js
     loader.js
     router.js
-    studysphere.js
+    minallo.js
     supabase.js
   pages/
 
@@ -130,10 +130,10 @@ backend/
     logger.js
 
 docs/
-  studysphere_admin_security.sql
-  studysphere_rls_hardening.sql
-  studysphere_storage_security.sql
-  studysphere_chat_room_rls_patch.sql
+  Minallo_admin_security.sql
+  Minallo_rls_hardening.sql
+  Minallo_storage_security.sql
+  Minallo_chat_room_rls_patch.sql
 
 .env.example
 ```
@@ -172,10 +172,10 @@ Supabase SQL files live in `docs/` and must be run in the Supabase SQL Editor fo
 
 Run these SQL files in the Supabase SQL Editor:
 
-1. `docs/studysphere_admin_security.sql`
-2. `docs/studysphere_rls_hardening.sql`
-3. `docs/studysphere_storage_security.sql`
-4. `docs/studysphere_chat_room_rls_patch.sql`
+1. `docs/Minallo_admin_security.sql`
+2. `docs/Minallo_rls_hardening.sql`
+3. `docs/Minallo_storage_security.sql`
+4. `docs/Minallo_chat_room_rls_patch.sql`
 
 Without these, the website will not match the intended security model.
 
@@ -255,14 +255,14 @@ In this workspace there are also helper scripts under `scripts/` for checks and 
 
 - `frontend/js/app.js` is still a compatibility-heavy file while the refactor continues.
 - Some newer backend-protected flows coexist with older direct Supabase frontend calls in other parts of the app.
-- The roadmap in `studysphere_code_improvement_roadmap.md` is still relevant for modular cleanup.
+- The roadmap in `Minallo_code_improvement_roadmap.md` is still relevant for modular cleanup.
 - AI, chat, and admin flows depend on correct Netlify and Supabase environment configuration.
 
 ## Related Docs
 
-- [studysphere_code_improvement_roadmap.md](./studysphere_code_improvement_roadmap.md)
-- [studysphere_security_hardening_notes.md](./studysphere_security_hardening_notes.md)
-- [docs/studysphere_admin_security.sql](./docs/studysphere_admin_security.sql)
-- [docs/studysphere_rls_hardening.sql](./docs/studysphere_rls_hardening.sql)
-- [docs/studysphere_storage_security.sql](./docs/studysphere_storage_security.sql)
-- [docs/studysphere_chat_room_rls_patch.sql](./docs/studysphere_chat_room_rls_patch.sql)
+- [Minallo_code_improvement_roadmap.md](./Minallo_code_improvement_roadmap.md)
+- [Minallo_security_hardening_notes.md](./Minallo_security_hardening_notes.md)
+- [docs/Minallo_admin_security.sql](./docs/Minallo_admin_security.sql)
+- [docs/Minallo_rls_hardening.sql](./docs/Minallo_rls_hardening.sql)
+- [docs/Minallo_storage_security.sql](./docs/Minallo_storage_security.sql)
+- [docs/Minallo_chat_room_rls_patch.sql](./docs/Minallo_chat_room_rls_patch.sql)
