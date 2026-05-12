@@ -61,7 +61,7 @@ Rules:
 
 CRITICAL: emit EXACTLY {count} items in "items". Do not stop short. Do not pad with junk — quality must hold.
 
-Response shape:
+Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
 {{
   "items": [
     {{
@@ -240,6 +240,7 @@ def generate_quiz(
     diagnostics: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
 
     needed = requested
+    last_error: str | None = None
     for attempt in range(_MAX_RETRIES):
         if needed <= 0:
             break
@@ -250,14 +251,18 @@ def generate_quiz(
                 "- " + (it.get("question") or "")[:160] for it in collected
             )
         system = _system_prompt(needed, diff, types) + avoid_block
+        # Give the model enough room — each MCQ with options + explanation +
+        # source can run 250-400 tokens, plus JSON overhead.
+        max_completion = min(8000, 1200 + needed * 500)
         try:
             res = chat_json(
                 system=system,
                 user="COURSE CONTEXT:\n\n" + context,
-                max_tokens=min(8000, 700 + needed * 320),
+                max_tokens=max_completion,
             )
-        except Exception:
-            log.exception("quiz LLM call failed")
+        except Exception as e:  # noqa: BLE001
+            last_error = f"{type(e).__name__}: {e}"
+            log.exception("quiz LLM call failed on attempt %s", attempt + 1)
             break
 
         diagnostics["model"] = res.model
@@ -265,13 +270,26 @@ def generate_quiz(
         diagnostics["completion_tokens"] += res.completion_tokens or 0
 
         raw_items = res.data.get("items") if isinstance(res.data, dict) else None
+        log.info(
+            "quiz attempt %s: model returned %s raw items; keys=%s",
+            attempt + 1,
+            len(raw_items) if isinstance(raw_items, list) else "n/a",
+            list(res.data.keys()) if isinstance(res.data, dict) else "non-dict",
+        )
         if not isinstance(raw_items, list):
             continue
 
         new_items: list[dict[str, Any]] = []
+        rejected = 0
         for raw in raw_items:
             norm = _normalize(raw)
             if not norm:
+                rejected += 1
+                if rejected <= 2:  # log first couple of rejections per attempt
+                    log.info("quiz item rejected (type=%r answer=%r): %.200s",
+                             (raw or {}).get("type") if isinstance(raw, dict) else None,
+                             (raw or {}).get("answer") if isinstance(raw, dict) else None,
+                             json.dumps(raw, ensure_ascii=False, default=str) if raw else "")
                 continue
             key = re.sub(r"\W+", " ", (norm["question"] or "").lower()).strip()
             if not key or key in seen_questions:
@@ -281,6 +299,7 @@ def generate_quiz(
             if len(collected) + len(new_items) >= requested:
                 break
 
+        log.info("quiz attempt %s: kept=%s rejected=%s", attempt + 1, len(new_items), rejected)
         collected.extend(new_items[: requested - len(collected)])
         needed = requested - len(collected)
 
@@ -295,10 +314,13 @@ def generate_quiz(
         "completionTokens": diagnostics["completion_tokens"],
     }
     if len(collected) < requested:
-        result["warning"] = (
+        msg = (
             f"Only {len(collected)} strong questions could be created from the selected "
             f"document context (requested {requested})."
         )
+        if last_error:
+            msg += f" (last error: {last_error})"
+        result["warning"] = msg
     return result
 
 

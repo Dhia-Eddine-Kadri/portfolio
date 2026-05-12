@@ -45,7 +45,7 @@ Rules:
 
 CRITICAL: produce EXACTLY {count} items in "items".
 
-Response shape:
+Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
 {{
   "items": [
     {{
@@ -126,6 +126,7 @@ def generate_flashcards(
     diagnostics = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
 
     needed = requested
+    last_error: str | None = None
     for attempt in range(_MAX_RETRIES):
         if needed <= 0:
             break
@@ -134,14 +135,17 @@ def generate_flashcards(
             avoid = "\n\nDO NOT repeat or paraphrase these card fronts:\n" + "\n".join(
                 "- " + (c.get("front") or "")[:140] for c in collected
             )
+        # Each card runs 200-350 tokens; give plenty of completion room.
+        max_completion = min(10000, 1200 + needed * 450)
         try:
             res = chat_json(
                 system=_system_prompt(needed) + avoid,
                 user="COURSE CONTEXT:\n\n" + context,
-                max_tokens=min(10000, 700 + needed * 380),
+                max_tokens=max_completion,
             )
-        except Exception:
-            log.exception("flashcards LLM call failed")
+        except Exception as e:  # noqa: BLE001
+            last_error = f"{type(e).__name__}: {e}"
+            log.exception("flashcards LLM call failed on attempt %s", attempt + 1)
             break
 
         diagnostics["model"] = res.model
@@ -176,10 +180,13 @@ def generate_flashcards(
         "completionTokens": diagnostics["completion_tokens"],
     }
     if len(collected) < requested:
-        result["warning"] = (
+        msg = (
             f"Only {len(collected)} strong flashcards could be created from the selected "
             f"document context (requested {requested})."
         )
+        if last_error:
+            msg += f" (last error: {last_error})"
+        result["warning"] = msg
     return result
 
 
