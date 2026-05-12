@@ -1200,12 +1200,22 @@ exports.handler = async function (event) {
       const py = upstream.body || {};
       // Map Python's response shape onto the existing JS contract the
       // frontend expects: { answer, sources, confidence, unsupported }.
+      // Map Python's response shape onto the snake_case keys the JS
+      // frontend already renders (see frontend/js/features/ai-chat/ai-ask.js
+      // — `s.file_name`, `s.pages`, `s.section`).
       const sources = (py.groundedSources || []).map(function (s) {
+        var pages = null;
+        if (s.pageStart && s.pageEnd) {
+          pages = s.pageStart === s.pageEnd
+            ? String(s.pageStart)
+            : s.pageStart + '-' + s.pageEnd;
+        } else if (s.pageStart) {
+          pages = String(s.pageStart);
+        }
         return {
-          fileName: s.fileName,
-          pageStart: s.pageStart,
-          pageEnd: s.pageEnd,
-          sectionTitle: s.sectionTitle || null
+          file_name: s.fileName || 'Unknown',
+          pages: pages,
+          section: s.sectionTitle || null
         };
       });
       const mappedMode = py.retrievalMode === 'strong' ? 'strict' : 'general';
