@@ -15,7 +15,9 @@ from ..supabase_client import get_supabase
 log = logging.getLogger(__name__)
 
 
-_MAX_RETRIES = 3
+# Two attempts max — keeps wall-clock under Fly's ~60s HTTP idle timeout
+# even for the largest flashcard sets.
+_MAX_RETRIES = 2
 _VALID_DIFFICULTIES = {"easy", "medium", "hard"}
 
 
@@ -135,8 +137,10 @@ def generate_flashcards(
             avoid = "\n\nDO NOT repeat or paraphrase these card fronts:\n" + "\n".join(
                 "- " + (c.get("front") or "")[:140] for c in collected
             )
-        # Each card runs 200-350 tokens; give plenty of completion room.
-        max_completion = min(10000, 1200 + needed * 450)
+        # Per-attempt completion budget. Each card runs ~200-350 tokens.
+        # Capped so the OpenAI call finishes well under Fly's proxy idle
+        # timeout (~60s). The second attempt only fills the shortfall.
+        max_completion = min(5000, 1000 + needed * 350)
         try:
             res = chat_json(
                 system=_system_prompt(needed) + avoid,

@@ -26,7 +26,10 @@ from ..supabase_client import get_supabase
 log = logging.getLogger(__name__)
 
 
-_MAX_RETRIES = 3
+# Two attempts max — the first asks for the full count with a generous
+# token budget; the second backfills only the shortfall. Keeps wall-clock
+# under Fly's ~60s HTTP idle timeout even for the largest quizzes.
+_MAX_RETRIES = 2
 _LETTERS = ("A", "B", "C", "D")
 _VALID_TYPES = {"mcq", "true_false", "short_answer"}
 _DEFAULT_TYPES = ["mcq", "true_false", "short_answer"]
@@ -251,9 +254,12 @@ def generate_quiz(
                 "- " + (it.get("question") or "")[:160] for it in collected
             )
         system = _system_prompt(needed, diff, types) + avoid_block
-        # Give the model enough room — each MCQ with options + explanation +
-        # source can run 250-400 tokens, plus JSON overhead.
-        max_completion = min(8000, 1200 + needed * 500)
+        # Per-attempt completion budget — each MCQ with options + explanation
+        # + source runs ~250-400 tokens. Capped at 6000 so the OpenAI call
+        # finishes well under Fly's ~60s proxy idle timeout (gpt-4o-mini
+        # generates ~80 tok/s, so 6000 tokens is ~75s — uncomfortable. Cap
+        # tighter at 5000.) The second attempt only fills the shortfall.
+        max_completion = min(5000, 1000 + needed * 380)
         try:
             res = chat_json(
                 system=system,
