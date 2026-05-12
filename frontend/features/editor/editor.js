@@ -1162,11 +1162,46 @@
         inp.addEventListener('blur', commit);
       }
 
+      // HTML for the friendly "Rendering page N…" placeholder shown while
+      // pdf.js fetches and rasterises the requested page.
+      function _epdfRenderingPlaceholder(pageNum) {
+        return (
+          '<div class="epdf-empty-state">' +
+            '<div class="epdf-empty-icon">' +
+              '<div class="epdf-spinner"></div>' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="#a8b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+            '</div>' +
+            '<div>' +
+              '<div class="epdf-empty-title">Rendering page ' + pageNum + '…</div>' +
+              '<div class="epdf-empty-sub">This may take a few seconds.</div>' +
+            '</div>' +
+            '<div class="epdf-empty-chips">' +
+              '<div class="epdf-chip">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="#a8b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>' +
+                '<span class="epdf-chip-label">High quality</span>' +
+              '</div>' +
+              '<div class="epdf-chip">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="#a8b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>' +
+                '<span class="epdf-chip-label">Accurate annotations</span>' +
+              '</div>' +
+              '<div class="epdf-chip">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="#a8b8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+                '<span class="epdf-chip-label">Secure &amp; private</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+
       function renderCurrentPage() {
         if (!_pdf) return;
-        canvas.innerHTML = '';
+        // Show the friendly placeholder while pdf.js does its work — gone
+        // the moment the rendered canvas wrap takes its place below.
+        canvas.innerHTML = _epdfRenderingPlaceholder(_currentPage);
         window._edPdfOverlayCanvas = null;
         _pdf.getPage(_currentPage).then(function (page) {
+          // Clear the placeholder now that we're about to insert the real page
+          canvas.innerHTML = '';
           var vp = page.getViewport({ scale: _scale });
           var wrap = document.createElement('div');
           wrap.style.cssText =

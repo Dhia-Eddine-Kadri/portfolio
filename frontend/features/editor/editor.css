@@ -1642,3 +1642,204 @@ body:not(.night) .epn-total {
 body:not(.night) .editor-wordcount {
   color: rgba(0, 0, 0, 0.35);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PDF EDITOR POLISH PASS — premium / glassy / StudySphere identity.
+   All overrides use IDs or !important because the markup uses inline
+   styles; nothing here changes class names or IDs the JS depends on.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Workspace behind the page — glassy gradient, not flat black */
+#edPdfEditorCanvas {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(96, 120, 255, 0.10), transparent 38%),
+    radial-gradient(circle at 100% 100%, rgba(167, 139, 250, 0.06), transparent 45%),
+    rgba(10, 9, 22, 0.78) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 28px !important;
+  gap: 20px !important;
+}
+
+/* PDF page wrap rendered by JS — JS sets inline border-radius:8px and a
+   shadow on the wrap div directly. We can't change JS easily without
+   risk, so target the page canvas children of #edPdfEditorCanvas. */
+#edPdfEditorCanvas > div {
+  border-radius: 16px !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 24px 70px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  overflow: hidden;
+}
+#edPdfEditorCanvas > div > canvas:first-child {
+  border-radius: 16px !important;
+  background: #fafaf7 !important;
+}
+
+/* ── EMPTY / LOADING state ─────────────────────────────────────────────── */
+.epdf-empty-state {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: center;
+  padding: 40px 20px;
+}
+.epdf-empty-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(95, 86, 255, 0.22), rgba(59, 130, 246, 0.14));
+  border: 1px solid rgba(130, 145, 255, 0.30);
+  box-shadow:
+    0 0 30px rgba(95, 86, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+.epdf-empty-icon svg { width: 32px; height: 32px; }
+.epdf-empty-icon .epdf-spinner {
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  border: 2px solid transparent;
+  border-top-color: rgba(130, 145, 255, 0.85);
+  border-right-color: rgba(130, 145, 255, 0.45);
+  animation: epdf-spin 1.1s linear infinite;
+}
+@keyframes epdf-spin { to { transform: rotate(360deg); } }
+.epdf-empty-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f4f7ff;
+  letter-spacing: 0.01em;
+}
+.epdf-empty-sub {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+}
+.epdf-empty-chips {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+.epdf-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  min-width: 110px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: all 180ms ease;
+}
+.epdf-chip:hover {
+  background: rgba(95, 86, 255, 0.10);
+  border-color: rgba(130, 145, 255, 0.30);
+  transform: translateY(-1px);
+}
+.epdf-chip svg { width: 18px; height: 18px; opacity: 0.85; }
+.epdf-chip-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.02em;
+}
+
+/* ── Top toolbar — glassy premium buttons (PDF Editor sub-tab) ────────── */
+/* Targets the inline-styled <button>s inside the top header bar inside
+   #editorPdfEditorView. We override the inline cssText with !important. */
+#editorPdfEditorView > div:first-child button,
+#editorPdfMergerView > div:first-child button {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-radius: 12px !important;
+  color: #f4f7ff !important;
+  transition: all 180ms ease !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+#editorPdfEditorView > div:first-child button:hover,
+#editorPdfMergerView > div:first-child button:hover {
+  background: rgba(96, 125, 255, 0.16) !important;
+  border-color: rgba(120, 150, 255, 0.35) !important;
+  box-shadow: 0 0 22px rgba(91, 120, 255, 0.22) !important;
+  transform: translateY(-1px);
+}
+/* Save & Open PDF — slightly more prominent (primary feel) */
+#edPdfSaveBtn,
+#edPdfEditorOpenBtn {
+  background: linear-gradient(135deg, rgba(79, 124, 255, 0.92), rgba(111, 92, 255, 0.92)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+#edPdfSaveBtn:hover,
+#edPdfEditorOpenBtn:hover {
+  background: linear-gradient(135deg, #5f8aff, #8071ff) !important;
+  box-shadow: 0 0 26px rgba(91, 120, 255, 0.42) !important;
+}
+
+/* ── Left tool list — unified accent ──────────────────────────────────── */
+.epdf-tool {
+  border-radius: 10px !important;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease !important;
+  border: 1px solid transparent !important;
+}
+.epdf-tool:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+.epdf-tool.epdf-tool-active {
+  background: linear-gradient(135deg, rgba(95, 86, 255, 0.28), rgba(59, 130, 246, 0.14)) !important;
+  border: 1px solid rgba(130, 145, 255, 0.35) !important;
+  box-shadow: 0 0 22px rgba(95, 86, 255, 0.22) !important;
+}
+/* Soften the bright dot-indicator on each tool — keep a hint, less noise */
+.epdf-tool > span:last-child + span,
+.epdf-tool span[style*="border-radius:50%"],
+.epdf-tool span[style*="border-radius: 50%"] {
+  opacity: 0.6 !important;
+  transform: scale(0.85);
+}
+
+/* ── Right settings panel — breathable glass blocks ───────────────────── */
+/* Target the inline-styled right pane. We don't know an ID for the
+   whole panel, but each section uses a "TITLE" + control pattern. */
+#editorPdfEditorView aside,
+#editorPdfEditorView [style*="border-left"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)) !important;
+}
+/* Section spacing inside the right panel — pad and separate */
+#editorPdfEditorView [style*="border-left"] > div {
+  margin-bottom: 14px;
+}
+/* Layer rows — small glass cards */
+#edPdfLayerList > div {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 10px !important;
+  padding: 9px 11px !important;
+  margin-bottom: 6px !important;
+  transition: all 160ms ease;
+}
+#edPdfLayerList > div:hover {
+  background: rgba(95, 86, 255, 0.08) !important;
+  border-color: rgba(130, 145, 255, 0.22) !important;
+}
+
+/* ── Page counter bar at bottom — cleaner & centered ──────────────────── */
+#editorPdfEditorView > div:last-child {
+  justify-content: center !important;
+  gap: 16px;
+}
