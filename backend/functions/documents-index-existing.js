@@ -9,24 +9,26 @@ const { requireEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
-const { triggerProcessing } = require('../lib/trigger-processing');
-const { shouldUsePythonAI, forwardToPython } = require('../lib/python-ai-proxy');
+const { pythonAiConfigured, forwardToPython } = require('../lib/python-ai-proxy');
 
-// Forward an indexing job to the Python service.  Falls back to the JS
-// triggerProcessing if Python is unreachable so the user is never left
-// without indexing.
+// Forward an indexing job to the Python service. No JS fallback — the
+// legacy JS PDF pipeline has been removed; if Python is unreachable, the
+// document stays in `processing_status: 'uploaded'` and the next
+// re-index request retries it.
 async function _kickIndex(documentId, userId, courseId, storagePath) {
-  if (shouldUsePythonAI()) {
-    const r = await forwardToPython('index-document', {
-      userId: userId,
-      courseId: courseId,
-      documentId: documentId,
-      storagePath: storagePath
-    });
-    if (r.ok) return;
-    console.warn('[documents-index-existing] Python upstream failed, falling back to JS:', r.status);
+  if (!pythonAiConfigured()) {
+    console.warn('[documents-index-existing] AI service not configured — document stays unprocessed');
+    return;
   }
-  await triggerProcessing(documentId, userId);
+  const r = await forwardToPython('index-document', {
+    userId: userId,
+    courseId: courseId,
+    documentId: documentId,
+    storagePath: storagePath
+  });
+  if (!r.ok) {
+    console.warn('[documents-index-existing] Python upstream failed:', r.status, r.body && r.body.error);
+  }
 }
 
 const SOURCE_BUCKET = 'course-uploads';

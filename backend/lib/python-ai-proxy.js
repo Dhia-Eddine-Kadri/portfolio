@@ -1,17 +1,10 @@
 // Shared helper: forward a request to the Python AI service.
 //
-// Used by ai-ask.js, ai-generate.js, notes-generate.js so each handler can
-// flag-gate at the top:
-//
-//   if (shouldUsePythonAI()) {
-//     const r = await forwardToPython('ask', { userId, courseId, ... });
-//     if (r.ok) return jsonResponse(r.status, r.body);
-//     // r.ok=false → fall through to existing JS implementation
-//   }
-//
-// The browser → Netlify → Python chain always has Netlify verify the
-// Supabase JWT first; this helper just signs the upstream request with
-// INTERNAL_SECRET so the Python service knows it came from us.
+// Python is now the only AI implementation — the legacy JS pipelines have
+// been removed. Every AI/document handler is a thin auth+forward shell
+// over this helper. Auth happens in the Netlify function (Supabase JWT);
+// this helper just signs the upstream request with INTERNAL_SECRET so the
+// Python service knows the call came through Netlify.
 
 const https = require('https');
 const { URL } = require('url');
@@ -20,22 +13,31 @@ const { optionalEnv } = require('./env');
 
 const _UPSTREAM_TIMEOUT_MS = 26000;
 
-function shouldUsePythonAI() {
-  const flag = (optionalEnv('USE_PYTHON_AI', 'false') || '').toLowerCase();
-  if (flag !== 'true' && flag !== '1' && flag !== 'yes') return false;
-  if (!optionalEnv('AI_SERVICE_URL', '')) return false;
-  if (!optionalEnv('INTERNAL_SECRET', '')) return false;
-  return true;
+function _config() {
+  return {
+    serviceUrl: optionalEnv('AI_SERVICE_URL', ''),
+    internalToken: optionalEnv('INTERNAL_SECRET', '')
+  };
+}
+
+// True if the Python service is wired up. If false, the handler should
+// surface a 503 — there is no JS fallback anymore.
+function pythonAiConfigured() {
+  const { serviceUrl, internalToken } = _config();
+  return Boolean(serviceUrl && internalToken);
 }
 
 // Returns { ok, status, body } where body is a parsed JS value if upstream
 // returned JSON, otherwise { raw: <string> }. `ok` is true only on 2xx.
 function forwardToPython(endpoint, payload) {
   return new Promise(function (resolve) {
-    const serviceUrl = optionalEnv('AI_SERVICE_URL', '');
-    const internalToken = optionalEnv('INTERNAL_SECRET', '');
+    const { serviceUrl, internalToken } = _config();
     if (!serviceUrl || !internalToken) {
-      return resolve({ ok: false, status: 503, body: { error: 'AI service not configured' } });
+      return resolve({
+        ok: false,
+        status: 503,
+        body: { error: 'AI service not configured' }
+      });
     }
     let target;
     try {
@@ -86,4 +88,4 @@ function forwardToPython(endpoint, payload) {
   });
 }
 
-module.exports = { shouldUsePythonAI, forwardToPython };
+module.exports = { pythonAiConfigured, forwardToPython };

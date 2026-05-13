@@ -14,8 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import require_internal_token
 from .config import get_settings
 from .routers import ask as ask_router
+from .routers import chat as chat_router
 from .routers import generate as generate_router
 from .routers import index as index_router
+from .routers import misc as misc_router
+from .routers import notes_full as notes_full_router
 from .routers import stream as stream_router
 from .supabase_client import get_supabase
 
@@ -25,7 +28,7 @@ log = logging.getLogger("minallo-ai")
 
 app = FastAPI(
     title="Minallo AI Service",
-    version="0.5.0",
+    version="0.6.0",
     description="PDF indexing, retrieval, and grounded answer generation.",
 )
 
@@ -49,6 +52,9 @@ app.include_router(index_router.router)
 app.include_router(ask_router.router)
 app.include_router(generate_router.router)
 app.include_router(stream_router.router)
+app.include_router(chat_router.router)
+app.include_router(misc_router.router)
+app.include_router(notes_full_router.router)
 
 
 @app.get("/health")

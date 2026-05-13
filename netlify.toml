@@ -4,7 +4,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["backend/node_modules/pdf-parse/**"]
 
 [[redirects]]
   from = "/api/ai"
@@ -79,11 +78,6 @@
 [[redirects]]
   from = "/api/documents/upload"
   to = "/.netlify/functions/documents-upload"
-  status = 200
-
-[[redirects]]
-  from = "/api/documents/process"
-  to = "/.netlify/functions/documents-process-background"
   status = 200
 
 [[redirects]]

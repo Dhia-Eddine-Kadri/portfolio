@@ -1,6 +1,6 @@
 # Minallo — Python AI/RAG Migration Plan
 
-Status: **Phase 1 in progress** (FastAPI skeleton + Supabase wiring).
+Status: **Complete (Phase 6 shipped 2026-05-13)** — all AI lives in Python; JS layer is auth + proxy only.
 Branch: `python-ai-rag-service` (forked off `main`).
 Constraint: same Supabase project, same tables, same Netlify functions folder, same env var names.
 
