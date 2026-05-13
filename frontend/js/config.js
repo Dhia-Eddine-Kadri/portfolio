@@ -12,7 +12,12 @@
       maxTokens: 4096,
       pdfCharacterCap: 100000,
       imageMax: 5
-    }
+    },
+    // Python AI service base URL (Fly.io). The streaming /ask-stream
+    // endpoint is called directly from the browser so the SSE connection
+    // isn't capped by Netlify's 30s function timeout. All other AI calls
+    // still go through /api/* on Netlify.
+    aiServiceUrl: 'https://python-ai.fly.dev'
   };
 
   window.MinalloConfig = Object.assign({}, window.MinalloConfig || {}, cfg);
@@ -21,4 +26,5 @@
   window._GCID = window.MinalloConfig.googleClientId;
   window._SUPA = window.MinalloConfig.supabaseUrl;
   window._SAKEY = window.MinalloConfig.supabaseAnonKey;
+  window.AI_SERVICE_URL = window.MinalloConfig.aiServiceUrl;
 })();

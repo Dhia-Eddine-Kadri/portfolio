@@ -1,0 +1,124 @@
+"""Streaming variant of generate_answer.
+
+Yields Server-Sent Event payloads as OpenAI returns tokens, then a
+terminal `done` event with the full source list + token diagnostics.
+The browser fetches this endpoint directly with the user's Supabase
+JWT — no Netlify hop, so the connection stays open for the streaming
+duration without hitting Netlify's 30s function timeout.
+
+Event schema (newline-delimited JSON inside an SSE `data:` field):
+  {"t": "Newton"}                          — token to append
+  {"done": true, "sources": [...], ...}    — final metadata
+  {"error": "..."}                         — fatal error
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, Generator
+
+from openai import OpenAI
+
+from ..config import get_settings
+from .answer import (
+    _SYSTEM_PROMPT_STRONG,
+    _SYSTEM_PROMPT_WEAK,
+    _build_context_block,
+    _context_strength,
+)
+from .retrieval import RetrievedChunk
+
+log = logging.getLogger(__name__)
+
+
+def _sse(event: dict[str, Any]) -> bytes:
+    return ("data: " + json.dumps(event, ensure_ascii=False) + "\n\n").encode("utf-8")
+
+
+def stream_answer(
+    *,
+    question: str,
+    chunks: list[RetrievedChunk],
+    doc_names: dict[str, str],
+    model: str | None = None,
+    max_tokens: int = 1200,
+) -> Generator[bytes, None, None]:
+    """Generator that yields SSE byte chunks. Pluggable into FastAPI's
+    StreamingResponse with media_type='text/event-stream'."""
+    settings = get_settings()
+    target_model = model or settings.openai_generate_model
+    strength = _context_strength(chunks)
+    used_chunks = chunks if strength == "strong" else []
+    system_prompt = _SYSTEM_PROMPT_STRONG if strength == "strong" else _SYSTEM_PROMPT_WEAK
+    context_block = _build_context_block(used_chunks, doc_names) if used_chunks else ""
+
+    user_message = "QUESTION:\n" + question.strip()
+    if context_block:
+        user_message += "\n\nCOURSE CONTEXT:\n\n" + context_block
+
+    sources = [
+        {
+            "file_name": doc_names.get(c.document_id, "Unknown"),
+            "pages": (
+                str(c.page_start)
+                if c.page_start and c.page_start == c.page_end
+                else (f"{c.page_start}-{c.page_end}" if c.page_start and c.page_end else None)
+            ),
+            "section": c.section_title,
+        }
+        for c in used_chunks
+    ]
+
+    # Send an opening "meta" event so the client can render the bubble
+    # immediately, even before the first content token arrives.
+    yield _sse({
+        "meta": True,
+        "retrievalMode": strength,
+        "confidence": "high" if strength == "strong" else "low",
+        "unsupported": strength != "strong",
+    })
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    prompt_tokens = None
+    completion_tokens = None
+    try:
+        stream = client.chat.completions.create(
+            model=target_model,
+            max_tokens=max_tokens,
+            stream=True,
+            stream_options={"include_usage": True},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_message},
+            ],
+        )
+        for chunk in stream:
+            # Usage chunk arrives at the end when include_usage=True.
+            if getattr(chunk, "usage", None):
+                if chunk.usage:
+                    prompt_tokens = chunk.usage.prompt_tokens
+                    completion_tokens = chunk.usage.completion_tokens
+                continue
+            choices = chunk.choices or []
+            if not choices:
+                continue
+            delta = choices[0].delta
+            token = getattr(delta, "content", None) if delta else None
+            if token:
+                yield _sse({"t": token})
+    except Exception as e:  # noqa: BLE001
+        log.exception("stream_answer failed")
+        yield _sse({"error": f"{type(e).__name__}: {e}"})
+        return
+
+    yield _sse({
+        "done": True,
+        "retrievalMode": strength,
+        "confidence": "high" if strength == "strong" else "low",
+        "unsupported": strength != "strong",
+        "sources": sources,
+        "model": target_model,
+        "promptTokens": prompt_tokens,
+        "completionTokens": completion_tokens,
+    })
