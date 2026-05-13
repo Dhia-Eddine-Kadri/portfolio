@@ -1,4 +1,27 @@
 import { panelShow, panelHide } from '../../core/panels.js';
+import { listCourseDocuments } from '../../services/ai-service.js';
+
+// Reuse one in-flight fetch per course so opening the dashboard repeatedly
+// doesn't fan out into duplicate /api/documents/list calls.
+var _countFetchInFlight = {};
+
+function _hydrateCardCount(courseId, badge) {
+  if (_countFetchInFlight[courseId]) {
+    _countFetchInFlight[courseId].then(function (count) {
+      if (count != null) badge.textContent = count + ' file' + (count !== 1 ? 's' : '');
+    });
+    return;
+  }
+  _countFetchInFlight[courseId] = listCourseDocuments(courseId)
+    .then(function (docs) {
+      var count = Array.isArray(docs) ? docs.length : 0;
+      try { localStorage.setItem('ss_fc_' + courseId, String(count)); } catch (e) {}
+      if (badge.isConnected) badge.textContent = count + ' file' + (count !== 1 ? 's' : '');
+      return count;
+    })
+    .catch(function () { return null; })
+    .finally(function () { delete _countFetchInFlight[courseId]; });
+}
 
 export function renderCourses(state) {
   var cl = document.getElementById('courseList');
@@ -103,6 +126,11 @@ export function sdRenderCourses(state) {
     var badge = document.createElement('div');
     badge.className = 'sd-course-badge';
     badge.textContent = count + ' file' + (count !== 1 ? 's' : '');
+
+    // course.files is only hydrated when the user opens the course. On a fresh
+    // dashboard render that hasn't happened yet, so kick off a background
+    // count fetch and refresh the badge + ss_fc_<id> cache when it returns.
+    if (!_liveCount) _hydrateCardCount(c.id, badge);
 
     var delBtn = document.createElement('button');
     delBtn.className = 'sd-del-btn';
