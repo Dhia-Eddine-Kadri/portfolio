@@ -7,12 +7,23 @@ import {
 } from './user-data.js';
 
 export interface AuthBridgeOptions {
-  sb: unknown;
+  sb: SbClientCompat | null;
   t: (key: string) => string;
   getCurrentUser: () => { id?: string; email?: string } | null;
   verifyAndEnter: (token: string) => Promise<void> | void;
   enterApp: (user: unknown) => void;
   resetActivityTimer: () => void;
+}
+
+// Re-declared structural type so auth-bridge doesn't have to import auth-modal's
+// internal shape. Kept narrow on purpose — anything matching this works.
+interface SbClientCompat {
+  auth: {
+    signUp: (email: string, password: string, redirect?: string) => Promise<unknown>;
+    signIn: (email: string, password: string) => Promise<unknown>;
+    signOut: () => Promise<unknown>;
+    onAuthStateChange?: (cb: (event: string, data: unknown) => void) => unknown;
+  };
 }
 
 export interface AuthBridge {
@@ -29,7 +40,7 @@ export interface AuthBridge {
 
 export function initAuthBridge(options: AuthBridgeOptions): AuthBridge {
   const authModal = initAuthModal({
-    sb: options.sb,
+    sb: options.sb as Parameters<typeof initAuthModal>[0]['sb'],
     t: options.t,
     getCurrentUser: options.getCurrentUser,
     verifyAndEnter: options.verifyAndEnter,

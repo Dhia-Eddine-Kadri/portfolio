@@ -236,6 +236,31 @@ declare global {
 
     // ── navigation extras ──────────────────────────────────────────────
     hideStudip?: (stRunning?: boolean) => void;
+
+    // ── pdf-viewer extras ──────────────────────────────────────────────
+    _pdfOpenSeq?: number;
+    currentCourseShort?: string;
+    pdfTotal?: number;
+    pdfShowAll?: boolean;
+    pdfScale?: number;
+    saveState?: () => void;
+    _ssPushHistory?: (state: unknown, hash?: string) => void;
+    _ssReplaceHistory?: (state: unknown, hash?: string) => void;
+    _ufFetchBytes?: (
+      uid: string | undefined,
+      course: LegacyCourse,
+      storageName: string,
+      folder?: string | null
+    ) => Promise<Uint8Array>;
+    _ufDropCachedUploadedFile?: (course: LegacyCourse, file: unknown) => void;
+    _ssEnsurePdfJs?: () => Promise<unknown>;
+    _annotLoad?: (fileName: string) => void;
+    renderPages?: () => void;
+    _ssImageViewerActive?: boolean;
+    _ssImageRenderPagesOrig?: (() => void) | null;
+    updatePageInfo?: () => void;
+    _googleAuth?: () => void;
+    _toggleLandingLang?: () => void;
   }
 }
 
