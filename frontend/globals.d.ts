@@ -261,6 +261,32 @@ declare global {
     updatePageInfo?: () => void;
     _googleAuth?: () => void;
     _toggleLandingLang?: () => void;
+
+    // ── course-files extras ────────────────────────────────────────────
+    openAI?: () => void;
+    downloadFile?: (fname: string) => unknown;
+    _ufDelete?: (
+      course: LegacyCourse,
+      name: string,
+      folder?: string | null,
+      sname?: string | null
+    ) => unknown;
+    _ufMoveFileTo?: (
+      uid: string,
+      fromCourse: LegacyCourse,
+      toCourse: LegacyCourse,
+      name: string,
+      fromFolder: string | null,
+      toFolder: string | null,
+      sname: string | null
+    ) => Promise<unknown>;
+    _showFolderPickerPopup?: (
+      anchor: HTMLElement,
+      folders: string[],
+      onPick: (chosen: string | null) => void
+    ) => void;
+    resetQuizToGrid?: (panel: HTMLElement) => void;
+    resetFlashcardsToGrid?: (panel: HTMLElement) => void;
   }
 }
 
