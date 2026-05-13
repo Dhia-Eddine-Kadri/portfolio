@@ -12,7 +12,7 @@
     "typecheck:backend": "tsc -p backend/tsconfig.json",
     "typecheck:frontend": "tsc -p frontend/tsconfig.json",
     "dev:frontend": "vite --config frontend/vite.config.ts",
-    "build:frontend": "vite build --config frontend/vite.config.ts",
+    "build:frontend": "tsc -p frontend/tsconfig.build.json",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report tests/e2e/report",

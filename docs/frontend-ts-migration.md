@@ -1,22 +1,36 @@
-# Frontend JS → TS migration — progress tracker
+# Frontend JS → TS migration — status
 
-Branch: `frontend-ts-migration` (work happens in the
-`../studysphere-ts/` git worktree to keep `main` shippable).
+Branch: `frontend-ts-migration` (worktree at `../studysphere-ts/`).
 
-Approach approved: **big-bang Vite cutover**. The legacy
-`<script>` + `loader.js` boot is incompatible with Vite's module
-graph, so the migration completes only when:
+**Approach (revised after reading the actual loader architecture):**
+`tsc emit` cutover, not Vite. The browser already loads ES modules
+natively via `loader.js → js/main.js (type=module) → app.js`. So we
+just compile `.ts` to `.js` in place, replacing the originals. Browser
+behaviour is unchanged; only the *source* is now typed.
 
-1. Every legacy `<script src="js/…">` is replaced by a single
-   `<script type="module" src="/src/main.ts">`.
-2. `loader.js`'s HTML-injection mechanic is replaced by proper
-   imports.
-3. Netlify publish dir is switched from `frontend/` to
-   `frontend/dist/`.
+## Build pipeline
 
-Until those three things land in the same commit, the `.ts` files
-in this branch are **shadow types only** — they coexist with the
-`.js` originals; production still ships the `.js`.
+- **Source of truth**: `frontend/js/**/*.ts` (committed to git).
+- **Emitted output**: `frontend/js/**/*.js` (gitignored; rebuilt by
+  Netlify before every deploy).
+- **Type-check**: `npm run typecheck:frontend`
+  (`tsc -p frontend/tsconfig.json`, `noEmit: true`).
+- **Build**: `npm run build:frontend`
+  (`tsc -p frontend/tsconfig.build.json`, emits `.js` alongside `.ts`).
+- **Netlify**: `netlify.toml` has `command = "npm run build:frontend"`.
+  Publishes from `frontend/` (unchanged — the emitted .js files sit
+  exactly where the originals used to live, so `index.html` and
+  `loader.js` need no changes).
+
+## Stubs for non-converted .js neighbours
+
+Two files we deliberately skipped still exist as `.js` and are imported
+by `.ts` modules. They have minimal `.d.ts` shims so the build passes:
+
+- `frontend/js/features/ai-chat/ai-export.d.ts`
+- `frontend/js/features/auth/onboarding.d.ts`
+
+Convert those two files to TS and the shims can be deleted.
 
 ---
 
