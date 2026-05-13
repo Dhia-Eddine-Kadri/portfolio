@@ -117,7 +117,7 @@ declare global {
     _authMode?: string;
     updateAuthIndicator?: (user: unknown) => void;
     loadUserData?: (uid: string) => unknown;
-    applyProfile?: (profile: unknown) => unknown;
+    applyProfile?: (profile: Record<string, unknown> | null | undefined) => unknown;
     _applyUserTypeUI?: () => void;
     _adminShowIfEligible?: (user: { id?: string } | null) => void;
     _showOnboarding?: (...args: unknown[]) => void;
@@ -145,7 +145,8 @@ declare global {
     setNavActive?: (id: string) => void;
 
     // ── ai-ask bridge ──────────────────────────────────────────────────
-    askAI?: (q: string, skipUserBubble?: boolean) => unknown;
+    askAI?: (q: string, skipUserBubble?: boolean, opts?: { forceRefresh?: boolean }) => unknown;
+    addBotMsg?: (text: string) => HTMLElement | null;
     _legacyAskAI?: (q: string) => unknown;
     addTyping?: () => unknown;
     _pdfToImages?: (...args: unknown[]) => unknown;
@@ -155,6 +156,52 @@ declare global {
     _abortCurrentStream?: () => void;
     _activeStreamRender?: (() => void) | null;
     _attachedImages?: unknown[];
+
+    // ── KaTeX (cdn-loaded math renderer) ───────────────────────────────
+    katex?: {
+      renderToString: (src: string, opts: { displayMode: boolean; throwOnError: boolean }) => string;
+    };
+    _ssEnsureKatex?: () => Promise<unknown>;
+    _ssScheduleKatexRender?: () => void;
+    renderMarkdown?: (text: string) => string;
+    _renderMath?: (el: Element | null) => void;
+    renderMathInElement?: (el: Element, opts: unknown) => void;
+
+    // ── Message-actions extras (set by ai-message-actions.ts) ──────────
+    _statsTrackAI?: () => void;
+    getTime?: () => string;
+    serializeChatDOM?: () => Array<{ role: string; text: string }>;
+
+    // ── auth/user-data extras ──────────────────────────────────────────
+    SUPA_URL?: string;
+    _sb?: {
+      from: (table: string) => {
+        select: (cols: string) => {
+          eq: (col: string, val: unknown) => { single: () => Promise<Record<string, unknown> | null> };
+        };
+      };
+    };
+    _sbHeaders?: () => Record<string, string>;
+    _loadUserCourses?: (data: unknown) => void;
+    restoreState?: () => void;
+    applySubscription?: (sub: unknown) => void;
+    _userIsAdmin?: boolean;
+    _userIsPro?: boolean;
+    _showPaywall?: () => void;
+    _lnLoadFromSupabase?: (uid: string) => Promise<void>;
+    lnLoadFromSupabase?: (uid: string) => Promise<void>;
+    _dwLoadAndRender?: () => void;
+    _userVertiefung?: string;
+    _userMajor?: string;
+    _chatUsername?: string;
+    _userType?: string;
+    _germanTest?: string;
+    _germanLevel?: string;
+    MAJOR_LIST?: string[];
+
+    // ── pdf controls extras ────────────────────────────────────────────
+    updateZoomPct?: () => void;
+    _pdfScrollToPage?: (n: number) => void;
   }
 }
 
