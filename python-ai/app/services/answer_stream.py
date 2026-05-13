@@ -25,6 +25,7 @@ from .answer import (
     _SYSTEM_PROMPT_STRONG,
     _SYSTEM_PROMPT_WEAK,
     _build_context_block,
+    _cited_indices,
     _context_strength,
 )
 from .retrieval import RetrievedChunk
@@ -57,8 +58,8 @@ def stream_answer(
     if context_block:
         user_message += "\n\nCOURSE CONTEXT:\n\n" + context_block
 
-    sources = [
-        {
+    def _source_payload(c):
+        return {
             "file_name": doc_names.get(c.document_id, "Unknown"),
             "pages": (
                 str(c.page_start)
@@ -67,8 +68,11 @@ def stream_answer(
             ),
             "section": c.section_title,
         }
-        for c in used_chunks
-    ]
+
+    # Buffer the streamed answer so we can filter sources by the [Source N]
+    # citations the model actually used. The full text isn't known until the
+    # stream completes, so the filtering happens just before the 'done' event.
+    answer_buf: list[str] = []
 
     # Send an opening "meta" event so the client can render the bubble
     # immediately, even before the first content token arrives.
@@ -106,18 +110,22 @@ def stream_answer(
             delta = choices[0].delta
             token = getattr(delta, "content", None) if delta else None
             if token:
+                answer_buf.append(token)
                 yield _sse({"t": token})
     except Exception as e:  # noqa: BLE001
         log.exception("stream_answer failed")
         yield _sse({"error": f"{type(e).__name__}: {e}"})
         return
 
+    cited = _cited_indices("".join(answer_buf), len(used_chunks))
+    filtered_sources = [_source_payload(c) for i, c in enumerate(used_chunks, start=1) if i in cited]
+
     yield _sse({
         "done": True,
         "retrievalMode": strength,
         "confidence": "high" if strength == "strong" else "low",
         "unsupported": strength != "strong",
-        "sources": sources,
+        "sources": filtered_sources,
         "model": target_model,
         "promptTokens": prompt_tokens,
         "completionTokens": completion_tokens,

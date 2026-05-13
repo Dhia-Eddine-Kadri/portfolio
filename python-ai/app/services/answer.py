@@ -20,6 +20,7 @@ Implementation:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from openai import OpenAI
@@ -60,6 +61,31 @@ Behaviour:
 4. Suggest what the student could upload (lecture slides, the exercise sheet, the formula sheet) to get a properly grounded answer next time.
 5. Write math using KaTeX: $...$ inline, $$...$$ display.
 6. Match the language of the question."""
+
+
+_SOURCE_REF_RE = re.compile(r"\bSources?\s+([0-9 ,andund&]+)\b", re.IGNORECASE)
+
+
+def _cited_indices(answer_text: str, total: int) -> set[int]:
+    """Return the 1-based [Source N] indices the LLM actually referenced.
+
+    The system prompt asks the model to cite using the `[Source N]` headers
+    from the context block, so most of the work is parsing those mentions
+    out of the answer text. Falls back to all-indices if the model produced
+    no citations — that way we never *hide* sources the model is silently
+    leaning on; we only trim ones it clearly ignored.
+    """
+    if not answer_text or total <= 0:
+        return set(range(1, total + 1))
+    cited: set[int] = set()
+    for m in _SOURCE_REF_RE.finditer(answer_text):
+        for tok in re.split(r"[\s,&]+|and|und", m.group(1), flags=re.IGNORECASE):
+            tok = tok.strip()
+            if tok.isdigit():
+                n = int(tok)
+                if 1 <= n <= total:
+                    cited.add(n)
+    return cited or set(range(1, total + 1))
 
 
 def _context_strength(chunks: list[RetrievedChunk]) -> str:
@@ -123,6 +149,7 @@ def generate_answer(
     msg = completion.choices[0].message if completion.choices else None
     answer_text = (msg.content if msg else "") or ""
 
+    cited = _cited_indices(answer_text, len(used_chunks))
     sources = [
         {
             "fileName":  doc_names.get(c.document_id, "Unknown"),
@@ -132,7 +159,7 @@ def generate_answer(
             "chunkType": c.chunk_type,
             "similarity": round(c.similarity, 4),
         }
-        for c in used_chunks
+        for i, c in enumerate(used_chunks, start=1) if i in cited
     ]
 
     return {
