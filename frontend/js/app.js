@@ -422,12 +422,11 @@ document.getElementById('pdfAll')?.addEventListener('click', () => {
 });
 // ── AI PANEL ──────────────────────────────────────────────────────────────
 const aiPanel = document.getElementById('aiPanel');
-const aiTab = document.getElementById('aiTab');
 const aiMsgs = document.getElementById('aiMsgs');
 initAiRenderBridge();
 initAiPanelEffects({ aiMsgs, aiPanel });
 const _aiPanelBridge = initAiPanelBridge({
-    aiPanel, aiTab, aiClose: document.getElementById('aiClose'), aiMsgs,
+    aiPanel, aiClose: document.getElementById('aiClose'), aiMsgs,
     t: _t, escapeHtml,
     askAI: (prompt) => askAI(prompt),
     getAiPinned: () => aiPinned,

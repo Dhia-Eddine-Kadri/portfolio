@@ -1,7 +1,6 @@
 export function initAiPanelBridge(options) {
     const opts = options || {};
     const aiPanel = (opts.aiPanel || document.getElementById('aiPanel'));
-    const aiTab = (opts.aiTab || document.getElementById('aiTab'));
     const aiClose = (opts.aiClose || document.getElementById('aiClose'));
     const aiMsgs = opts.aiMsgs || document.getElementById('aiMsgs');
     const getAiPinned = opts.getAiPinned || (() => false);
@@ -15,14 +14,11 @@ export function initAiPanelBridge(options) {
                 return window.askAI(prompt);
             return undefined;
         });
-    let _aiManualClosed = false;
     function forceCloseAI() {
         setAiPinned(false);
         setAiOpen(false);
         if (aiPanel)
             aiPanel.classList.remove('visible');
-        if (aiTab)
-            aiTab.classList.remove('hidden');
     }
     function closeAI() {
         if (getAiPinned())
@@ -30,15 +26,11 @@ export function initAiPanelBridge(options) {
         setAiOpen(false);
         if (aiPanel)
             aiPanel.classList.remove('visible');
-        if (aiTab)
-            aiTab.classList.remove('hidden');
     }
     function openAI() {
         setAiOpen(true);
         if (aiPanel)
             aiPanel.classList.add('visible');
-        if (aiTab)
-            aiTab.classList.add('hidden');
         const cid = window.activeCourseId || window.currentCourseId || '';
         if (cid && typeof window.restoreCourseHistory === 'function') {
             window.restoreCourseHistory(cid);
@@ -86,30 +78,11 @@ export function initAiPanelBridge(options) {
         aiMsgs.appendChild(banner);
         aiMsgs.scrollTop = aiMsgs.scrollHeight;
     }
-    if (aiTab && !aiTab.__ssAiPanelBound) {
-        aiTab.addEventListener('click', openAI);
-        aiTab.addEventListener('mouseenter', () => {
-            if (!_aiManualClosed)
-                openAI();
-        });
-        aiTab.__ssAiPanelBound = true;
-    }
     if (aiClose && !aiClose.__ssAiCloseBound) {
         aiClose.addEventListener('click', () => {
             forceCloseAI();
-            _aiManualClosed = true;
         });
         aiClose.__ssAiCloseBound = true;
-    }
-    const docFlag = document;
-    if (!docFlag.__ssAiPanelMouseResetBound) {
-        document.addEventListener('mousemove', (e) => {
-            if (!_aiManualClosed)
-                return;
-            if (window.innerWidth - e.clientX > 150)
-                _aiManualClosed = false;
-        });
-        docFlag.__ssAiPanelMouseResetBound = true;
     }
     if (aiPanel && !aiPanel.__ssAiLeaveBound) {
         aiPanel.addEventListener('mouseleave', () => {

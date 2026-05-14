@@ -58,16 +58,13 @@ export function showPortalSection(sec: string): void {
     _activePortalSection = target;
 
     const aiPanel = document.getElementById('aiPanel');
-    const aiTab = document.getElementById('aiTab');
     const aiBubble = document.getElementById('aiBubble');
     if (sec !== 'studip') {
       if (typeof window.forceCloseAI === 'function') window.forceCloseAI();
       else if (aiPanel) aiPanel.classList.remove('visible');
-      if (aiTab) aiTab.style.display = 'none';
       if (aiBubble) aiBubble.style.display = 'none';
       if (typeof window._aiBubbleClose === 'function') window._aiBubbleClose();
     } else {
-      if (aiTab) aiTab.style.display = '';
       if (aiBubble) aiBubble.style.display = '';
     }
   }
@@ -230,9 +227,7 @@ export function showStudipResume(): boolean {
   clearResumeFile();
   showFilesView(typeof window._stRunning !== 'undefined' ? window._stRunning : false);
 
-  const aiTab = document.getElementById('aiTab');
   const aiBubble = document.getElementById('aiBubble');
-  if (aiTab) aiTab.style.display = '';
   if (aiBubble) aiBubble.style.display = '';
 
   window.openFile(hit.file, hit.course);
