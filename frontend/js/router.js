@@ -36,6 +36,22 @@ function _ssReplaceHistory(state, hash) {
   } catch (e) {}
 }
 
+// Authoritative URL + ss_portal_tab + ss_last_section commit. Belt-and-suspenders
+// alongside the showPortalSection wrapper — calling this after every navigation
+// guarantees URL and storage match the visible section even if the wrapper
+// chain is shadowed/broken by a later script.
+function _finalizeNav(section) {
+  if (!section) return;
+  try {
+    sessionStorage.setItem('ss_portal_tab', section);
+    localStorage.setItem('ss_last_section', section);
+  } catch (e) {}
+  var urlSection = section === 'studip' ? 'courses' : section;
+  try {
+    history.pushState({ view: 'portal', section: section }, '', '#portal=' + encodeURIComponent(urlSection));
+  } catch (e) {}
+}
+
 function _ssFindCourseById(courseId) {
   if (!courseId) return null;
   for (var semId in SEMS) {
@@ -331,10 +347,12 @@ _bindIf('psbDashboard', 'click', function () {
     showPortal();
     setNavActive('psbGerman');
     showPortalSection('german');
+    _finalizeNav('german');
   } else {
     showPortal();
     setNavActive('psbDashboard');
     showPortalSection('dashboard');
+    _finalizeNav('dashboard');
   }
 });
 
@@ -342,6 +360,7 @@ _bindIf('psbGerman', 'click', function () {
   showPortal();
   setNavActive('psbGerman');
   showPortalSection('german');
+  _finalizeNav('german');
   window._glBackToHome();
 });
 
@@ -349,18 +368,21 @@ _bindIf('psbProfile', 'click', function () {
   showPortal();
   setNavActive('psbProfile');
   showPortalSection('profile');
+  _finalizeNav('profile');
 });
 
 _bindIf('psbSettings', 'click', function () {
   showPortal();
   setNavActive('psbSettings');
   showPortalSection('settings');
+  _finalizeNav('settings');
 });
 
 _bindIf('psbSubscription', 'click', function () {
   showPortal();
   setNavActive('psbSubscription');
   showPortalSection('subscription');
+  _finalizeNav('subscription');
 });
 
 _bindIf('goPortal', 'click', function () {
@@ -412,29 +434,36 @@ _bindIf('goPortal', 'click', function () {
     }
     if (item.id === 'psbNotes') {
       _navTo('psbNotes', 'notes');
+      _finalizeNav('notes');
     }
     if (item.id === 'psbEditor') {
       _navTo('psbEditor', 'editor');
+      _finalizeNav('editor');
       if (typeof window._writerInit === 'function') window._writerInit();
       else if (typeof window._editorInit === 'function') window._editorInit();
     }
     if (item.id === 'psbAIPage') {
       _navTo('psbAIPage', 'aipage');
+      _finalizeNav('aipage');
       if (typeof window._aipRefreshSidebar === 'function') window._aipRefreshSidebar();
     }
     if (item.id === 'psbChat') {
       _navTo('psbChat', 'chat');
+      _finalizeNav('chat');
       _chatInit();
     }
     if (item.id === 'psbNotifications') {
       _navTo('psbNotifications', 'notifications');
+      _finalizeNav('notifications');
     }
     if (item.id === 'psbGames') {
       if (item.classList.contains('st-locked')) return;
       _navTo('psbGames', 'games');
+      _finalizeNav('games');
     }
     if (item.id === 'psbLounge') {
       _navTo('psbLounge', 'lounge');
+      _finalizeNav('lounge');
       _loungeRender();
     }
   });
