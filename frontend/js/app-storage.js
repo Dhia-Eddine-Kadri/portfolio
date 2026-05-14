@@ -378,8 +378,23 @@ async function _ufDeleteRemote(uid, course, name, folder, storageName) {
   });
 }
 
+// Dedup map: when prewarm and a course-open click both fire _ufMerge for the
+// same course, the second caller reuses the first call's Promise instead of
+// firing a duplicate Supabase storage list.
+var _ufMergeInFlight = {};
+
 // Merge remote file list into course.files + course.userFolders (called on openCourse)
-async function _ufMerge(course) {
+function _ufMerge(course) {
+  if (!course || !course.id) return Promise.resolve();
+  if (_ufMergeInFlight[course.id]) return _ufMergeInFlight[course.id];
+  var p = _ufMergeImpl(course).finally(function () {
+    delete _ufMergeInFlight[course.id];
+  });
+  _ufMergeInFlight[course.id] = p;
+  return p;
+}
+
+async function _ufMergeImpl(course) {
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
   if (!uid) return;
   function _parseMeta(item) {
