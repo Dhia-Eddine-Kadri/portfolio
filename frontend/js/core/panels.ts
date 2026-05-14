@@ -34,19 +34,16 @@ export function showFilesView(stRunning?: boolean): void {
   if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
 }
 
-// Single source of truth for which of the three top-level containers is shown.
-// `studipDash` (courses listing), `#app` (file view), `#portal .main-scroll`
-// (portal sections). Previously, each had its own show/hide function, and
-// nothing enforced mutual exclusion — leading to ghost pages when one was
-// switched while another was still visible underneath. Calling this guarantees
-// the other two are hidden, all `.portal-section` orphans are cleared, and the
-// `#portal[data-active-view]` attribute reflects reality for debugging.
-export type TopLevelView = 'file' | 'studip' | 'portal';
+// Single source of truth for which of the two top-level containers is shown.
+// `#app` (file view with PDF inside) vs `#portal .main-scroll` (portal
+// sections — including the courses listing, which is `psec-studip`).
+// Earlier code had `#studipDash` references but that element doesn't exist;
+// the courses listing has always been a portal section.
+export type TopLevelView = 'file' | 'portal';
 
 export function selectTopLevelView(which: TopLevelView, opts?: { stRunning?: boolean }): void {
   const portal = document.getElementById('portal');
   const app = document.getElementById('app');
-  const studip = document.getElementById('studipDash');
   const mainScroll = document.querySelector<HTMLElement>('#portal .main-scroll');
 
   if (portal) {
@@ -57,29 +54,13 @@ export function selectTopLevelView(which: TopLevelView, opts?: { stRunning?: boo
 
   if (which === 'file') {
     if (mainScroll) mainScroll.style.display = 'none';
-    if (studip) studip.style.display = 'none';
     if (app) app.style.display = 'flex';
-    // Clear any portal-section orphans that may still be display:block under us
-    document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
-      el.style.display = 'none';
-      el.classList.remove('psec-entering', 'psec-leaving');
-    });
     _applyFileChrome(opts?.stRunning ?? false);
-  } else if (which === 'studip') {
-    if (mainScroll) mainScroll.style.display = 'none';
-    if (app) app.style.display = 'none';
-    if (studip) studip.style.display = '';
-    document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
-      el.style.display = 'none';
-      el.classList.remove('psec-entering', 'psec-leaving');
-    });
-    _applyPortalChrome();
   } else {
-    // 'portal' — show the main-scroll, hide app/studip. Caller is responsible
-    // for revealing the specific .portal-section they want.
+    // 'portal' — show main-scroll, hide #app. Caller (showPortalSection) is
+    // responsible for revealing the specific .portal-section they want.
     if (mainScroll) mainScroll.style.display = '';
     if (app) app.style.display = 'none';
-    if (studip) studip.style.display = 'none';
     _applyPortalChrome();
   }
 }

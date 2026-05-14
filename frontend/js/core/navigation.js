@@ -224,14 +224,15 @@ export function showStudipResume() {
     return true;
 }
 export function showStudip() {
-    // Top-level switch first — guarantees file view and any visible
-    // portal-section are hidden, and clears .portal-section orphans.
-    selectTopLevelView('studip');
-    // Reset the in-portal active marker so the next showPortalSection call
-    // doesn't try to animate a "leaving" transition against a section that's
-    // already gone.
-    _activePortalSection = null;
+    // The courses listing is the `psec-studip` portal section — not a separate
+    // top-level container. Switch to portal (hides #app file view), then ask
+    // showPortalSection to reveal the specific section.
+    selectTopLevelView('portal');
     setNavActive('pcStudip');
+    if (typeof window.showPortalSection === 'function')
+        window.showPortalSection('studip');
+    else
+        showPortalSection('studip');
     if (typeof window.sdRenderCourses === 'function')
         window.sdRenderCourses();
     try {

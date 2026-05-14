@@ -20,23 +20,13 @@ export function initStatePersistence(options) {
             let activeView = portalEl ? portalEl.dataset.activeView || null : null;
             if (!activeView) {
                 const appEl = document.getElementById('app');
-                const studipEl = document.getElementById('studipDash');
                 if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
-                else if (studipEl && studipEl.style.display !== 'none' && studipEl.style.display !== '') activeView = 'studip';
                 else activeView = 'portal';
             }
-            if (activeView === 'portal') return;
-            if (activeView === 'studip') {
-                try {
-                    const prior = JSON.parse(localStorage.getItem('ss_state') || '{}');
-                    const st = Object.assign({}, prior, { view: 'studip', inApp: false });
-                    localStorage.setItem('ss_state', JSON.stringify(st));
-                }
-                catch {
-                    localStorage.setItem('ss_state', JSON.stringify({ view: 'studip', inApp: false }));
-                }
-                return;
-            }
+            // Only persist when the user is in file view. Portal sections
+            // (notes, editor, chatbot, studip listing, etc.) are tracked
+            // entirely via ss_portal_tab.
+            if (activeView !== 'file') return;
             const st = {
                 semId: options.getActiveSemId(),
                 courseId: options.getActiveCourseId() || undefined,

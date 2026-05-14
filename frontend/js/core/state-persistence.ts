@@ -67,28 +67,14 @@ export function initStatePersistence(options: StatePersistenceOptions): {
       let activeView: string | null = portalEl ? portalEl.dataset.activeView || null : null;
       if (!activeView) {
         const appEl = document.getElementById('app');
-        const studipEl = document.getElementById('studipDash');
         if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
-        else if (studipEl && studipEl.style.display !== 'none' && studipEl.style.display !== '') activeView = 'studip';
         else activeView = 'portal';
       }
 
-      // Only persist when the user is in something restorable (file view with
-      // a course/file open, or studip listing). Pure portal sections aren't
-      // tracked here — ss_portal_tab is the source of truth for those.
-      if (activeView === 'portal') return;
-      if (activeView === 'studip') {
-        // studip view: keep prior fields if present so refresh restores to the
-        // courses list. We don't delete — that was the bug.
-        try {
-          const prior = JSON.parse(localStorage.getItem('ss_state') || '{}') as StoredState;
-          const st: StoredState = { ...prior, view: 'studip', inApp: false };
-          localStorage.setItem('ss_state', JSON.stringify(st));
-        } catch {
-          localStorage.setItem('ss_state', JSON.stringify({ view: 'studip', inApp: false }));
-        }
-        return;
-      }
+      // Only persist when the user is in file view (course overview or PDF).
+      // Pure portal sections (notes, editor, chatbot, studip listing, etc.) are
+      // tracked entirely via ss_portal_tab and don't need ss_state.
+      if (activeView !== 'file') return;
 
       // activeView === 'file' — courseOverview or pdfView under #app.
       const st: StoredState = {

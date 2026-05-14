@@ -41,12 +41,11 @@ export function showFilesView(stRunning) {
     if (stMini)
         stMini.style.display = stRunning ? 'flex' : 'none';
 }
-// Single source of truth for which of the three top-level containers is shown.
+// Single source of truth for which of the two top-level containers is shown.
 // See panels.ts for the contract.
 export function selectTopLevelView(which, opts) {
     const portal = document.getElementById('portal');
     const app = document.getElementById('app');
-    const studip = document.getElementById('studipDash');
     const mainScroll = document.querySelector('#portal .main-scroll');
     if (portal) {
         portal.classList.add('show');
@@ -55,28 +54,12 @@ export function selectTopLevelView(which, opts) {
     }
     if (which === 'file') {
         if (mainScroll) mainScroll.style.display = 'none';
-        if (studip) studip.style.display = 'none';
         if (app) app.style.display = 'flex';
-        document.querySelectorAll('.portal-section').forEach((el) => {
-            el.style.display = 'none';
-            el.classList.remove('psec-entering', 'psec-leaving');
-        });
         _applyFileChrome((opts && opts.stRunning) || false);
-    }
-    else if (which === 'studip') {
-        if (mainScroll) mainScroll.style.display = 'none';
-        if (app) app.style.display = 'none';
-        if (studip) studip.style.display = '';
-        document.querySelectorAll('.portal-section').forEach((el) => {
-            el.style.display = 'none';
-            el.classList.remove('psec-entering', 'psec-leaving');
-        });
-        _applyPortalChrome();
     }
     else {
         if (mainScroll) mainScroll.style.display = '';
         if (app) app.style.display = 'none';
-        if (studip) studip.style.display = 'none';
         _applyPortalChrome();
     }
 }
