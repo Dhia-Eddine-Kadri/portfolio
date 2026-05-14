@@ -403,19 +403,19 @@ function _enterApp(user) {
     _restoreSec =
       sessionStorage.getItem('ss_portal_tab') || localStorage.getItem('ss_last_section');
   } catch (e) {}
-  // ss_state is the authoritative signal for "user was inside the courses area"
-  // (covers course view + file view). Some entry points (e.g. dashboard-widget
-  // course pills) don't update ss_portal_tab, so we'd otherwise default to
-  // dashboard nav and the post-auth restoreState would bail because lastTab is
-  // a PORTAL_ONLY_SECTION. Prefer 'studip' whenever ss_state indicates we were
-  // inside the app/courses area.
+  // If ss_state says the user was inside a file/course view (inApp=true),
+  // force _restoreSec='studip' so nav lands on Courses regardless of what
+  // ss_portal_tab happens to say — covers entry points (e.g. deep-link to
+  // #file=, dashboard-widget course pills before they updated the tab) that
+  // bypass the normal showPortalSection path.
+  //
+  // We deliberately do NOT override for ss_state.view==='studip' alone
+  // (courses listing without inApp). That case is fully covered by
+  // ss_portal_tab, and overriding here would yank the user back to Courses
+  // on every refresh after they navigated to Notes/Editor/Chatbot/etc.
   try {
     var _savedSt = JSON.parse(localStorage.getItem('ss_state') || 'null');
-    if (_savedSt && (
-      _savedSt.inApp === true ||
-      _savedSt.view === 'studip' ||
-      _savedSt.view === 'courses'
-    )) {
+    if (_savedSt && _savedSt.inApp === true) {
       _restoreSec = 'studip';
     }
   } catch (e) {}
