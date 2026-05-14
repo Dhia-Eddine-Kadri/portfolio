@@ -4,6 +4,22 @@ import { listCourseDocuments } from '../../services/ai-service.js';
 // doesn't fan out into duplicate /api/documents/list calls.
 const _countFetchInFlight = {};
 function _hydrateCardCount(courseId, badge) {
+    // The cached-profile IIFE in app.ts renders course cards before _verifyAndEnter
+    // sets window._sbToken, so a fetch fired here would 401. Render the cached count
+    // (written by a prior successful fetch) and bail — a second render runs once
+    // auth completes via loadUserData → _loadUserCourses, which will repopulate.
+    if (!window._sbToken) {
+        try {
+            const cached = localStorage.getItem('ss_fc_' + courseId);
+            if (cached != null) {
+                const n = Number(cached);
+                if (Number.isFinite(n))
+                    badge.textContent = n + ' file' + (n !== 1 ? 's' : '');
+            }
+        }
+        catch { /* quota / parse */ }
+        return;
+    }
     const inFlight = _countFetchInFlight[courseId];
     if (inFlight) {
         inFlight.then((count) => {
