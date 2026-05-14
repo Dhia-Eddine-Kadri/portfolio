@@ -1,6 +1,7 @@
 [build]
   publish = "frontend"
   functions = "backend/functions"
+  edge_functions = "backend/edge-functions"
   command = "npm run build:frontend"
 
 [functions]

@@ -13,10 +13,12 @@ backend/
 │   ├── chat/         Friend/room/messaging endpoints
 │   ├── documents/    Upload, list, delete, indexing
 │   └── notes/        Notes CRUD + generation
+├── edge-functions/   Netlify Edge Functions (ai-stream)
 ├── lib/              Shared modules imported by functions
-├── migrations/       Sequential Supabase SQL migrations
 └── tsconfig.json
 ```
+
+SQL migrations live at the repo level in `supabase/migrations/`.
 
 ## How URLs map to function files
 
@@ -58,4 +60,4 @@ npm run dev                 # netlify dev (functions on :8888)
 
 ## Migrations
 
-Numbered SQL files in `migrations/`. Run order matters — never edit an already-applied migration; add a new one instead.
+SQL files in `../supabase/migrations/`. Two naming styles coexist (sequential `0NN_*.sql` and date-prefixed `YYYYMMDD_*.sql`) — both sort consistently. Run order matters; never edit an already-applied migration, add a new one instead.
