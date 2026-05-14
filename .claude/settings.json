@@ -1,19 +1,4 @@
 {
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd \"c:/Users/dalim/OneDrive/Documents/personal files/StudyBuddyAI/files\" && netlify deploy --prod 2>/dev/null || true",
-            "async": true,
-            "statusMessage": "Deploying to Netlify..."
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "Bash(python -c \":*)",
