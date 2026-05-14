@@ -1,4 +1,4 @@
-import { panelHide } from '../../core/panels.js';
+import { panelHide, selectTopLevelView } from '../../core/panels.js';
 import { bindFileEvents } from './course-files.js';
 import { bindFolderEvents } from './course-folders.js';
 import { escapeHtml } from '../../utils/escape-html.js';
@@ -134,6 +134,9 @@ export function openCourse(course) {
         course.files = [];
     window.activeCourseId = course.id;
     window.activeFileName = null;
+    // Top-level switch first — clears portal-section orphans and studip view.
+    // The course overview lives inside #app (the file-view container).
+    selectTopLevelView('file');
     panelHide(document.getElementById('welcomeState'));
     panelHide(document.getElementById('pdfView'));
     const co = document.getElementById('courseOverview');

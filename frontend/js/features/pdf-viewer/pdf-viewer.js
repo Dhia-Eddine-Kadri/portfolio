@@ -1,5 +1,5 @@
 import { fetchPdfBytes } from '../../services/pdf-service.js';
-import { panelShow, panelHide } from '../../core/panels.js';
+import { panelShow, panelHide, selectTopLevelView } from '../../core/panels.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 function _bookmarkKey(fileName) {
     return 'ss_page_' + (fileName || '');
@@ -34,6 +34,9 @@ export function openFile(f, course) {
     if (typeof window._statsTrackFile === 'function') {
         window._statsTrackFile(f.name, course.short || course.name || '');
     }
+    // Top-level switch first — guarantees portal sections and studip view are
+    // hidden so no ghost page lingers under the PDF.
+    selectTopLevelView('file', { stRunning: !!window._stRunning });
     panelHide(document.getElementById('welcomeState'));
     panelHide(document.getElementById('courseOverview'));
     const pv = document.getElementById('pdfView');

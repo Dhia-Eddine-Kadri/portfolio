@@ -2,7 +2,7 @@
 // resume-to-file stash, and the back-and-forth between portal and file
 // views. Most functions push DOM state directly because the app shell
 // hasn't migrated yet.
-import { hideFilesView, showFilesView } from './panels.js';
+import { hideFilesView, selectTopLevelView, showFilesView } from './panels.js';
 let _activePortalSection = null;
 export function setNavActive(id) {
     document.querySelectorAll('.psb').forEach((el) => {
@@ -31,6 +31,9 @@ export function showPortalSection(sec) {
     const gamesItem = document.getElementById('psbGames');
     if (sec === 'games' && gamesItem && gamesItem.classList.contains('st-locked'))
         return;
+    // Make sure portal is the visible top-level view — kills file/studip ghosts
+    // that would otherwise sit on top of (or under) the section we're showing.
+    selectTopLevelView('portal');
     const ms = document.querySelector('#portal .main .main-scroll');
     const target = document.getElementById('psec-' + sec);
     const fab = document.getElementById('addWidgetFab');
@@ -221,17 +224,14 @@ export function showStudipResume() {
     return true;
 }
 export function showStudip() {
-    hideFilesView();
-    const portal = document.getElementById('portal');
-    if (portal) {
-        portal.classList.add('show');
-        portal.style.display = 'block';
-    }
+    // Top-level switch first — guarantees file view and any visible
+    // portal-section are hidden, and clears .portal-section orphans.
+    selectTopLevelView('studip');
+    // Reset the in-portal active marker so the next showPortalSection call
+    // doesn't try to animate a "leaving" transition against a section that's
+    // already gone.
+    _activePortalSection = null;
     setNavActive('pcStudip');
-    if (typeof window.showPortalSection === 'function')
-        window.showPortalSection('studip');
-    else
-        showPortalSection('studip');
     if (typeof window.sdRenderCourses === 'function')
         window.sdRenderCourses();
     try {
