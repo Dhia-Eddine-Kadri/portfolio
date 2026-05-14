@@ -108,6 +108,14 @@ function buildFilesContent(course: LegacyCourse): string {
     filesHtml = '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
   }
 
+  const refreshingPill = course._filesRefreshing
+    ? '<div class="co-files-refreshing" style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:rgba(96,165,250,.12);color:rgba(96,165,250,.85);font-size:.72rem;margin-left:8px;vertical-align:middle">' +
+      '<span class="co-spinner" style="display:inline-block;width:9px;height:9px;border:1.5px solid rgba(96,165,250,.25);border-top-color:rgba(96,165,250,.85);border-radius:50%;animation:co-spin 0.8s linear infinite"></span>' +
+      'refreshing' +
+      '</div>' +
+      '<style>@keyframes co-spin{to{transform:rotate(360deg)}}</style>'
+    : '';
+
   return (
     '<div class="co-course-tabs" role="tablist" aria-label="Course sections">' +
       '<button class="co-course-tab active" type="button" data-course-tab="files" role="tab" aria-selected="true">Files</button>' +
@@ -125,6 +133,7 @@ function buildFilesContent(course: LegacyCourse): string {
           ' Upload files' +
         '</button>' +
         '<button id="coReindexAllBtn" title="Re-process all PDFs with updated AI extraction" style="font-size:.75rem;padding:5px 12px;border-radius:20px;background:rgba(99,102,241,.13);color:rgba(99,102,241,.9);border:1px solid rgba(99,102,241,.3);cursor:pointer;white-space:nowrap">&#x21BA; Reindex all</button>' +
+        refreshingPill +
       '</div>' +
       foldersHtml +
       '<div id="coFilesList">' + filesHtml + '</div>' +
@@ -160,6 +169,11 @@ export function openCourse(course: LegacyCourse): void {
   }
 
   const ufCacheKey = 'ss_uf_cache_' + course.id;
+  // Track whether a cache *entry* exists (vs. has files). An empty cache from a
+  // prior successful list is authoritative — skip the full spinner for it.
+  const hadCacheEntry = (() => {
+    try { return localStorage.getItem(ufCacheKey) != null; } catch { return false; }
+  })();
   try {
     const cached = JSON.parse(localStorage.getItem(ufCacheKey) || 'null');
     if (cached && Array.isArray(cached.files)) {
@@ -196,10 +210,14 @@ export function openCourse(course: LegacyCourse): void {
     }
   } catch { /* corrupted cache — render without */ }
 
-  const hasCache =
+  const hasAnyFiles =
     (course.files?.length ?? 0) > 0 ||
     (course.userFolders || []).some((fd) => fd.files && fd.files.length > 0);
-  if (!hasCache) course._filesLoading = true;
+  // Full-panel spinner only when we have neither a prior cache entry nor any files.
+  // When a cache entry exists (even empty), trust it for first paint and show a
+  // small "refreshing" pill while the background _ufMerge runs.
+  course._filesLoading = !hadCacheEntry && !hasAnyFiles;
+  course._filesRefreshing = hadCacheEntry;
 
   showCourseSection(course, 'files');
   if (typeof window._setAiChipsVisible === 'function') window._setAiChipsVisible(false);
@@ -209,6 +227,7 @@ export function openCourse(course: LegacyCourse): void {
   window._ufMerge?.(course)
     .then(() => {
       course._filesLoading = false;
+      course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
       if (stillOnThisCourse) {
         window._ssRestoring = true;
@@ -244,6 +263,13 @@ export function openCourse(course: LegacyCourse): void {
     })
     .catch(() => {
       course._filesLoading = false;
+      course._filesRefreshing = false;
+      const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
+      if (stillOnThisCourse) {
+        window._ssRestoring = true;
+        showCourseSection(course, 'files');
+        window._ssRestoring = false;
+      }
     });
 }
 

@@ -91,7 +91,11 @@ function _prewarmCourses(opts) {
     }
   } catch (e) { /* hash parse failed — fall back to natural order */ }
 
-  var CONCURRENCY = 4;
+  // 6 is a measured-ish bump from 4 — Supabase storage list calls are cheap and
+  // the dominant per-course cost is _ufMergeImpl's folder listing (now parallel
+  // within a course). Higher than 6 risks contending with the user's in-focus
+  // open call; 4 left too many courses cold on first paint.
+  var CONCURRENCY = 6;
   var cursor = 0;
 
   function _persistCourseCache(c) {

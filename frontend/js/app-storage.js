@@ -461,12 +461,19 @@ async function _ufMergeImpl(course) {
   });
   if (allFolders.length !== savedFolders.length) _ufSaveFolders(uid, course, allFolders);
 
-  course.userFolders = [];
-  for (var i = 0; i < allFolders.length; i++) {
-    var folderName = allFolders[i];
-    var folderItems = await _ufListFolder(uid, course, folderName);
+  // Fan out folder listings in parallel — N folders previously cost N round-trips
+  // serialized, which dominated open latency on courses with many folders.
+  var folderResults = await Promise.all(
+    allFolders.map(function (folderName) {
+      return _ufListFolder(uid, course, folderName).then(
+        function (folderItems) { return { name: folderName, items: folderItems }; },
+        function () { return { name: folderName, items: [] }; }
+      );
+    })
+  );
+  course.userFolders = folderResults.map(function (fr) {
     var folderFiles = [];
-    folderItems.forEach(function (item) {
+    fr.items.forEach(function (item) {
       var m = _parseMeta(item);
       if (!m) return;
       folderFiles.push({
@@ -477,11 +484,11 @@ async function _ufMergeImpl(course) {
         _uploaded: true,
         _uid: uid,
         _course: course,
-        _folder: folderName
+        _folder: fr.name
       });
     });
-    course.userFolders.push({ name: folderName, files: folderFiles });
-  }
+    return { name: fr.name, files: folderFiles };
+  });
 }
 
 // Delete — removes from Supabase and from course.files / course.userFolders in memory
