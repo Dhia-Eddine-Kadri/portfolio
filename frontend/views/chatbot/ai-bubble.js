@@ -137,6 +137,20 @@
 
     // Restore chat history via bridge
     if (typeof window.openAI === 'function') window.openAI();
+
+    // Focus the input so the user can start typing immediately. Wait for the
+    // open transition (~220ms — see panel.style.transition in detachPanel) so
+    // the focus ring doesn't flash mid-scale animation. preventScroll keeps
+    // the surrounding portal from jumping when the input gains focus.
+    setTimeout(function () {
+      var input = document.getElementById('aiInput');
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (e) {
+        input.focus();
+      }
+    }, 240);
   }
 
   function closePanel() {

@@ -356,7 +356,7 @@
             const featureSrcs = [
                 'views/toast/toast.js',
                 'views/chatbot/chatbot.js?v=2',
-                'views/chatbot/ai-bubble.js?v=3',
+                'views/chatbot/ai-bubble.js?v=4',
                 'views/chat/chat.js',
                 'views/dashboard/dashboard-widget.js',
                 'views/dashboard/dashboard-calendar.js',
