@@ -288,3 +288,35 @@ body:not(.night) .toggle-track {
 .yt-pl-edit-url:focus {
   border-color: #2563eb;
 }
+.yt-pl-empty {
+  padding: 14px 12px;
+  border: 1px dashed var(--glass-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--on-glass-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+.music-connect-btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 0 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--glass-border);
+}
+.settings-save-state {
+  font-size: 0.78rem;
+  color: var(--on-glass-muted);
+  transition: color 0.2s;
+}
+.settings-save-state.dirty { color: #f59e0b; }
+.settings-save-state.saved { color: #22c55e; }
+.settings-save-state.error { color: #ef4444; }
+.pf-save:disabled { opacity: 0.6; cursor: progress; }

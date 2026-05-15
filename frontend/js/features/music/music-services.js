@@ -142,17 +142,36 @@ export function initMusicServices(options) {
             applyCurrentlyPlaying(d, false);
         });
     }
+    function spIsConfigured() {
+        const stored = localStorage.getItem('ss_spotify_cid') || '';
+        return !!(SPOTIFY_CLIENT_ID || stored);
+    }
     function spUpdateUI(connected) {
         const statusEl = document.getElementById('spotifyStatus');
         const btn = document.getElementById('spotifyConnectBtn');
         const player = document.getElementById('spotifyPlayer');
+        const configured = spIsConfigured();
         if (statusEl) {
-            statusEl.textContent = connected ? 'Connected ✓' : 'Not connected';
-            statusEl.className = 'music-service-status' + (connected ? ' connected' : '');
+            if (!configured && !connected) {
+                statusEl.textContent = 'Not configured';
+                statusEl.className = 'music-service-status';
+            }
+            else {
+                statusEl.textContent = connected ? 'Connected ✓' : 'Not connected';
+                statusEl.className = 'music-service-status' + (connected ? ' connected' : '');
+            }
         }
         if (btn) {
-            btn.textContent = connected ? 'Reconnect' : 'Connect';
-            btn.className = 'music-connect-btn' + (connected ? ' connected' : '');
+            if (!configured && !connected) {
+                btn.textContent = 'Unavailable';
+                btn.className = 'music-connect-btn music-connect-btn-disabled';
+                btn.disabled = true;
+            }
+            else {
+                btn.textContent = connected ? 'Reconnect' : 'Connect';
+                btn.className = 'music-connect-btn' + (connected ? ' connected' : '');
+                btn.disabled = false;
+            }
         }
         if (player)
             player.style.display = connected ? 'flex' : 'none';
@@ -207,6 +226,9 @@ export function initMusicServices(options) {
             return;
         list.innerHTML = '';
         const playlists = ytGetPlaylists();
+        if (playlists.length === 0) {
+            list.innerHTML = '<div class="yt-pl-empty">No playlists yet — add one below</div>';
+        }
         playlists.forEach((pl, i) => {
             const row = document.createElement('div');
             row.className = 'yt-playlist-row';
@@ -370,6 +392,9 @@ export function initMusicServices(options) {
             spRefresh = localStorage.getItem('ss_sp_refresh');
             spUpdateUI(true);
             spPollPlayback();
+        }
+        else {
+            spUpdateUI(false);
         }
         const params = new URLSearchParams(window.location.search);
         if (params.get('state') === 'spotify_pkce' && params.get('code')) {
