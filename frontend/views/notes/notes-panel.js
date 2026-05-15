@@ -930,6 +930,24 @@
       if (!_currentNote || !_currentNote.id) return;
       if (!confirm('Delete this note?')) return;
       _deleteNote(_currentNote.id);
+    },
+    // Document-rail follow-up: force-create #pdfNotesPanel if it doesn't
+    // exist yet. _openPanel() bails when the panel is missing, and the
+    // lazy-create path inside _wrapOpenFile only fires on window.openFile
+    // wrapping + a one-shot 500ms timer, both of which can miss in some
+    // navigation flows. The drawer calls ensure() before mounting.
+    ensure: function () {
+      if (document.getElementById('pdfNotesPanel')) return;
+      _ctx.courseId = _ctx.courseId ||
+        window.activeCourseId ||
+        (window.activeCourseRef && window.activeCourseRef.id) ||
+        null;
+      _ctx.fileName = _ctx.fileName || window.activeFileName || null;
+      _createPanel();
+      _injectToolbarButton();
+      if (_ctx.courseId && _ctx.fileName && !_ctx.documentId) {
+        _resolveDocumentId(_ctx.fileName, _ctx.courseId);
+      }
     }
   };
 })();

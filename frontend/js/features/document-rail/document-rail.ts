@@ -19,6 +19,7 @@ interface NotesPanelApi {
   close: () => void;
   delete?: () => void;
   ctx?: () => unknown;
+  ensure?: () => void;
 }
 
 interface DocRailWindow extends Window {
@@ -231,11 +232,16 @@ function restoreAiPanel(): void {
 function ensureNotesPanel(): HTMLElement | null {
   let panel = document.getElementById('pdfNotesPanel') as HTMLElement | null;
   if (panel) return panel;
-  // notes-panel.js lazy-creates #pdfNotesPanel only when a PDF is open.
-  // Try invoking its public open() to force creation, then immediately
-  // restore the visual state we want.
+  // The legacy module exposes ensure() which reads window.activeCourseId /
+  // window.activeFileName, calls _createPanel + _injectToolbarButton, and
+  // resolves the documentId. open() alone is not enough — it bails when
+  // #pdfNotesPanel doesn't exist yet, and the one-shot 500ms init timer in
+  // notes-panel.js can miss in some PDF-open flows.
   const w = window as DocRailWindow;
-  if (w._notesPanel && typeof w._notesPanel.open === 'function') {
+  if (w._notesPanel && typeof w._notesPanel.ensure === 'function') {
+    try { w._notesPanel.ensure(); } catch (_e) { /* ignore */ }
+  } else if (w._notesPanel && typeof w._notesPanel.open === 'function') {
+    // Fallback for older notes-panel.js without ensure().
     try { w._notesPanel.open(); } catch (_e) { /* ignore */ }
   }
   panel = document.getElementById('pdfNotesPanel') as HTMLElement | null;
