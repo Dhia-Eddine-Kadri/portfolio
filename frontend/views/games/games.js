@@ -189,6 +189,27 @@
         showHub();
       });
       wire('gdBack', showHub);
+
+      // Solitaire dispatcher loaded its IIFE before this HTML was injected, so
+      // its picker/back/undo listeners couldn't attach to elements that didn't
+      // exist yet. Trigger the deferred wiring now.
+      if (typeof window._solInitUI === 'function') window._solInitUI();
+
+      // Reset to hub whenever the user enters Games via the sidebar, so we
+      // don't get stuck on whatever sub-view (solitaire picker, tetris, ...)
+      // was last visible.
+      var gamesNav = document.getElementById('psbGames');
+      if (gamesNav) {
+        gamesNav.addEventListener('click', function () {
+          // Stop any in-flight game and reset to the hub on the next tick,
+          // after the router has finished swapping sections.
+          if (typeof _tetrisStop === 'function') _tetrisStop();
+          if (typeof window._solStop === 'function') window._solStop();
+          if (typeof _birdStop === 'function') _birdStop();
+          if (typeof _chessStop === 'function') _chessStop();
+          setTimeout(showHub, 0);
+        });
+      }
     })();
   } // end _init
 })();
