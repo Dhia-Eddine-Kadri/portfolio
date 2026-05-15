@@ -745,6 +745,13 @@
 .dr-drawer .dr-host-notes .np-body {
   background: transparent;
   padding: 4px 2px;
+  /* Fill the remaining vertical space inside the hosted panel and let the
+     preview / saved-list child scroll its own content. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .dr-drawer .dr-host-notes .np-empty {
   display: flex;
@@ -782,6 +789,11 @@
 /* Editor inputs / preview */
 .dr-drawer .dr-host-notes .np-editor-wrap {
   background: transparent;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .dr-drawer .dr-host-notes .np-title-input {
   width: 100%;
@@ -831,6 +843,10 @@
   color: var(--dr-text);
   line-height: 1.6;
   font-size: 0.85rem;
+  /* Grow to fill the editor-wrap and scroll the markdown content inside. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .dr-drawer .dr-host-notes .np-editor-ta {
   width: 100%;
@@ -842,7 +858,8 @@
   color: var(--dr-text);
   font: 500 0.85rem/1.6 'Nunito', system-ui, sans-serif;
   outline: none;
-  resize: vertical;
+  resize: none;
+  flex: 1 1 auto;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 .dr-drawer .dr-host-notes .np-editor-ta::placeholder {
@@ -859,6 +876,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 4px 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .dr-drawer .dr-host-notes .np-saved-item {
   border-radius: 14px;
