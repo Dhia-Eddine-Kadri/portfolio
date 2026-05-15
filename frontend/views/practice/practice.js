@@ -899,10 +899,6 @@
       }
       activeCourseId = course.id;
       activeCourseRef = course;
-      _showFilesView();
-      var crumb = document.getElementById('breadcrumb');
-      if (crumb) crumb.innerHTML = '<b>' + (course.name || course.id) + '</b>';
-      showCourseSection(course, 'files');
     }
 
     function _glOpenFile(uid, fname) {
