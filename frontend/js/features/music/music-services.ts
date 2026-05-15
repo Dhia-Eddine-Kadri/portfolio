@@ -339,7 +339,7 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
       showToast('Already saved', 'This playlist is already in your list');
       return;
     }
-    playlists.push({ name: name, id: id });
+    playlists.unshift({ name: name, id: id });
     void ytSavePlaylists(playlists);
     nameEl.value = '';
     urlEl.value = '';
