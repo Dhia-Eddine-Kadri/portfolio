@@ -32,12 +32,15 @@
   /* JS sets display:flex/none — keep none default in case CSS loads before
      the HTML is injected. */
   display: none;
-  align-items: center;
-  justify-content: center;
+  /* `safe center` falls back to flex-start when content overflows the
+     container, so the top of the card never gets clipped when the form is
+     taller than the viewport (e.g. signup mode with confirm-password +
+     strength meter). The modal itself scrolls in that case. */
+  align-items: safe center;
+  justify-content: safe center;
   padding: 24px 20px;
-  /* Card fits within viewport; no outer scroll. The form column can scroll
-     internally on very short screens as a last resort (see .na-form-col). */
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   color: var(--na-ink);
   font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: var(--na-bg);
@@ -130,8 +133,10 @@
      wider than the viewport (the default `min-width: auto` on grid items
      would let long content blow out the column). */
   min-width: 0;
-  /* Cap the card to the viewport so the page never needs to scroll. */
-  max-height: calc(100vh - 48px);
+  /* No max-height: let the card grow with its content. If the card is
+     taller than the viewport (e.g. signup mode with strength meter +
+     confirm field), #authModal { overflow-y: auto } scrolls the whole
+     modal so the user can reach the Google button + switch row. */
   border-radius: 1.75rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.07);
@@ -161,10 +166,6 @@
   /* Prevent the form column from forcing the card wider than the viewport
      (grid items default to min-width: auto, which is "min-content"). */
   min-width: 0;
-  /* Last-resort: if a very short viewport forces clipping, the form column
-     (not the page) is what scrolls. The .na-card max-height handles the
-     normal case. */
-  overflow-y: auto;
 }
 @media (min-width: 640px) { .na-form-col { padding: 1.75rem; } }
 @media (min-width: 900px) { .na-form-col { padding: 2rem 2.25rem; } }
