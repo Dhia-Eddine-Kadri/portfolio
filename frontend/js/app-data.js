@@ -74,7 +74,28 @@ function _prewarmCourses(opts) {
   });
   if (!todo.length) return;
 
-  var CONCURRENCY = 4;
+  // Prioritize the course the user is currently looking at (URL hash
+  // #course=<id>) so its files are ready before the spinner times out.
+  try {
+    var m = /[#&]course=([^&]+)/.exec(window.location.hash || '');
+    var openId = m && m[1];
+    if (openId) {
+      var idx = -1;
+      for (var i = 0; i < todo.length; i++) {
+        if (todo[i].id === openId) { idx = i; break; }
+      }
+      if (idx > 0) {
+        var first = todo.splice(idx, 1)[0];
+        todo.unshift(first);
+      }
+    }
+  } catch (e) { /* hash parse failed — fall back to natural order */ }
+
+  // 6 is a measured-ish bump from 4 — Supabase storage list calls are cheap and
+  // the dominant per-course cost is _ufMergeImpl's folder listing (now parallel
+  // within a course). Higher than 6 risks contending with the user's in-focus
+  // open call; 4 left too many courses cold on first paint.
+  var CONCURRENCY = 6;
   var cursor = 0;
 
   function _persistCourseCache(c) {
@@ -160,9 +181,9 @@ function _loadUserCourses(data) {
   } catch (e) {}
   sdRenderCourses();
   // Fire-and-forget: pre-fetch every course's files now so cards show real
-  // counts and opening a course is instant. Defer one tick so the initial
-  // render isn't blocked by parallel storage requests.
-  setTimeout(function () { try { _prewarmCourses(); } catch (e) {} }, 50);
+  // counts and opening a course is instant. Fire on next microtask so the
+  // initial render commits first, but with no extra setTimeout delay.
+  Promise.resolve().then(function () { try { _prewarmCourses(); } catch (e) {} });
   restoreState();
   // If a course was restored before auth completed, refresh its files from network now.
   // Skip if _currentUser isn't set yet — the post-auth _loadUserCourses call will handle it.

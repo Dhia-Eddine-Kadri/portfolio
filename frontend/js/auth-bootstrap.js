@@ -37,7 +37,12 @@
 
   if (!loggedIn) {
     try {
-      if (sessionStorage.getItem('sb_sess_token')) loggedIn = true;
+      // Tokens persist in localStorage now (so the user stays signed in
+      // across tab close). Fall back to sessionStorage for in-flight
+      // sessions from before this code deployed.
+      if (localStorage.getItem('sb_sess_token') || sessionStorage.getItem('sb_sess_token')) {
+        loggedIn = true;
+      }
     } catch (e) {}
   }
 
@@ -130,8 +135,11 @@ function _handleGoogleCredential(response) {
     })
     .then(function (d) {
       if (d && d.access_token) {
-        sessionStorage.setItem('sb_sess_token', d.access_token);
-        if (d.refresh_token) sessionStorage.setItem('sb_sess_refresh', d.refresh_token);
+        // Persistent across tab close (matches _sbStoreSession in supabase.js).
+        localStorage.setItem('sb_sess_token', d.access_token);
+        if (d.refresh_token) localStorage.setItem('sb_sess_refresh', d.refresh_token);
+        sessionStorage.removeItem('sb_sess_token');
+        sessionStorage.removeItem('sb_sess_refresh');
         localStorage.removeItem('sb_token');
         localStorage.removeItem('sb_refresh');
         if (window.Minallo)
@@ -174,8 +182,9 @@ function _initOneTap() {
       auto_select: false,
       itp_support: true,
       // Required since Chrome's FedCM rollout (Oct 2024). Without this flag
-      // Chrome silently suppresses the One Tap prompt (notification.isNotDisplayed
-      // returns 'opt_out_or_no_session' / suppressed by browser policy).
+      // Chrome silently suppresses the One Tap prompt — the callback fires
+      // with isNotDisplayed() === true and a browser-policy suppression
+      // reason. That's why no popup appeared on the landing.
       use_fedcm_for_prompt: true,
       nonce: hashedNonce,
       prompt_parent_id: 'ss-one-tap-parent'

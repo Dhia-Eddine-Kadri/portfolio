@@ -93,6 +93,11 @@ let _stRunning = false;
 let _stPaused = false;
 let _stTimer: ReturnType<typeof setInterval> | null = null;
 let _stSecondsLeft = 0;
+/* Wall-clock end time (ms since epoch). Source of truth while ticking; nulled
+   on pause / stop. Survives tab-throttle (Chrome throttles setInterval to
+   ~1/min on hidden tabs, which would cause drift) and full tab close (the
+   value is also written to localStorage). */
+let _stEndTime: number | null = null;
 let _stPhase: Phase = 'focus';
 let _stCycle = 0;
 let _stSettings: TimerSettings = { focus: 25, shortBreak: 5, longBreak: 15, cycles: 4 };
@@ -100,6 +105,8 @@ let _stTech = 'pomodoro';
 let _stMusicEnabled = true;
 let _stMusicMuted = false;
 let _stMusicSrc: MusicSrc = 'lofi';
+
+const _ST_STORAGE_KEY = 'ss_focus_timer_v1';
 
 const _stPresets: Record<string, TimerSettings | null> = {
   pomodoro: { focus: 25, shortBreak: 5, longBreak: 15, cycles: 4 },
@@ -534,12 +541,64 @@ function _stNextPhase(): void {
   _stShowDonePopup(wasBreak);
 }
 
+/* Wall-clock derived remaining seconds. _stSecondsLeft is the "frozen" view
+   used by the UI; _stEndTime is the real source of truth while ticking. */
+function _stRemainingFromClock(): number {
+  if (_stEndTime == null) return _stSecondsLeft;
+  return Math.max(0, Math.ceil((_stEndTime - Date.now()) / 1000));
+}
+
+interface StoredTimer {
+  v: 1;
+  running: boolean;
+  paused: boolean;
+  phase: Phase;
+  cycle: number;
+  settings: TimerSettings;
+  tech: string;
+  musicSrc: MusicSrc;
+  secondsLeft: number;
+  endTime: number | null;
+}
+
+function _stPersist(): void {
+  try {
+    if (!_stRunning) {
+      localStorage.removeItem(_ST_STORAGE_KEY);
+      return;
+    }
+    const data: StoredTimer = {
+      v: 1,
+      running: _stRunning,
+      paused: _stPaused,
+      phase: _stPhase,
+      cycle: _stCycle,
+      settings: _stSettings,
+      tech: _stTech,
+      musicSrc: _stMusicSrc,
+      secondsLeft: _stSecondsLeft,
+      endTime: _stEndTime,
+    };
+    localStorage.setItem(_ST_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore — localStorage may be unavailable in private mode */
+  }
+}
+
 function _stStartTimer(): void {
   if (_stTimer) clearInterval(_stTimer);
+  /* Anchor the wall-clock end time from the current remaining seconds.
+     Re-anchored on every (re)start including resume-from-pause. */
+  _stEndTime = Date.now() + _stSecondsLeft * 1000;
+  _stPersist();
   _stTimer = setInterval(() => {
-    _stSecondsLeft--;
+    _stSecondsLeft = _stRemainingFromClock();
     _stUpdateMini();
-    if (_stSecondsLeft <= 0) _stNextPhase();
+    if (_stSecondsLeft <= 0) {
+      _stEndTime = null;
+      _stPersist();
+      _stNextPhase();
+    }
   }, 1000);
 }
 
@@ -547,6 +606,7 @@ function _stStop(): void {
   if (_stTimer) clearInterval(_stTimer);
   _stRunning = false;
   _stPaused = false;
+  _stEndTime = null;
   _stPhase = 'focus';
   _stCycle = 0;
   _stMusicMuted = false;
@@ -555,6 +615,65 @@ function _stStop(): void {
   const mini = document.getElementById('stMiniTimer');
   if (mini) mini.style.display = 'none';
   _stUpdatePauseBtn();
+  _stPersist();
+}
+
+/* Restore a previously running timer from localStorage. Called once on init.
+   If the saved endTime is already in the past, auto-advance to the done
+   popup (matches the in-session "phase ended" flow). */
+function _stRestore(): void {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(_ST_STORAGE_KEY);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  let saved: StoredTimer;
+  try {
+    saved = JSON.parse(raw) as StoredTimer;
+  } catch {
+    return;
+  }
+  if (!saved || saved.v !== 1 || !saved.running) return;
+
+  _stRunning = true;
+  _stPaused = saved.paused;
+  _stPhase = saved.phase;
+  _stCycle = saved.cycle;
+  _stSettings = saved.settings;
+  _stTech = saved.tech;
+  _stMusicSrc = saved.musicSrc;
+  _stMusicEnabled = _stMusicSrc !== 'none';
+  _stEndTime = saved.endTime;
+  _stSecondsLeft = saved.secondsLeft;
+
+  const mini = document.getElementById('stMiniTimer');
+  if (mini) mini.style.display = 'flex';
+  _stLockGames(true);
+
+  if (_stPaused) {
+    /* Paused — show frozen value, do not resume ticking. */
+    _stUpdateMini();
+    _stUpdatePauseBtn();
+    return;
+  }
+
+  /* Active. Did the phase end while we were away? */
+  if (_stEndTime != null && Date.now() >= _stEndTime) {
+    _stSecondsLeft = 0;
+    _stEndTime = null;
+    _stUpdateMini();
+    _stNextPhase();
+    return;
+  }
+
+  /* Still ticking — snap the displayed seconds to the wall-clock value and
+     resume the interval (which re-anchors _stEndTime to the same instant). */
+  _stSecondsLeft = _stRemainingFromClock();
+  _stUpdateMini();
+  _stUpdatePauseBtn();
+  _stStartTimer();
 }
 
 export function initStudyTimer(): void {
@@ -730,6 +849,11 @@ export function initStudyTimer(): void {
       _stPaused = !_stPaused;
       if (_stPaused) {
         if (_stTimer) clearInterval(_stTimer);
+        /* Freeze: capture the live wall-clock value and drop the anchor so
+           the resumed interval re-anchors fresh from _stSecondsLeft. */
+        _stSecondsLeft = _stRemainingFromClock();
+        _stEndTime = null;
+        _stPersist();
         try {
           if (_ytPlayer) _ytPlayer.pauseVideo();
         } catch {
@@ -765,4 +889,23 @@ export function initStudyTimer(): void {
   });
   window._stStopMusic = _stStopMusic;
   window._stPlayMusic = _stPlayMusic;
+
+  /* When the tab becomes visible again, snap the display to the wall-clock
+     value — covers both backgrounded throttle (setInterval drifts to ~1/min
+     on hidden tabs) and OS sleep. If the phase already ended while away,
+     auto-advance. */
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (!_stRunning || _stPaused || _stEndTime == null) return;
+    _stSecondsLeft = _stRemainingFromClock();
+    _stUpdateMini();
+    if (_stSecondsLeft <= 0) {
+      if (_stTimer) clearInterval(_stTimer);
+      _stEndTime = null;
+      _stNextPhase();
+    }
+  });
+
+  /* Resume a session that was running when the tab was closed/reloaded. */
+  _stRestore();
 }

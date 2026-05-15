@@ -378,8 +378,23 @@ async function _ufDeleteRemote(uid, course, name, folder, storageName) {
   });
 }
 
+// Dedup map: when prewarm and a course-open click both fire _ufMerge for the
+// same course, the second caller reuses the first call's Promise instead of
+// firing a duplicate Supabase storage list.
+var _ufMergeInFlight = {};
+
 // Merge remote file list into course.files + course.userFolders (called on openCourse)
-async function _ufMerge(course) {
+function _ufMerge(course) {
+  if (!course || !course.id) return Promise.resolve();
+  if (_ufMergeInFlight[course.id]) return _ufMergeInFlight[course.id];
+  var p = _ufMergeImpl(course).finally(function () {
+    delete _ufMergeInFlight[course.id];
+  });
+  _ufMergeInFlight[course.id] = p;
+  return p;
+}
+
+async function _ufMergeImpl(course) {
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
   if (!uid) return;
   function _parseMeta(item) {
@@ -438,6 +453,15 @@ async function _ufMerge(course) {
       });
   });
 
+  // Root listing is done. Fire an event so the course view can render the
+  // root files immediately — folder listings continue below in parallel.
+  // Without this, the UI waits for the *last* folder list to clear the spinner.
+  try {
+    window.dispatchEvent(new CustomEvent('uf-merge-root-done', {
+      detail: { courseId: course.id, course: course }
+    }));
+  } catch (e) {}
+
   // Merge discovered folders with localStorage list so neither source loses data
   var savedFolders = _ufGetFolders(uid, course);
   var allFolders = savedFolders.slice();
@@ -446,12 +470,19 @@ async function _ufMerge(course) {
   });
   if (allFolders.length !== savedFolders.length) _ufSaveFolders(uid, course, allFolders);
 
-  course.userFolders = [];
-  for (var i = 0; i < allFolders.length; i++) {
-    var folderName = allFolders[i];
-    var folderItems = await _ufListFolder(uid, course, folderName);
+  // Fan out folder listings in parallel — N folders previously cost N round-trips
+  // serialized, which dominated open latency on courses with many folders.
+  var folderResults = await Promise.all(
+    allFolders.map(function (folderName) {
+      return _ufListFolder(uid, course, folderName).then(
+        function (folderItems) { return { name: folderName, items: folderItems }; },
+        function () { return { name: folderName, items: [] }; }
+      );
+    })
+  );
+  course.userFolders = folderResults.map(function (fr) {
     var folderFiles = [];
-    folderItems.forEach(function (item) {
+    fr.items.forEach(function (item) {
       var m = _parseMeta(item);
       if (!m) return;
       folderFiles.push({
@@ -462,11 +493,11 @@ async function _ufMerge(course) {
         _uploaded: true,
         _uid: uid,
         _course: course,
-        _folder: folderName
+        _folder: fr.name
       });
     });
-    course.userFolders.push({ name: folderName, files: folderFiles });
-  }
+    return { name: fr.name, files: folderFiles };
+  });
 }
 
 // Delete — removes from Supabase and from course.files / course.userFolders in memory

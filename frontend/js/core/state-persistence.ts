@@ -53,21 +53,30 @@ export function initStatePersistence(options: StatePersistenceOptions): {
 
   function saveState(): void {
     try {
-      let curTab: string | null = null;
-      try {
-        curTab = sessionStorage.getItem('ss_portal_tab');
-      } catch {
-        /* sessionStorage disabled */
+      // Read from the actually-visible view, not from ss_portal_tab. The tab
+      // can be stale (e.g. user used the chatbot, then opened a file via a
+      // path that didn't update the tab) and the old behavior here was to
+      // *delete* ss_state when the stale tab said "I'm on a portal-only
+      // section" — which wiped the user's course/file location and made
+      // refresh land on dashboard.
+      //
+      // The portal `data-active-view` attribute is set by selectTopLevelView()
+      // and is the truth. Fall back to DOM inspection for cases where the
+      // attribute hasn't been set yet (early boot).
+      const portalEl = document.getElementById('portal');
+      let activeView: string | null = portalEl ? portalEl.dataset.activeView || null : null;
+      if (!activeView) {
+        const appEl = document.getElementById('app');
+        if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
+        else activeView = 'portal';
       }
-      if (curTab && PORTAL_ONLY_SECTIONS.indexOf(curTab) !== -1) {
-        localStorage.removeItem('ss_state');
-        return;
-      }
-      const appEl = document.getElementById('app');
-      const pdfEl = document.getElementById('pdfView');
-      const appVisible = !!(appEl && appEl.style.display === 'flex');
-      const pdfVisible = !!(pdfEl && (pdfEl.style.display === 'flex' || pdfEl.style.display === 'block'));
-      if (!appVisible && !pdfVisible) return;
+
+      // Only persist when the user is in file view (course overview or PDF).
+      // Pure portal sections (notes, editor, chatbot, studip listing, etc.) are
+      // tracked entirely via ss_portal_tab and don't need ss_state.
+      if (activeView !== 'file') return;
+
+      // activeView === 'file' — courseOverview or pdfView under #app.
       const st: StoredState = {
         semId: options.getActiveSemId(),
         courseId: options.getActiveCourseId() || undefined,

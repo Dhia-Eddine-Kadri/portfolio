@@ -3,7 +3,7 @@
 // views. Most functions push DOM state directly because the app shell
 // hasn't migrated yet.
 
-import { hideFilesView, showFilesView } from './panels.js';
+import { hideFilesView, selectTopLevelView, showFilesView } from './panels.js';
 import type { LegacyCourse } from '../../globals.js';
 
 let _activePortalSection: HTMLElement | null = null;
@@ -36,6 +36,10 @@ export function showPortalSection(sec: string): void {
   const gamesItem = document.getElementById('psbGames');
   if (sec === 'games' && gamesItem && gamesItem.classList.contains('st-locked')) return;
 
+  // Make sure portal is the visible top-level view — kills file/studip ghosts
+  // that would otherwise sit on top of (or under) the section we're about to show.
+  selectTopLevelView('portal');
+
   const ms = document.querySelector<HTMLElement>('#portal .main .main-scroll');
   const target = document.getElementById('psec-' + sec);
   const fab = document.getElementById('addWidgetFab');
@@ -58,17 +62,26 @@ export function showPortalSection(sec: string): void {
     _activePortalSection = target;
 
     const aiPanel = document.getElementById('aiPanel');
-    const aiTab = document.getElementById('aiTab');
     const aiBubble = document.getElementById('aiBubble');
     if (sec !== 'studip') {
       if (typeof window.forceCloseAI === 'function') window.forceCloseAI();
       else if (aiPanel) aiPanel.classList.remove('visible');
-      if (aiTab) aiTab.style.display = 'none';
       if (aiBubble) aiBubble.style.display = 'none';
       if (typeof window._aiBubbleClose === 'function') window._aiBubbleClose();
     } else {
-      if (aiTab) aiTab.style.display = '';
       if (aiBubble) aiBubble.style.display = '';
+    }
+
+    // Document rail: visible on the courses dashboard (psec-studip) only here;
+    // PDF visibility is handled by panels.ts → showFilesView / hideFilesView.
+    // Use a global to avoid creating a hard import dependency from navigation
+    // into the new feature module.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dr = (window as any).__minalloDocRail as
+      | { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void }
+      | undefined;
+    if (dr && typeof dr.setRouteVisibility === 'function') {
+      dr.setRouteVisibility(sec === 'studip' ? 'courses' : 'other');
     }
   }
 
@@ -230,9 +243,7 @@ export function showStudipResume(): boolean {
   clearResumeFile();
   showFilesView(typeof window._stRunning !== 'undefined' ? window._stRunning : false);
 
-  const aiTab = document.getElementById('aiTab');
   const aiBubble = document.getElementById('aiBubble');
-  if (aiTab) aiTab.style.display = '';
   if (aiBubble) aiBubble.style.display = '';
 
   window.openFile(hit.file, hit.course);
@@ -240,12 +251,10 @@ export function showStudipResume(): boolean {
 }
 
 export function showStudip(): void {
-  hideFilesView();
-  const portal = document.getElementById('portal');
-  if (portal) {
-    portal.classList.add('show');
-    portal.style.display = 'block';
-  }
+  // The courses listing is the `psec-studip` portal section — not a separate
+  // top-level container. Switch to portal (hides #app file view), then ask
+  // showPortalSection to reveal the specific section.
+  selectTopLevelView('portal');
   setNavActive('pcStudip');
   if (typeof window.showPortalSection === 'function') window.showPortalSection('studip');
   else showPortalSection('studip');

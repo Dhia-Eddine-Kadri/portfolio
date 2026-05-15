@@ -11,23 +11,22 @@ export function initStatePersistence(options) {
     let _stateRestored = false;
     function saveState() {
         try {
-            let curTab = null;
-            try {
-                curTab = sessionStorage.getItem('ss_portal_tab');
+            // Read from the actually-visible view, not ss_portal_tab. The tab
+            // can be stale (e.g. user used the chatbot, then opened a file via
+            // a path that didn't update the tab) and the old behavior here was
+            // to *delete* ss_state when the stale tab said "I'm on a portal-only
+            // section" — wiping the user's location.
+            const portalEl = document.getElementById('portal');
+            let activeView = portalEl ? portalEl.dataset.activeView || null : null;
+            if (!activeView) {
+                const appEl = document.getElementById('app');
+                if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
+                else activeView = 'portal';
             }
-            catch {
-                /* sessionStorage disabled */
-            }
-            if (curTab && PORTAL_ONLY_SECTIONS.indexOf(curTab) !== -1) {
-                localStorage.removeItem('ss_state');
-                return;
-            }
-            const appEl = document.getElementById('app');
-            const pdfEl = document.getElementById('pdfView');
-            const appVisible = !!(appEl && appEl.style.display === 'flex');
-            const pdfVisible = !!(pdfEl && (pdfEl.style.display === 'flex' || pdfEl.style.display === 'block'));
-            if (!appVisible && !pdfVisible)
-                return;
+            // Only persist when the user is in file view. Portal sections
+            // (notes, editor, chatbot, studip listing, etc.) are tracked
+            // entirely via ss_portal_tab.
+            if (activeView !== 'file') return;
             const st = {
                 semId: options.getActiveSemId(),
                 courseId: options.getActiveCourseId() || undefined,

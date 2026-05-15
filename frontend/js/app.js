@@ -422,12 +422,11 @@ document.getElementById('pdfAll')?.addEventListener('click', () => {
 });
 // ── AI PANEL ──────────────────────────────────────────────────────────────
 const aiPanel = document.getElementById('aiPanel');
-const aiTab = document.getElementById('aiTab');
 const aiMsgs = document.getElementById('aiMsgs');
 initAiRenderBridge();
 initAiPanelEffects({ aiMsgs, aiPanel });
 const _aiPanelBridge = initAiPanelBridge({
-    aiPanel, aiTab, aiClose: document.getElementById('aiClose'), aiMsgs,
+    aiPanel, aiClose: document.getElementById('aiClose'), aiMsgs,
     t: _t, escapeHtml,
     askAI: (prompt) => askAI(prompt),
     getAiPinned: () => aiPinned,
@@ -555,8 +554,17 @@ _bindIf('nightBtn', 'click', function () {
 // Dashboard cards
 _bindIf('pcStudip', 'click', () => {
     const resumed = _showStudipResume();
-    if (!resumed)
-        _ssPushHistory({ view: 'studip' }, '#studip');
+    if (!resumed) {
+        // Push history directly (bypassing _ssPushHistory's _ssRestoring bail)
+        // so the URL updates regardless of whatever's left the restore flag set.
+        try {
+            sessionStorage.setItem('ss_portal_tab', 'studip');
+            localStorage.setItem('ss_last_section', 'studip');
+        } catch { /* ignore */ }
+        try {
+            history.pushState({ view: 'portal', section: 'studip' }, '', '#portal=courses');
+        } catch { /* ignore */ }
+    }
 });
 _bindIf('pcMail', 'click', () => window.open('https://mail.tu-braunschweig.de', '_blank'));
 _bindIf('pcConnect', 'click', () => window.open('https://connect.tu-braunschweig.de', '_blank'));

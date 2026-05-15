@@ -7,6 +7,16 @@
 (function () {
   'use strict';
 
+  // ── Task-01 (document rail) guard ────────────────────────────────────────
+  // The legacy floating bubble is being replaced by the right-side document
+  // rail + drawer. We keep the openPanel/closePanel/auto-focus logic intact
+  // (Task-02 will reuse it from the new AI drawer), but the bubble element
+  // itself must never appear. Other code paths reference `#aiBubble` as a
+  // DOM query target; injectBubble() still creates a hidden stub so those
+  // queries don't crash. CSS (`#aiBubble { display:none !important }` in
+  // document-rail.css) provides the visual hide.
+  var HIDE_BUBBLE = true;
+
   var DRAG_THRESHOLD  = 6;
   var SNAP_MARGIN     = 16;
   var BUBBLE_KEY      = 'ss_ai_bubble_pos';
@@ -28,6 +38,12 @@
     el.id    = 'aiBubble';
     el.title = 'Minallo AI';
     el.style.zIndex = '10001'; // always above panel (10000) and #portal (200)
+    // Task-01: never render the floating bubble — keep a hidden stub so any
+    // existing code that queries `#aiBubble` doesn't crash.
+    if (HIDE_BUBBLE) {
+      el.style.display = 'none';
+      el.setAttribute('aria-hidden', 'true');
+    }
     el.innerHTML =
       '<svg class="ai-bubble-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
         '<rect x="3" y="8" width="18" height="11" rx="3" fill="currentColor" opacity="0.9"/>' +
@@ -67,9 +83,12 @@
     panel.style.borderRadius = '20px';
     panel.style.overflow   = 'hidden';
 
-    // Width: restore saved or default
+    // Width + height: restore saved or default. (Height is optional — set by
+    // the resize handles in ai.js; if unsaved the panel falls back to its
+    // content height.)
     var savedSize = getSavedPanelSize();
     panel.style.width = savedSize.w + 'px';
+    if (savedSize.h) panel.style.height = savedSize.h + 'px';
   }
 
   // ── Panel open/close ───────────────────────────────────────────────────────
@@ -134,6 +153,20 @@
 
     // Restore chat history via bridge
     if (typeof window.openAI === 'function') window.openAI();
+
+    // Focus the input so the user can start typing immediately. Wait for the
+    // open transition (~220ms — see panel.style.transition in detachPanel) so
+    // the focus ring doesn't flash mid-scale animation. preventScroll keeps
+    // the surrounding portal from jumping when the input gains focus.
+    setTimeout(function () {
+      var input = document.getElementById('aiInput');
+      if (!input) return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (e) {
+        input.focus();
+      }
+    }, 240);
   }
 
   function closePanel() {

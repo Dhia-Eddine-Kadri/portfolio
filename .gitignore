@@ -50,3 +50,6 @@ backend/package-lock.json
 
 # Stashed Vite WIP — see history if you want to revive
 .vite-wip-backup/
+
+# Local planning / handoff artifacts (not shared)
+artifacts/

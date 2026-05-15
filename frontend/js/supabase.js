@@ -28,8 +28,16 @@ var _SS = window.Minallo;
 
 function _sbStoreSession(accessToken, refreshToken) {
   try {
-    sessionStorage.setItem('sb_sess_token', accessToken || '');
-    if (refreshToken) sessionStorage.setItem('sb_sess_refresh', refreshToken);
+    // Persistent across tab close — user "stays signed in until they log out"
+    // (per product requirement). Previously this wrote to sessionStorage which
+    // is volatile per-tab; the result was every new tab forced a re-login.
+    localStorage.setItem('sb_sess_token', accessToken || '');
+    if (refreshToken) localStorage.setItem('sb_sess_refresh', refreshToken);
+    // Wipe any sessionStorage copy from before this commit so the fallback
+    // reader below doesn't return stale tokens.
+    sessionStorage.removeItem('sb_sess_token');
+    sessionStorage.removeItem('sb_sess_refresh');
+    // Legacy keys from an even earlier scheme — leave the removes for safety.
     localStorage.removeItem('sb_token');
     localStorage.removeItem('sb_refresh');
   } catch (e) {}
@@ -37,7 +45,13 @@ function _sbStoreSession(accessToken, refreshToken) {
 
 function _sbStoredToken() {
   try {
-    return sessionStorage.getItem('sb_sess_token') || null;
+    // Prefer localStorage; fall back to sessionStorage so users mid-session
+    // when this code deploys don't get logged out.
+    return (
+      localStorage.getItem('sb_sess_token') ||
+      sessionStorage.getItem('sb_sess_token') ||
+      null
+    );
   } catch (e) {
     return null;
   }
@@ -45,7 +59,11 @@ function _sbStoredToken() {
 
 function _sbStoredRefresh() {
   try {
-    return sessionStorage.getItem('sb_sess_refresh') || null;
+    return (
+      localStorage.getItem('sb_sess_refresh') ||
+      sessionStorage.getItem('sb_sess_refresh') ||
+      null
+    );
   } catch (e) {
     return null;
   }
@@ -53,11 +71,38 @@ function _sbStoredRefresh() {
 
 function _sbClearStoredSession() {
   try {
+    localStorage.removeItem('sb_sess_token');
+    localStorage.removeItem('sb_sess_refresh');
     sessionStorage.removeItem('sb_sess_token');
     sessionStorage.removeItem('sb_sess_refresh');
     localStorage.removeItem('sb_token');
     localStorage.removeItem('sb_refresh');
   } catch (e) {}
+}
+
+// Decode the JWT exp claim to milliseconds. Returns 0 if the token is missing,
+// malformed, or the payload doesn't have a numeric exp. Fail-closed: anything
+// non-parseable looks expired, which forces a refresh — same fallback the
+// pre-existing getUser-then-refresh path used to take after a 403.
+function _jwtExpiryMs(tok) {
+  try {
+    var part = (tok || '').split('.')[1];
+    if (!part) return 0;
+    var b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var p = JSON.parse(atob(b64));
+    return p && typeof p.exp === 'number' ? p.exp * 1000 : 0;
+  } catch (e) { return 0; }
+}
+
+// 90s buffer covers ~minute of client/server clock skew in either direction
+// plus the time the refresh round-trip itself takes. Better one extra refresh
+// call than the 403 noise coming back.
+var _JWT_SKEW_MS = 90 * 1000;
+
+function _jwtAliveEnough(tok) {
+  var exp = _jwtExpiryMs(tok);
+  return exp > 0 && (Date.now() + _JWT_SKEW_MS) < exp;
 }
 
 function _ssAuth(status, detail) {
@@ -192,39 +237,51 @@ var _sb = {
         return window._sbSessionReady;
       }
       _sbToken = token;
-      window._sbSessionReady = _sb.auth
-        .getUser()
-        .then(function (user) {
-          if (user && user.id) {
-            _currentUser = user;
-            _ssAuth('signed-in', { source: 'restoreSession', user: user });
-            _sbAuthCallbacks.forEach(function (cb) {
-              cb('SIGNED_IN', { user: user });
-            });
-            return user;
-          }
-          // Token expired — try refresh token before giving up
-          return _sb.auth.refreshSession().then(function (user) {
-            if (user && user.id) {
-              _currentUser = user;
-              _ssAuth('signed-in', { source: 'refreshSession', user: user });
-              _sbAuthCallbacks.forEach(function (cb) {
-                cb('SIGNED_IN', { user: user });
-              });
-              return user;
-            }
-            _sbToken = null;
-            _sbClearStoredSession();
-            _ssAuth('signed-out', { source: 'restoreSession' });
-            return null;
+
+      function _signedOut() {
+        _sbToken = null;
+        _sbClearStoredSession();
+        _ssAuth('signed-out', { source: 'restoreSession' });
+        return null;
+      }
+
+      function _settle(user, source) {
+        _currentUser = user;
+        _ssAuth('signed-in', { source: source, user: user });
+        _sbAuthCallbacks.forEach(function (cb) { cb('SIGNED_IN', { user: user }); });
+        return user;
+      }
+
+      function _attemptGetUser(refreshedAlready) {
+        return _sb.auth.getUser().then(function (user) {
+          if (user && user.id) return _settle(user, refreshedAlready ? 'refreshSession' : 'restoreSession');
+          // Safety net: JWT looked alive but server still rejected. Try refresh
+          // exactly once, then give up.
+          if (refreshedAlready) return _signedOut();
+          return _sb.auth.refreshSession().then(function (refreshedUser) {
+            if (refreshedUser && refreshedUser.id) return _settle(refreshedUser, 'refreshSession');
+            return _signedOut();
           });
-        })
-        .catch(function () {
-          _sbToken = null;
-          _sbClearStoredSession();
-          _ssAuth('signed-out', { source: 'restoreSession' });
-          return null;
+        }).catch(function () {
+          if (refreshedAlready) return _signedOut();
+          return _sb.auth.refreshSession().then(function (refreshedUser) {
+            if (refreshedUser && refreshedUser.id) return _settle(refreshedUser, 'refreshSession');
+            return _signedOut();
+          });
         });
+      }
+
+      if (_jwtAliveEnough(token)) {
+        window._sbSessionReady = _attemptGetUser(false);
+      } else {
+        // Refresh first so we don't fire /auth/v1/user with a dead token.
+        window._sbSessionReady = _sb.auth.refreshSession().then(function (user) {
+          if (user && user.id) return _settle(user, 'refreshSession');
+          // Refresh failed — last-ditch attempt at getUser in case the access
+          // token is somehow still good (unlikely, but free).
+          return _attemptGetUser(true);
+        });
+      }
       return window._sbSessionReady;
     }
   },
@@ -365,6 +422,22 @@ function _enterApp(user) {
   try {
     _restoreSec =
       sessionStorage.getItem('ss_portal_tab') || localStorage.getItem('ss_last_section');
+  } catch (e) {}
+  // If ss_state says the user was inside a file/course view (inApp=true),
+  // force _restoreSec='studip' so nav lands on Courses regardless of what
+  // ss_portal_tab happens to say — covers entry points (e.g. deep-link to
+  // #file=, dashboard-widget course pills before they updated the tab) that
+  // bypass the normal showPortalSection path.
+  //
+  // We deliberately do NOT override for ss_state.view==='studip' alone
+  // (courses listing without inApp). That case is fully covered by
+  // ss_portal_tab, and overriding here would yank the user back to Courses
+  // on every refresh after they navigated to Notes/Editor/Chatbot/etc.
+  try {
+    var _savedSt = JSON.parse(localStorage.getItem('ss_state') || 'null');
+    if (_savedSt && _savedSt.inApp === true) {
+      _restoreSec = 'studip';
+    }
   } catch (e) {}
 
   if (!_inAppAlready) {
@@ -508,62 +581,45 @@ function _verifyAndEnter(tok) {
   _ssAuth('checking', { source: 'verifyAndEnter' });
   _ssEmit('auth:verify:start', { hasToken: !!tok });
   _sbToken = tok;
-  _sb.auth
-    .getUser()
-    .then(function (user) {
-      if (user && user.id) {
-        _ssEmit('auth:verify:success', { userId: user.id });
-        _enterApp(user);
-      } else {
-        // Access token may be expired — try refreshing silently
-        _sbRefreshAccessToken().then(function (newTok) {
-          if (newTok) {
-            _sb.auth
-              .getUser()
-              .then(function (user2) {
-                if (user2 && user2.id) {
-                  _ssEmit('auth:verify:success', { userId: user2.id, refreshed: true });
-                  _enterApp(user2);
-                } else {
-                  _ssAuth('failed', { source: 'verifyAndEnter' });
-                  _showModal();
-                }
-              })
-              .catch(function () {
-                _ssAuth('failed', { source: 'verifyAndEnter' });
-                _showModal();
-              });
-          } else {
-            _ssAuth('failed', { source: 'verifyAndEnter' });
-            _showModal();
-          }
-        });
-      }
-    })
-    .catch(function () {
+
+  function _giveUp() {
+    _ssAuth('failed', { source: 'verifyAndEnter' });
+    _showModal();
+  }
+
+  // refreshedAlready: when true, we've burned our one refresh retry. A second
+  // getUser failure goes straight to the modal — no infinite loop.
+  function _tryGetUser(refreshedAlready) {
+    function _onFail() {
+      if (refreshedAlready) return _giveUp();
       _sbRefreshAccessToken().then(function (newTok) {
-        if (newTok) {
-          _sb.auth
-            .getUser()
-            .then(function (user2) {
-              if (user2 && user2.id) {
-                _ssEmit('auth:verify:success', { userId: user2.id, refreshed: true });
-                _enterApp(user2);
-              } else {
-                _ssAuth('failed', { source: 'verifyAndEnter' });
-                _showModal();
-              }
-            })
-            .catch(function () {
-              _ssAuth('failed', { source: 'verifyAndEnter' });
-              _showModal();
-            });
-        } else {
-          _ssAuth('failed', { source: 'verifyAndEnter' });
-          _showModal();
-        }
+        if (newTok) _tryGetUser(true);
+        else _giveUp();
       });
+    }
+    _sb.auth.getUser()
+      .then(function (user) {
+        if (user && user.id) {
+          _ssEmit('auth:verify:success', { userId: user.id, refreshed: refreshedAlready });
+          _enterApp(user);
+        } else {
+          _onFail();
+        }
+      })
+      .catch(_onFail);
+  }
+
+  if (_jwtAliveEnough(tok)) {
+    // Token looks valid — try getUser straight; refresh-on-fail is the safety net.
+    _tryGetUser(false);
+  } else {
+    // Token is expired (or within the skew buffer). Refresh first so we don't
+    // hit /auth/v1/user with a dead token and spam the console with 403s.
+    _sbRefreshAccessToken().then(function (newTok) {
+      if (newTok) _tryGetUser(true);
+      else _giveUp();
     });
+  }
 }
 
 window.addEventListener('ss-ready', function () {
@@ -702,7 +758,6 @@ window.addEventListener('ss-ready', function () {
     console.log('[Auth] → path: alreadyIn');
     var saved2 = null;
     var sess2 = null;
-    var alive2 = false;
     var tok2 = null;
 
     try {
@@ -710,6 +765,10 @@ window.addEventListener('ss-ready', function () {
       sess2 = _sbStoredToken();
       tok2 = saved2 || sess2 || null;
     } catch (e) {}
+
+    // Compute from JWT exp instead of leaving a dead literal — the log now
+    // tells you whether the token is actually still good.
+    var alive2 = _jwtAliveEnough(tok2);
 
     console.log(
       '[Auth] alreadyIn: saved2=',

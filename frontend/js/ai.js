@@ -753,57 +753,116 @@ function _captureSnipRegion(x1, y1, x2, y2) {
 })();
 
 // ── AI panel resize (desktop only) ───────────────────────────────────────
+// The panel is detached by ai-bubble.js and positioned with `position: fixed`
+// + inline `left`/`top`/`width` (height defaults to content). So we set inline
+// width/height/left/top here too — CSS variables don't work because
+// #portal #aiPanel previously had `width: auto !important; height: auto`,
+// which we softened to non-important in this same commit.
+//
+// Anchoring: when resizing from the LEFT edge we also adjust `left` so the
+// RIGHT edge stays put (otherwise the panel just shifts as it grows). Same
+// for the TOP edge w.r.t. the BOTTOM edge. The corner handle does both.
+//
+// Persisted to localStorage 'ss_ai_panel_size' = { w, h }, which is the same
+// key ai-bubble.js reads in detachPanel() / getSavedPanelSize().
 (function () {
-  var handle = document.getElementById('aiResizeHandle');
+  var leftHandle = document.getElementById('aiResizeHandle');
+  var topHandle = document.getElementById('aiResizeHandleTop');
+  var cornerHandle = document.getElementById('aiResizeHandleCorner');
   var panel = document.getElementById('aiPanel');
-  if (!handle || !panel) return;
+  if (!panel) return;
 
-  var AI_W_MIN = 280;
-  var AI_W_MAX = 600;
-  var AI_W_KEY = 'ss_ai_width';
+  var W_MIN = 280;
+  var W_MAX = 800;
+  var H_MIN = 240;
+  var SIZE_KEY = 'ss_ai_panel_size';
+  var POS_KEY = 'ss_ai_panel_pos';
 
-  // Restore saved width
-  var saved = parseInt(localStorage.getItem(AI_W_KEY), 10);
-  if (saved && saved >= AI_W_MIN && saved <= AI_W_MAX) {
-    document.documentElement.style.setProperty('--ai-w', saved + 'px');
+  function persistSize(w, h) {
+    try {
+      var prev = {};
+      try {
+        prev = JSON.parse(localStorage.getItem(SIZE_KEY) || '{}') || {};
+      } catch (e) {}
+      prev.w = w;
+      prev.h = h;
+      localStorage.setItem(SIZE_KEY, JSON.stringify(prev));
+    } catch (e) {
+      /* ignore — private mode etc. */
+    }
+  }
+  function persistPos(left, top) {
+    try {
+      localStorage.setItem(POS_KEY, JSON.stringify({ left: left, top: top }));
+    } catch (e) {
+      /* ignore */
+    }
   }
 
-  var startX, startW;
-
-  handle.addEventListener('mousedown', function (e) {
+  function startDrag(e, handle, axis, cursor) {
     e.preventDefault();
-    startX = e.clientX;
-    startW =
-      panel.offsetWidth ||
-      parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ai-w'), 10) ||
-      340;
+    var startX = e.clientX;
+    var startY = e.clientY;
+    var rect = panel.getBoundingClientRect();
+    var startW = rect.width;
+    var startH = rect.height;
+    var startLeft = rect.left;
+    var startTop = rect.top;
+    // Edges we keep anchored while dragging the opposite edge:
+    var rightAnchor = startLeft + startW;
+    var bottomAnchor = startTop + startH;
+    var H_MAX = Math.max(H_MIN, window.innerHeight - 16);
+
     handle.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = cursor;
     document.body.style.userSelect = 'none';
 
-    function onMove(e) {
-      var delta = startX - e.clientX; // dragging left = wider
-      var newW = Math.min(AI_W_MAX, Math.max(AI_W_MIN, startW + delta));
-      document.documentElement.style.setProperty('--ai-w', newW + 'px');
+    function onMove(ev) {
+      if (axis === 'x' || axis === 'xy') {
+        // LEFT edge: dragging leftward (clientX decreases) -> wider.
+        var deltaX = startX - ev.clientX;
+        var newW = Math.min(W_MAX, Math.max(W_MIN, startW + deltaX));
+        panel.style.width = newW + 'px';
+        // Keep the right edge fixed.
+        panel.style.left = rightAnchor - newW + 'px';
+      }
+      if (axis === 'y' || axis === 'xy') {
+        // TOP edge: dragging upward (clientY decreases) -> taller.
+        var deltaY = startY - ev.clientY;
+        var newH = Math.min(H_MAX, Math.max(H_MIN, startH + deltaY));
+        panel.style.height = newH + 'px';
+        // Keep the bottom edge fixed.
+        panel.style.top = bottomAnchor - newH + 'px';
+      }
     }
 
     function onUp() {
       handle.classList.remove('dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      // Persist
-      var finalW = parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue('--ai-w'),
-        10
-      );
-      if (finalW) localStorage.setItem(AI_W_KEY, finalW);
+      var r = panel.getBoundingClientRect();
+      persistSize(Math.round(r.width), Math.round(r.height));
+      persistPos(Math.round(r.left), Math.round(r.top));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     }
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  });
+  }
+
+  if (leftHandle)
+    leftHandle.addEventListener('mousedown', function (e) {
+      startDrag(e, leftHandle, 'x', 'col-resize');
+    });
+  if (topHandle)
+    topHandle.addEventListener('mousedown', function (e) {
+      startDrag(e, topHandle, 'y', 'row-resize');
+    });
+  if (cornerHandle)
+    cornerHandle.addEventListener('mousedown', function (e) {
+      startDrag(e, cornerHandle, 'xy', 'nw-resize');
+    });
 })();
 
 // ── Scroll-to-bottom button ───────────────────────────────────────────────

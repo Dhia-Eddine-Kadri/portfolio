@@ -512,6 +512,11 @@
             });
           if (!course) return;
           setNavActive('pcStudip');
+          // Update ss_portal_tab via the portal-section call so a later refresh
+          // doesn't think we're still on the dashboard and wipe ss_state.
+          if (typeof window.showPortalSection === 'function') {
+            window.showPortalSection('studip');
+          }
           _showFilesView();
           openCourse(course);
         });

@@ -9,15 +9,46 @@ var _ssHandlingPop = false;
 var _ssRestoring = false; // suppress history pushes during state restore
 
 function _ssPushHistory(state, hash) {
-  if (_ssHandlingPop || _ssRestoring) return;
+  // TEMP diagnostic — remove after URL-stuck-on-notes bug is confirmed fixed.
+  // Logs why a push is suppressed so the next click reveals which flag is held.
+  if (_ssHandlingPop || _ssRestoring || window._ssRestoring) {
+    try {
+      console.log(
+        '[router] _ssPushHistory bailed',
+        'hash=', hash,
+        '_ssHandlingPop=', _ssHandlingPop,
+        '_ssRestoring(local)=', _ssRestoring,
+        'window._ssRestoring=', window._ssRestoring
+      );
+    } catch (e) {}
+    return;
+  }
   try {
     history.pushState(state, '', hash || window.location.pathname);
-  } catch (e) {}
+  } catch (e) {
+    try { console.log('[router] pushState threw', e); } catch (e2) {}
+  }
 }
 
 function _ssReplaceHistory(state, hash) {
   try {
     history.replaceState(state, '', hash || window.location.pathname);
+  } catch (e) {}
+}
+
+// Authoritative URL + ss_portal_tab + ss_last_section commit. Belt-and-suspenders
+// alongside the showPortalSection wrapper — calling this after every navigation
+// guarantees URL and storage match the visible section even if the wrapper
+// chain is shadowed/broken by a later script.
+function _finalizeNav(section) {
+  if (!section) return;
+  try {
+    sessionStorage.setItem('ss_portal_tab', section);
+    localStorage.setItem('ss_last_section', section);
+  } catch (e) {}
+  var urlSection = section === 'studip' ? 'courses' : section;
+  try {
+    history.pushState({ view: 'portal', section: section }, '', '#portal=' + encodeURIComponent(urlSection));
   } catch (e) {}
 }
 
@@ -93,6 +124,8 @@ function _ssPortalNavId(section) {
 function _ssApplyHistoryState(state) {
   if (!state) {
     showPortal();
+    // Default to dashboard when we have no state at all.
+    setNavActive('psbDashboard');
     return;
   }
 
@@ -101,19 +134,26 @@ function _ssApplyHistoryState(state) {
     if (state.section) {
       setNavActive(_ssPortalNavId(state.section));
       showPortalSection(state.section);
+    } else {
+      setNavActive('psbDashboard');
     }
     return;
   }
 
   if (state.view === 'studip' || state.view === 'courses') {
     showStudip();
+    // showStudip already sets nav, but be explicit so future readers see it.
+    setNavActive('pcStudip');
     return;
   }
 
+  // ── Inside a course or a file: nav must be pcStudip (Courses), not whatever
+  // section the user was on before. This is the bug from the screenshot —
+  // browser back from chatbot to a file left the AI sidebar item highlighted.
   if (state.view === 'course') {
     var course = _ssFindCourseById(state.courseId) || _ssFindCourseByShort(state.courseShort);
     if (course) {
-      _showFilesView();
+      setNavActive('pcStudip');
       if (typeof window.openCourse === 'function') window.openCourse(course);
       if (state.section && typeof window.showCourseSection === 'function')
         window.showCourseSection(course, state.section);
@@ -124,7 +164,7 @@ function _ssApplyHistoryState(state) {
   if (state.view === 'file') {
     var fileCourse = _ssFindCourseById(state.courseId) || _ssFindCourseByShort(state.courseShort);
     if (fileCourse) {
-      _showFilesView();
+      setNavActive('pcStudip');
       var file = _ssFindFileInCourse(fileCourse, state.fileName);
       if (file) {
         if (typeof window.openFile === 'function') window.openFile(file, fileCourse);
@@ -227,7 +267,21 @@ window.showPortalSection = function (sec) {
   }
 
   activePortalSection = target;
-  _origShowPortalSection(target);
+  // TEMP diagnostic — catch any throw from the inner showPortalSection so we
+  // can see what's blowing up while still completing the URL/sessionStorage
+  // update. Without this, a throw here silently kills the ss_portal_tab and
+  // history push, leaving Notes (the last successful update) as the perpetual
+  // restore target.
+  try {
+    _origShowPortalSection(target);
+  } catch (e) {
+    try {
+      console.error(
+        '[router] _origShowPortalSection threw for target=', target,
+        'error=', e && (e.stack || e.message || e)
+      );
+    } catch (e2) {}
+  }
   if (target === 'subscription') {
     setTimeout(function () {
       if (typeof _bindSubscriptionControls === 'function') _bindSubscriptionControls();
@@ -293,10 +347,12 @@ _bindIf('psbDashboard', 'click', function () {
     showPortal();
     setNavActive('psbGerman');
     showPortalSection('german');
+    _finalizeNav('german');
   } else {
     showPortal();
     setNavActive('psbDashboard');
     showPortalSection('dashboard');
+    _finalizeNav('dashboard');
   }
 });
 
@@ -304,6 +360,7 @@ _bindIf('psbGerman', 'click', function () {
   showPortal();
   setNavActive('psbGerman');
   showPortalSection('german');
+  _finalizeNav('german');
   window._glBackToHome();
 });
 
@@ -311,18 +368,21 @@ _bindIf('psbProfile', 'click', function () {
   showPortal();
   setNavActive('psbProfile');
   showPortalSection('profile');
+  _finalizeNav('profile');
 });
 
 _bindIf('psbSettings', 'click', function () {
   showPortal();
   setNavActive('psbSettings');
   showPortalSection('settings');
+  _finalizeNav('settings');
 });
 
 _bindIf('psbSubscription', 'click', function () {
   showPortal();
   setNavActive('psbSubscription');
   showPortalSection('subscription');
+  _finalizeNav('subscription');
 });
 
 _bindIf('goPortal', 'click', function () {
@@ -374,29 +434,36 @@ _bindIf('goPortal', 'click', function () {
     }
     if (item.id === 'psbNotes') {
       _navTo('psbNotes', 'notes');
+      _finalizeNav('notes');
     }
     if (item.id === 'psbEditor') {
       _navTo('psbEditor', 'editor');
+      _finalizeNav('editor');
       if (typeof window._writerInit === 'function') window._writerInit();
       else if (typeof window._editorInit === 'function') window._editorInit();
     }
     if (item.id === 'psbAIPage') {
       _navTo('psbAIPage', 'aipage');
+      _finalizeNav('aipage');
       if (typeof window._aipRefreshSidebar === 'function') window._aipRefreshSidebar();
     }
     if (item.id === 'psbChat') {
       _navTo('psbChat', 'chat');
+      _finalizeNav('chat');
       _chatInit();
     }
     if (item.id === 'psbNotifications') {
       _navTo('psbNotifications', 'notifications');
+      _finalizeNav('notifications');
     }
     if (item.id === 'psbGames') {
       if (item.classList.contains('st-locked')) return;
       _navTo('psbGames', 'games');
+      _finalizeNav('games');
     }
     if (item.id === 'psbLounge') {
       _navTo('psbLounge', 'lounge');
+      _finalizeNav('lounge');
       _loungeRender();
     }
   });
