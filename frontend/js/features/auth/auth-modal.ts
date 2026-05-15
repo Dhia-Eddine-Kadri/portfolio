@@ -281,6 +281,7 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
       }
     } else if (authModal) {
       authModal.style.display = 'flex';
+      pushAuthHistory();
     }
   }
 
@@ -290,7 +291,28 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
     if (authModal) authModal.style.display = 'flex';
     if (mode === 'signup' && authMode !== 'signup') setAuthMode('signup');
     else if (mode === 'signin' && authMode !== 'signin') setAuthMode('signin');
+    pushAuthHistory();
   }
+
+  // Browser back-button support: push a marker history entry when the modal
+  // opens so pressing Back closes the modal and reveals the landing again
+  // instead of leaving the site.
+  function pushAuthHistory(): void {
+    const state = history.state as { ssAuthModal?: boolean } | null;
+    if (state && state.ssAuthModal) return;
+    history.pushState({ ssAuthModal: true }, '', '#auth');
+  }
+  function closeAuthFromHistory(): void {
+    if (!authModal || authModal.style.display === 'none') return;
+    authModal.style.display = 'none';
+    const landing = document.getElementById('landing');
+    if (landing) landing.classList.remove('hidden');
+  }
+  window.addEventListener('popstate', (e: PopStateEvent) => {
+    const state = e.state as { ssAuthModal?: boolean } | null;
+    if (state && state.ssAuthModal) return;
+    closeAuthFromHistory();
+  });
 
   authSwitch?.addEventListener('click', () => {
     setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
