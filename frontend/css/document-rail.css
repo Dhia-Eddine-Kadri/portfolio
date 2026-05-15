@@ -789,14 +789,19 @@
   max-width: 240px;
 }
 
-/* Editor inputs / preview */
+/* Editor inputs / preview.
+   Flex inheritance through .np-body → .np-editor-wrap → .np-preview was not
+   reliably propagating the drawer's available height down to the preview
+   (something in the legacy cascade keeps collapsing back to content size).
+   Force the layout with CSS grid: title-row + view-tabs are auto, preview
+   takes 1fr — explicit, unambiguous, no flex chain. */
 .dr-drawer .dr-host-notes .np-editor-wrap {
   background: transparent;
   flex: 1 1 0 !important;
   min-height: 0 !important;
-  height: auto !important;
-  display: flex !important;
-  flex-direction: column !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-rows: auto auto 1fr !important;
   overflow: hidden !important;
   gap: 8px;
 }
@@ -848,10 +853,10 @@
   color: var(--dr-text);
   line-height: 1.6;
   font-size: 0.85rem;
-  /* Grow to fill editor-wrap and scroll markdown inside. */
-  flex: 1 1 0 !important;
+  /* Inside the grid editor-wrap, the preview is the 1fr row; height comes
+     from the grid track, scroll happens inside this box. */
   min-height: 0 !important;
-  height: auto !important;
+  height: 100% !important;
   overflow-y: auto !important;
 }
 .dr-drawer .dr-host-notes .np-editor-ta {
