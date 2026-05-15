@@ -126,6 +126,10 @@
   display: grid;
   grid-template-columns: 1fr;
   width: 100%;
+  /* min-width:0 on grid children prevents text/inputs forcing the card
+     wider than the viewport (the default `min-width: auto` on grid items
+     would let long content blow out the column). */
+  min-width: 0;
   /* Cap the card to the viewport so the page never needs to scroll. */
   max-height: calc(100vh - 48px);
   border-radius: 1.75rem;
@@ -143,7 +147,7 @@
   to   { opacity: 1; transform: none; }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 900px) {
   .na-card {
     grid-template-columns: 1.05fr 0.95fr;
   }
@@ -154,13 +158,16 @@
 .na-form-col {
   position: relative;
   padding: 1.25rem;
+  /* Prevent the form column from forcing the card wider than the viewport
+     (grid items default to min-width: auto, which is "min-content"). */
+  min-width: 0;
   /* Last-resort: if a very short viewport forces clipping, the form column
      (not the page) is what scrolls. The .na-card max-height handles the
      normal case. */
   overflow-y: auto;
 }
 @media (min-width: 640px) { .na-form-col { padding: 1.75rem; } }
-@media (min-width: 1024px) { .na-form-col { padding: 2rem 2.25rem; } }
+@media (min-width: 900px) { .na-form-col { padding: 2rem 2.25rem; } }
 
 .na-form-glow {
   position: absolute;
@@ -255,6 +262,9 @@
   letter-spacing: -0.02em;
   color: #fff;
   line-height: 1.1;
+  /* Long words (e.g. "Minallo") on narrow viewports should wrap rather than
+     force a horizontal scroll. */
+  overflow-wrap: anywhere;
 }
 @media (min-width: 768px) {
   .na-heading { font-size: 1.85rem; }
@@ -305,6 +315,11 @@
 
 .na-field {
   display: block;
+  /* The existing auth-modal.js sets `style.display = 'flex'` on
+     #authConfirmWrap when entering signup mode. Without flex-direction:column
+     the label and input would lay out as a horizontal row. flex-direction
+     is harmless when display is block, so this is safe for every .na-field. */
+  flex-direction: column;
 }
 
 .na-field-label {
@@ -552,13 +567,16 @@
 
 .na-buddy {
   position: relative;
-  display: none; /* hidden <1024px */
+  display: none; /* hidden <900px */
+  /* Same reason as .na-form-col: don't let inner content force the grid
+     column wider than the available card width. */
+  min-width: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(125, 211, 252, 0.10);
   padding: 1.5rem;
   overflow: hidden;
 }
-@media (min-width: 1024px) {
+@media (min-width: 900px) {
   .na-buddy { display: block; }
 }
 
