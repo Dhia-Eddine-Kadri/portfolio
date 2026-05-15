@@ -1,4 +1,4 @@
-import { panelShow, panelHide } from '../../core/panels.js';
+import { panelHide } from '../../core/panels.js';
 import { listCourseDocuments } from '../../services/ai-service.js';
 import type { LegacyCourse } from '../../../globals.js';
 
