@@ -850,8 +850,11 @@
 }
 .dr-drawer .dr-host-notes .np-preview {
   border-radius: 14px;
-  border: 1px solid var(--dr-glass-border);
-  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid var(--dr-sky-border-soft);
+  background:
+    linear-gradient(135deg, rgba(56, 189, 248, 0.05), rgba(99, 102, 241, 0.04)),
+    rgba(2, 6, 23, 0.42);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.06) inset;
   padding: 12px 14px;
   color: var(--dr-text);
   line-height: 1.6;
@@ -861,6 +864,54 @@
   min-height: 0 !important;
   height: 100% !important;
   overflow-y: auto !important;
+}
+
+/* Markdown content inside the preview — repaint the purple legacy accents
+   (#e9d5ff / #d8b4fe / #c4b5fd) in the AI drawer's sky palette so Notes
+   and Summary feel like they belong with the AI chat. Scoped to
+   .dr-host-notes so the legacy panel's original styling stays untouched
+   elsewhere. */
+.dr-drawer .dr-host-notes .np-preview h1 {
+  color: var(--dr-sky-100) !important;
+}
+.dr-drawer .dr-host-notes .np-preview h2 {
+  color: var(--dr-sky-200) !important;
+  border-bottom: 1px solid var(--dr-sky-border-soft) !important;
+}
+.dr-drawer .dr-host-notes .np-preview h3,
+.dr-drawer .dr-host-notes .np-preview h4 {
+  color: var(--dr-sky-200) !important;
+}
+.dr-drawer .dr-host-notes .np-preview strong {
+  color: var(--dr-sky-100) !important;
+}
+.dr-drawer .dr-host-notes .np-preview em {
+  color: rgba(186, 230, 253, 0.7) !important;
+}
+.dr-drawer .dr-host-notes .np-preview code {
+  background: var(--dr-sky-bg-soft) !important;
+  color: var(--dr-sky-200) !important;
+  border: 1px solid var(--dr-sky-border-soft);
+}
+.dr-drawer .dr-host-notes .np-preview pre {
+  background: rgba(2, 6, 23, 0.55) !important;
+  border: 1px solid var(--dr-glass-border);
+}
+.dr-drawer .dr-host-notes .np-preview blockquote {
+  border-left: 3px solid var(--dr-sky-border) !important;
+  background: var(--dr-sky-bg-soft) !important;
+  color: rgba(226, 232, 240, 0.78) !important;
+}
+.dr-drawer .dr-host-notes .np-preview th {
+  background: var(--dr-sky-bg-soft) !important;
+  color: var(--dr-sky-100) !important;
+  border: 1px solid var(--dr-sky-border-soft) !important;
+}
+.dr-drawer .dr-host-notes .np-preview a {
+  color: var(--dr-sky-200) !important;
+}
+.dr-drawer .dr-host-notes .np-preview .katex {
+  color: var(--dr-sky-100) !important;
 }
 .dr-drawer .dr-host-notes .np-editor-ta {
   width: 100%;
