@@ -28,8 +28,16 @@ var _SS = window.Minallo;
 
 function _sbStoreSession(accessToken, refreshToken) {
   try {
-    sessionStorage.setItem('sb_sess_token', accessToken || '');
-    if (refreshToken) sessionStorage.setItem('sb_sess_refresh', refreshToken);
+    // Persistent across tab close — user "stays signed in until they log out"
+    // (per product requirement). Previously this wrote to sessionStorage which
+    // is volatile per-tab; the result was every new tab forced a re-login.
+    localStorage.setItem('sb_sess_token', accessToken || '');
+    if (refreshToken) localStorage.setItem('sb_sess_refresh', refreshToken);
+    // Wipe any sessionStorage copy from before this commit so the fallback
+    // reader below doesn't return stale tokens.
+    sessionStorage.removeItem('sb_sess_token');
+    sessionStorage.removeItem('sb_sess_refresh');
+    // Legacy keys from an even earlier scheme — leave the removes for safety.
     localStorage.removeItem('sb_token');
     localStorage.removeItem('sb_refresh');
   } catch (e) {}
@@ -37,7 +45,13 @@ function _sbStoreSession(accessToken, refreshToken) {
 
 function _sbStoredToken() {
   try {
-    return sessionStorage.getItem('sb_sess_token') || null;
+    // Prefer localStorage; fall back to sessionStorage so users mid-session
+    // when this code deploys don't get logged out.
+    return (
+      localStorage.getItem('sb_sess_token') ||
+      sessionStorage.getItem('sb_sess_token') ||
+      null
+    );
   } catch (e) {
     return null;
   }
@@ -45,7 +59,11 @@ function _sbStoredToken() {
 
 function _sbStoredRefresh() {
   try {
-    return sessionStorage.getItem('sb_sess_refresh') || null;
+    return (
+      localStorage.getItem('sb_sess_refresh') ||
+      sessionStorage.getItem('sb_sess_refresh') ||
+      null
+    );
   } catch (e) {
     return null;
   }
@@ -53,6 +71,8 @@ function _sbStoredRefresh() {
 
 function _sbClearStoredSession() {
   try {
+    localStorage.removeItem('sb_sess_token');
+    localStorage.removeItem('sb_sess_refresh');
     sessionStorage.removeItem('sb_sess_token');
     sessionStorage.removeItem('sb_sess_refresh');
     localStorage.removeItem('sb_token');
