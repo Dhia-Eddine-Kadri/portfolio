@@ -72,7 +72,6 @@ export function renderCourses(state) {
             if (state.activeCourseId === c.id) {
                 state.activeCourseId = null;
                 panelHide(document.getElementById('courseOverview'));
-                panelShow(document.getElementById('welcomeState'));
                 const crumb = document.getElementById('breadcrumb');
                 if (crumb)
                     crumb.textContent = 'Courses';
