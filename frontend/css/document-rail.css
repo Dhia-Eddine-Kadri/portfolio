@@ -391,12 +391,138 @@
   z-index: 1;
 }
 
-/* ── Mobile (Task-03 will replace this with a bottom pill).
-   For now: hide both rail and drawer on narrow viewports so Task-01
-   doesn't overlap the mobile chrome. */
+/* ── Mobile pill + chooser popover (Task-03) ──────────────────────────── */
+/* Pill + popover hidden by default at all viewport sizes; revealed only by
+   the mobile @media block below. Route visibility still flows through
+   .dr-root.is-pdf / .is-courses (the pill lives inside #drRoot). */
+.dr-pill {
+  display: none;
+}
+.dr-pill-menu {
+  display: none;
+}
+
+.dr-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  transform: translateX(-50%);
+  z-index: 9501;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.30);
+  background: rgba(2, 6, 23, 0.72);
+  box-shadow: 0 0 32px rgba(14, 165, 233, 0.22);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #e0f2fe;
+  font: 800 0.82rem/1 'Nunito', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+.dr-pill:hover {
+  border-color: rgba(125, 211, 252, 0.50);
+  background: rgba(2, 6, 23, 0.82);
+}
+.dr-pill:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.dr-pill-menu {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
+  transform: translateX(-50%);
+  z-index: 9502;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  min-width: 180px;
+  border-radius: 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  background: rgba(2, 6, 23, 0.78);
+  box-shadow: 0 0 38px rgba(14, 165, 233, 0.20);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.dr-pill-menu[hidden] {
+  display: none !important;
+}
+.dr-pill-menu-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font: 700 0.85rem/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.dr-pill-menu-btn:hover {
+  border-color: rgba(125, 211, 252, 0.35);
+  background: rgba(125, 211, 252, 0.12);
+  color: #e0f2fe;
+}
+.dr-pill-menu-btn svg {
+  flex-shrink: 0;
+}
+
+/* ── Sheet mode (mobile bottom sheet for the drawer) ──────────────────── */
+.dr-drawer.dr-sheet {
+  /* Override the desktop right-anchored geometry: full-width bottom sheet
+     with small gutters, animating up from the bottom. */
+  right: 8px;
+  left: 8px;
+  top: auto;
+  bottom: 0;
+  width: auto !important; /* defeat inline width set by JS resize */
+  max-height: 86vh;
+  height: 86vh;
+  border-radius: 1.25rem 1.25rem 0 0;
+  transform: translateY(100%);
+  transition: opacity 220ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dr-drawer.dr-sheet.is-open {
+  transform: translateY(0);
+}
+.dr-drawer.dr-sheet #drResize {
+  display: none !important;
+  pointer-events: none;
+}
+
+/* ── Mobile breakpoint: hide rail, show pill ──────────────────────────── */
 @media (max-width: 768px) {
-  .dr-rail,
-  .dr-drawer {
+  .dr-rail {
     display: none !important;
+  }
+  /* Pill + popover are gated on the .dr-root route classes so they only
+     appear in PDF view + courses dashboard (inherited from #drRoot). */
+  .dr-root.is-pdf .dr-pill,
+  .dr-root.is-courses .dr-pill {
+    display: inline-flex;
+  }
+  /* Hide the pill while the sheet is open so they don't overlap. The
+     .is-sheet-open class is toggled by JS on #drRoot. */
+  .dr-root.is-sheet-open .dr-pill,
+  .dr-root.is-sheet-open .dr-pill-menu {
+    display: none !important;
+  }
+  /* Show popover when JS removes [hidden]. */
+  .dr-root.is-pdf .dr-pill-menu:not([hidden]),
+  .dr-root.is-courses .dr-pill-menu:not([hidden]) {
+    display: flex;
   }
 }

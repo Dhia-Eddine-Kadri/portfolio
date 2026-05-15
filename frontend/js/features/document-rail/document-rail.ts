@@ -304,6 +304,15 @@ function renderModeContent(mode: DocRailMode): void {
   }
 }
 
+const MOBILE_MQ = '(max-width: 768px)';
+function isMobileViewport(): boolean {
+  try {
+    return window.matchMedia(MOBILE_MQ).matches;
+  } catch {
+    return false;
+  }
+}
+
 function openDrawer(mode: DocRailMode): void {
   const drawer = $('drDrawer');
   if (!drawer) return;
@@ -312,9 +321,21 @@ function openDrawer(mode: DocRailMode): void {
   applyHeader(mode);
   updateDrawerModeClass(drawer, mode);
   drawer.hidden = false;
+  // Decide presentation mode at open time. Once open, we keep whatever
+  // mode we picked even if the viewport is resized across the breakpoint.
+  if (!wasOpen) {
+    const sheet = isMobileViewport();
+    drawer.classList.toggle('dr-sheet', sheet);
+    const root = $('drRoot');
+    if (root) root.classList.toggle('is-sheet-open', sheet);
+  }
   void drawer.offsetWidth;
   drawer.classList.add('is-open');
-  applyWidth(drawer, _drawerWidth);
+  // On mobile (sheet mode) CSS forces full-width; don't apply the persisted
+  // desktop width.
+  if (!drawer.classList.contains('dr-sheet')) {
+    applyWidth(drawer, _drawerWidth);
+  }
   updateRailActive(mode);
   // Render after the slide-in starts so we don't pay the cost during the
   // transition; tiny delay also helps the input auto-focus feel natural.
@@ -333,6 +354,17 @@ function closeDrawer(): void {
   if (!drawer) return;
   _openMode = null;
   drawer.classList.remove('is-open');
+  // Clear sheet-mode state on close so the next open re-evaluates the
+  // viewport.
+  const wasSheet = drawer.classList.contains('dr-sheet');
+  drawer.classList.remove('dr-sheet');
+  const rootEl = $('drRoot');
+  if (rootEl) rootEl.classList.remove('is-sheet-open');
+  if (wasSheet) {
+    // Strip the inline width that JS might have left behind from a prior
+    // desktop session so it doesn't leak back when the user resizes up.
+    drawer.style.width = '';
+  }
   updateDrawerModeClass(drawer, null);
   updateRailActive(null);
   // Tear down hosted content so legacy modules' references stay valid.
@@ -384,6 +416,8 @@ function wireResize(): void {
   };
 
   handle.addEventListener('mousedown', (e: MouseEvent) => {
+    // Resize is desktop-only — disable in mobile bottom-sheet mode.
+    if (drawer.classList.contains('dr-sheet')) return;
     dragging = true;
     startX = e.clientX;
     startW = drawer.offsetWidth || _drawerWidth;
@@ -417,6 +451,53 @@ function wireClose(): void {
   });
 }
 
+// ── Mobile pill + chooser popover ────────────────────────────────────────
+function setPillMenuOpen(open: boolean): void {
+  const menu = $('drPillMenu');
+  const pill = $('drPill');
+  if (!menu || !pill) return;
+  menu.hidden = !open;
+  pill.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function wirePill(): void {
+  const pill = $('drPill');
+  const menu = $('drPillMenu');
+  if (!pill || !menu) return;
+
+  pill.addEventListener('click', (e: MouseEvent) => {
+    e.stopPropagation();
+    setPillMenuOpen(menu.hidden);
+  });
+
+  // Mode buttons inside the popover — open the drawer in the picked mode.
+  menu.querySelectorAll<HTMLButtonElement>('.dr-pill-menu-btn').forEach((btn) => {
+    btn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      const mode = btn.dataset.drMode as DocRailMode | undefined;
+      if (!mode) return;
+      setPillMenuOpen(false);
+      openDrawer(mode);
+    });
+  });
+
+  // Outside-click closes the popover.
+  document.addEventListener('click', (e: MouseEvent) => {
+    if (menu.hidden) return;
+    const target = e.target as Node | null;
+    if (!target) return;
+    if (menu.contains(target) || pill.contains(target)) return;
+    setPillMenuOpen(false);
+  });
+
+  // Esc closes the popover (in addition to closing the drawer).
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && !menu.hidden) {
+      setPillMenuOpen(false);
+    }
+  });
+}
+
 function setRouteVisibility(route: DocRailRoute): void {
   const root = $('drRoot');
   if (!root) return;
@@ -444,6 +525,7 @@ export function initDocumentRail(): void {
   wireRailButtons();
   wireClose();
   wireResize();
+  wirePill();
 
   const w: DocRailWindow = window as DocRailWindow;
   w.__minalloDocRail = {

@@ -291,6 +291,15 @@ function renderModeContent(mode) {
         mountNotesPanel(mode);
     }
 }
+const MOBILE_MQ = '(max-width: 768px)';
+function isMobileViewport() {
+    try {
+        return window.matchMedia(MOBILE_MQ).matches;
+    }
+    catch {
+        return false;
+    }
+}
 function openDrawer(mode) {
     const drawer = $('drDrawer');
     if (!drawer)
@@ -300,9 +309,22 @@ function openDrawer(mode) {
     applyHeader(mode);
     updateDrawerModeClass(drawer, mode);
     drawer.hidden = false;
+    // Decide presentation mode at open time. Once open, we keep whatever
+    // mode we picked even if the viewport is resized across the breakpoint.
+    if (!wasOpen) {
+        const sheet = isMobileViewport();
+        drawer.classList.toggle('dr-sheet', sheet);
+        const root = $('drRoot');
+        if (root)
+            root.classList.toggle('is-sheet-open', sheet);
+    }
     void drawer.offsetWidth;
     drawer.classList.add('is-open');
-    applyWidth(drawer, _drawerWidth);
+    // On mobile (sheet mode) CSS forces full-width; don't apply the persisted
+    // desktop width.
+    if (!drawer.classList.contains('dr-sheet')) {
+        applyWidth(drawer, _drawerWidth);
+    }
     updateRailActive(mode);
     // Render after the slide-in starts so we don't pay the cost during the
     // transition; tiny delay also helps the input auto-focus feel natural.
@@ -323,6 +345,18 @@ function closeDrawer() {
         return;
     _openMode = null;
     drawer.classList.remove('is-open');
+    // Clear sheet-mode state on close so the next open re-evaluates the
+    // viewport.
+    const wasSheet = drawer.classList.contains('dr-sheet');
+    drawer.classList.remove('dr-sheet');
+    const rootEl = $('drRoot');
+    if (rootEl)
+        rootEl.classList.remove('is-sheet-open');
+    if (wasSheet) {
+        // Strip the inline width that JS might have left behind from a prior
+        // desktop session so it doesn't leak back when the user resizes up.
+        drawer.style.width = '';
+    }
     updateDrawerModeClass(drawer, null);
     updateRailActive(null);
     // Tear down hosted content so legacy modules' references stay valid.
@@ -374,6 +408,9 @@ function wireResize() {
         saveWidth(_drawerWidth);
     };
     handle.addEventListener('mousedown', (e) => {
+        // Resize is desktop-only — disable in mobile bottom-sheet mode.
+        if (drawer.classList.contains('dr-sheet'))
+            return;
         dragging = true;
         startX = e.clientX;
         startW = drawer.offsetWidth || _drawerWidth;
@@ -406,6 +443,53 @@ function wireClose() {
         }
     });
 }
+// ── Mobile pill + chooser popover ────────────────────────────────────────
+function setPillMenuOpen(open) {
+    const menu = $('drPillMenu');
+    const pill = $('drPill');
+    if (!menu || !pill)
+        return;
+    menu.hidden = !open;
+    pill.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function wirePill() {
+    const pill = $('drPill');
+    const menu = $('drPillMenu');
+    if (!pill || !menu)
+        return;
+    pill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setPillMenuOpen(menu.hidden);
+    });
+    // Mode buttons inside the popover — open the drawer in the picked mode.
+    menu.querySelectorAll('.dr-pill-menu-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const mode = btn.dataset.drMode;
+            if (!mode)
+                return;
+            setPillMenuOpen(false);
+            openDrawer(mode);
+        });
+    });
+    // Outside-click closes the popover.
+    document.addEventListener('click', (e) => {
+        if (menu.hidden)
+            return;
+        const target = e.target;
+        if (!target)
+            return;
+        if (menu.contains(target) || pill.contains(target))
+            return;
+        setPillMenuOpen(false);
+    });
+    // Esc closes the popover (in addition to closing the drawer).
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !menu.hidden) {
+            setPillMenuOpen(false);
+        }
+    });
+}
 function setRouteVisibility(route) {
     const root = $('drRoot');
     if (!root)
@@ -433,6 +517,7 @@ export function initDocumentRail() {
     wireRailButtons();
     wireClose();
     wireResize();
+    wirePill();
     const w = window;
     w.__minalloDocRail = {
         setRouteVisibility,
