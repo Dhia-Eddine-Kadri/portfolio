@@ -90,7 +90,10 @@ body.nl-body {
   background-color: var(--nl-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  /* See note on .nl-main below. Same reasoning applies: use `clip` instead
+     of `hidden` so the body never becomes a wheel-event-swallowing scroll
+     container with zero scroll range. */
+  overflow-x: clip;
   position: relative;
 }
 
@@ -102,10 +105,17 @@ body.nl-body ::selection {
 .nl-main {
   position: relative;
   min-height: 100vh;
-  /* Clip horizontal overflow from off-screen floating orbs without trapping
-     vertical scroll. Using `overflow: hidden` here was the bug — it killed
-     the page's vertical scroll entirely. */
-  overflow-x: hidden;
+  /* Clip horizontal overflow from off-screen floating orbs WITHOUT becoming
+     a scroll container. `overflow-x: hidden` would make .nl-main a scroll
+     container with computed overflow-y: auto (per CSS spec, when one axis
+     is hidden the other is promoted to auto). Since .nl-main has no fixed
+     height (just min-height: 100vh, it grows to its content), the implicit
+     vertical scroll range is zero — wheel events would hit this dead
+     scroll container and stop bubbling, leaving the page un-scrollable
+     even though programmatic anchor scrolls still worked.
+     `overflow-x: clip` clips visually but does NOT create a scroll
+     container, so wheel events bubble normally to the document. */
+  overflow-x: clip;
 }
 
 a {
@@ -1787,4 +1797,27 @@ img, svg {
     transform: none;
     transition: none;
   }
+}
+
+/* ===================== Language toggle button ===================== */
+.nl-lang-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.nl-lang-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.nl-lang-btn:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.6);
+  outline-offset: 2px;
 }
