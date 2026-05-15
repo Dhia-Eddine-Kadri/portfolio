@@ -753,9 +753,18 @@ function _captureSnipRegion(x1, y1, x2, y2) {
 })();
 
 // ── AI panel resize (desktop only) ───────────────────────────────────────
-// Three handles: left edge (width), top edge (height), top-left corner (both).
-// Each persists its axis independently to localStorage; the corner handle
-// drives both axes at once.
+// The panel is detached by ai-bubble.js and positioned with `position: fixed`
+// + inline `left`/`top`/`width` (height defaults to content). So we set inline
+// width/height/left/top here too — CSS variables don't work because
+// #portal #aiPanel previously had `width: auto !important; height: auto`,
+// which we softened to non-important in this same commit.
+//
+// Anchoring: when resizing from the LEFT edge we also adjust `left` so the
+// RIGHT edge stays put (otherwise the panel just shifts as it grows). Same
+// for the TOP edge w.r.t. the BOTTOM edge. The corner handle does both.
+//
+// Persisted to localStorage 'ss_ai_panel_size' = { w, h }, which is the same
+// key ai-bubble.js reads in detachPanel() / getSavedPanelSize().
 (function () {
   var leftHandle = document.getElementById('aiResizeHandle');
   var topHandle = document.getElementById('aiResizeHandleTop');
@@ -763,27 +772,33 @@ function _captureSnipRegion(x1, y1, x2, y2) {
   var panel = document.getElementById('aiPanel');
   if (!panel) return;
 
-  var AI_W_MIN = 280;
-  var AI_W_MAX = 600;
-  var AI_H_MIN = 240;
-  var AI_W_KEY = 'ss_ai_width';
-  var AI_H_KEY = 'ss_ai_height';
+  var W_MIN = 280;
+  var W_MAX = 800;
+  var H_MIN = 240;
+  var SIZE_KEY = 'ss_ai_panel_size';
+  var POS_KEY = 'ss_ai_panel_pos';
 
-  // Restore saved dimensions
-  var savedW = parseInt(localStorage.getItem(AI_W_KEY), 10);
-  if (savedW && savedW >= AI_W_MIN && savedW <= AI_W_MAX) {
-    document.documentElement.style.setProperty('--ai-w', savedW + 'px');
+  function persistSize(w, h) {
+    try {
+      var prev = {};
+      try {
+        prev = JSON.parse(localStorage.getItem(SIZE_KEY) || '{}') || {};
+      } catch (e) {}
+      prev.w = w;
+      prev.h = h;
+      localStorage.setItem(SIZE_KEY, JSON.stringify(prev));
+    } catch (e) {
+      /* ignore — private mode etc. */
+    }
   }
-  var savedH = parseInt(localStorage.getItem(AI_H_KEY), 10);
-  if (savedH && savedH >= AI_H_MIN) {
-    // Clamp to parent height at restore time. If parent isn't measurable yet
-    // (still booting), trust the saved value — CSS will cap it visually.
-    var parentH = (panel.parentElement && panel.parentElement.clientHeight) || 0;
-    var clampedH = parentH > 0 ? Math.min(savedH, parentH) : savedH;
-    document.documentElement.style.setProperty('--ai-h', clampedH + 'px');
+  function persistPos(left, top) {
+    try {
+      localStorage.setItem(POS_KEY, JSON.stringify({ left: left, top: top }));
+    } catch (e) {
+      /* ignore */
+    }
   }
 
-  // Shared drag bootstrap. axis: 'x' | 'y' | 'xy'. cursor: drag-cursor style.
   function startDrag(e, handle, axis, cursor) {
     e.preventDefault();
     var startX = e.clientX;
@@ -791,41 +806,47 @@ function _captureSnipRegion(x1, y1, x2, y2) {
     var rect = panel.getBoundingClientRect();
     var startW = rect.width;
     var startH = rect.height;
-    var parentH = (panel.parentElement && panel.parentElement.clientHeight) || startH;
+    var startLeft = rect.left;
+    var startTop = rect.top;
+    // Edges we keep anchored while dragging the opposite edge:
+    var rightAnchor = startLeft + startW;
+    var bottomAnchor = startTop + startH;
+    var H_MAX = Math.max(H_MIN, window.innerHeight - 16);
+
     handle.classList.add('dragging');
     document.body.style.cursor = cursor;
     document.body.style.userSelect = 'none';
 
     function onMove(ev) {
       if (axis === 'x' || axis === 'xy') {
-        // Dragging the LEFT edge leftward (decreasing clientX) widens the panel.
+        // LEFT edge: dragging leftward (clientX decreases) -> wider.
         var deltaX = startX - ev.clientX;
-        var newW = Math.min(AI_W_MAX, Math.max(AI_W_MIN, startW + deltaX));
-        document.documentElement.style.setProperty('--ai-w', newW + 'px');
+        var newW = Math.min(W_MAX, Math.max(W_MIN, startW + deltaX));
+        panel.style.width = newW + 'px';
+        // Keep the right edge fixed.
+        panel.style.left = rightAnchor - newW + 'px';
       }
       if (axis === 'y' || axis === 'xy') {
-        // Dragging the TOP edge upward (decreasing clientY) makes panel taller.
+        // TOP edge: dragging upward (clientY decreases) -> taller.
         var deltaY = startY - ev.clientY;
-        var newH = Math.min(parentH, Math.max(AI_H_MIN, startH + deltaY));
-        document.documentElement.style.setProperty('--ai-h', newH + 'px');
+        var newH = Math.min(H_MAX, Math.max(H_MIN, startH + deltaY));
+        panel.style.height = newH + 'px';
+        // Keep the bottom edge fixed.
+        panel.style.top = bottomAnchor - newH + 'px';
       }
     }
+
     function onUp() {
       handle.classList.remove('dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      var css = getComputedStyle(document.documentElement);
-      if (axis === 'x' || axis === 'xy') {
-        var finalW = parseInt(css.getPropertyValue('--ai-w'), 10);
-        if (finalW) localStorage.setItem(AI_W_KEY, finalW);
-      }
-      if (axis === 'y' || axis === 'xy') {
-        var finalH = parseInt(css.getPropertyValue('--ai-h'), 10);
-        if (finalH) localStorage.setItem(AI_H_KEY, finalH);
-      }
+      var r = panel.getBoundingClientRect();
+      persistSize(Math.round(r.width), Math.round(r.height));
+      persistPos(Math.round(r.left), Math.round(r.top));
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     }
+
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }

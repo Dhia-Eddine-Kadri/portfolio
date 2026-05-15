@@ -2900,13 +2900,8 @@ body.night .sb-acc-chev-btn {
 #aiPanel {
   position: absolute;
   right: 0;
-  /* Anchored to the bottom-right corner. Height defaults to 100% (full
-     shell) so existing behavior is unchanged; user can shrink it from
-     the top edge / corner via #aiResizeHandleTop / #aiResizeHandleCorner.
-     Using bottom + height (instead of top:0 + bottom:0) lets the panel
-     be shorter than the viewport without breaking flex layout inside. */
+  top: 0;
   bottom: 0;
-  height: var(--ai-h, 100%);
   width: 0;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(24px);
@@ -5238,12 +5233,15 @@ body:not(.night) #portal {
   border-radius: 20px;
   /* Kill the old width-slide transition — width is now set inline */
   transition: opacity 0.22s ease, transform 0.22s ease !important;
-  /* Kill old absolute sizing that would override fixed */
-  width: auto !important;
-  height: auto !important;
-  max-height: 80vh;
+  /* Soft defaults that ai-bubble.js / the resize handles override inline.
+     Previously these were `!important` to kill the old absolute-positioned
+     sizing — but `!important` also broke the resize handles, since inline
+     styles can't beat `!important`. The inline `width`/`height` from
+     ai-bubble.js and the resize logic in ai.js win without it. */
+  width: auto;
+  height: auto;
   min-width: 280px;
-  min-height: 360px;
+  min-height: 240px;
 }
 #portal #aiPanel.visible {
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);

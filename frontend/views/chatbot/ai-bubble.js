@@ -67,9 +67,12 @@
     panel.style.borderRadius = '20px';
     panel.style.overflow   = 'hidden';
 
-    // Width: restore saved or default
+    // Width + height: restore saved or default. (Height is optional — set by
+    // the resize handles in ai.js; if unsaved the panel falls back to its
+    // content height.)
     var savedSize = getSavedPanelSize();
     panel.style.width = savedSize.w + 'px';
+    if (savedSize.h) panel.style.height = savedSize.h + 'px';
   }
 
   // ── Panel open/close ───────────────────────────────────────────────────────
