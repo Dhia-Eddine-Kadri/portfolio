@@ -12,6 +12,7 @@ import { initOnboarding } from './features/auth/onboarding.js';
 import { initStudyLounge } from './features/study-lounge/lounge.js';
 import { initMusicServices } from './features/music/music-services.js';
 import { initStudyTimer } from './features/study-timer/study-timer.js';
+import { initWritingCoach } from './features/writing-coach/writing-coach.js';
 
 window.addEventListener('error', (event: ErrorEvent) => {
   console.error('[Minallo] Unhandled error:', event.error || event.message);
@@ -41,6 +42,7 @@ initMusicServices({
   },
 });
 initStudyTimer();
+initWritingCoach();
 
 // @ts-ignore — dynamic import with cache-busting query string
 import('./app.js?v=7');

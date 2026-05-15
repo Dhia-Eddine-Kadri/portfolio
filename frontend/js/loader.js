@@ -284,6 +284,7 @@
             'views/chat/chat.css',
             'views/dashboard/dashboard.css',
             'views/practice/practice.css',
+            'views/writing-coach/writing-coach.css',
             'views/flashcards/flashcards.css',
             'views/quiz/quiz.css',
             'views/lecturenotes/lecturenotes.css',

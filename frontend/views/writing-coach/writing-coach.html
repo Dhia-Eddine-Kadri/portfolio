@@ -1,0 +1,52 @@
+<!-- Writing Coach — entry card (appended into #glHome after the skill grid) -->
+<button id="wcCard" class="wc-feature-card" type="button">
+  <div class="wc-feature-card-left">
+    <span class="wc-feature-card-icon">&#x270F;&#xFE0F;</span>
+    <div class="wc-feature-card-text">
+      <div class="wc-feature-card-title">Deutsch Schreibtrainer</div>
+      <div class="wc-feature-card-sub">German Writing Coach &middot; write a paragraph, get AI feedback adapted to your level</div>
+    </div>
+  </div>
+  <span class="wc-feature-card-badge">AI</span>
+</button>
+
+<!-- Writing Coach — detail view (sibling of #glHome inside #psec-german) -->
+<div id="wcView" style="display: none">
+  <div class="wc-view-header">
+    <button id="wcBack" class="wc-back-btn" type="button">&#x2190; Back</button>
+    <div class="wc-view-title-block">
+      <div class="wc-view-title">Deutsch Schreibtrainer</div>
+      <div class="wc-view-sub">Write a German paragraph and get AI feedback adapted to your level.</div>
+    </div>
+  </div>
+
+  <div class="wc-card-glass">
+    <div class="wc-level-row-input">
+      <label for="wcLevel" class="wc-label">Your level</label>
+      <select id="wcLevel" class="wc-select">
+        <option value="A1">A1</option>
+        <option value="A2">A2</option>
+        <option value="B1" selected>B1</option>
+        <option value="B2">B2</option>
+        <option value="C1">C1</option>
+        <option value="C2">C2</option>
+      </select>
+    </div>
+    <textarea
+      id="wcInput"
+      class="wc-textarea"
+      rows="10"
+      placeholder="Write your German paragraph here&hellip;"
+    ></textarea>
+    <div class="wc-input-actions">
+      <button id="wcAnalyze" class="wc-btn-primary" type="button" disabled>Analyze with AI</button>
+    </div>
+  </div>
+
+  <div id="wcLoading" class="wc-loading" style="display: none">
+    <div class="wc-spinner"></div>
+    <div class="wc-loading-text">Analyzing&hellip;</div>
+  </div>
+
+  <div id="wcResults" class="wc-results" style="display: none"></div>
+</div>
