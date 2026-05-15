@@ -102,7 +102,10 @@ body.nl-body ::selection {
 .nl-main {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  /* Clip horizontal overflow from off-screen floating orbs without trapping
+     vertical scroll. Using `overflow: hidden` here was the bug — it killed
+     the page's vertical scroll entirely. */
+  overflow-x: hidden;
 }
 
 a {
