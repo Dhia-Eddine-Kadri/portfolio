@@ -280,6 +280,21 @@ function mountNotesPanel(mode) {
     // Set a mode marker on the panel so CSS can hide the irrelevant tab.
     panel.classList.remove('dr-mode-notes', 'dr-mode-summary');
     panel.classList.add('dr-mode-' + mode);
+    // Mirror the active tab as a data-attribute on the panel so CSS can
+    // collapse the generation chrome (pills + Generate + preview) to just
+    // the saved-list when the Saved tab is active.
+    syncDrTab(panel, wantTab);
+    panel.querySelectorAll('.np-tab').forEach((btn) => {
+        if (btn.dataset.drBound === '1') return;
+        btn.dataset.drBound = '1';
+        btn.addEventListener('click', () => {
+            const t = btn.dataset.tab;
+            if (t) syncDrTab(panel, t);
+        });
+    });
+}
+function syncDrTab(panel, tab) {
+    panel.dataset.drTab = tab;
 }
 function restoreNotesPanel() {
     const panel = document.getElementById('pdfNotesPanel');

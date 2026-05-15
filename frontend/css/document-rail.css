@@ -364,6 +364,29 @@
   display: none !important;
 }
 
+/* Saved tab: collapse all the generation chrome (Scope/Lang/Detail/Range
+   pills, Generate action bar, preview/editor) to leave just the saved
+   list visible. The data-dr-tab attribute is set by document-rail.js
+   whenever a .np-tab button is clicked inside the hosted panel. */
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-options-row,
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-range-row,
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-action-bar,
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-editor-wrap,
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-empty {
+  display: none !important;
+}
+#pdfNotesPanel.dr-host-notes[data-dr-tab="saved"] .np-saved-list {
+  display: flex !important;
+}
+
+/* AI drawer: hide the legacy quick-action chip row (Summarise, Formulas,
+   Quiz me, Key ideas, Analogy, Flashcards) and their drawer sub-menus.
+   They eat vertical space that the user wants for the chat response. */
+#aiPanel.dr-host-ai .ai-chips,
+#aiPanel.dr-host-ai .chip-drawer {
+  display: none !important;
+}
+
 /* Decorative ambient orbs inside the drawer. */
 .dr-orb {
   position: absolute;
