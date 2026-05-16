@@ -31,6 +31,7 @@ export function initNewChatbotShell() {
     initContextTabs(newRoot);
     initContextCollapse(newRoot);
     initUploads(newRoot);
+    initFullbleed();
     renderSidebar(newRoot);
     loadActiveChatIntoCenter(newRoot);
 }
@@ -1255,6 +1256,29 @@ function initContextCollapse(root) {
         catch {
             // ignore
         }
+    }
+}
+// Toggle body.ncb-fullbleed whenever #psec-aipage is visible. Watches the
+// section's style attribute so we react to portal route changes without
+// touching the portal navigation code.
+let _ncbFullbleedBound = false;
+function initFullbleed() {
+    if (_ncbFullbleedBound)
+        return;
+    const section = document.getElementById('psec-aipage');
+    if (!section)
+        return;
+    _ncbFullbleedBound = true;
+    const apply = () => {
+        const visible = section.style.display !== 'none' && section.offsetParent !== null;
+        document.body.classList.toggle('ncb-fullbleed', visible);
+    };
+    apply();
+    try {
+        new MutationObserver(apply).observe(section, { attributes: true, attributeFilter: ['style'] });
+    }
+    catch {
+        // older browsers without MutationObserver — fullbleed just won't toggle
     }
 }
 window.initNewChatbotShell = initNewChatbotShell;

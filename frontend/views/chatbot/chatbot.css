@@ -1059,6 +1059,24 @@ body:not(.night) .aip-course-cancel {
 .ncb-root [hidden],
 .ncb-modal-overlay[hidden] { display: none !important; }
 
+/* Fullbleed mode (active when #psec-aipage is visible AND the flag is on).
+   Hides the portal topbar with the legacy "Chatbot" h1 and expands the
+   section so the new shell fills the viewport. The portal sidebar (left
+   icon column) is intentionally preserved for cross-section navigation. */
+body.ncb-fullbleed #portal .main .topbar { display: none !important; }
+body.ncb-fullbleed #portal .main .main-scroll { padding: 0 !important; }
+body.ncb-fullbleed #psec-aipage {
+  height: 100dvh !important;
+  min-height: 0 !important;
+}
+body.ncb-fullbleed .ncb-card {
+  border-radius: 0 !important;
+  border: none !important;
+}
+body.ncb-fullbleed .ncb-main {
+  padding: 0 !important;
+}
+
 
 .ncb-root {
   position: relative;
