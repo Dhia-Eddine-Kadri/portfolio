@@ -1091,16 +1091,26 @@ body.ncb-fullbleed .ncb-main {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
-  padding-left: 24px;
-  padding-right: 24px;
+  /* Inset content via padding so the textarea + button row sit in a
+     narrower visual lane, while the opaque bar still reaches both card
+     edges (sealing the bottom). max-width caps it nicely on wide screens. */
+  padding-left: 60px;
+  padding-right: 60px;
 }
 
 @media (min-width: 768px) {
   .ncb-empty[data-state="active"] .ncb-input {
     margin-left: -40px;
     margin-right: -40px;
-    padding-left: 44px;
-    padding-right: 44px;
+    padding-left: 96px;
+    padding-right: 96px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ncb-empty[data-state="active"] .ncb-input {
+    padding-left: 160px;
+    padding-right: 160px;
   }
 }
 
