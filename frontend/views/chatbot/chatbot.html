@@ -391,7 +391,17 @@
 
         <section class="ncb-center ncb-no-scrollbar">
           <div class="ncb-center-inner">
-            <div class="ncb-empty">
+            <div class="ncb-empty" data-state="empty">
+              <div class="ncb-chat-header">
+                <div class="ncb-chat-header-text">
+                  <p class="ncb-eyebrow">Current chat</p>
+                  <h2 class="ncb-chat-header-title">New chat</h2>
+                </div>
+                <span class="ncb-chat-context-pill">Course context active</span>
+              </div>
+
+              <div class="ncb-msgs"></div>
+
               <div class="ncb-empty-head">
                 <div class="ncb-greet-pill">
                   <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -407,6 +417,7 @@
               </div>
 
               <div class="ncb-input">
+                <div class="ncb-paste-row" hidden></div>
                 <textarea
                   class="ncb-input-textarea"
                   placeholder="Ask anything about your lectures, exercises, or course files... Paste screenshots with Ctrl+V."
