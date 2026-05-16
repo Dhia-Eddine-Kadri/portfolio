@@ -1067,6 +1067,17 @@ body.ncb-fullbleed .ncb-main {
    scrolling center column so the user can keep typing while they scroll
    through the conversation. The blurred background covers messages
    scrolling underneath. */
+/* In active chats, kill the scroll-container's bottom padding so the sticky
+   composer can sit flush against the bottom of the card. Otherwise the
+   composer floats 32px above the actual bottom edge and messages scroll
+   into that gap. */
+.ncb-empty[data-state="active"] {
+  padding-bottom: 0;
+}
+.ncb-card:has(.ncb-empty[data-state="active"]) .ncb-center {
+  padding-bottom: 0;
+}
+
 .ncb-empty[data-state="active"] .ncb-input {
   position: sticky;
   bottom: 0;
@@ -1075,27 +1086,28 @@ body.ncb-fullbleed .ncb-main {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
+  /* Negative side margins so the composer hits the card's left/right
+     edges; combined with bottom:0 this means no transparent strip on
+     any side for messages to peek through. */
+  margin-left: -20px;
+  margin-right: -20px;
+  border-radius: 0;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
-/* The center column scrolls; its bottom edge meets the rounded card edge.
-   Use a ::after on .ncb-empty (positioned via the sticky composer's stacking
-   context) to extend a solid strip BELOW the composer down to the card's
-   rounded bottom — otherwise the 8px gap between bottom:0 and the rounded
-   corner lets scrolling messages peek through. */
-.ncb-empty[data-state="active"] .ncb-input::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 16px;
-  background: #0b1220;
-  pointer-events: none;
+@media (min-width: 768px) {
+  .ncb-empty[data-state="active"] .ncb-input {
+    margin-left: -40px;
+    margin-right: -40px;
+    padding-left: 44px;
+    padding-right: 44px;
+  }
 }
 
-/* Tiny breathing room so the last AI reply doesn't kiss the composer. */
+/* Breathing room so the last AI reply doesn't kiss the composer. */
 .ncb-empty[data-state="active"] .ncb-msgs {
-  padding-bottom: 24px;
+  padding-bottom: 16px;
 }
 
 /* Chat header (above messages once active) */
