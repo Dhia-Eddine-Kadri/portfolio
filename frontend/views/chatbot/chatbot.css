@@ -709,7 +709,9 @@ body.ncb-fullbleed .ncb-main {
 
 .ncb-input-textarea {
   width: 100%;
-  min-height: 30px;
+  /* Matches the JS auto-resize MIN so the textarea has the same height
+     before and after the user types — no subpixel jump on first input. */
+  min-height: 36px;
   max-height: 96px;
   resize: none;
   overflow-y: auto;

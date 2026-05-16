@@ -2079,10 +2079,17 @@ function initTextareaAutoSize(root: HTMLElement): void {
   const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
   if (!ta || ta.dataset.ncbAutoSize === '1') return;
   ta.dataset.ncbAutoSize = '1';
+  // MIN must be slightly above what scrollHeight reports for a single
+  // line (one baseline + textarea padding) — otherwise the first
+  // keystroke pushes scrollHeight from N → N+1 (subpixel rounding) and
+  // the composer visibly grows by 1–2px. Clamping at 36 keeps the
+  // composer stable for one-line input.
+  const MIN = 36;
   const MAX = 96;
   const resize = (): void => {
     ta.style.height = 'auto';
-    ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';
+    const next = Math.max(MIN, Math.min(MAX, ta.scrollHeight));
+    ta.style.height = next + 'px';
     ta.style.overflowY = ta.scrollHeight > MAX ? 'auto' : 'hidden';
   };
   ta.addEventListener('input', resize);
