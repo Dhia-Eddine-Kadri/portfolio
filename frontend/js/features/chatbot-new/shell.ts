@@ -24,6 +24,9 @@ export function initNewChatbotShell(): void {
   initContextCollapse(newRoot);
   initUploads(newRoot);
   initAiTools(newRoot);
+  initClearAll(newRoot);
+  initTextareaAutoSize(newRoot);
+  initKeyboardShortcuts(newRoot);
   initFullbleed();
 
   renderSidebar(newRoot);
@@ -65,7 +68,20 @@ function bindChatItems(sidebar: HTMLElement): void {
   // Event delegation: re-renders of the list (PR-05) keep the binding alive.
   list.addEventListener('click', (ev) => {
     const target = ev.target as HTMLElement | null;
-    const item = target ? target.closest<HTMLElement>('.ncb-chat-item') : null;
+    if (!target) return;
+
+    // PR-10: three-dots → open chat-row menu instead of selecting the chat.
+    const moreBtn = target.closest<HTMLElement>('.ncb-chat-more');
+    if (moreBtn) {
+      ev.stopPropagation();
+      const ownerItem = moreBtn.closest<HTMLElement>('.ncb-chat-item');
+      const ownerId = ownerItem?.dataset.chatId;
+      const root = sidebar.closest<HTMLElement>('.ncb-root');
+      if (ownerId && root) openChatRowMenu(root, ownerId, moreBtn);
+      return;
+    }
+
+    const item = target.closest<HTMLElement>('.ncb-chat-item');
     if (!item) return;
 
     if (sidebar.dataset.collapsed === 'true') setCollapsed(sidebar, false);
@@ -75,7 +91,6 @@ function bindChatItems(sidebar: HTMLElement): void {
     if (chatId && root) {
       switchActiveChat(root, chatId);
     } else {
-      // Fallback: still mark visually active.
       selectChatItem(list, item);
     }
   });
@@ -415,6 +430,7 @@ async function streamAiReply(
       bubble.innerHTML = isAbort
         ? '<em class="ncb-bubble-aborted">Response stopped.</em>'
         : renderInlineMarkdown('❌ ' + ((err as Error)?.message || 'Request failed.'));
+      if (!isAbort) attachErrorRetry(aiRow, bubble);
     }
   } finally {
     state.controller = null;
@@ -948,6 +964,10 @@ function initImportModal(root: HTMLElement): void {
     activeFolder = null;
     searchTerm = '';
     if (searchInput) searchInput.value = '';
+
+    // PR-10: eagerly hydrate any course whose folder list is empty so the
+    // user doesn't have to "open the course first" before importing.
+    eagerlyHydrateCourses();
 
     // Build the course list each open so newly-added courses appear.
     const courses = listCourses();
@@ -1835,6 +1855,254 @@ function exportActiveChat(btn: HTMLElement): void {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   flashAck(btn, 'Exported');
+}
+
+// ============ PR-10: chat-row menu, rename, delete, pin, clear-all ============
+
+let _ncbMenuEl: HTMLElement | null = null;
+
+function ensureMenuEl(): HTMLElement {
+  if (_ncbMenuEl) return _ncbMenuEl;
+  const el = document.createElement('div');
+  el.className = 'ncb-row-menu';
+  el.hidden = true;
+  document.body.appendChild(el);
+  document.addEventListener('click', (ev) => {
+    if (!_ncbMenuEl || _ncbMenuEl.hidden) return;
+    const t = ev.target as Node | null;
+    if (t && (_ncbMenuEl === t || _ncbMenuEl.contains(t))) return;
+    closeChatRowMenu();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeChatRowMenu();
+  });
+  _ncbMenuEl = el;
+  return el;
+}
+
+function closeChatRowMenu(): void {
+  if (_ncbMenuEl) _ncbMenuEl.hidden = true;
+}
+
+function openChatRowMenu(root: HTMLElement, chatId: string, anchor: HTMLElement): void {
+  const chat = chatStore.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+  const menu = ensureMenuEl();
+  menu.innerHTML = `
+    <button type="button" class="ncb-row-menu-item" data-act="pin">${chat.pinned ? 'Unpin' : 'Pin'}</button>
+    <button type="button" class="ncb-row-menu-item" data-act="rename">Rename</button>
+    <button type="button" class="ncb-row-menu-item ncb-row-menu-item--danger" data-act="delete">Delete</button>
+  `;
+  // Position below the anchor, right-aligned to its right edge.
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = Math.round(r.bottom + 4) + 'px';
+  menu.style.left = Math.round(Math.max(8, r.right - 160)) + 'px';
+  menu.hidden = false;
+
+  menu.querySelectorAll<HTMLButtonElement>('.ncb-row-menu-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      closeChatRowMenu();
+      if (act === 'pin') togglePin(root, chatId);
+      else if (act === 'rename') beginRename(root, chatId);
+      else if (act === 'delete') deleteChat(root, chatId);
+    });
+  });
+}
+
+function togglePin(root: HTMLElement, chatId: string): void {
+  const chat = chatStore.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+  chat.pinned = !chat.pinned;
+  chat.updatedAt = Date.now();
+  saveChatStore();
+  renderSidebar(root);
+}
+
+function beginRename(root: HTMLElement, chatId: string): void {
+  const row = root.querySelector<HTMLElement>(`.ncb-chat-item[data-chat-id="${cssEscape(chatId)}"]`);
+  const titleEl = row?.querySelector<HTMLElement>('.ncb-chat-title');
+  if (!row || !titleEl) return;
+  const chat = chatStore.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = chat.title;
+  input.className = 'ncb-chat-rename-input';
+  input.setAttribute('aria-label', 'Rename chat');
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = (save: boolean): void => {
+    if (committed) return;
+    committed = true;
+    const next = input.value.trim();
+    if (save && next && next !== chat.title) {
+      chat.title = next;
+      chat.updatedAt = Date.now();
+      saveChatStore();
+      // If this is the active chat, the header title needs to sync too.
+      if (chat.id === chatStore.activeId) {
+        const hdr = root.querySelector<HTMLElement>('.ncb-chat-header-title');
+        if (hdr) hdr.textContent = next;
+      }
+    }
+    renderSidebar(root);
+  };
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); commit(false); }
+    ev.stopPropagation();
+  });
+  input.addEventListener('click', (ev) => ev.stopPropagation());
+  input.addEventListener('blur', () => commit(true));
+}
+
+function deleteChat(root: HTMLElement, chatId: string): void {
+  const chat = chatStore.chats.find((c) => c.id === chatId);
+  if (!chat) return;
+  const ok = window.confirm(`Delete "${chat.title}"? This can't be undone.`);
+  if (!ok) return;
+  const wasActive = chat.id === chatStore.activeId;
+  chatStore.chats = chatStore.chats.filter((c) => c.id !== chatId);
+  if (!chatStore.chats.length) chatStore.newChat();
+  if (wasActive) chatStore.activeId = chatStore.chats[0]!.id;
+  saveChatStore();
+  renderSidebar(root);
+  if (wasActive) loadActiveChatIntoCenter(root);
+}
+
+function cssEscape(s: string): string {
+  // CSS.escape isn't in older TS lib types; fall back to a regex.
+  const css = (window as unknown as { CSS?: { escape?: (s: string) => string } }).CSS;
+  if (css?.escape) return css.escape(s);
+  return s.replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
+}
+
+// ---- Clear-all-chats ----
+
+function initClearAll(root: HTMLElement): void {
+  const sidebar = root.querySelector<HTMLElement>('.ncb-sidebar');
+  if (!sidebar || sidebar.querySelector('.ncb-clear-all')) return;
+
+  // Inject the clear-all button just before the safe-card.
+  const safe = sidebar.querySelector<HTMLElement>('.ncb-safe-card');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ncb-clear-all';
+  btn.innerHTML = `
+    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    <span>Clear all chats</span>
+  `;
+  btn.addEventListener('click', () => {
+    const ok = window.confirm('Delete every chat in the sidebar? This can\'t be undone.');
+    if (!ok) return;
+    chatStore.chats = [];
+    const fresh = chatStore.newChat();
+    chatStore.activeId = fresh.id;
+    saveChatStore();
+    renderSidebar(root);
+    loadActiveChatIntoCenter(root);
+  });
+  if (safe) sidebar.insertBefore(btn, safe);
+  else sidebar.appendChild(btn);
+}
+
+// ---- Textarea auto-resize ----
+
+function initTextareaAutoSize(root: HTMLElement): void {
+  const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+  if (!ta || ta.dataset.ncbAutoSize === '1') return;
+  ta.dataset.ncbAutoSize = '1';
+  const MAX = 220;
+  const resize = (): void => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';
+    ta.style.overflowY = ta.scrollHeight > MAX ? 'auto' : 'hidden';
+  };
+  ta.addEventListener('input', resize);
+  // Reset on send (textarea is cleared by doSend) — observe the value change
+  // via a MutationObserver on the value-set side isn't reliable, so we hook
+  // a paste/cut/blur for good measure.
+  ta.addEventListener('blur', resize);
+  resize();
+}
+
+// ---- Error retry ----
+
+function attachErrorRetry(aiRow: HTMLElement, bubble: HTMLElement | null): void {
+  if (!bubble) return;
+  const existing = aiRow.querySelector('.ncb-retry-btn');
+  if (existing) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ncb-retry-btn';
+  btn.innerHTML = `
+    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    <span>Retry</span>
+  `;
+  btn.addEventListener('click', () => {
+    const root = aiRow.closest<HTMLElement>('.ncb-root');
+    if (!root) return;
+    const msgs = root.querySelector<HTMLElement>('.ncb-msgs');
+    const sendBtn = root.querySelector<HTMLButtonElement>('.ncb-send-btn');
+    const state = liveState;
+    if (!msgs || !sendBtn || !state || state.isSending) return;
+    aiRow.remove();
+    void streamAiReply(state, sendBtn, msgs);
+  });
+  bubble.appendChild(btn);
+}
+
+// ---- Course folder hydration ----
+
+function eagerlyHydrateCourses(): void {
+  const sems = getSems();
+  const w = window as unknown as {
+    _ufMerge?: (courseId: string) => unknown;
+    listUserFolders?: (courseId: string) => unknown;
+  };
+  const trigger = w._ufMerge || w.listUserFolders;
+  if (!trigger) return;
+  Object.values(sems).forEach((sem) => {
+    (sem.courses || []).forEach((c) => {
+      const empty = !c.userFolders || c.userFolders.length === 0;
+      if (empty && c.id) {
+        try { trigger(c.id); } catch { /* tolerate per-course failure */ }
+      }
+    });
+  });
+}
+
+// ---- Keyboard shortcuts ----
+
+function initKeyboardShortcuts(root: HTMLElement): void {
+  if (root.dataset.ncbKbBound === '1') return;
+  root.dataset.ncbKbBound = '1';
+  document.addEventListener('keydown', (ev) => {
+    if (root.hidden || root.offsetParent === null) return;
+    const meta = ev.metaKey || ev.ctrlKey;
+    if (!meta) return;
+
+    // Cmd/Ctrl+K → new chat (and focus the input)
+    if (ev.key === 'k' || ev.key === 'K') {
+      ev.preventDefault();
+      const newBtn = root.querySelector<HTMLButtonElement>('.ncb-new-chat-btn');
+      newBtn?.click();
+      const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+      ta?.focus();
+      return;
+    }
+    // Cmd/Ctrl+/ → focus the input
+    if (ev.key === '/') {
+      ev.preventDefault();
+      const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+      ta?.focus();
+    }
+  });
 }
 
 (window as unknown as { initNewChatbotShell?: () => void }).initNewChatbotShell = initNewChatbotShell;
