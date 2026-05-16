@@ -1052,6 +1052,14 @@ body:not(.night) .aip-course-cancel {
 
 /* ============ NEW CHATBOT SHELL (PR-01) ============ */
 
+/* HTML `hidden` attribute must win over our display: grid/flex rules.
+   The browser's user-agent [hidden] { display: none } gets overridden
+   otherwise (same specificity, user stylesheet wins), which leaves the
+   import modal stuck on screen after Close. */
+.ncb-root [hidden],
+.ncb-modal-overlay[hidden] { display: none !important; }
+
+
 .ncb-root {
   position: relative;
   width: 100%;
