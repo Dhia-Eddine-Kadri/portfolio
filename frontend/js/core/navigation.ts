@@ -242,6 +242,9 @@ export function showStudipResume(): boolean {
 
   clearResumeFile();
   showFilesView(typeof window._stRunning !== 'undefined' ? window._stRunning : false);
+  // Resuming a PDF lands us back on the Courses route, so reflect that in the
+  // sidebar — otherwise whichever section the user just left stays highlighted.
+  setNavActive('pcStudip');
 
   const aiBubble = document.getElementById('aiBubble');
   if (aiBubble) aiBubble.style.display = '';
@@ -280,7 +283,18 @@ export function navTo(navId: string, section: string): void {
   const fromStudip = !!(studipEl && studipEl.style.display !== 'none');
 
   if (fromFiles) stashResumeFile();
-  if (fromFiles || fromStudip) showPortal();
+  // Hide every portal-section *before* the portal fades in. Otherwise the
+  // previously-active section (typically the courses dashboard, since we're
+  // coming from the PDF view) is still display:block during the 380ms
+  // fade-in and flashes as a ghost page before showPortalSection swaps in
+  // the target section.
+  if (fromFiles || fromStudip) {
+    document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
+      el.style.display = 'none';
+    });
+    _activePortalSection = null;
+    showPortal();
+  }
   setNavActive(navId);
   if (typeof window.showPortalSection === 'function') window.showPortalSection(section);
   else showPortalSection(section);
