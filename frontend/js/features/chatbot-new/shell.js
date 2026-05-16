@@ -1969,7 +1969,8 @@ function initActionCards(root) {
     root.dataset.ncbActionsBound = '1';
     const cards = root.querySelectorAll('.ncb-action-card[data-prefill]');
     cards.forEach((card) => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (ev) => {
+            ev.preventDefault();
             const prefill = card.dataset.prefill || '';
             if (!prefill)
                 return;
@@ -1978,9 +1979,12 @@ function initActionCards(root) {
                 return;
             ta.value = prefill;
             ta.dispatchEvent(new Event('input', { bubbles: true }));
-            ta.focus();
-            const end = ta.value.length;
-            try { ta.setSelectionRange(end, end); } catch { /* old browsers */ }
+            ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            window.requestAnimationFrame(() => {
+                ta.focus();
+                const end = ta.value.length;
+                try { ta.setSelectionRange(end, end); } catch { /* old browsers */ }
+            });
         });
     });
 }

@@ -2163,16 +2163,24 @@ function initActionCards(root: HTMLElement): void {
   root.dataset.ncbActionsBound = '1';
   const cards = root.querySelectorAll<HTMLButtonElement>('.ncb-action-card[data-prefill]');
   cards.forEach((card) => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (ev) => {
+      ev.preventDefault();
       const prefill = card.dataset.prefill || '';
       if (!prefill) return;
       const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
       if (!ta) return;
       ta.value = prefill;
       ta.dispatchEvent(new Event('input', { bubbles: true })); // trigger auto-resize
-      ta.focus();
-      const end = ta.value.length;
-      try { ta.setSelectionRange(end, end); } catch { /* old browsers */ }
+      // Scroll the composer into view BEFORE focusing so the user sees the
+      // prefilled text appear — focus alone often doesn't scroll the page
+      // when the composer is far above the cards.
+      ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Focus on next frame so the smooth scroll has a chance to start.
+      window.requestAnimationFrame(() => {
+        ta.focus();
+        const end = ta.value.length;
+        try { ta.setSelectionRange(end, end); } catch { /* old browsers */ }
+      });
     });
   });
 }
