@@ -12,6 +12,7 @@ import { initStudyLounge } from './features/study-lounge/lounge.js';
 import { initMusicServices } from './features/music/music-services.js';
 import { initStudyTimer } from './features/study-timer/study-timer.js';
 import { initDocumentRail } from './features/document-rail/document-rail.js';
+import './features/chatbot-new/shell.js';
 window.addEventListener('error', (event) => {
     console.error('[Minallo] Unhandled error:', event.error || event.message);
 });

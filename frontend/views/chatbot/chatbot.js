@@ -31,6 +31,7 @@
     .then(function (html) {
       container.innerHTML = html;
       _init();
+      if (typeof window.initNewChatbotShell === 'function') window.initNewChatbotShell();
     })
     .catch(function (err) {
       console.error('chatbot.html load failed:', err);
