@@ -686,22 +686,28 @@ body.ncb-fullbleed .ncb-main {
   color: #94a3b8;
 }
 
-/* Real input (replaces placeholder) — compact, premium, glassy. */
+/* Real input (replaces placeholder) — compact, premium, glassy.
+   Target total height ~84px (textarea ~34 + bottom row ~36 + gaps/padding).
+   Grows only when the textarea wraps to multiple lines. */
 
 .ncb-input {
-  padding: 14px 16px;
-  /* Stronger glass tone so the composer reads as one polished surface. */
-  background: rgba(9, 18, 38, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 84px;
+  max-height: 190px;
+  padding: 12px 14px 12px 16px;
+  background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.18);
   box-shadow:
-    0 18px 45px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 18px 45px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .ncb-input-textarea {
   width: 100%;
-  min-height: 56px;
-  max-height: 160px;
+  min-height: 34px;
+  max-height: 110px;
   resize: none;
   overflow-y: auto;
   background: transparent;
@@ -709,9 +715,9 @@ body.ncb-fullbleed .ncb-main {
   outline: none;
   color: #e5edff;
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 1.45;
   font-family: inherit;
-  padding: 14px 18px;
+  padding: 6px 8px;
   box-sizing: border-box;
 }
 .ncb-input-textarea::placeholder {
@@ -723,9 +729,9 @@ body.ncb-fullbleed .ncb-main {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
-  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  margin-top: 0;
 }
 
 .ncb-input-actions {
@@ -741,11 +747,11 @@ body.ncb-fullbleed .ncb-main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(30, 41, 59, 0.72);
+  background: rgba(30, 41, 59, 0.68);
   color: #e5edff;
   font-size: 0.875rem;
   font-weight: 650;
@@ -755,7 +761,7 @@ body.ncb-fullbleed .ncb-main {
 }
 .ncb-input-action-btn:hover {
   background: rgba(51, 65, 85, 0.82);
-  border-color: rgba(96, 165, 250, 0.40);
+  border-color: rgba(96, 165, 250, 0.42);
   color: #ffffff;
 }
 
@@ -772,20 +778,36 @@ body.ncb-fullbleed .ncb-main {
 .ncb-send-btn {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
   flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid rgba(147, 197, 253, 0.35);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.85));
+  border: 1px solid rgba(147, 197, 253, 0.36);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.98), rgba(37, 99, 235, 0.86));
   color: #ffffff;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(37, 99, 235, 0.28);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .ncb-send-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.36);
+}
+.ncb-send-btn svg {
+  width: 20px;
+  height: 20px;
+}
+/* While AI is streaming, the same arrow icon stays — the button becomes
+   the "stop" affordance via color shift only (darker + ring). Clicking
+   still aborts the stream. Keeps the glyph from ever looking broken. */
+.ncb-send-btn.ncb-send-btn--pause {
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.95), rgba(51, 65, 85, 0.88));
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18), 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.ncb-send-btn.ncb-send-btn--pause:hover {
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.88));
 }
 
 /* Context panel internals */
@@ -1118,6 +1140,9 @@ body.ncb-fullbleed .ncb-main {
    edge across the card so there is no transparent strip on any side for
    scrolling messages to peek through. Only the TOP corners are rounded
    (the bottom meets the card's bottom edge cleanly). */
+/* Active-chat composer: pinned to the bottom of the chat column. The
+   base .ncb-input rules already make it compact + glassy — here we
+   just anchor it and inset its content to a comfortable lane. */
 .ncb-empty[data-state="active"] .ncb-input {
   position: sticky;
   bottom: 0;
@@ -1125,16 +1150,14 @@ body.ncb-fullbleed .ncb-main {
   margin-left: -20px;
   margin-right: -20px;
   border-radius: 1.25rem 1.25rem 0 0;
-  background: rgba(9, 18, 38, 0.92);
+  background: rgba(8, 15, 34, 0.92);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
-  padding: 10px 20px 12px;
+  box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.55);
 }
 
-/* Center the textarea + button row inside the opaque bar with a soft
-   max-width so the composer looks like a tidy "card on a bar" instead
-   of stretching edge to edge. */
+/* Center inner content with a soft max-width so the composer reads as
+   a tidy lane on the opaque bar, not an edge-to-edge strip. */
 .ncb-empty[data-state="active"] .ncb-input-textarea,
 .ncb-empty[data-state="active"] .ncb-attach-row,
 .ncb-empty[data-state="active"] .ncb-files-row,
@@ -1145,23 +1168,10 @@ body.ncb-fullbleed .ncb-main {
   margin-right: auto;
 }
 
-/* Compact textarea in active state — premium chat input, not document editor. */
-.ncb-empty[data-state="active"] .ncb-input-textarea {
-  min-height: 48px;
-  max-height: 140px;
-  padding: 12px 16px;
-}
-
-.ncb-empty[data-state="active"] .ncb-input-bottom {
-  padding-top: 8px;
-  margin-top: 2px;
-}
-
 @media (min-width: 768px) {
   .ncb-empty[data-state="active"] .ncb-input {
     margin-left: -40px;
     margin-right: -40px;
-    padding: 14px 40px 16px;
   }
 }
 

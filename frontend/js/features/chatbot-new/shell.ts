@@ -545,18 +545,18 @@ function typeIntoBubble(
 }
 
 function setSendBtnMode(btn: HTMLButtonElement, mode: 'send' | 'pause'): void {
+  // Keep the arrow-up glyph in both modes so the button always reads as
+  // "send". The mode flip only swaps the class (color + ring) and the
+  // aria-label / click handler — preserves stop-generation without
+  // making the button look broken mid-stream.
+  btn.innerHTML =
+    '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
   if (mode === 'pause') {
     btn.classList.add('ncb-send-btn--pause');
     btn.setAttribute('aria-label', 'Stop AI response');
-    // Solid square = "stop generating" — clearly distinct from the
-    // upward-arrow send glyph so users never confuse them.
-    btn.innerHTML =
-      '<svg class="ncb-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   } else {
     btn.classList.remove('ncb-send-btn--pause');
     btn.setAttribute('aria-label', 'Send message');
-    btn.innerHTML =
-      '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
   }
 }
 
@@ -2073,7 +2073,7 @@ function initTextareaAutoSize(root: HTMLElement): void {
   const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
   if (!ta || ta.dataset.ncbAutoSize === '1') return;
   ta.dataset.ncbAutoSize = '1';
-  const MAX = 160;
+  const MAX = 110;
   const resize = (): void => {
     ta.style.height = 'auto';
     ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';
