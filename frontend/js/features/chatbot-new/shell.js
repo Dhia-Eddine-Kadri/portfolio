@@ -21,6 +21,8 @@ export function initNewChatbotShell() {
     newRoot.style.display = '';
     initSidebar(newRoot);
     initConversation(newRoot);
+    initImportModal(newRoot);
+    initContextTabs(newRoot);
 }
 // PR-02 — sidebar behavior. Idempotent: each binding tags the node with
 // data-ncb-bound so we don't double-bind across repeat init calls.
@@ -347,6 +349,14 @@ async function doSend(state, stage, textarea, sendBtn, pasteRow, msgs) {
                 : 'No response.';
         state.messages.push({ role: 'assistant', text: raw });
         await typeIntoBubble(bubble, raw, () => controller.signal.aborted);
+        appendBubbleActions(aiRow, raw);
+        // After the first AI reply, ask the model for a 4-6 word title.
+        if (state.messages.filter((m) => m.role === 'assistant').length === 1) {
+            void generateChatTitle(state).then((title) => {
+                if (title)
+                    updateChatTitle(title);
+            });
+        }
     }
     catch (err) {
         if (bubble) {
@@ -528,6 +538,256 @@ function renderInlineMarkdown(raw) {
         .map((p) => '<p>' + p.replace(/\n/g, '<br/>') + '</p>')
         .join('');
     return paragraphs;
+}
+// ============ PR-04: AI bubble actions, import modal, context tabs, title gen ============
+function appendBubbleActions(aiRow, raw) {
+    if (aiRow.querySelector('.ncb-bubble-actions'))
+        return;
+    const bubble = aiRow.querySelector('.ncb-bubble--ai');
+    if (!bubble)
+        return;
+    const bar = document.createElement('div');
+    bar.className = 'ncb-bubble-actions';
+    bar.innerHTML = `
+    <button type="button" class="ncb-bubble-action" data-action="copy" title="Copy">
+      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      <span>Copy</span>
+    </button>
+    <button type="button" class="ncb-bubble-action" data-action="regen" title="Regenerate">
+      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      <span>Regenerate</span>
+    </button>
+    <button type="button" class="ncb-bubble-action" data-action="save" title="Save to notes">
+      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M16 2v20"/></svg>
+      <span>Save to notes</span>
+    </button>
+    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-up" aria-label="Thumbs up">
+      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7"/></svg>
+    </button>
+    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-down" aria-label="Thumbs down">
+      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17"/></svg>
+    </button>
+  `;
+    bubble.appendChild(bar);
+    bar.addEventListener('click', (ev) => {
+        const target = ev.target?.closest('.ncb-bubble-action');
+        if (!target)
+            return;
+        const action = target.dataset.action;
+        if (action === 'copy')
+            copyToClipboard(raw, target);
+        else if (action === 'regen')
+            regenerateLast(aiRow);
+        else if (action === 'save')
+            flashAck(target, 'Saved');
+        else if (action === 'thumb-up' || action === 'thumb-down') {
+            target.classList.add('ncb-bubble-action--picked');
+        }
+    });
+}
+function copyToClipboard(text, btn) {
+    try {
+        void navigator.clipboard.writeText(text).then(() => flashAck(btn, 'Copied'));
+    }
+    catch {
+        // older browsers — fall through quietly
+    }
+}
+function regenerateLast(aiRow) {
+    // PR-04 stub: surface a hint. Full re-send (drop last assistant, re-call /api/ai)
+    // is deferred until chat-history persistence lands.
+    const btn = aiRow.querySelector('[data-action="regen"]');
+    if (btn)
+        flashAck(btn, 'Coming soon');
+}
+function flashAck(btn, msg) {
+    const label = btn.querySelector('span');
+    if (!label) {
+        btn.classList.add('ncb-bubble-action--ack');
+        window.setTimeout(() => btn.classList.remove('ncb-bubble-action--ack'), 1200);
+        return;
+    }
+    const prev = label.textContent;
+    label.textContent = msg;
+    btn.classList.add('ncb-bubble-action--ack');
+    window.setTimeout(() => {
+        label.textContent = prev;
+        btn.classList.remove('ncb-bubble-action--ack');
+    }, 1200);
+}
+function initImportModal(root) {
+    const trigger = root.querySelector('.ncb-import-btn');
+    const overlay = document.getElementById('ncbImportModal');
+    if (!trigger || !overlay || trigger.dataset.ncbBound === '1')
+        return;
+    trigger.dataset.ncbBound = '1';
+    const closeBtn = overlay.querySelector('.ncb-modal-close');
+    const cancelBtn = overlay.querySelector('.ncb-modal-cancel');
+    const importBtn = overlay.querySelector('.ncb-modal-import');
+    const folderRows = Array.from(overlay.querySelectorAll('.ncb-folder-row'));
+    const countEl = overlay.querySelector('.ncb-modal-count-num');
+    const countLabel = overlay.querySelector('.ncb-modal-count');
+    const sync = () => {
+        const picked = folderRows.filter((r) => r.classList.contains('ncb-folder-row--selected'));
+        if (countEl)
+            countEl.textContent = String(picked.length);
+        if (countLabel) {
+            const word = picked.length === 1 ? 'folder' : 'folders';
+            countLabel.innerHTML = `<span class="ncb-modal-count-num">${picked.length}</span> ${word} selected`;
+        }
+        if (importBtn)
+            importBtn.disabled = picked.length === 0;
+    };
+    folderRows.forEach((row) => {
+        row.addEventListener('click', () => {
+            row.classList.toggle('ncb-folder-row--selected');
+            const chev = row.querySelector('.ncb-folder-pick-chev');
+            const check = row.querySelector('.ncb-folder-pick-check');
+            const selected = row.classList.contains('ncb-folder-row--selected');
+            if (chev)
+                chev.hidden = selected;
+            if (check)
+                check.hidden = !selected;
+            sync();
+        });
+    });
+    const open = () => {
+        overlay.hidden = false;
+        overlay.setAttribute('aria-hidden', 'false');
+        sync();
+    };
+    const close = () => {
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+    };
+    trigger.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    cancelBtn?.addEventListener('click', close);
+    overlay.addEventListener('click', (ev) => {
+        if (ev.target === overlay)
+            close();
+    });
+    document.addEventListener('keydown', (ev) => {
+        if (!overlay.hidden && ev.key === 'Escape')
+            close();
+    });
+    importBtn?.addEventListener('click', () => {
+        const picked = folderRows
+            .filter((r) => r.classList.contains('ncb-folder-row--selected'))
+            .map((r) => ({
+            id: r.dataset.folderId || '',
+            name: r.dataset.folderName || 'Folder',
+            count: r.querySelector('.ncb-folder-count')?.textContent || '',
+        }));
+        if (!picked.length)
+            return;
+        attachImportedFolders(root, picked);
+        close();
+    });
+    sync();
+}
+function attachImportedFolders(root, folders) {
+    const row = root.querySelector('.ncb-attach-row');
+    if (!row)
+        return;
+    const existing = new Set(Array.from(row.querySelectorAll('.ncb-attach-chip')).map((el) => el.dataset.id || ''));
+    folders.forEach((f) => {
+        if (existing.has(f.id))
+            return;
+        const chip = document.createElement('span');
+        chip.className = 'ncb-attach-chip';
+        chip.dataset.id = f.id;
+        chip.innerHTML = `
+      <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>
+      <span class="ncb-attach-chip-name">${escapeHtml(f.name)}</span>
+      <span class="ncb-attach-chip-meta">${escapeHtml(f.count)}</span>
+      <button type="button" class="ncb-attach-chip-x" aria-label="Remove ${escapeAttr(f.name)}">
+        <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    `;
+        chip.querySelector('.ncb-attach-chip-x')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            chip.remove();
+            if (!row.querySelector('.ncb-attach-chip'))
+                row.hidden = true;
+        });
+        row.appendChild(chip);
+    });
+    if (row.querySelector('.ncb-attach-chip'))
+        row.hidden = false;
+}
+// ---- Context-panel tabs ----
+function initContextTabs(root) {
+    const tabs = Array.from(root.querySelectorAll('.ncb-mini-tab'));
+    if (!tabs.length || tabs[0]?.dataset.ncbBound === '1')
+        return;
+    tabs.forEach((tab, idx) => {
+        tab.dataset.ncbBound = '1';
+        tab.dataset.tabIdx = String(idx);
+        tab.addEventListener('click', () => {
+            tabs.forEach((t) => t.classList.remove('ncb-mini-tab--active'));
+            tab.classList.add('ncb-mini-tab--active');
+            // PR-04: visual only. Real Files/Notes content arrives in a later PR;
+            // for now we re-purpose the existing "Sources used" card as the always-on
+            // body and only switch the active-tab highlight + a subtle label.
+            const label = tab.querySelector('span')?.textContent || '';
+            const card = root.querySelector('.ncb-context-card .ncb-context-card-title');
+            if (card && label)
+                card.textContent = label === 'Sources' ? 'Sources used' : label;
+        });
+    });
+}
+// ---- Chat title generation ----
+async function generateChatTitle(state) {
+    const lastUser = [...state.messages].reverse().find((m) => m.role === 'user');
+    const lastAi = [...state.messages].reverse().find((m) => m.role === 'assistant');
+    if (!lastUser && !lastAi)
+        return null;
+    const seed = (lastUser?.text || '') +
+        (lastUser?.images?.length ? ' [' + lastUser.images.length + ' image(s)]' : '') +
+        '\n\n' +
+        (lastAi?.text || '').slice(0, 400);
+    try {
+        const resp = await fetch('/api/ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + (getSbToken() || ''),
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                max_tokens: 30,
+                system: 'You title chat conversations. Reply with ONLY a 3-6 word title in Title Case. ' +
+                    'No quotes, no punctuation at the end, no preamble. Match the language of the user.',
+                messages: [{ role: 'user', content: seed }],
+            }),
+        });
+        if (!resp.ok)
+            return null;
+        const data = (await resp.json());
+        const title = (data.content || [])
+            .map((b) => b.text || '')
+            .join('')
+            .trim()
+            .replace(/^["'`]+|["'`.!?]+$/g, '');
+        return title || null;
+    }
+    catch {
+        return null;
+    }
+}
+function updateChatTitle(title) {
+    const headerTitle = document.querySelector('.ncb-chat-header-title');
+    if (headerTitle)
+        headerTitle.textContent = title;
+    // Sync the active sidebar row (likely the draft "New chat" added in PR-02,
+    // or whichever row is currently marked active).
+    const activeRow = document.querySelector('.ncb-chat-item--active .ncb-chat-title');
+    if (activeRow)
+        activeRow.textContent = title;
+    const activeRowMeta = document.querySelector('.ncb-chat-item--active .ncb-chat-meta');
+    if (activeRowMeta)
+        activeRowMeta.textContent = 'Generated from chat context · Just now';
 }
 window.initNewChatbotShell = initNewChatbotShell;
 //# sourceMappingURL=shell.js.map
