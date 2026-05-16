@@ -1889,7 +1889,7 @@ function initTextareaAutoSize(root) {
     if (!ta || ta.dataset.ncbAutoSize === '1')
         return;
     ta.dataset.ncbAutoSize = '1';
-    const MAX = 110;
+    const MAX = 96;
     const resize = () => {
         ta.style.height = 'auto';
         ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';

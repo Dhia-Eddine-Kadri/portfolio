@@ -2073,7 +2073,7 @@ function initTextareaAutoSize(root: HTMLElement): void {
   const ta = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
   if (!ta || ta.dataset.ncbAutoSize === '1') return;
   ta.dataset.ncbAutoSize = '1';
-  const MAX = 110;
+  const MAX = 96;
   const resize = (): void => {
     ta.style.height = 'auto';
     ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';
