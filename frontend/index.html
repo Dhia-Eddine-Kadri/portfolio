@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Minallo - AI Study Assistant for Students</title>
-  <meta name="description" content="Minallo helps students study smarter with AI notes, summaries, PDFs, flashcards, Pomodoro, and course-based learning.">
+  <meta name="description" content="Minallo is an AI study assistant for students with AI notes, summaries, PDF tools, Pomodoro, flashcards, and course-based learning.">
   <link rel="canonical" href="https://minallo.de/">
 
   <!-- Open Graph (Facebook, LinkedIn, Slack, Discord previews) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Minallo">
   <meta property="og:title" content="Minallo - AI Study Assistant for Students">
-  <meta property="og:description" content="Minallo helps students study smarter with AI notes, summaries, PDFs, flashcards, Pomodoro, and course-based learning.">
+  <meta property="og:description" content="Minallo is an AI study assistant for students with AI notes, summaries, PDF tools, Pomodoro, flashcards, and course-based learning.">
   <meta property="og:url" content="https://minallo.de/">
   <meta property="og:image" content="https://minallo.de/assets/hero.png">
   <meta property="og:locale" content="en_US">
@@ -20,7 +20,7 @@
   <!-- Twitter / X card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Minallo - AI Study Assistant for Students">
-  <meta name="twitter:description" content="Minallo helps students study smarter with AI notes, summaries, PDFs, flashcards, Pomodoro, and course-based learning.">
+  <meta name="twitter:description" content="Minallo is an AI study assistant for students with AI notes, summaries, PDF tools, Pomodoro, flashcards, and course-based learning.">
   <meta name="twitter:image" content="https://minallo.de/assets/hero.png">
 
   <!-- Structured data: tells Google this site is the Minallo AI study product,
@@ -33,6 +33,16 @@
     "alternateName": "Minallo AI",
     "url": "https://minallo.de/",
     "description": "AI study assistant for students. AI notes, summaries, PDFs, flashcards, Pomodoro, course-based learning."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Minallo",
+    "url": "https://minallo.de/",
+    "logo": "https://minallo.de/assets/favicon.png",
+    "description": "Minallo is an AI study assistant for students with AI notes, summaries, PDF tools, Pomodoro, flashcards, and course-based learning."
   }
   </script>
   <script type="application/ld+json">
@@ -77,8 +87,22 @@
       </div>
     </div>
 
-    <!-- SECTIONS ARE INJECTED HERE BY loader.js -->
-    <div id="ss-sections-root"></div>
+    <!-- SECTIONS ARE INJECTED HERE BY loader.js.
+         The static SEO hero below ships in the raw HTML so Googlebot
+         (and crawlers that don't execute JS) can read the H1, the
+         product description, and the "Minallo AI Study Assistant"
+         phrasing without waiting for the SPA to hydrate. loader.js
+         replaces this block with the rendered landing/app sections. -->
+    <div id="ss-sections-root">
+      <main class="ss-seo-hero" role="main" style="max-width:780px;margin:48px auto;padding:24px;color:#e2e8f0;font-family:Nunito,system-ui,sans-serif;text-align:center;">
+        <h1 style="font-size:2.25rem;font-weight:800;line-height:1.15;margin:0 0 16px;color:#fff;">Minallo - AI Study Assistant for Students</h1>
+        <p style="font-size:1.05rem;line-height:1.6;margin:0;color:#cbd5e1;">
+          Minallo is an AI study assistant for students. It helps you summarize
+          lecture notes, organize study materials, edit PDFs, create notes, use
+          Pomodoro study sessions, and learn from your course documents with AI.
+        </p>
+      </main>
+    </div>
 
     <script src="js/minallo.js?v=2"></script>
     <script src="js/config.js?v=1"></script>
