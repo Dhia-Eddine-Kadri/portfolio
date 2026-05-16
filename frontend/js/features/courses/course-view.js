@@ -135,7 +135,8 @@ export function openCourse(course) {
     window.activeCourseId = course.id;
     window.activeFileName = null;
     // Top-level switch first — clears portal-section orphans and studip view.
-    // The course overview lives inside #app (the file-view container).
+    // The course overview lives inside #app (the file-view container), so we want
+    // the 'file' top-level.
     selectTopLevelView('file');
     panelHide(document.getElementById('welcomeState'));
     panelHide(document.getElementById('pdfView'));
@@ -150,11 +151,15 @@ export function openCourse(course) {
         crumb.appendChild(b);
     }
     const ufCacheKey = 'ss_uf_cache_' + course.id;
-    // Track whether a cache *entry* exists (vs. has files). An empty cache from
-    // a prior successful list is authoritative — skip the full spinner for it.
+    // Track whether a cache *entry* exists (vs. has files). An empty cache from a
+    // prior successful list is authoritative — skip the full spinner for it.
     const hadCacheEntry = (() => {
-        try { return localStorage.getItem(ufCacheKey) != null; }
-        catch { return false; }
+        try {
+            return localStorage.getItem(ufCacheKey) != null;
+        }
+        catch {
+            return false;
+        }
     })();
     try {
         const cached = JSON.parse(localStorage.getItem(ufCacheKey) || 'null');
@@ -203,24 +208,29 @@ export function openCourse(course) {
     if (typeof window.renderCourses === 'function')
         window.renderCourses();
     const myCourseSeq = ++window._courseOpenSeq;
-    // Render root-level files the moment they arrive — folder listings keep
+    // Render the root-level files the moment they arrive — folder listings keep
     // running in the background. Without this, the spinner persists until the
-    // slowest folder list returns.
+    // slowest folder list returns (often seconds longer than necessary).
     const onRootDone = (ev) => {
         const detail = ev.detail;
-        if (!detail || detail.courseId !== course.id) return;
-        if (myCourseSeq !== window._courseOpenSeq) return;
+        if (!detail || detail.courseId !== course.id)
+            return;
+        if (myCourseSeq !== window._courseOpenSeq)
+            return;
         course._filesLoading = false;
-        // Keep _filesRefreshing true — folders still loading. Toolbar pill stays.
+        // Keep _filesRefreshing true — folders are still loading. Toolbar pill stays.
         window._ssRestoring = true;
         showCourseSection(course, 'files');
         window._ssRestoring = false;
     };
     window.addEventListener('uf-merge-root-done', onRootDone);
-    // 10-second timeout fallback — don't leave the user on a spinner forever.
+    // 10-second timeout fallback — if _ufMerge hangs entirely (auth race / network
+    // dead), don't leave the user staring at the spinner forever.
     const fallbackTimer = window.setTimeout(() => {
-        if (myCourseSeq !== window._courseOpenSeq) return;
-        if (!course._filesLoading) return;
+        if (myCourseSeq !== window._courseOpenSeq)
+            return;
+        if (!course._filesLoading)
+            return; // already cleared
         course._filesLoading = false;
         course._filesRefreshing = false;
         window._ssRestoring = true;

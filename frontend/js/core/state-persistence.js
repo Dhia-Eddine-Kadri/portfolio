@@ -11,22 +11,31 @@ export function initStatePersistence(options) {
     let _stateRestored = false;
     function saveState() {
         try {
-            // Read from the actually-visible view, not ss_portal_tab. The tab
-            // can be stale (e.g. user used the chatbot, then opened a file via
-            // a path that didn't update the tab) and the old behavior here was
-            // to *delete* ss_state when the stale tab said "I'm on a portal-only
-            // section" — wiping the user's location.
+            // Read from the actually-visible view, not from ss_portal_tab. The tab
+            // can be stale (e.g. user used the chatbot, then opened a file via a
+            // path that didn't update the tab) and the old behavior here was to
+            // *delete* ss_state when the stale tab said "I'm on a portal-only
+            // section" — which wiped the user's course/file location and made
+            // refresh land on dashboard.
+            //
+            // The portal `data-active-view` attribute is set by selectTopLevelView()
+            // and is the truth. Fall back to DOM inspection for cases where the
+            // attribute hasn't been set yet (early boot).
             const portalEl = document.getElementById('portal');
             let activeView = portalEl ? portalEl.dataset.activeView || null : null;
             if (!activeView) {
                 const appEl = document.getElementById('app');
-                if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
-                else activeView = 'portal';
+                if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '')
+                    activeView = 'file';
+                else
+                    activeView = 'portal';
             }
-            // Only persist when the user is in file view. Portal sections
-            // (notes, editor, chatbot, studip listing, etc.) are tracked
-            // entirely via ss_portal_tab.
-            if (activeView !== 'file') return;
+            // Only persist when the user is in file view (course overview or PDF).
+            // Pure portal sections (notes, editor, chatbot, studip listing, etc.) are
+            // tracked entirely via ss_portal_tab and don't need ss_state.
+            if (activeView !== 'file')
+                return;
+            // activeView === 'file' — courseOverview or pdfView under #app.
             const st = {
                 semId: options.getActiveSemId(),
                 courseId: options.getActiveCourseId() || undefined,
