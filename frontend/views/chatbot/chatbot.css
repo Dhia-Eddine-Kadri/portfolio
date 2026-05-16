@@ -311,9 +311,9 @@ body.ncb-fullbleed .ncb-main {
 
 .ncb-input {
   margin-top: 8px;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   animation: ncb-fade-up 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -321,7 +321,7 @@ body.ncb-fullbleed .ncb-main {
 }
 
 .ncb-input.ncb-input--placeholder {
-  min-height: 152px;
+  min-height: 120px;
 }
 
 /* Quick-action grid */
@@ -659,12 +659,12 @@ body.ncb-fullbleed .ncb-main {
 /* Real input (replaces placeholder) */
 
 .ncb-input {
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .ncb-input-textarea {
   width: 100%;
-  min-height: 88px;
+  min-height: 56px;
   resize: none;
   background: transparent;
   border: none;
@@ -702,9 +702,9 @@ body.ncb-fullbleed .ncb-main {
 .ncb-input-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 16px;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.065);
@@ -1071,7 +1071,7 @@ body.ncb-fullbleed .ncb-main {
   position: sticky;
   bottom: 8px;
   z-index: 5;
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
