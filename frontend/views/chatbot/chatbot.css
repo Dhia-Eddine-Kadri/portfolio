@@ -1112,11 +1112,22 @@ body.ncb-fullbleed .ncb-main {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
-  /* Inset content via padding so the textarea + button row sit in a
-     narrower visual lane, while the opaque bar still reaches both card
-     edges (sealing the bottom). */
-  padding: 10px 60px;
+  padding: 12px 20px 14px;
 }
+
+/* Center the textarea + button row inside the opaque bar with a soft
+   max-width so the composer looks like a tidy "card on a bar" instead
+   of stretching edge to edge. */
+.ncb-empty[data-state="active"] .ncb-input-textarea,
+.ncb-empty[data-state="active"] .ncb-attach-row,
+.ncb-empty[data-state="active"] .ncb-files-row,
+.ncb-empty[data-state="active"] .ncb-paste-row,
+.ncb-empty[data-state="active"] .ncb-input-bottom {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .ncb-empty[data-state="active"] .ncb-input-textarea {
   min-height: 44px;
 }
@@ -1125,13 +1136,7 @@ body.ncb-fullbleed .ncb-main {
   .ncb-empty[data-state="active"] .ncb-input {
     margin-left: -40px;
     margin-right: -40px;
-    padding: 12px 96px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .ncb-empty[data-state="active"] .ncb-input {
-    padding: 14px 160px;
+    padding: 14px 40px 16px;
   }
 }
 
