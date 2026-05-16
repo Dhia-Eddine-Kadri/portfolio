@@ -720,7 +720,10 @@ body.ncb-fullbleed .ncb-main {
   font-size: 1rem;
   line-height: 1.4;
   font-family: inherit;
-  padding: 4px 8px;
+  /* Slightly more vertical padding so the placeholder/caret sits a
+     pinch lower — visually centers the text inside the composer
+     between the top edge and the divider above the action row. */
+  padding: 8px 8px 6px;
   box-sizing: border-box;
 }
 .ncb-input-textarea::placeholder {
