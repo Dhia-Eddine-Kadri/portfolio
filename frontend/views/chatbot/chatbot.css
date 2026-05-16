@@ -725,21 +725,13 @@ body.ncb-fullbleed .ncb-main {
 }
 
 .ncb-input-bottom {
+  position: static;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 6px;
+  gap: 10px;
+  padding-top: 8px;
+  margin-top: 0;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
-  margin-top: 2px;
-  /* Pull the divider line all the way to the edges of the composer so the
-     bottom row visually anchors to the card walls instead of floating
-     in dead space. The -16/-14 matches the .ncb-input padding-left/right
-     so the row content stays inset but the border line is full-width. */
-  margin-left: -16px;
-  margin-right: -14px;
-  padding-left: 16px;
-  padding-right: 14px;
 }
 
 .ncb-input-actions {
