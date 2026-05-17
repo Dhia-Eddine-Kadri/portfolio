@@ -1590,7 +1590,7 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   if (sendBtn) setSendBtnMode(sendBtn, 'send');
   if (textarea) {
     textarea.value = '';
-    textarea.style.height = '38px';
+    textarea.style.height = '36px';
     textarea.style.overflowY = 'hidden';
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
   }
@@ -2143,8 +2143,8 @@ function initTextareaAutoSize(root: HTMLElement): void {
   // keystroke pushes scrollHeight from N → N+1 (subpixel rounding) and
   // the composer visibly grows by 1–2px. Clamping at 36 keeps the
   // composer stable for one-line input.
-  const MIN = 38;
-  const MAX = 130;
+  const MIN = 36;
+  const MAX = 160;
   const resize = (): void => {
     ta.style.height = 'auto';
     const next = Math.max(MIN, Math.min(MAX, ta.scrollHeight));
@@ -2234,9 +2234,9 @@ function initActionCards(root: HTMLElement): void {
       // the listener before the browser has re-laid out for the new
       // value, leaving the textarea capped at its previous height.
       ta.style.height = 'auto';
-      const next = Math.max(38, Math.min(130, ta.scrollHeight));
+      const next = Math.max(36, Math.min(160, ta.scrollHeight));
       ta.style.height = next + 'px';
-      ta.style.overflowY = ta.scrollHeight > 130 ? 'auto' : 'hidden';
+      ta.style.overflowY = ta.scrollHeight > 160 ? 'auto' : 'hidden';
       ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
       window.requestAnimationFrame(() => {
         ta.focus();

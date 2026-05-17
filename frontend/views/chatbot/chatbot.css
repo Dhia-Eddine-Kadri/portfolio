@@ -698,57 +698,59 @@ body.ncb-fullbleed .ncb-main {
   /* Don't let the flex parent (.ncb-empty in active chats) compress
      the composer when the message list grows. */
   flex-shrink: 0;
-  min-height: 58px;
+  min-height: 56px;
+  max-height: 240px;
   border-radius: 28px;
   /* overflow:hidden makes the rounded frame a hard boundary —
      attachments, textarea overflow, button shadows all stay inside. */
   overflow: hidden;
-  padding: 0;
+  padding: 8px 10px;
+  box-sizing: border-box;
   background: rgba(8, 13, 30, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
 /* Attachment / paste / files preview rows live inside the same frame,
-   above the input row. Auto-hidden when empty (CSS :empty + the
-   `hidden` attribute the JS toggles). */
+   above the input row. */
 .ncb-input > .ncb-attach-row,
 .ncb-input > .ncb-files-row,
 .ncb-input > .ncb-paste-row {
   flex-shrink: 0;
-  padding: 12px 14px 0;
+  max-height: 96px;
+  padding: 6px 6px 4px;
   gap: 8px;
+  overflow-x: auto;
 }
 .ncb-input > .ncb-paste-row {
   border-bottom: none;
   margin-bottom: 0;
-  padding-bottom: 0;
 }
 
-/* The single inline input row. */
+/* The single inline input row. align-items:flex-end keeps icon buttons
+   stuck to the bottom as the textarea grows on multi-line input. */
 .ncb-input-row {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 10px 12px;
-  box-sizing: border-box;
+  min-height: 40px;
 }
 
 .ncb-input-textarea {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 38px;
-  max-height: 130px;
+  min-height: 36px;
+  max-height: 160px;
   resize: none;
   overflow-y: auto;
   background: transparent;
   border: 0;
   outline: none;
   color: #e5edff;
-  font-size: 1rem;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 20px;
   font-family: inherit;
-  padding: 8px 6px;
+  padding: 8px 4px;
   box-sizing: border-box;
 }
 .ncb-input-textarea::placeholder {
@@ -760,8 +762,9 @@ body.ncb-fullbleed .ncb-main {
 .ncb-input-action-btn {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
