@@ -695,6 +695,10 @@ body.ncb-fullbleed .ncb-main {
 .ncb-input {
   display: flex;
   flex-direction: column;
+  /* Don't let the flex parent (.ncb-empty in active chats) compress
+     the composer when the message list grows. */
+  flex-shrink: 0;
+  min-height: 58px;
   border-radius: 28px;
   /* overflow:hidden makes the rounded frame a hard boundary —
      attachments, textarea overflow, button shadows all stay inside. */
