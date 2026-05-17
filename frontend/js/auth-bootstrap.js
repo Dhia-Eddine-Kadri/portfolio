@@ -62,6 +62,23 @@
   }
 })();
 
+// Back/forward cache (bfcache) defeats the popstate guard: Chrome restores
+// the cached, authenticated DOM without re-running scripts, so _currentUser
+// is still set and history-state restore re-mounts the app even though the
+// session is gone. Force a reload when bfcache restores a page that no
+// longer has a valid session.
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  var hasSession = false;
+  try {
+    hasSession =
+      sessionStorage.getItem('ss_logged_in') === 'true' ||
+      !!localStorage.getItem('sb_sess_token') ||
+      !!sessionStorage.getItem('sb_sess_token');
+  } catch (err) {}
+  if (!hasSession) window.location.reload();
+});
+
 window._onLoginSuccess = function () {
   try {
     sessionStorage.setItem('ss_logged_in', 'true');
