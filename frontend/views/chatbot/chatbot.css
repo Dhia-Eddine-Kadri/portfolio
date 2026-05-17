@@ -697,10 +697,9 @@ body.ncb-fullbleed .ncb-main {
   flex-direction: column;
   gap: 6px;
   min-height: 92px;
-  max-height: 220px;
-  /* Real, visible bottom padding so the button row sits unambiguously
-     inside the rounded frame with clear breathing room — NOT touching
-     the bottom edge. */
+  /* No max-height: when the user attaches images / files, the composer
+     must grow to fit them. Otherwise the .ncb-paste-row pushes the
+     textarea + buttons OUT of the rounded frame. */
   padding: 10px 16px 26px 16px;
   background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.28);

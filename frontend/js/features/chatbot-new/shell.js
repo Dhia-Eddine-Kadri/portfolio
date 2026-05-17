@@ -941,6 +941,54 @@ function updateContextPill(root) {
         : first + ' +' + (folders.length - 1) + ' more';
     pill.hidden = false;
 }
+// Render the right-rail "Sources used" card from the active chat's
+// attachedFolders. Real per-message citations aren't available from
+// /api/ai yet — this is the honest version: lists what the AI has
+// access to in this chat.
+function renderSourcesCard(root) {
+    const card = root.querySelector('.ncb-sources-card');
+    if (!card) return;
+    const list = card.querySelector('.ncb-source-list');
+    const pill = card.querySelector('.ncb-sources-count');
+    if (!list || !pill) return;
+    const active = chatStore.getActive();
+    const folders = active.attachedFolders;
+    const n = folders.length;
+    pill.textContent = n === 1 ? '1 file' : n + ' files';
+    if (!n) {
+        list.innerHTML =
+            '<p class="ncb-notes-empty">No sources attached yet. Use ' +
+            '<strong>Import from Course</strong> below to attach lectures, ' +
+            'exercises, or formula sheets — the AI will use them as context.</p>';
+        return;
+    }
+    list.innerHTML = folders
+        .map((f) => `
+      <div class="ncb-source-row" data-id="${escapeAttr(f.id)}">
+        <div class="ncb-source-info">
+          <p class="ncb-source-name">${escapeHtml(f.name)}</p>
+          <p class="ncb-source-meta">${escapeHtml(f.count)}</p>
+        </div>
+        <button type="button" class="ncb-source-open" aria-label="Detach ${escapeAttr(f.name)}">
+          <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    `)
+        .join('');
+    list.querySelectorAll('.ncb-source-open').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const id = btn.closest('.ncb-source-row')?.dataset.id;
+            if (!id) return;
+            const active2 = chatStore.getActive();
+            active2.attachedFolders = active2.attachedFolders.filter((f) => f.id !== id);
+            saveChatStore();
+            renderAttachChips(root);
+            renderSourcesCard(root);
+            updateContextPill(root);
+        });
+    });
+}
+
 function renderAttachChips(root) {
     const row = root.querySelector('.ncb-attach-row');
     if (!row)

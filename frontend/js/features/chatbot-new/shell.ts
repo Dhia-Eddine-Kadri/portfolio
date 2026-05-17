@@ -1065,6 +1065,7 @@ function attachImportedFolders(root: HTMLElement, folders: ImportedFolder[]): vo
   });
   saveChatStore();
   renderAttachChips(root);
+  renderSourcesCard(root);
   updateContextPill(root);
 }
 
@@ -1085,6 +1086,57 @@ function updateContextPill(root: HTMLElement): void {
     ? first
     : first + ' +' + (folders.length - 1) + ' more';
   pill.hidden = false;
+}
+
+// Render the right-rail "Sources used" card from the active chat's
+// attachedFolders. Until /api/ai returns real per-message citations,
+// this is the most honest version of the panel: it lists exactly the
+// course materials the AI has access to for this chat.
+function renderSourcesCard(root: HTMLElement): void {
+  const card = root.querySelector<HTMLElement>('.ncb-sources-card');
+  if (!card) return;
+  const list = card.querySelector<HTMLElement>('.ncb-source-list');
+  const pill = card.querySelector<HTMLElement>('.ncb-sources-count');
+  if (!list || !pill) return;
+  const active = chatStore.getActive();
+  const folders = active.attachedFolders;
+  const n = folders.length;
+  pill.textContent = n === 1 ? '1 file' : n + ' files';
+
+  if (!n) {
+    list.innerHTML =
+      '<p class="ncb-notes-empty">No sources attached yet. Use ' +
+      '<strong>Import from Course</strong> below to attach lectures, ' +
+      'exercises, or formula sheets — the AI will use them as context.</p>';
+    return;
+  }
+  list.innerHTML = folders
+    .map(
+      (f) => `
+      <div class="ncb-source-row" data-id="${escapeAttr(f.id)}">
+        <div class="ncb-source-info">
+          <p class="ncb-source-name">${escapeHtml(f.name)}</p>
+          <p class="ncb-source-meta">${escapeHtml(f.count)}</p>
+        </div>
+        <button type="button" class="ncb-source-open" aria-label="Detach ${escapeAttr(f.name)}">
+          <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    `
+    )
+    .join('');
+  list.querySelectorAll<HTMLButtonElement>('.ncb-source-open').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest<HTMLElement>('.ncb-source-row')?.dataset.id;
+      if (!id) return;
+      const active2 = chatStore.getActive();
+      active2.attachedFolders = active2.attachedFolders.filter((f) => f.id !== id);
+      saveChatStore();
+      renderAttachChips(root);
+      renderSourcesCard(root);
+      updateContextPill(root);
+    });
+  });
 }
 
 function renderAttachChips(root: HTMLElement): void {
@@ -1120,6 +1172,7 @@ function renderAttachChips(root: HTMLElement): void {
       active2.attachedFolders = active2.attachedFolders.filter((f) => f.id !== id);
       saveChatStore();
       renderAttachChips(root);
+      renderSourcesCard(root);
       updateContextPill(root);
     });
   });
@@ -1564,8 +1617,10 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
     }
   });
 
-  // Re-render attached folders + saved-replies count for this chat.
+  // Re-render attached folders + sources panel + saved-replies count.
   renderAttachChips(root);
+  renderSourcesCard(root);
+  updateContextPill(root);
   const count = root.querySelector<HTMLElement>('.ncb-notes-count');
   if (count) count.textContent = String(chat.savedReplies.length);
   const notesCard = root.querySelector<HTMLElement>('.ncb-notes-card');
