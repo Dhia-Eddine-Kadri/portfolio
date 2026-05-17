@@ -1000,6 +1000,11 @@ function initImportModal(root: HTMLElement): void {
     activeFolder = null;
     searchTerm = '';
     if (searchInput) searchInput.value = '';
+    // Defensive reset — the modal's state persists across open/close,
+    // and a stale crumb visibility was leaving the Back button visible
+    // on courses with no files showing.
+    if (crumb) crumb.hidden = true;
+    listEl.innerHTML = '';
 
     // Build the course list each open so newly-added courses appear.
     const courses = listCourses();
