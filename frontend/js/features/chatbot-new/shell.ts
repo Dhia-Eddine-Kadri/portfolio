@@ -2144,7 +2144,7 @@ function initTextareaAutoSize(root: HTMLElement): void {
   // the composer visibly grows by 1–2px. Clamping at 36 keeps the
   // composer stable for one-line input.
   const MIN = 36;
-  const MAX = 96;
+  const MAX = 150;
   const resize = (): void => {
     ta.style.height = 'auto';
     const next = Math.max(MIN, Math.min(MAX, ta.scrollHeight));
@@ -2234,9 +2234,9 @@ function initActionCards(root: HTMLElement): void {
       // the listener before the browser has re-laid out for the new
       // value, leaving the textarea capped at its previous height.
       ta.style.height = 'auto';
-      const next = Math.max(36, Math.min(96, ta.scrollHeight));
+      const next = Math.max(36, Math.min(150, ta.scrollHeight));
       ta.style.height = next + 'px';
-      ta.style.overflowY = ta.scrollHeight > 96 ? 'auto' : 'hidden';
+      ta.style.overflowY = ta.scrollHeight > 150 ? 'auto' : 'hidden';
       ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
       window.requestAnimationFrame(() => {
         ta.focus();

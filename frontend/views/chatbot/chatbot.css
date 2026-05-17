@@ -697,13 +697,31 @@ body.ncb-fullbleed .ncb-main {
   flex-direction: column;
   gap: 6px;
   min-height: 92px;
-  /* No max-height: when the user attaches images / files, the composer
-     must grow to fit them. Otherwise the .ncb-paste-row pushes the
-     textarea + buttons OUT of the rounded frame. */
-  padding: 10px 16px 26px 16px;
+  max-height: 320px;
+  /* overflow:hidden so NOTHING — paste thumbs, textarea overflow,
+     button shadows — can escape the rounded frame. The textarea has
+     its own internal scroll when content overflows. */
+  overflow: hidden;
+  padding: 10px 16px 18px 16px;
   background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+
+/* All non-textarea rows are fixed-size: they never shrink and they
+   never expand beyond their content. Only the textarea grows/scrolls. */
+.ncb-input > .ncb-attach-row,
+.ncb-input > .ncb-files-row,
+.ncb-input > .ncb-paste-row {
+  flex-shrink: 0;
+}
+.ncb-input > .ncb-input-bottom {
+  flex-shrink: 0;
+}
+.ncb-input > .ncb-input-textarea {
+  flex: 1 1 auto;
+  min-height: 36px;
+  max-height: 150px;
 }
 
 .ncb-input-textarea {
@@ -1163,7 +1181,9 @@ body.ncb-fullbleed .ncb-main {
   /* Single soft drop shadow — no inset highlight that reads as a
      second top border inside the composer. */
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
-  overflow: visible;
+  /* Inherits overflow:hidden from base .ncb-input — keeps the rounded
+     frame as a hard boundary so attachments/textarea/buttons all stay
+     inside no matter what. */
 }
 
 /* Messages scroll above the composer. Reserve enough bottom padding

@@ -1946,7 +1946,7 @@ function initTextareaAutoSize(root) {
         return;
     ta.dataset.ncbAutoSize = '1';
     const MIN = 36;
-    const MAX = 96;
+    const MAX = 150;
     const resize = () => {
         ta.style.height = 'auto';
         const next = Math.max(MIN, Math.min(MAX, ta.scrollHeight));
@@ -2032,9 +2032,9 @@ function initActionCards(root) {
             // Resize manually so the textarea is the right size before
             // scroll / focus — dispatchEvent alone can fire before layout.
             ta.style.height = 'auto';
-            const next = Math.max(36, Math.min(96, ta.scrollHeight));
+            const next = Math.max(36, Math.min(150, ta.scrollHeight));
             ta.style.height = next + 'px';
-            ta.style.overflowY = ta.scrollHeight > 96 ? 'auto' : 'hidden';
+            ta.style.overflowY = ta.scrollHeight > 150 ? 'auto' : 'hidden';
             ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
             window.requestAnimationFrame(() => {
                 ta.focus();
