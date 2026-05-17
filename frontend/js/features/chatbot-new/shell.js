@@ -1401,7 +1401,7 @@ function loadActiveChatIntoCenter(root) {
         setSendBtnMode(sendBtn, 'send');
     if (textarea) {
         textarea.value = '';
-        textarea.style.height = '36px';
+        textarea.style.height = '38px';
         textarea.style.overflowY = 'hidden';
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -1945,8 +1945,8 @@ function initTextareaAutoSize(root) {
     if (!ta || ta.dataset.ncbAutoSize === '1')
         return;
     ta.dataset.ncbAutoSize = '1';
-    const MIN = 36;
-    const MAX = 150;
+    const MIN = 38;
+    const MAX = 130;
     const resize = () => {
         ta.style.height = 'auto';
         const next = Math.max(MIN, Math.min(MAX, ta.scrollHeight));
@@ -2032,9 +2032,9 @@ function initActionCards(root) {
             // Resize manually so the textarea is the right size before
             // scroll / focus — dispatchEvent alone can fire before layout.
             ta.style.height = 'auto';
-            const next = Math.max(36, Math.min(150, ta.scrollHeight));
+            const next = Math.max(38, Math.min(130, ta.scrollHeight));
             ta.style.height = next + 'px';
-            ta.style.overflowY = ta.scrollHeight > 150 ? 'auto' : 'hidden';
+            ta.style.overflowY = ta.scrollHeight > 130 ? 'auto' : 'hidden';
             ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
             window.requestAnimationFrame(() => {
                 ta.focus();

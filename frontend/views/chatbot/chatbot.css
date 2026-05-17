@@ -688,48 +688,53 @@ body.ncb-fullbleed .ncb-main {
   color: #94a3b8;
 }
 
-/* Real input (replaces placeholder) — compact, premium, glassy.
-   Target total height ~84px (textarea ~34 + bottom row ~36 + gaps/padding).
-   Grows only when the textarea wraps to multiple lines. */
+/* ChatGPT-style inline composer:
+   [📎] [📁]  textarea …  [↑]
+   in one row. Optional image previews stack above. */
 
 .ncb-input {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 92px;
-  max-height: 320px;
-  /* overflow:hidden so NOTHING — paste thumbs, textarea overflow,
-     button shadows — can escape the rounded frame. The textarea has
-     its own internal scroll when content overflows. */
+  border-radius: 28px;
+  /* overflow:hidden makes the rounded frame a hard boundary —
+     attachments, textarea overflow, button shadows all stay inside. */
   overflow: hidden;
-  padding: 10px 16px 18px 16px;
-  background: rgba(8, 15, 34, 0.82);
+  padding: 0;
+  background: rgba(8, 13, 30, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
-/* All non-textarea rows are fixed-size: they never shrink and they
-   never expand beyond their content. Only the textarea grows/scrolls. */
+/* Attachment / paste / files preview rows live inside the same frame,
+   above the input row. Auto-hidden when empty (CSS :empty + the
+   `hidden` attribute the JS toggles). */
 .ncb-input > .ncb-attach-row,
 .ncb-input > .ncb-files-row,
 .ncb-input > .ncb-paste-row {
   flex-shrink: 0;
+  padding: 12px 14px 0;
+  gap: 8px;
 }
-.ncb-input > .ncb-input-bottom {
-  flex-shrink: 0;
+.ncb-input > .ncb-paste-row {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
-.ncb-input > .ncb-input-textarea {
-  flex: 1 1 auto;
-  min-height: 36px;
-  max-height: 150px;
+
+/* The single inline input row. */
+.ncb-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  box-sizing: border-box;
 }
 
 .ncb-input-textarea {
-  width: 100%;
-  /* Matches the JS auto-resize MIN so the textarea has the same height
-     before and after the user types — no subpixel jump on first input. */
-  min-height: 36px;
-  max-height: 96px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  max-height: 130px;
   resize: none;
   overflow-y: auto;
   background: transparent;
@@ -737,64 +742,43 @@ body.ncb-fullbleed .ncb-main {
   outline: none;
   color: #e5edff;
   font-size: 1rem;
-  line-height: 1.4;
+  line-height: 1.45;
   font-family: inherit;
-  /* Keep textarea's own padding tight so scrollHeight ≈ min-height —
-     auto-resize never bumps the composer on the first keystroke. */
-  padding: 4px 8px;
+  padding: 8px 6px;
   box-sizing: border-box;
 }
 .ncb-input-textarea::placeholder {
-  color: rgba(203, 213, 225, 0.72);
+  color: rgba(226, 232, 240, 0.55);
 }
 
-.ncb-input-bottom {
-  position: static;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-top: 8px;
-  margin-top: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.ncb-input-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  flex-wrap: nowrap;
-}
-
+/* Icon-only round action buttons (📎 upload, 📁 import). Tooltip via
+   the native title attribute on the <button>. */
 .ncb-input-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 14px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(30, 41, 59, 0.68);
-  color: #e5edff;
-  font-size: 0.875rem;
-  font-weight: 650;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e5e7eb;
   cursor: pointer;
-  white-space: nowrap;
+  padding: 0;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 .ncb-input-action-btn:hover {
-  background: rgba(51, 65, 85, 0.82);
+  background: rgba(30, 41, 59, 0.92);
   border-color: rgba(96, 165, 250, 0.42);
   color: #ffffff;
 }
+.ncb-input-action-btn .ncb-icon { width: 18px; height: 18px; }
 
 .ncb-input-action-icon {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
   color: #bfdbfe;
@@ -2336,13 +2320,7 @@ body.ncb-fullbleed .ncb-main {
   .ncb-msg-row--ai { gap: 8px; }
   .ncb-avatar { width: 32px; height: 32px; }
 
-  /* Keep the composer row uniform with the desktop styles — same
-     36px heights, no-wrap. Only the action button label collapses to
-     icon-only when the row gets tight. */
-  .ncb-input-action-btn { height: 36px; padding: 0 12px; font-size: 0.8125rem; }
-  .ncb-input-action-btn span:last-child { display: none; } /* icon-only on tight viewports */
-  .ncb-input-action-icon { width: 20px; height: 20px; }
-  .ncb-send-btn { width: 36px; height: 36px; min-width: 36px; }
+  /* Composer is icon-only by default now — nothing to override here. */
 }
 
 /* ≤ 480px: tighten everything one more notch. */
@@ -2352,10 +2330,7 @@ body.ncb-fullbleed .ncb-main {
   .ncb-header-title { font-size: 0.95rem; }
   .ncb-header-subtitle { display: none; }
   .ncb-pill { padding: 4px 10px; font-size: 0.75rem; }
-  .ncb-input { padding: 8px 12px 14px 12px; }
-  /* Don't override the desktop min-height: 36 — the textarea must
-     stay the same compact size on mobile so the composer doesn't
-     balloon. */
+  .ncb-input-row { padding: 8px 10px; gap: 6px; }
   .ncb-input-textarea { font-size: 0.95rem; }
   .ncb-empty-title { font-size: 1.75rem; }
   .ncb-msgs { gap: 14px; margin-bottom: 16px; }

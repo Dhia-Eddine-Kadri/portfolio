@@ -113,38 +113,37 @@
               </div>
 
               <div class="ncb-input">
+                <!-- Attachment / paste / files previews. Empty by default,
+                     populated by JS when the user attaches things. Each
+                     is auto-hidden when empty via CSS :empty. -->
                 <div class="ncb-attach-row" hidden></div>
                 <div class="ncb-files-row" hidden></div>
                 <div class="ncb-paste-row" hidden></div>
                 <input type="file" class="ncb-file-input" multiple hidden
                        accept="image/*,application/pdf,text/plain,.txt,.md" />
 
-                <textarea
-                  class="ncb-input-textarea"
-                  placeholder="Ask anything about your lectures, exercises, or course files... Paste screenshots with Ctrl+V."
-                  aria-label="Type your message"
-                ></textarea>
-                <div class="ncb-input-bottom">
-                  <div class="ncb-input-actions">
-                    <button type="button" class="ncb-input-action-btn ncb-upload-btn">
-                      <span class="ncb-input-action-icon">
-                        <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M13.234 20.252 21 12.3"/>
-                          <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"/>
-                        </svg>
-                      </span>
-                      <span>Upload photos &amp; files</span>
-                    </button>
-                    <button type="button" class="ncb-input-action-btn ncb-import-btn">
-                      <span class="ncb-input-action-icon">
-                        <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                      </span>
-                      <span>Import from Course</span>
-                    </button>
-                  </div>
-                  <button type="button" class="ncb-send-btn" aria-label="Send message">
+                <!-- Single inline input row: icon-only action buttons →
+                     textarea → send. ChatGPT-style. -->
+                <div class="ncb-input-row">
+                  <button type="button" class="ncb-input-action-btn ncb-upload-btn"
+                          title="Upload photos & files" aria-label="Upload photos & files">
+                    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M13.234 20.252 21 12.3"/>
+                      <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="ncb-input-action-btn ncb-import-btn"
+                          title="Import from Course" aria-label="Import from Course">
+                    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                  </button>
+                  <textarea
+                    class="ncb-input-textarea"
+                    placeholder="Ask anything about your lectures, exercises, or course files..."
+                    aria-label="Type your message"
+                  ></textarea>
+                  <button type="button" class="ncb-send-btn" title="Send message" aria-label="Send message">
                     <svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 19V5"/>
                       <path d="m5 12 7-7 7 7"/>
