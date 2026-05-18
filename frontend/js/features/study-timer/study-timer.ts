@@ -91,6 +91,13 @@ interface TimerSettings {
 
 let _stRunning = false;
 let _stPaused = false;
+let _stVolume: number = ((): number => {
+  try {
+    const v = parseInt(localStorage.getItem('ss_st_volume') || '70', 10);
+    return isNaN(v) ? 70 : Math.max(0, Math.min(100, v));
+  } catch { return 70; }
+})();
+let _stMutedByUser = false;
 let _stTimer: ReturnType<typeof setInterval> | null = null;
 let _stSecondsLeft = 0;
 /* Wall-clock end time (ms since epoch). Source of truth while ticking; nulled
@@ -189,6 +196,16 @@ function _stCreatePlayer(customList: string | null): void {
     '<button class="smc-ctrl smc-play" id="stMiniPlayPause" title="Play/Pause">&#x25B6;</button>' +
     '<button class="smc-ctrl" id="stMiniNext" title="Next">&#x23ED;</button>' +
     '</div>' +
+    '<div class="smc-volume-row">' +
+    '<button class="smc-vol-btn" id="smcVolBtn" title="Mute / unmute">' +
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>' +
+        '<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>' +
+        '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>' +
+      '</svg>' +
+    '</button>' +
+    '<input type="range" id="smcVolume" class="smc-vol-range" min="0" max="100" value="70" step="1" aria-label="Volume">' +
+    '</div>' +
     '</div>' +
     '<button class="st-music-pill" id="stMusicPill" title="Show music player" style="display:none">&#x266B;</button>';
   document.body.appendChild(holder);
@@ -217,6 +234,35 @@ function _stCreatePlayer(customList: string | null): void {
     if (pill) pill.style.display = 'none';
     if (card) card.style.display = 'flex';
   });
+
+  // Volume slider + mute toggle.
+  const volRange = document.getElementById('smcVolume') as HTMLInputElement | null;
+  const volBtn = document.getElementById('smcVolBtn') as HTMLButtonElement | null;
+  if (volRange) {
+    volRange.value = String(_stVolume);
+    _smcSetVolumeFill(_stVolume);
+    volRange.addEventListener('input', () => {
+      const v = Math.max(0, Math.min(100, parseInt(volRange.value, 10) || 0));
+      _stVolume = v;
+      _stMutedByUser = v === 0;
+      try { localStorage.setItem('ss_st_volume', String(v)); } catch { /* quota */ }
+      _smcSetVolumeFill(v);
+      _smcSyncVolBtn();
+      try { if (_ytPlayer) _ytPlayer.setVolume(v); } catch { /* ignore */ }
+    });
+  }
+  if (volBtn) {
+    volBtn.addEventListener('click', () => {
+      _stMutedByUser = !_stMutedByUser;
+      const target = _stMutedByUser ? 0 : (_stVolume || 70);
+      if (!_stMutedByUser && _stVolume === 0) _stVolume = 70;
+      try { if (_ytPlayer) _ytPlayer.setVolume(target); } catch { /* ignore */ }
+      if (volRange) volRange.value = String(target);
+      _smcSetVolumeFill(target);
+      _smcSyncVolBtn();
+    });
+  }
+  _smcSyncVolBtn();
 
   let _smcSeeking = false;
   const progressEl = document.getElementById('smcProgress') as HTMLInputElement | null;
@@ -284,7 +330,7 @@ function _stCreatePlayer(customList: string | null): void {
       setTimeout(() => {
         try {
           e.target.unMute();
-          e.target.setVolume(70);
+          e.target.setVolume(_stMutedByUser ? 0 : _stVolume);
         } catch {
           /* ignore */
         }
@@ -372,7 +418,7 @@ function _stPlayMusic(): void {
     try {
       _ytPlayer.playVideo();
       _ytPlayer.unMute();
-      _ytPlayer.setVolume(70);
+      _ytPlayer.setVolume(_stMutedByUser ? 0 : _stVolume);
       _stShowMusicControls(true);
       return;
     } catch {
@@ -429,6 +475,17 @@ function _stShowMusicControls(show: boolean): void {
   }
 }
 
+function _smcSetVolumeFill(pct: number): void {
+  const r = document.getElementById('smcVolume') as HTMLInputElement | null;
+  if (r) r.style.setProperty('--vol', Math.max(0, Math.min(100, pct)) + '%');
+}
+
+function _smcSyncVolBtn(): void {
+  const btn = document.getElementById('smcVolBtn');
+  if (!btn) return;
+  btn.classList.toggle('smc-vol-muted', _stMutedByUser || _stVolume === 0);
+}
+
 function _stUpdateMini(): void {
   const t = document.getElementById('stMiniTime');
   const l = document.getElementById('stMiniLabel');
@@ -436,7 +493,61 @@ function _stUpdateMini(): void {
   if (l)
     l.textContent =
       _stPhase === 'focus' ? 'Focus' : _stPhase === 'short' ? 'Short break' : 'Long break';
+  _syncCourseStudyBtn();
 }
+
+/** Swap the course-page Study button between "open the popup" and a live
+ * Pause / timer / Stop cluster, depending on whether a session is running. */
+function _syncCourseStudyBtn(): void {
+  const wrap = document.getElementById('coStudyWrap');
+  if (!wrap) return;
+  const btn = document.getElementById('coStudyBtn') as HTMLElement | null;
+  let controls = document.getElementById('coStudyControls');
+
+  if (!_stRunning) {
+    if (controls) controls.remove();
+    if (btn) btn.style.display = '';
+    return;
+  }
+
+  if (btn) btn.style.display = 'none';
+
+  const timerText = _stFmt(_stSecondsLeft);
+  const pauseGlyph = _stPaused ? '&#x25B6;' : '&#x23F8;';
+  const pauseTitle = _stPaused ? 'Resume' : 'Pause';
+
+  if (!controls) {
+    controls = document.createElement('div');
+    controls.id = 'coStudyControls';
+    controls.className = 'co-study-controls';
+    wrap.appendChild(controls);
+    controls.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement | null)?.closest<HTMLElement>('button');
+      if (!t) return;
+      e.stopPropagation();
+      if (t.id === 'coStudyPause') {
+        const mini = document.getElementById('stMiniPause') as HTMLButtonElement | null;
+        if (mini) mini.click();
+        else _syncCourseStudyBtn();
+      } else if (t.id === 'coStudyStop') {
+        _stStop();
+        _syncCourseStudyBtn();
+      }
+    });
+  }
+  controls.innerHTML =
+    '<button id="coStudyPause" class="co-study-ctrl" type="button" title="' + pauseTitle + '">' +
+      pauseGlyph +
+    '</button>' +
+    '<span class="co-study-timer">' + timerText + '</span>' +
+    '<button id="coStudyStop" class="co-study-ctrl co-study-ctrl-stop" type="button" title="Stop">' +
+      '&#x25A0;' +
+    '</button>';
+}
+
+// Expose so course-view.ts can call after re-rendering the topnav.
+(window as unknown as { _syncCourseStudyBtn?: () => void })._syncCourseStudyBtn =
+  _syncCourseStudyBtn;
 
 function _stUpdatePauseBtn(): void {
   const btn = document.getElementById('stMiniPause');
@@ -616,6 +727,7 @@ function _stStop(): void {
   if (mini) mini.style.display = 'none';
   _stUpdatePauseBtn();
   _stPersist();
+  _syncCourseStudyBtn();
 }
 
 /* Restore a previously running timer from localStorage. Called once on init.
@@ -686,13 +798,22 @@ export function openStudyPopup(): void {
   if (!popup) return;
   if (overlay) overlay.style.display = 'none';
 
-  // Prefer the course-workspace wrapper; fall back to the legacy topbar
-  // trigger if we're not in a course view.
+  // Prefer the in-PDF Study trigger when the PDF view is open, then the
+  // course-workspace wrapper, then the legacy topbar trigger.
+  const pdfBtn = document.getElementById('pdfStudyBtn');
+  const pdfVisible =
+    !!pdfBtn && pdfBtn.offsetParent !== null;
   const wrap =
+    (pdfVisible ? (pdfBtn!.parentElement as HTMLElement | null) : null) ||
     (document.getElementById('coStudyWrap') as HTMLElement | null) ||
     (document.getElementById('studyTechBtn')?.parentElement as HTMLElement | null);
-  if (wrap && popup.parentElement !== wrap) {
-    wrap.appendChild(popup);
+  if (wrap) {
+    // The popup is absolute-positioned with top:100%/right:0, so the wrap
+    // needs to establish a positioning context.
+    if (getComputedStyle(wrap).position === 'static') {
+      wrap.style.position = 'relative';
+    }
+    if (popup.parentElement !== wrap) wrap.appendChild(popup);
   }
 
   popup.classList.remove('shrinking');
@@ -785,7 +906,7 @@ export function initStudyTimer(): void {
       target.closest('#stClose') ||
       // Outside-click-to-close. Excludes the trigger button itself so the
       // toggle handler can decide what to do.
-      (!target.closest('#stPopup') && !target.closest('#coStudyBtn') && !target.closest('#studyTechBtn') && popupOpen)
+      (!target.closest('#stPopup') && !target.closest('#coStudyBtn') && !target.closest('#studyTechBtn') && !target.closest('#pdfStudyBtn') && popupOpen)
     ) {
       closeStudyPopup();
       return;

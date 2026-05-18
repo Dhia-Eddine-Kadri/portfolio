@@ -369,7 +369,61 @@ function _stUpdateMini() {
     if (l)
         l.textContent =
             _stPhase === 'focus' ? 'Focus' : _stPhase === 'short' ? 'Short break' : 'Long break';
+    _syncCourseStudyBtn();
 }
+/** Swap the course-page Study button between "open the popup" and a live
+ * Pause / timer / Stop cluster, depending on whether a session is running. */
+function _syncCourseStudyBtn() {
+    const wrap = document.getElementById('coStudyWrap');
+    if (!wrap)
+        return;
+    const btn = document.getElementById('coStudyBtn');
+    let controls = document.getElementById('coStudyControls');
+    if (!_stRunning) {
+        if (controls)
+            controls.remove();
+        if (btn)
+            btn.style.display = '';
+        return;
+    }
+    if (btn)
+        btn.style.display = 'none';
+    const timerText = _stFmt(_stSecondsLeft);
+    const pauseGlyph = _stPaused ? '&#x25B6;' : '&#x23F8;';
+    const pauseTitle = _stPaused ? 'Resume' : 'Pause';
+    if (!controls) {
+        controls = document.createElement('div');
+        controls.id = 'coStudyControls';
+        controls.className = 'co-study-controls';
+        wrap.appendChild(controls);
+        controls.addEventListener('click', (e) => {
+            const t = e.target?.closest('button');
+            if (!t)
+                return;
+            e.stopPropagation();
+            if (t.id === 'coStudyPause') {
+                const mini = document.getElementById('stMiniPause');
+                if (mini)
+                    mini.click();
+                else
+                    _syncCourseStudyBtn();
+            }
+            else if (t.id === 'coStudyStop') {
+                _stStop();
+                _syncCourseStudyBtn();
+            }
+        });
+    }
+    controls.innerHTML =
+        '<button id="coStudyPause" class="co-study-ctrl" type="button" title="' + pauseTitle + '">' +
+            pauseGlyph +
+        '</button>' +
+        '<span class="co-study-timer">' + timerText + '</span>' +
+        '<button id="coStudyStop" class="co-study-ctrl co-study-ctrl-stop" type="button" title="Stop">' +
+            '&#x25A0;' +
+        '</button>';
+}
+window._syncCourseStudyBtn = _syncCourseStudyBtn;
 function _stUpdatePauseBtn() {
     const btn = document.getElementById('stMiniPause');
     if (btn)
@@ -540,6 +594,7 @@ function _stStop() {
         mini.style.display = 'none';
     _stUpdatePauseBtn();
     _stPersist();
+    _syncCourseStudyBtn();
 }
 /* Restore a previously running timer from localStorage. Called once on init.
    If the saved endTime is already in the past, auto-advance to the done
@@ -609,12 +664,19 @@ export function openStudyPopup() {
         return;
     if (overlay)
         overlay.style.display = 'none';
-    // Prefer the course-workspace wrapper; fall back to the legacy topbar
-    // trigger if we're not in a course view.
-    const wrap = document.getElementById('coStudyWrap') ||
+    // Prefer the in-PDF Study trigger when the PDF view is open, then the
+    // course-workspace wrapper, then the legacy topbar trigger.
+    const pdfBtn = document.getElementById('pdfStudyBtn');
+    const pdfVisible = !!pdfBtn && pdfBtn.offsetParent !== null;
+    const wrap = (pdfVisible ? pdfBtn.parentElement : null) ||
+        document.getElementById('coStudyWrap') ||
         document.getElementById('studyTechBtn')?.parentElement;
-    if (wrap && popup.parentElement !== wrap) {
-        wrap.appendChild(popup);
+    if (wrap) {
+        if (getComputedStyle(wrap).position === 'static') {
+            wrap.style.position = 'relative';
+        }
+        if (popup.parentElement !== wrap)
+            wrap.appendChild(popup);
     }
     popup.classList.remove('shrinking');
     // Position is relative to .co-study-wrap (or fallback parent). Top:100%
@@ -702,7 +764,7 @@ export function initStudyTimer() {
         if (target.closest('#stClose') ||
             // Outside-click-to-close. Excludes the trigger button itself so the
             // toggle handler can decide what to do.
-            (!target.closest('#stPopup') && !target.closest('#coStudyBtn') && !target.closest('#studyTechBtn') && popupOpen)) {
+            (!target.closest('#stPopup') && !target.closest('#coStudyBtn') && !target.closest('#studyTechBtn') && !target.closest('#pdfStudyBtn') && popupOpen)) {
             closeStudyPopup();
             return;
         }
