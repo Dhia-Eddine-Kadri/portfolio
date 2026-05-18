@@ -371,10 +371,9 @@
             // so their window.* functions are defined when games.js _init() wires the buttons.
             const featureSrcs = [
                 'views/toast/toast.js',
-                // Old chatbot/chat scripts disabled — replaced by chatbot-new shell.
-                // 'views/chatbot/chatbot.js?v=2',
-                // 'views/chatbot/ai-bubble.js?v=4',
-                // 'views/chat/chat.js',
+                'views/chatbot/chatbot.js?v=2',
+                'views/chatbot/ai-bubble.js?v=4',
+                'views/chat/chat.js',
                 'views/dashboard/dashboard-widget.js',
                 'views/dashboard/dashboard-calendar.js',
                 'js/utils/db-helpers.js',
@@ -415,14 +414,23 @@
                 });
             });
             void Promise.all(featurePromises).then(() => {
-                // Old js/ai.js engine is no longer loaded — the chatbot-new
-                // shell owns all AI calls now. Still fire ss-ready so anything
-                // that listened for the boot completion keeps working.
-                if (SS) {
-                    SS.markReady('ai', { file: null });
-                    SS.markReady('app', {});
-                }
-                window.dispatchEvent(new Event('ss-ready'));
+                const aiScript = document.createElement('script');
+                aiScript.src = 'js/ai.js?v=' + _v;
+                aiScript.onload = () => {
+                    console.log('js/ai.js loaded');
+                    if (SS) {
+                        SS.markReady('ai', { file: 'js/ai.js' });
+                        SS.markReady('app', {});
+                    }
+                    window.dispatchEvent(new Event('ss-ready'));
+                };
+                aiScript.onerror = () => {
+                    console.error('Failed to load js/ai.js — falling back');
+                    if (SS)
+                        SS.markReady('app', { ai: false });
+                    window.dispatchEvent(new Event('ss-ready'));
+                };
+                document.body.appendChild(aiScript);
             });
         })
             .catch((err) => {
