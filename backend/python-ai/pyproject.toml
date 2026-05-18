@@ -17,6 +17,8 @@ dependencies = [
   # Phase 12 vision OCR — renders PDF pages to PNG for the vision model.
   # Pure-Python wheel, ships its own PDFium binary, no system Poppler needed.
   "pypdfium2>=4.30",
+  # pypdfium2.to_pil() lazy-imports PIL — Pillow must be installed at runtime.
+  "Pillow>=10.4",
 ]
 
 [project.optional-dependencies]
