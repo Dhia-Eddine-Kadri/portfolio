@@ -371,14 +371,16 @@ function _stUpdateMini() {
             _stPhase === 'focus' ? 'Focus' : _stPhase === 'short' ? 'Short break' : 'Long break';
     _syncCourseStudyBtn();
 }
-/** Swap the course-page Study button between "open the popup" and a live
- * Pause / timer / Stop cluster, depending on whether a session is running. */
-function _syncCourseStudyBtn() {
-    const wrap = document.getElementById('coStudyWrap');
+/** Swap a Study button between "open the popup" and a live
+ * Pause / timer / Stop cluster, depending on whether a session is running.
+ * Runs for both the course-overview button and the PDF-header button so
+ * the two stay in sync with the single global timer state. */
+function _syncStudyBtnFor(wrapId, btnId, controlsId) {
+    const wrap = document.getElementById(wrapId);
     if (!wrap)
         return;
-    const btn = document.getElementById('coStudyBtn');
-    let controls = document.getElementById('coStudyControls');
+    const btn = document.getElementById(btnId);
+    let controls = document.getElementById(controlsId);
     if (!_stRunning) {
         if (controls)
             controls.remove();
@@ -391,9 +393,11 @@ function _syncCourseStudyBtn() {
     const timerText = _stFmt(_stSecondsLeft);
     const pauseGlyph = _stPaused ? '&#x25B6;' : '&#x23F8;';
     const pauseTitle = _stPaused ? 'Resume' : 'Pause';
+    const pauseBtnId = controlsId + 'Pause';
+    const stopBtnId = controlsId + 'Stop';
     if (!controls) {
         controls = document.createElement('div');
-        controls.id = 'coStudyControls';
+        controls.id = controlsId;
         controls.className = 'co-study-controls';
         wrap.appendChild(controls);
         controls.addEventListener('click', (e) => {
@@ -401,27 +405,30 @@ function _syncCourseStudyBtn() {
             if (!t)
                 return;
             e.stopPropagation();
-            if (t.id === 'coStudyPause') {
+            if (t.id === pauseBtnId) {
                 const mini = document.getElementById('stMiniPause');
                 if (mini)
                     mini.click();
                 else
                     _syncCourseStudyBtn();
             }
-            else if (t.id === 'coStudyStop') {
+            else if (t.id === stopBtnId) {
                 _stStop();
-                _syncCourseStudyBtn();
             }
         });
     }
     controls.innerHTML =
-        '<button id="coStudyPause" class="co-study-ctrl" type="button" title="' + pauseTitle + '">' +
+        '<button id="' + pauseBtnId + '" class="co-study-ctrl" type="button" title="' + pauseTitle + '">' +
             pauseGlyph +
         '</button>' +
         '<span class="co-study-timer">' + timerText + '</span>' +
-        '<button id="coStudyStop" class="co-study-ctrl co-study-ctrl-stop" type="button" title="Stop">' +
+        '<button id="' + stopBtnId + '" class="co-study-ctrl co-study-ctrl-stop" type="button" title="Stop">' +
             '&#x25A0;' +
         '</button>';
+}
+function _syncCourseStudyBtn() {
+    _syncStudyBtnFor('coStudyWrap', 'coStudyBtn', 'coStudyControls');
+    _syncStudyBtnFor('pdfStudyWrap', 'pdfStudyBtn', 'pdfStudyControls');
 }
 window._syncCourseStudyBtn = _syncCourseStudyBtn;
 function _stUpdatePauseBtn() {

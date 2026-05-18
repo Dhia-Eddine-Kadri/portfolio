@@ -1520,27 +1520,34 @@ body.night .sb-acc-chev-btn {
 /* Hide legacy injected Notes button — replaced by AI side panel + actions */
 #pdfNotesToggle { display: none !important; }
 
-/* Study button inside the PDF header */
+/* Study button inside the PDF header — matches the .co-study-btn in the
+ * course overview so both share the same look and the in-session controls
+ * cluster (.co-study-controls) drops in cleanly. */
+.pdf-study-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
 .pdf-toolbar-v2 .pdf-study-button {
-  height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 16px;
-  border: 1px solid rgba(147, 197, 253, 0.30);
-  background: rgba(59, 130, 246, 0.14);
-  color: #bfdbfe;
+  padding: 11px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
   font-family: 'Nunito', sans-serif;
-  font-weight: 700;
-  font-size: 0.85rem;
-  padding: 0 14px;
+  font-size: 0.9rem;
+  font-weight: 800;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 8px 22px -8px rgba(37, 99, 235, 0.6);
 }
 .pdf-toolbar-v2 .pdf-study-button:hover {
-  background: rgba(59, 130, 246, 0.24);
-  border-color: rgba(147, 197, 253, 0.55);
-  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -8px rgba(59, 130, 246, 0.75);
 }
 
 /* ─── ANNOTATION POPOVER — compact floating blue-glass toolbar ───────── */
