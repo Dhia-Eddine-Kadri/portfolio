@@ -267,12 +267,16 @@ export function initAskAI(state) {
             }
             const _courseId = window.activeCourseId || window.currentCourseId || '';
             let _hasRag = false;
-            const _activeDocId = window.activeRagDocumentId || null;
+            let _activeDocId = window.activeRagDocumentId || null;
             if (_courseId) {
                 try {
                     const _docs = await listCourseDocuments(_courseId);
                     const _readyDocs = _docs.filter((d) => d.processing_status === 'ready');
                     _hasRag = _readyDocs.length > 0;
+                    if (!_activeDocId && activeFileName) {
+                        const _open = _readyDocs.find((d) => (d.file_name || '').toLowerCase() === activeFileName.toLowerCase());
+                        if (_open?.id) _activeDocId = _open.id;
+                    }
                 }
                 catch {
                     _hasRag = false;
@@ -550,6 +554,7 @@ export function initAskAI(state) {
                             courseId: _courseId,
                             question: question,
                             documentIds: _activeDocId ? [_activeDocId] : undefined,
+                            activeDocumentId: _activeDocId || undefined,
                             bypassCache: opts && opts.forceRefresh ? true : undefined,
                         }),
                     })

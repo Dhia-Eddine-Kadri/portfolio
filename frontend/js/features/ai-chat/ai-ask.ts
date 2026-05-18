@@ -328,12 +328,21 @@ export function initAskAI(
 
         const _courseId = window.activeCourseId || window.currentCourseId || '';
         let _hasRag = false;
-        const _activeDocId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
+        let _activeDocId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
         if (_courseId) {
           try {
             const _docs: CourseDocument[] = await listCourseDocuments(_courseId);
             const _readyDocs = _docs.filter((d) => d.processing_status === 'ready');
             _hasRag = _readyDocs.length > 0;
+            // If the user is reading a specific file, resolve its UUID so we
+            // can target it directly via documentIds — otherwise /ask-stream
+            // searches the whole course and may miss the open doc.
+            if (!_activeDocId && activeFileName) {
+              const _open = _readyDocs.find(
+                (d) => (d.file_name || '').toLowerCase() === activeFileName.toLowerCase()
+              );
+              if (_open?.id) _activeDocId = _open.id;
+            }
           } catch { _hasRag = false; }
         }
 
@@ -583,6 +592,7 @@ export function initAskAI(
                 courseId: _courseId,
                 question: question,
                 documentIds: _activeDocId ? [_activeDocId] : undefined,
+                activeDocumentId: _activeDocId || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
             })
