@@ -1,13 +1,13 @@
 <div class="dash-greeting">
-  <h1>&#x2699;&#xFE0F; Settings</h1>
-  <p>Customise your experience</p>
+  <h1 data-i18n="settings_title">&#x2699;&#xFE0F; Settings</h1>
+  <p data-i18n="settings_subtitle">Customise your experience</p>
 </div>
 <div class="settings-block">
-  <div class="settings-block-title">&#x2728; Appearance</div>
+  <div class="settings-block-title" data-i18n="settings_appearance">&#x2728; Appearance</div>
   <div class="settings-row-new">
     <label class="settings-row-lbl" for="settingsDarkMode">
       <div class="settings-row-ico">&#x1F319;</div>
-      Dark mode
+      <span data-i18n="settings_dark_mode">Dark mode</span>
     </label>
     <label class="toggle"
       ><input type="checkbox" id="settingsDarkMode" />
@@ -17,7 +17,7 @@
   <div class="settings-row-new">
     <label class="settings-row-lbl" for="settingsLanguage">
       <div class="settings-row-ico">&#x1F310;</div>
-      Language
+      <span data-i18n="settings_language">Language</span>
     </label>
     <select class="settings-select-new" id="settingsLanguage">
       <option value="en">&#x1F1EC;&#x1F1E7; English</option>
@@ -26,11 +26,11 @@
   </div>
 </div>
 <div class="settings-block">
-  <div class="settings-block-title">&#x1F916; AI Assistant</div>
+  <div class="settings-block-title" data-i18n="settings_ai_section">&#x1F916; AI Assistant</div>
   <div class="settings-row-new">
     <label class="settings-row-lbl" for="settingsAutoOpen">
       <div class="settings-row-ico">&#x2728;</div>
-      Auto-open on text select
+      <span data-i18n="settings_auto_open">Auto-open on text select</span>
     </label>
     <label class="toggle"
       ><input type="checkbox" id="settingsAutoOpen" checked />
@@ -40,7 +40,7 @@
   <div class="settings-row-new">
     <label class="settings-row-lbl" for="settingsSaveChat">
       <div class="settings-row-ico">&#x1F4AC;</div>
-      Save chat history per PDF
+      <span data-i18n="settings_save_chat">Save chat history per PDF</span>
     </label>
     <label class="toggle"
       ><input type="checkbox" id="settingsSaveChat" checked />
@@ -49,8 +49,8 @@
   </div>
 </div>
 <div class="settings-block" id="musicServicesBlock">
-  <div class="settings-block-title">&#x1F3B5; Music Services</div>
-  <p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 14px; line-height: 1.5">
+  <div class="settings-block-title" data-i18n="settings_music_section">&#x1F3B5; Music Services</div>
+  <p data-i18n="settings_music_desc" style="font-size: 0.78rem; color: var(--muted); margin-bottom: 14px; line-height: 1.5">
     Connect a music service to play your own playlists during study sessions.
   </p>
   <div class="music-service-row" id="spotifyRow">
@@ -62,10 +62,10 @@
       </svg>
       <div>
         <div class="music-service-name">Spotify</div>
-        <div class="music-service-status" id="spotifyStatus">Not connected</div>
+        <div class="music-service-status" id="spotifyStatus" data-i18n="settings_spotify_not_connected">Not connected</div>
       </div>
     </div>
-    <button class="music-connect-btn" id="spotifyConnectBtn">Connect</button>
+    <button class="music-connect-btn" id="spotifyConnectBtn" data-i18n="settings_spotify_connect">Connect</button>
   </div>
   <div class="music-player-mini" id="spotifyPlayer" style="display: none">
     <div class="music-now-playing" id="spotifyNowPlaying">
@@ -76,13 +76,13 @@
       </div>
     </div>
     <div class="music-controls">
-      <button class="music-ctrl-btn" id="spotifyPrev" title="Previous">&#x23EE;</button>
-      <button class="music-ctrl-btn music-play-btn" id="spotifyPlayPause" title="Play/Pause">
+      <button class="music-ctrl-btn" id="spotifyPrev" data-i18n-title="settings_spotify_prev" title="Previous">&#x23EE;</button>
+      <button class="music-ctrl-btn music-play-btn" id="spotifyPlayPause" data-i18n-title="settings_spotify_play" title="Play/Pause">
         &#x25B6;
       </button>
-      <button class="music-ctrl-btn" id="spotifyNext" title="Next">&#x23ED;</button>
+      <button class="music-ctrl-btn" id="spotifyNext" data-i18n-title="settings_spotify_next" title="Next">&#x23ED;</button>
     </div>
-    <button class="music-disconnect-btn" id="spotifyDisconnect">Disconnect</button>
+    <button class="music-disconnect-btn" id="spotifyDisconnect" data-i18n="settings_spotify_disconnect">Disconnect</button>
   </div>
   <div class="music-service-divider"></div>
   <div class="music-service-row" id="youtubeRow">
@@ -93,8 +93,8 @@
         />
       </svg>
       <div>
-        <div class="music-service-name">YouTube Playlists</div>
-        <div class="music-service-status" id="youtubeStatus">No playlists saved</div>
+        <div class="music-service-name" data-i18n="settings_yt_title">YouTube Playlists</div>
+        <div class="music-service-status" id="youtubeStatus" data-i18n="settings_yt_status">No playlists saved</div>
       </div>
     </div>
   </div>
@@ -107,6 +107,7 @@
       class="music-yt-input"
       id="ytPlaylistName"
       type="text"
+      data-i18n-ph="settings_yt_name_ph"
       placeholder="Name (e.g. Lofi Study)"
       style="flex: 0.9"
     />
@@ -114,28 +115,29 @@
       class="music-yt-input"
       id="ytPlaylistUrl"
       type="text"
+      data-i18n-ph="settings_yt_url_ph"
       placeholder="YouTube playlist URL"
       style="flex: 2"
     />
-    <button class="music-connect-btn" id="ytSaveBtn">Add</button>
+    <button class="music-connect-btn" id="ytSaveBtn" data-i18n="settings_yt_add">Add</button>
   </div>
 </div>
 <div class="settings-block">
-  <div class="settings-block-title">&#x1F5D1;&#xFE0F; Data</div>
+  <div class="settings-block-title" data-i18n="settings_data">&#x1F5D1;&#xFE0F; Data</div>
   <div class="settings-row-new">
     <div class="settings-row-lbl">
       <div class="settings-row-ico">&#x1F5D1;&#xFE0F;</div>
-      Clear all AI chat history
+      <span data-i18n="settings_clear_chat">Clear all AI chat history</span>
     </div>
-    <button class="settings-danger-btn" id="clearChatHistoryBtn">Clear history</button>
+    <button class="settings-danger-btn" id="clearChatHistoryBtn" data-i18n="settings_clear_btn">Clear history</button>
   </div>
 </div>
 <div class="settings-block">
-  <div class="settings-block-title">&#x1F464; Account</div>
+  <div class="settings-block-title" data-i18n="settings_account">&#x1F464; Account</div>
   <div class="settings-row-new">
     <div class="settings-row-lbl">
       <div class="settings-row-ico">&#x1F6AA;</div>
-      Sign out of Minallo
+      <span data-i18n="settings_signout">Sign out of Minallo</span>
     </div>
     <button
       class="settings-danger-btn"
@@ -146,14 +148,14 @@
         color: rgba(239, 68, 68, 0.85);
       "
     >
-      Log out
+      <span data-i18n="settings_logout_btn">Log out</span>
     </button>
   </div>
   <div class="settings-row-new">
     <div class="settings-row-lbl">
       <div class="settings-row-ico">&#x26A0;&#xFE0F;</div>
       <span
-        ><strong>Delete account</strong><br /><span style="font-size: 0.72rem; opacity: 0.55"
+        ><strong data-i18n="settings_delete_account_lbl">Delete account</strong><br /><span data-i18n="settings_delete_account_desc" style="font-size: 0.72rem; opacity: 0.55"
           >Permanently deletes your account and all data. This cannot be undone.</span
         ></span
       >
@@ -167,11 +169,11 @@
         color: rgba(239, 68, 68, 0.95);
       "
     >
-      Delete account
+      <span data-i18n="settings_delete_account">Delete account</span>
     </button>
   </div>
 </div>
 <div class="settings-save-bar">
   <span class="settings-save-state" id="settingsSaveState"></span>
-  <button class="pf-save" id="saveSettingsBtn">Save Changes</button>
+  <button class="pf-save" id="saveSettingsBtn" data-i18n="settings_save_btn">Save Changes</button>
 </div>

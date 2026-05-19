@@ -16,21 +16,27 @@ export function setNavActive(id: string): void {
   if (el) el.classList.add('on');
 }
 
-const SECTION_TITLES: Record<string, string> = {
-  dashboard: 'Dashboard',
-  notes: 'Lecture Notes',
-  editor: 'Editor',
-  profile: 'Profile',
-  settings: 'Settings',
-  subscription: 'Subscription',
-  studip: 'Courses',
-  chat: 'Chat',
-  notifications: 'Notifications',
-  games: 'Games',
-  lounge: 'Study Lounge',
-  aipage: 'Chatbot',
-  german: 'Practice',
+const SECTION_TITLE_KEYS: Record<string, string> = {
+  dashboard: 'nav_dashboard',
+  notes: 'nav_notes',
+  editor: 'nav_editor',
+  profile: 'nav_profile',
+  settings: 'nav_settings',
+  subscription: 'nav_subscription',
+  studip: 'nav_courses',
+  chat: 'nav_chat',
+  notifications: 'nav_notifications',
+  games: 'nav_games',
+  lounge: 'nav_lounge',
+  aipage: 'nav_chatbot',
+  german: 'nav_practice',
 };
+
+function _sectionTitle(sec: string): string {
+  const key = SECTION_TITLE_KEYS[sec];
+  if (key && typeof window._t === 'function') return window._t(key);
+  return key || sec;
+}
 
 export function showPortalSection(sec: string): void {
   const gamesItem = document.getElementById('psbGames');
@@ -57,7 +63,11 @@ export function showPortalSection(sec: string): void {
     void target.offsetWidth;
     target.classList.add('psec-entering');
     if (ms) ms.classList.toggle('editor-active', sec === 'editor' || sec === 'chat');
-    if (tt) tt.textContent = SECTION_TITLES[sec] || sec;
+    if (tt) {
+      tt.textContent = _sectionTitle(sec);
+      const key = SECTION_TITLE_KEYS[sec];
+      if (key) tt.setAttribute('data-i18n', key);
+    }
     if (fab) fab.classList.toggle('visible', sec === 'dashboard');
     _activePortalSection = target;
 
@@ -76,7 +86,6 @@ export function showPortalSection(sec: string): void {
     // PDF visibility is handled by panels.ts → showFilesView / hideFilesView.
     // Use a global to avoid creating a hard import dependency from navigation
     // into the new feature module.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dr = (window as any).__minalloDocRail as
       | { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void }
       | undefined;

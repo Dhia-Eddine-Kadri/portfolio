@@ -4,7 +4,7 @@ import { jsonResponse, fail, handleOptions } from '../lib/responses';
 import { optionalEnv, requireEnv } from '../lib/env';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
-import { enforceEventRateLimit, enforceMonthlyAiCap, AI_MONTHLY_CAP } from '../lib/rate-limit';
+import { enforceEventRateLimit, enforceInteractiveCap } from '../lib/rate-limit';
 import { requireActiveSubscription } from '../lib/subscription-gate';
 import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
@@ -27,6 +27,7 @@ interface GroundedSource {
 interface AskResponseBody {
   answer?: string;
   retrievalMode?: string;
+  tutorMode?: string | null;
   groundedSources?: GroundedSource[];
   cacheHit?: boolean;
   model?: string | null;
@@ -61,7 +62,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   const subBlocked = await requireActiveSubscription(serviceKey, user.id, 'ai_ask');
   if (subBlocked) return subBlocked;
-  const monthlyCapped = await enforceMonthlyAiCap(serviceKey, user.id, AI_MONTHLY_CAP);
+  const monthlyCapped = await enforceInteractiveCap(serviceKey, user.id);
   if (monthlyCapped) return monthlyCapped;
   const limited = await enforceEventRateLimit(
     serviceKey,
@@ -82,6 +83,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!question || typeof question !== 'string') return fail(400, 'question is required');
   if (question.length > MAX_QUESTION_LENGTH) return fail(400, 'question is too long');
+
+  // Tutor-mode overlay: explain | solve | quiz. The Python layer normalises
+  // and falls back to default; we still validate here so a bad client value
+  // doesn't trigger the upstream call at all.
+  const ALLOWED_TUTOR_MODES = ['explain', 'solve', 'quiz'] as const;
+  const tutorMode: string | null =
+    typeof body.tutorMode === 'string' &&
+    (ALLOWED_TUTOR_MODES as readonly string[]).includes(body.tutorMode)
+      ? body.tutorMode
+      : null;
 
   const documentIds: string[] | null = Array.isArray(body.documentIds)
     ? (body.documentIds as string[]).slice(0, MAX_DOCUMENT_IDS)
@@ -108,6 +119,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     documentIds,
     activeDocumentId,
     question,
+    tutorMode,
     // bypassCache is intentionally NOT forwarded from the client — the answer
     // cache is our biggest cost mitigation, so the public API is not allowed
     // to defeat it. Cache invalidation happens automatically via
@@ -120,6 +132,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   return jsonResponse(200, {
     answer: py.answer || '',
     retrievalMode: py.retrievalMode || 'strong',
+    tutorMode: py.tutorMode ?? null,
     confidence: py.retrievalMode === 'strong' ? 'high' : 'low',
     unsupported: py.retrievalMode !== 'strong',
     sources: _mapSources(py.groundedSources),

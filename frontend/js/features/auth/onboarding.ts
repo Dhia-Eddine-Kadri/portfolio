@@ -94,6 +94,34 @@ const _obTestLevels: Record<string, string[]> = {
   DSD: ['DSD I (B1/B2)', 'DSD II (C1)'],
 };
 
+function _obT(key: string): string {
+  try {
+    return typeof window._t === 'function' ? window._t(key) : key;
+  } catch {
+    return key;
+  }
+}
+
+function _obSetText(id: string, key: string): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.setAttribute('data-i18n', key);
+  el.textContent = _obT(key);
+}
+
+function _obSetPlaceholder(el: HTMLInputElement | null, key: string): void {
+  if (!el) return;
+  el.setAttribute('data-i18n-ph', key);
+  el.placeholder = _obT(key);
+}
+
+function _obSetHeader(titleKey: string, subKey: string, emojiText: string): void {
+  _obSetText('obTitle', titleKey);
+  _obSetText('obSub', subKey);
+  const emoji = document.getElementById('obEmoji');
+  if (emoji) emoji.textContent = emojiText;
+}
+
 function _obShowStep(step: string): void {
   ['obStep1', 'obStep2', 'obStep3a', 'obStep3b'].forEach((id) => {
     const el = document.getElementById(id);
@@ -138,7 +166,7 @@ function _obBaseInfo(): { first: string; last: string; age: string; email: strin
 async function _obSaveAndClose(
   profilePayload: ProfilePayload,
   cachePayload: CachePayload,
-  onError?: () => void
+  onError?: (msg: string) => void
 ): Promise<void> {
   const _currentUser = window._currentUser;
   if (_currentUser) {
@@ -156,15 +184,17 @@ async function _obSaveAndClose(
             .from('profiles')
             .upsert(fallback as unknown as Record<string, unknown>);
           if (fallbackRes && fallbackRes.error) {
-            console.warn('Profile save error (both attempts failed):', fallbackRes.error);
-            if (typeof onError === 'function') onError();
+            console.error('Profile save error (both attempts failed):', fallbackRes.error);
+            const msg = fallbackRes.error.message || 'Could not save your profile.';
+            if (typeof onError === 'function') onError(msg);
             return;
           }
           console.warn('Profile partial save:', res.error);
         }
       } catch (e: unknown) {
-        console.warn('Profile save error:', e);
-        if (typeof onError === 'function') onError();
+        console.error('Profile save error:', e);
+        const msg = e instanceof Error ? e.message : 'Could not save your profile.';
+        if (typeof onError === 'function') onError(msg);
         return;
       }
     }
@@ -199,16 +229,47 @@ export function showOnboarding(email?: string): void {
   _obTest = '';
   _obLevel = '';
   _obShowStep('1');
-  const title = document.getElementById('obTitle');
-  const sub = document.getElementById('obSub');
-  const emoji = document.getElementById('obEmoji');
-  if (title) title.textContent = 'Welcome to Minallo!';
-  if (sub) sub.textContent = "Let's set up your profile — step 1 of 3";
-  if (emoji) emoji.textContent = '👋';
+  _obSetHeader('ob_welcome_title', 'ob_step1', '👋');
   const emailField = document.getElementById('obEmail') as HTMLInputElement | null;
   if (emailField && email) emailField.value = email;
   const modal = document.getElementById('onboardModal');
   if (modal) modal.style.display = 'flex';
+}
+
+function _selectedState(): string {
+  const sel = document.getElementById('obState') as HTMLSelectElement | null;
+  return sel ? sel.value : '';
+}
+
+function setupStateSelect(): void {
+  const sel = document.getElementById('obState') as HTMLSelectElement | null;
+  const uniInp = document.getElementById('obUni') as HTMLInputElement | null;
+  if (!sel) return;
+  // Populate options from HOCHSCHULEN so the list stays in sync with the
+  // generated data file. Sorted alphabetically (de-DE locale).
+  const states = Array.from(new Set(HOCHSCHULEN.map((h) => h.state))).sort((a, b) =>
+    a.localeCompare(b, 'de')
+  );
+  states.forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => {
+    if (!uniInp) return;
+    // State changed → previously chosen uni is no longer valid.
+    uniInp.value = '';
+    _obSelectedHochschule = null;
+    if (sel.value) {
+      uniInp.disabled = false;
+      _obSetPlaceholder(uniInp, 'ob_uni_ph_after');
+      uniInp.focus();
+    } else {
+      uniInp.disabled = true;
+      _obSetPlaceholder(uniInp, 'ob_uni_ph_before');
+    }
+  });
 }
 
 function setupUniAutocomplete(): void {
@@ -218,15 +279,21 @@ function setupUniAutocomplete(): void {
 
   function _showUniDrop(q: string): void {
     if (!drop || !inp) return;
+    const state = _selectedState();
+    if (!state) {
+      drop.style.display = 'none';
+      return;
+    }
+    const inState = HOCHSCHULEN.filter((h) => h.state === state);
     const needle = q.toLowerCase();
     // Match against short OR full name so users can search either way.
     const items = needle
-      ? HOCHSCHULEN.filter(
+      ? inState.filter(
           (h) =>
             h.short.toLowerCase().includes(needle) ||
             h.name.toLowerCase().includes(needle)
         )
-      : HOCHSCHULEN;
+      : inState;
     // Cap to 50 results — autocomplete lists longer than that overwhelm the
     // dropdown and the user is expected to type more to narrow down.
     const shown = items.slice(0, 50);
@@ -322,9 +389,10 @@ function setupProgAutocomplete(): void {
     const list = VERTIEFUNG_MAP[major];
     const hasVertiefung = !!(list && list.length);
     if (vInp) {
-      vInp.placeholder = hasVertiefung
-        ? 'e.g. Mechatronik'
-        : 'Type your specialization (optional)';
+      _obSetPlaceholder(
+        vInp,
+        hasVertiefung ? 'ob_vertiefung_ph' : 'ob_vertiefung_optional_ph'
+      );
     }
     if (major) void _loadVertSuggestions(major);
   }
@@ -458,6 +526,7 @@ function setupVertProfileAutocomplete(): void {
 }
 
 export function initOnboarding(): void {
+  setupStateSelect();
   setupUniAutocomplete();
   setupProgAutocomplete();
   setupVertOnboardingAutocomplete();
@@ -481,23 +550,18 @@ export function initOnboarding(): void {
     const err = document.getElementById('obErr1');
     if (!err) return;
     if (!first || !last || !age || !email) {
-      err.textContent = 'Please fill in all fields';
+      err.textContent = _obT('ob_err_fill_all');
       err.style.display = 'block';
       return;
     }
     if (!email.includes('@')) {
-      err.textContent = 'Please enter a valid email';
+      err.textContent = _obT('ob_err_valid_email');
       err.style.display = 'block';
       return;
     }
     err.style.display = 'none';
     _obShowStep('2');
-    const title = document.getElementById('obTitle');
-    const sub = document.getElementById('obSub');
-    const emoji = document.getElementById('obEmoji');
-    if (title) title.textContent = 'Your path';
-    if (sub) sub.textContent = 'Tell us about yourself — step 2 of 3';
-    if (emoji) emoji.textContent = '🧭';
+    _obSetHeader('ob_path_title', 'ob_step2', '🧭');
   };
 
   window._obSelectPath = function (path: string) {
@@ -508,32 +572,21 @@ export function initOnboarding(): void {
     if (card) card.classList.add('selected');
     setTimeout(() => {
       _obShowStep(path === 'enrolled' ? '3a' : '3b');
-      const title = document.getElementById('obTitle');
-      const sub = document.getElementById('obSub');
-      const emoji = document.getElementById('obEmoji');
-      if (title) title.textContent = path === 'enrolled' ? 'Almost there!' : 'Your German journey';
-      if (sub) sub.textContent = 'Details — step 3 of 3';
-      if (emoji) emoji.textContent = path === 'enrolled' ? '🎓' : '🇩🇪';
+      _obSetHeader(
+        path === 'enrolled' ? 'ob_almost_there' : 'ob_de_journey',
+        'ob_step3',
+        path === 'enrolled' ? '🎓' : '🇩🇪'
+      );
     }, 200);
   };
 
   window._obBack = function (fromStep?: number) {
     if (fromStep === 1 || fromStep === undefined) {
       _obShowStep('1');
-      const title = document.getElementById('obTitle');
-      const sub = document.getElementById('obSub');
-      const emoji = document.getElementById('obEmoji');
-      if (title) title.textContent = 'Welcome to Minallo!';
-      if (sub) sub.textContent = "Let's set up your profile — step 1 of 3";
-      if (emoji) emoji.textContent = '👋';
+      _obSetHeader('ob_welcome_title', 'ob_step1', '👋');
     } else {
       _obShowStep('2');
-      const title = document.getElementById('obTitle');
-      const sub = document.getElementById('obSub');
-      const emoji = document.getElementById('obEmoji');
-      if (title) title.textContent = 'Your path';
-      if (sub) sub.textContent = 'Tell us about yourself — step 2 of 3';
-      if (emoji) emoji.textContent = '🧭';
+      _obSetHeader('ob_path_title', 'ob_step2', '🧭');
     }
   };
 
@@ -563,6 +616,7 @@ export function initOnboarding(): void {
   };
 
   window._obFinish = async function () {
+    const state = _selectedState();
     const uni = inputValue('obUni');
     const prog = inputValue('obProg');
     const vertiefung = inputValue('obVertiefung');
@@ -570,17 +624,30 @@ export function initOnboarding(): void {
     const matrikel = inputValue('obMatrikel');
     const err = document.getElementById('obErr3a');
     if (!err) return;
+    if (!state) {
+      err.textContent = _obT('ob_err_bundesland');
+      err.style.display = 'block';
+      return;
+    }
     if (!uni || !prog || !sem || !matrikel) {
-      err.textContent = 'Please fill in all fields';
+      err.textContent = _obT('ob_err_fill_all');
       err.style.display = 'block';
       return;
     }
     // Require the user to pick a real entry from the dropdown so we always
     // persist the registry metadata (state, type) alongside the short name.
-    if (!_obSelectedHochschule || _obSelectedHochschule.short !== uni) {
-      const match = HOCHSCHULEN.find((h) => h.short.toLowerCase() === uni.toLowerCase());
+    // The match must also be in the selected Bundesland — guards against a
+    // user changing the state after picking a uni.
+    if (
+      !_obSelectedHochschule ||
+      _obSelectedHochschule.short !== uni ||
+      _obSelectedHochschule.state !== state
+    ) {
+      const match = HOCHSCHULEN.find(
+        (h) => h.short.toLowerCase() === uni.toLowerCase() && h.state === state
+      );
       if (!match) {
-        err.textContent = 'Please pick a university from the list';
+        err.textContent = _obT('ob_err_pick_uni');
         err.style.display = 'block';
         return;
       }
@@ -589,13 +656,17 @@ export function initOnboarding(): void {
     err.style.display = 'none';
     const btn = document.getElementById('obFinish') as HTMLButtonElement | null;
     if (btn) {
-      btn.textContent = '⏳ Saving…';
+      btn.textContent = _obT('ob_saving');
       btn.disabled = true;
     }
-    function _reEnableFinish(): void {
+    function _reEnableFinish(msg?: string): void {
       if (btn) {
-        btn.textContent = 'Finish';
+        btn.textContent = _obT('ob_finish_btn');
         btn.disabled = false;
+      }
+      if (msg) {
+        err!.textContent = _obT('ob_save_failed_prefix') + msg;
+        err!.style.display = 'block';
       }
     }
 
@@ -667,25 +738,29 @@ export function initOnboarding(): void {
     const err = document.getElementById('obErr3b');
     if (!err) return;
     if (!_obTest) {
-      err.textContent = 'Please select a test';
+      err.textContent = _obT('ob_err_select_test');
       err.style.display = 'block';
       return;
     }
     if (!_obLevel) {
-      err.textContent = 'Please select your level';
+      err.textContent = _obT('ob_err_select_level');
       err.style.display = 'block';
       return;
     }
     err.style.display = 'none';
     const btn = document.getElementById('obFinishLearner') as HTMLButtonElement | null;
     if (btn) {
-      btn.textContent = '⏳ Saving…';
+      btn.textContent = _obT('ob_saving');
       btn.disabled = true;
     }
-    function _reEnableFinishLearner(): void {
+    function _reEnableFinishLearner(msg?: string): void {
       if (btn) {
-        btn.textContent = 'Finish';
+        btn.textContent = _obT('ob_finish_btn');
         btn.disabled = false;
+      }
+      if (msg) {
+        err!.textContent = _obT('ob_save_failed_prefix') + msg;
+        err!.style.display = 'block';
       }
     }
 
@@ -724,7 +799,14 @@ export function initOnboarding(): void {
     );
   };
 
-  window.addEventListener('ss-ready', () => {
+  // initOnboarding is called from main.ts via runIdle(), which usually fires
+  // AFTER loader.ts dispatches 'ss-ready' — so registering only on ss-ready
+  // means the listener is added too late and the buttons never get wired.
+  // Wire immediately if the modal is in the DOM; otherwise wait for ss-ready
+  // as a fallback. Guard with a flag so we never wire twice.
+  let _wired = false;
+  const wireButtons = (): void => {
+    if (_wired) return;
     const logoutBtn = document.getElementById('obLogoutBtn');
     const continueBtn = document.getElementById('obContinueBtn');
     const back1Btn = document.getElementById('obBack1Btn');
@@ -735,10 +817,14 @@ export function initOnboarding(): void {
     const testGrid = document.getElementById('obTestGrid');
     const levelGrid = document.getElementById('obLevelGrid');
 
-    if (logoutBtn)
-      logoutBtn.addEventListener('click', () => {
-        window._obLogout?.();
-      });
+    // If the modal hasn't been injected yet, bail and let the ss-ready
+    // fallback below try again. Use obLogoutBtn as the sentinel.
+    if (!logoutBtn) return;
+    _wired = true;
+
+    logoutBtn.addEventListener('click', () => {
+      window._obLogout?.();
+    });
     if (continueBtn)
       continueBtn.addEventListener('click', () => {
         window._obNext?.();
@@ -785,5 +871,8 @@ export function initOnboarding(): void {
           window._obSelectLevel(btn, btn.dataset['level']);
       });
     }
-  });
+  };
+
+  wireButtons();
+  if (!_wired) window.addEventListener('ss-ready', wireButtons);
 }

@@ -16,6 +16,9 @@
         while (sec.firstChild) container.appendChild(sec.firstChild);
       }
       _init();
+      if (typeof window.applyLanguage === 'function') {
+        window.applyLanguage(window._lang || localStorage.getItem('ss_lang') || 'en');
+      }
     })
     .catch(function (err) {
       console.error('practice.html load error:', err);
@@ -31,12 +34,12 @@
       grammar: 'Grammatik'
     };
     var _glSkillSubs = {
-      reading: 'Reading comprehension',
-      listening: 'Listening comprehension',
-      writing: 'Writing tasks',
-      speaking: 'Speaking exercises',
-      vocab: 'Vocabulary builder',
-      grammar: 'Grammar practice'
+      reading: _t('gl_reading_sub'),
+      listening: _t('gl_listening_sub'),
+      writing: _t('gl_writing_sub'),
+      speaking: _t('gl_speaking_sub'),
+      vocab: _t('gl_vocab_sub'),
+      grammar: _t('gl_grammar_sub')
     };
     var _glSkillChips = {
       reading: [

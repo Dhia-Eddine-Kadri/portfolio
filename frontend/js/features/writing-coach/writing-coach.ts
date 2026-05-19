@@ -89,6 +89,7 @@ async function _inject(psecGerman: HTMLElement): Promise<void> {
       psecGerman.querySelector('#glHome');
     if (card && target) target.appendChild(card);
     if (view) psecGerman.appendChild(view);
+    window.applyLanguage?.(window._lang || localStorage.getItem('ss_lang') || 'en');
 
     _wire();
   } catch (e) {

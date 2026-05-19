@@ -58,7 +58,9 @@ PAYPAL_PLAN_ID
 PAYPAL_WEBHOOK_ID             # *new, required by /api/paypal-webhook
 PAYPAL_API_BASE               # https://api-m.paypal.com
 ALLOWED_ORIGIN                # https://minallo.de
-AI_MONTHLY_CAP                # *new, default 500 if unset
+INTERACTIVE_MONTHLY_CAP       # *new, default 2000 (chat / RAG / writing-coach)
+GENERATION_MONTHLY_CAP        # *new, default 200  (quiz / flashcards / notes)
+AI_MONTHLY_CAP                # legacy alias, routes to interactive bucket
 ```
 
 Trigger a Netlify redeploy after editing env vars — function bundles do not
@@ -144,7 +146,10 @@ order by total desc
 limit 20;
 ```
 
-Users who hit the 500/month fair-use cap (= cost-protection working):
+Users who hit either monthly fair-use cap (= cost-protection working).
+The `bucket` field on the metadata distinguishes `interactive` (chat / RAG /
+writing-coach / stream, default 2000/mo) from `generation` (quiz / flashcards
+/ notes, default 200/mo):
 
 ```sql
 select user_id, count(*) as cap_hits, max(created_at) as last_hit

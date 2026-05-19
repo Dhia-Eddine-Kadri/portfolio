@@ -4,7 +4,7 @@ import { jsonResponse, fail, handleOptions } from '../lib/responses';
 import { optionalEnv, requireEnv } from '../lib/env';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
-import { enforceEventRateLimit, enforceMonthlyAiCap, AI_MONTHLY_CAP } from '../lib/rate-limit';
+import { enforceEventRateLimit, enforceGenerationCap } from '../lib/rate-limit';
 import { requireActiveSubscription } from '../lib/subscription-gate';
 import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
@@ -59,7 +59,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   const subBlocked = await requireActiveSubscription(serviceKey, user.id, 'ai_generate');
   if (subBlocked) return subBlocked;
-  const monthlyCapped = await enforceMonthlyAiCap(serviceKey, user.id, AI_MONTHLY_CAP);
+  const monthlyCapped = await enforceGenerationCap(serviceKey, user.id);
   if (monthlyCapped) return monthlyCapped;
   const limited = await enforceEventRateLimit(
     serviceKey,

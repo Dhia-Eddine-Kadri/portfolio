@@ -810,7 +810,7 @@
 }
 
 /* ----------------------------------------------------------------
-   MOBILE RESPONSIVE � Minallo
+   MOBILE RESPONSIVE — Minallo
    Breakpoints: 768px tablet  |  480px phone  |  360px small phone
    ---------------------------------------------------------------- */
 
@@ -913,7 +913,7 @@
   }
 }
 
-/* Hamburger button � hidden on desktop, shown on mobile */
+/* Hamburger button — hidden on desktop, shown on mobile */
 #portalHamburger {
   display: none;
   width: 38px;
@@ -1046,7 +1046,7 @@
   .ai-chips::-webkit-scrollbar {
     display: none;
   }
-  /* App view � AI panel inside portal */
+  /* App view — AI panel inside portal */
   #portal #aiPanel {
     position: fixed !important;
     right: 0 !important;
@@ -1242,7 +1242,7 @@
 
 /* Widget panel responsive -- moved to features/css/dashboard.css */
 
-/* Toast mobile styles � moved to features/toast/toast.css */
+/* Toast mobile styles — moved to features/toast/toast.css */
 
 /* -- Level select grid: fewer columns on very small phone -- */
 @media (max-width: 360px) {
@@ -1372,12 +1372,12 @@
     flex: 1 !important;
     max-width: 90px !important;
   }
-  /* Canvas sizing is handled by JS (initCanvas) � CSS just ensures display:block */
+  /* Canvas sizing is handled by JS (initCanvas) — CSS just ensures display:block */
   #tetrisCanvas {
     display: block !important;
   }
 
-  /* Flappy bird: scale canvas to fit � keep internal resolution, scale CSS display */
+  /* Flappy bird: scale canvas to fit — keep internal resolution, scale CSS display */
   .bird-wrap {
     display: flex !important;
     justify-content: center !important;

@@ -36,65 +36,22 @@
       ROW_H = 160,
       GAP = 14;
 
+    function _t(key, fallback) {
+      return (window._t && window._t(key)) || fallback;
+    }
     var DEFS = [
-      {
-        type: 'courses',
-        icon: '📚',
-        name: 'Course Shortcuts',
-        cols: 2,
-        rows: 1,
-        desc: 'Jump into any course'
-      },
-      {
-        type: 'mail',
-        icon: '✉️',
-        name: 'New Mails',
-        cols: 2,
-        rows: 2,
-        desc: 'Unread messages only'
-      },
-      {
-        type: 'notes',
-        icon: '📝',
-        name: 'Quick Notes',
-        cols: 2,
-        rows: 2,
-        desc: 'Personal scratch pad'
-      },
-      { type: 'stats', icon: '📊', name: 'Study Stats', cols: 2, rows: 1, desc: 'Weekly progress' },
-      {
-        type: 'deadlines',
-        icon: '⏰',
-        name: 'Deadlines',
-        cols: 2,
-        rows: 2,
-        desc: 'Upcoming due dates'
-      },
-      {
-        type: 'weather',
-        icon: '🌤️',
-        name: 'Campus Weather',
-        cols: 1,
-        rows: 1,
-        desc: 'Braunschweig forecast'
-      },
-      {
-        type: 'ai',
-        icon: '🤖',
-        name: 'AI Quick Chat',
-        cols: 2,
-        rows: 2,
-        desc: 'Ask anything instantly'
-      },
-      {
-        type: 'gcal',
-        icon: '📆',
-        name: 'Google Calendar',
-        cols: 1,
-        rows: 3,
-        desc: 'View & edit your events'
-      }
+      { type: 'courses', icon: '📚', nameKey: 'wdg_courses_name', descKey: 'wdg_courses_desc', cols: 2, rows: 1 },
+      { type: 'mail', icon: '✉️', nameKey: 'wdg_mail_name', descKey: 'wdg_mail_desc', cols: 2, rows: 2 },
+      { type: 'notes', icon: '📝', nameKey: 'wdg_notes_name', descKey: 'wdg_notes_desc', cols: 2, rows: 2 },
+      { type: 'stats', icon: '📊', nameKey: 'wdg_stats_name', descKey: 'wdg_stats_desc', cols: 2, rows: 1 },
+      { type: 'deadlines', icon: '⏰', nameKey: 'wdg_deadlines_name', descKey: 'wdg_deadlines_desc', cols: 2, rows: 2 },
+      { type: 'weather', icon: '🌤️', nameKey: 'wdg_weather_name', descKey: 'wdg_weather_desc', cols: 1, rows: 1 },
+      { type: 'ai', icon: '🤖', nameKey: 'wdg_ai_name', descKey: 'wdg_ai_desc', cols: 2, rows: 2 },
+      { type: 'gcal', icon: '📆', nameKey: 'wdg_gcal_name', descKey: 'wdg_gcal_desc', cols: 1, rows: 3 },
+      { type: 'mastery', icon: '🎯', nameKey: 'wdg_mastery_name', descKey: 'wdg_mastery_desc', cols: 2, rows: 2 }
     ];
+    function defName(def) { return _t(def.nameKey, def.nameKey); }
+    function defDesc(def) { return _t(def.descKey, def.descKey); }
 
     var now = new Date();
     var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -179,7 +136,7 @@
         var sem = SEMS[window.sdActiveSemId];
         var courses = sem && sem.courses && sem.courses.length ? sem.courses : [];
         if (!courses.length)
-          return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.5;font-size:.82rem">No courses yet — add some in Subjects</div>';
+          return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.5;font-size:.82rem">' + _t('dash_no_courses', 'No courses yet — add some in Subjects') + '</div>';
         return (
           '<div class="cw-pills">' +
           courses
@@ -234,7 +191,21 @@
           '<div class="aw-hint">Powered by Minallo AI</div>'
         );
       if (type === 'gcal')
-        return '<div class="gcw-root" id="gcwRoot"><div class="gcw-connect"><button class="gcw-connect-btn" id="gcwConnectBtn">Connect Google Calendar</button><div class="gcw-connect-sub">Sign in with Google to view and edit your events</div></div></div>';
+        return '<div class="gcw-root" id="gcwRoot"><div class="gcw-connect"><button class="gcw-connect-btn" id="gcwConnectBtn">' + _t('gcw_connect_btn', 'Connect Google Calendar') + '</button><div class="gcw-connect-sub">' + _t('gcw_connect_sub', 'Sign in with Google to view and edit your events') + '</div></div></div>';
+      if (type === 'mastery') {
+        // Course picker + sorted mastery list. Initial state shows a loading
+        // placeholder; the post-render hook below fetches /api/ai/mastery
+        // for the selected course and re-paints. Re-paints again whenever
+        // the chatbot or quiz UI dispatches `ss:mastery-updated`.
+        return (
+          '<div class="mw-root" style="display:flex;flex-direction:column;height:100%;gap:8px">' +
+            '<select class="mw-course" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#fff;padding:6px 8px;font-family:\'Nunito\',sans-serif;font-size:.78rem;outline:none"></select>' +
+            '<div class="mw-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">' +
+              '<div class="mw-empty" style="opacity:.5;font-size:.78rem;text-align:center;padding:14px">Loading practice focus…</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }
       return '';
     }
 
@@ -478,7 +449,7 @@
           '<div class="dw-header"><span class="dw-icon">' +
           (def ? def.icon : '') +
           '</span><span class="dw-title">' +
-          (def ? def.name : '') +
+          (def ? defName(def) : '') +
           '</span><button class="dw-remove">\xD7</button></div>' +
           '<div class="dw-body">' +
           widgetBody(w.type) +
@@ -578,6 +549,139 @@
         });
         inp.addEventListener('keydown', function (e) {
           if (e.key === 'Enter') _sendWidgetAI(body);
+        });
+      });
+
+      // ── Mastery widget binding ────────────────────────────────────────────
+      canvas.querySelectorAll('.dw-body').forEach(function (body) {
+        var root = body.querySelector('.mw-root');
+        if (!root || body._mwBound) return;
+        body._mwBound = true;
+
+        var sel = root.querySelector('.mw-course');
+        var list = root.querySelector('.mw-list');
+
+        function _allCourses() {
+          var out = [];
+          Object.keys(SEMS || {}).forEach(function (semId) {
+            ((SEMS[semId] && SEMS[semId].courses) || []).forEach(function (c) {
+              if (c && c.id) out.push({ id: c.id, name: c.name || c.id });
+            });
+          });
+          // Phase 3: Schreibtrainer feeds writing weaknesses into the same
+          // table under a sentinel course_id; expose it as its own picker
+          // option so the user can see german:* topics alongside quizzes.
+          out.push({ id: '_writing_coach', name: 'Schreibtrainer (German)' });
+          return out;
+        }
+
+        function _renderList(rows) {
+          if (!rows || !rows.length) {
+            list.innerHTML =
+              '<div class="mw-empty" style="opacity:.6;font-size:.78rem;text-align:center;padding:14px;line-height:1.4">' +
+              _t('mastery_take_quiz', 'Take a quiz to see your practice focus for this course.') + '</div>';
+            return;
+          }
+          // Sorted weakest-first server-side. Show top 6.
+          var top = rows.slice(0, 6);
+          list.innerHTML = top.map(function (r, i) {
+            var pct = Math.max(0, Math.min(100, Math.round((r.mastery_score || 0) * 100)));
+            var bad = pct < 50;
+            var color = bad ? '#ef4444' : pct < 75 ? '#f59e0b' : '#22c55e';
+            var rawTopic = String(r.topic || '');
+            var name = rawTopic.replace(/[<>&]/g, function (c) {
+              return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+            });
+            return (
+              '<div class="mw-row" data-mw-topic-idx="' + i + '" style="display:flex;flex-direction:column;gap:3px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+                  '<span style="font-size:.78rem;color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + name + '">' + name + '</span>' +
+                  '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+                    '<span style="font-size:.72rem;color:rgba(255,255,255,.55)">' + pct + '%</span>' +
+                    '<button class="mw-practice" data-mw-practice="' + i + '" title="Practice this topic" ' +
+                      'style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:#93c5fd;font-family:\'Nunito\',sans-serif;font-size:.66rem;font-weight:700;padding:2px 7px;border-radius:10px;cursor:pointer">' +
+                      'Practice' +
+                    '</button>' +
+                  '</span>' +
+                '</div>' +
+                '<div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">' +
+                  '<div style="width:' + pct + '%;height:100%;background:' + color + ';transition:width .25s ease"></div>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('');
+
+          // Wire Practice buttons. Drops a seed into sessionStorage and
+          // navigates to the chatbot, which consumes the seed on mount
+          // (see shell.ts: consumePracticeSeed).
+          list.querySelectorAll('[data-mw-practice]').forEach(function (btn) {
+            btn.addEventListener('click', function (ev) {
+              ev.stopPropagation();
+              var idx = parseInt(btn.getAttribute('data-mw-practice'), 10);
+              var row = top[idx];
+              if (!row || !row.topic) return;
+              // Schreibtrainer topics are namespaced "german:<category>".
+              // Strip the prefix for the practice prompt so it reads naturally.
+              var displayTopic = String(row.topic).replace(/^german:/, '');
+              var courseId = sel.value;
+              var isWriting = courseId === '_writing_coach' || /^german:/.test(row.topic);
+              var prompt = isWriting
+                ? 'Quiz me on the German grammar topic "' + displayTopic + '". Give me 3-5 multiple-choice questions.'
+                : 'Quiz me on "' + displayTopic + '". Give me 3-5 multiple-choice questions grounded in my course material.';
+              try {
+                sessionStorage.setItem('ss_practice_seed', JSON.stringify({
+                  topic: row.topic,
+                  courseId: courseId,
+                  prompt: prompt
+                }));
+              } catch (e) { /* ignore */ }
+              if (typeof window.showPortalSection === 'function') {
+                window.showPortalSection('aipage');
+              }
+            });
+          });
+        }
+
+        function _fetch(courseId) {
+          if (!courseId) { _renderList([]); return; }
+          list.innerHTML = '<div class="mw-empty" style="opacity:.5;font-size:.78rem;text-align:center;padding:14px">Loading…</div>';
+          var token = window._sbToken || '';
+          fetch((window.BACKEND_URL || '') + '/api/ai/mastery?courseId=' + encodeURIComponent(courseId), {
+            headers: { Authorization: 'Bearer ' + token }
+          })
+            .then(function (r) { return r.ok ? r.json() : { mastery: [] }; })
+            .then(function (data) { _renderList(data && data.mastery); })
+            .catch(function () { _renderList([]); });
+        }
+
+        var courses = _allCourses();
+        if (!courses.length) {
+          sel.innerHTML = '<option>' + _t('dash_no_courses_short', 'No courses yet') + '</option>';
+          list.innerHTML = '<div class="mw-empty" style="opacity:.6;font-size:.78rem;text-align:center;padding:14px">Add a course in Subjects to start tracking your practice focus.</div>';
+          return;
+        }
+        sel.innerHTML = courses.map(function (c) {
+          return '<option value="' + c.id + '">' + (c.name || c.id) + '</option>';
+        }).join('');
+        // Restore last selection per user-local preference.
+        var lastKey = 'ss_mastery_widget_course';
+        var last = null;
+        try { last = localStorage.getItem(lastKey); } catch (e) {}
+        if (last && courses.some(function (c) { return c.id === last; })) sel.value = last;
+        var initial = sel.value || courses[0].id;
+        sel.value = initial;
+        _fetch(initial);
+        sel.addEventListener('change', function () {
+          try { localStorage.setItem(lastKey, sel.value); } catch (e) {}
+          _fetch(sel.value);
+        });
+
+        // Re-render after a quiz submit updates mastery for the current course.
+        window.addEventListener('ss:mastery-updated', function (e) {
+          var d = (e && e.detail) || {};
+          if (!d.courseId || d.courseId !== sel.value) return;
+          if (Array.isArray(d.mastery)) _renderList(d.mastery);
+          else _fetch(sel.value);
         });
       });
       canvas.querySelectorAll('.dw-body').forEach(function (body) {
@@ -869,13 +973,13 @@
           '<div class="wp-icon">' +
           def.icon +
           '</div><div class="wp-name">' +
-          def.name +
+          defName(def) +
           '</div><div class="wp-size">' +
           def.cols +
           '\xD7' +
           def.rows +
           ' \xB7 ' +
-          def.desc +
+          defDesc(def) +
           '</div>';
         card.addEventListener('click', function () {
           if (card.classList.contains('added')) return;
@@ -948,6 +1052,16 @@
       } catch (e) {}
     })();
     render();
+
+    // Re-render tiles + picker when the user switches language so widget names,
+    // descriptions, and JS-generated bodies (mastery prompt, Google Calendar
+    // connect, "No courses yet"…) all flip immediately.
+    window.addEventListener('minallo:lang-changed', function () {
+      try {
+        if (typeof buildPicker === 'function') buildPicker();
+        if (typeof render === 'function') render();
+      } catch (e) { /* ignore */ }
+    });
   } // end _init
 })();
 

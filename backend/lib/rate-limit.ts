@@ -4,9 +4,40 @@ import { logSecurityEvent } from './logger';
 import { optionalEnv } from './env';
 import type { LambdaResponse } from './types';
 
-/** Global monthly AI call cap. Default 500 covers heavy legitimate use while
- *  protecting against runaway-cost scripts. Override with the env var. */
-export const AI_MONTHLY_CAP = parseInt(optionalEnv('AI_MONTHLY_CAP', '500'), 10);
+// ── Monthly Fair-Use caps (split: interactive vs. generation) ──────────────
+//
+// Interactive AI (chat / RAG asks / writing coach / ask-stream) is cheap
+// per-call (~$0.001 on gpt-4o-mini), so the cap is generous. Bulk generation
+// (flashcards / quizzes / notes summary) costs more per output token and is
+// the realistic abuse vector, so its cap is tighter. Both reset on the 1st
+// of each UTC month.
+
+/** @deprecated kept exported for backward compat — used to be the single
+ *  combined cap. Now split into interactive + generation. */
+export const AI_MONTHLY_CAP = parseInt(optionalEnv('AI_MONTHLY_CAP', '2000'), 10);
+
+/** Combined chat / RAG / writing-coach / streaming asks. */
+export const INTERACTIVE_MONTHLY_CAP = parseInt(
+  optionalEnv('INTERACTIVE_MONTHLY_CAP', '2000'),
+  10
+);
+/** Notes + quiz + flashcard generation (each item = one event). */
+export const GENERATION_MONTHLY_CAP = parseInt(
+  optionalEnv('GENERATION_MONTHLY_CAP', '200'),
+  10
+);
+
+const INTERACTIVE_EVENT_TYPES = [
+  'ai_ask',
+  'ai_chat',
+  'writing_coach_analyse',
+  'ask_stream'
+] as const;
+
+const GENERATION_EVENT_TYPES = [
+  'ai_generate',
+  'notes_generate'
+] as const;
 
 // Counts recent security_events for a user within a rolling window.
 export async function countRecentEvents(
@@ -70,23 +101,7 @@ export async function enforceEventRateLimit(
   return rateLimitResponse(windowMs, message);
 }
 
-// ── Monthly combined cap across all AI endpoints ───────────────────────────
-//
-// The hourly per-endpoint caps stop short-burst abuse, but a focused user can
-// still reach ~21k calls/month at gpt-4o pricing — a net loss against the
-// €11.99 subscription. This cap counts every AI call across all endpoints in
-// the current calendar month (UTC) and blocks further calls past the budget.
-// The window resets at the first of the month so we can keep the "unlimited"
-// marketing language as long as fair-use is documented in the AGB.
-
-const AI_EVENT_TYPES = [
-  'ai_ask',
-  'ai_generate',
-  'ai_chat',
-  'notes_generate',
-  'writing_coach_analyse',
-  'ask_stream'
-] as const;
+// ── Calendar-month helpers ──────────────────────────────────────────────────
 
 function _startOfMonthIso(): string {
   const now = new Date();
@@ -98,12 +113,13 @@ function _startOfNextMonthIso(): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0)).toISOString();
 }
 
-export async function countAiEventsThisMonth(
+async function _countEventsThisMonth(
   serviceKey: string,
-  userId: string
+  userId: string,
+  eventTypes: readonly string[]
 ): Promise<number> {
   const since = _startOfMonthIso();
-  const types = AI_EVENT_TYPES.map(encodeURIComponent).join(',');
+  const types = eventTypes.map(encodeURIComponent).join(',');
   const path =
     'security_events?user_id=eq.' + encodeURIComponent(userId) +
     '&event_type=in.(' + types + ')' +
@@ -113,24 +129,51 @@ export async function countAiEventsThisMonth(
   return Array.isArray(res.body) ? res.body.length : 0;
 }
 
-/** Returns null if the user is within their monthly AI budget, or a 429
- *  LambdaResponse with a Retry-After header set to "seconds until the 1st
- *  of next month". */
-export async function enforceMonthlyAiCap(
+export async function countInteractiveEventsThisMonth(
   serviceKey: string,
-  userId: string,
-  maxEvents: number
-): Promise<LambdaResponse | null> {
-  const count = await countAiEventsThisMonth(serviceKey, userId);
-  if (count < maxEvents) return null;
-  await logSecurityEvent(serviceKey, userId, 'ai_monthly_cap_blocked', {
-    count,
-    cap: maxEvents
-  }).catch(() => undefined);
+  userId: string
+): Promise<number> {
+  return _countEventsThisMonth(serviceKey, userId, INTERACTIVE_EVENT_TYPES);
+}
+
+export async function countGenerationEventsThisMonth(
+  serviceKey: string,
+  userId: string
+): Promise<number> {
+  return _countEventsThisMonth(serviceKey, userId, GENERATION_EVENT_TYPES);
+}
+
+/** @deprecated retained for the existing /api/ai/usage callers; sums both
+ *  counters into one combined number. New code should call the split helpers. */
+export async function countAiEventsThisMonth(
+  serviceKey: string,
+  userId: string
+): Promise<number> {
+  return _countEventsThisMonth(serviceKey, userId, [
+    ...INTERACTIVE_EVENT_TYPES,
+    ...GENERATION_EVENT_TYPES
+  ]);
+}
+
+type Bucket = 'interactive' | 'generation';
+
+function _capBlockedResponse(
+  bucket: Bucket,
+  count: number,
+  cap: number
+): LambdaResponse {
   const secondsUntilReset = Math.max(
     60,
     Math.floor((new Date(_startOfNextMonthIso()).getTime() - Date.now()) / 1000)
   );
+  const friendly =
+    bucket === 'interactive'
+      ? "You've reached this month's chat + tutor allowance (" +
+        cap +
+        ' AI calls). Resets on the 1st of next month.'
+      : "You've reached this month's quiz / flashcard / notes generation allowance (" +
+        cap +
+        ' bulk operations). Chat and tutor still work. Resets on the 1st of next month.';
   return {
     statusCode: 429,
     headers: {
@@ -139,17 +182,57 @@ export async function enforceMonthlyAiCap(
     },
     body: JSON.stringify({
       error: {
-        // `code` lets the client recognise the cap (vs. generic rate-limit)
-        // and surface a dedicated modal instead of a generic toast.
         code: 'ai_monthly_cap',
-        message:
-          "You've reached this month's fair-use limit (" +
-          maxEvents +
-          ' AI calls). It resets on the 1st of next month.',
+        bucket,
+        message: friendly,
         used: count,
-        limit: maxEvents,
+        limit: cap,
         resetsAt: _startOfNextMonthIso()
       }
     })
   };
+}
+
+/** Enforce the interactive (chat / RAG / writing-coach / stream) bucket. */
+export async function enforceInteractiveCap(
+  serviceKey: string,
+  userId: string,
+  cap: number = INTERACTIVE_MONTHLY_CAP
+): Promise<LambdaResponse | null> {
+  const count = await countInteractiveEventsThisMonth(serviceKey, userId);
+  if (count < cap) return null;
+  await logSecurityEvent(serviceKey, userId, 'ai_monthly_cap_blocked', {
+    bucket: 'interactive',
+    count,
+    cap
+  }).catch(() => undefined);
+  return _capBlockedResponse('interactive', count, cap);
+}
+
+/** Enforce the generation (quiz / flashcards / notes) bucket. */
+export async function enforceGenerationCap(
+  serviceKey: string,
+  userId: string,
+  cap: number = GENERATION_MONTHLY_CAP
+): Promise<LambdaResponse | null> {
+  const count = await countGenerationEventsThisMonth(serviceKey, userId);
+  if (count < cap) return null;
+  await logSecurityEvent(serviceKey, userId, 'ai_monthly_cap_blocked', {
+    bucket: 'generation',
+    count,
+    cap
+  }).catch(() => undefined);
+  return _capBlockedResponse('generation', count, cap);
+}
+
+/** @deprecated wrapper. Routes to interactive bucket so existing call sites
+ *  in ai-ask / ai-writing-coach / ai (chat) keep working with the old call
+ *  shape `enforceMonthlyAiCap(serviceKey, userId, cap)`. New code should call
+ *  enforceInteractiveCap or enforceGenerationCap directly. */
+export async function enforceMonthlyAiCap(
+  serviceKey: string,
+  userId: string,
+  cap?: number
+): Promise<LambdaResponse | null> {
+  return enforceInteractiveCap(serviceKey, userId, cap ?? INTERACTIVE_MONTHLY_CAP);
 }

@@ -22,9 +22,11 @@ from openai import OpenAI
 
 from ..config import get_settings
 from .answer import (
+    DEFAULT_TUTOR_MODE,
     _build_context_block,
     _cited_indices,
     _context_strength,
+    normalise_tutor_mode,
     pick_system_prompt,
 )
 from .retrieval import RetrievedChunk
@@ -45,6 +47,8 @@ def stream_answer(
     max_tokens: int = 1200,
     active_file_name: str | None = None,
     open_file_context: str | None = None,
+    tutor_mode: str = DEFAULT_TUTOR_MODE,
+    weak_topics: list[str] | None = None,
 ) -> Generator[bytes, None, None]:
     """Generator that yields SSE byte chunks. Pluggable into FastAPI's
     StreamingResponse with media_type='text/event-stream'.
@@ -67,7 +71,11 @@ def stream_answer(
     # apology when they're literally reading the relevant page. The
     # currently-visible text becomes Source 0 of the context block.
     effective_strength = "strong" if (strength == "strong" or has_open) else strength
-    system_prompt, answer_mode = pick_system_prompt(question, effective_strength, used_chunks)
+    tutor_mode_norm = normalise_tutor_mode(tutor_mode)
+    system_prompt, answer_mode = pick_system_prompt(
+        question, effective_strength, used_chunks, tutor_mode=tutor_mode_norm,
+        weak_topics=weak_topics,
+    )
 
     # Compose the context block. Open-file text goes first as [Source 0] so
     # the model cites it preferentially for deictic ("this question /
@@ -118,6 +126,7 @@ def stream_answer(
         "meta": True,
         "retrievalMode": effective_strength,
         "answerMode": answer_mode,
+        "tutorMode": tutor_mode_norm,
         "confidence": "high" if effective_strength == "strong" else "low",
         "unsupported": effective_strength != "strong",
     })
@@ -182,6 +191,7 @@ def stream_answer(
         "done": True,
         "retrievalMode": effective_strength,
         "answerMode": answer_mode,
+        "tutorMode": tutor_mode_norm,
         "verification": verification,
         "confidence": "high" if effective_strength == "strong" else "low",
         "unsupported": effective_strength != "strong",

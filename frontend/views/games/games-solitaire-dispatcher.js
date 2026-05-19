@@ -1,4 +1,4 @@
-﻿// â”€â”€ SOLITAIRE VARIANT DISPATCHER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿// -- SOLITAIRE VARIANT DISPATCHER -----------------------------------------
 (function () {
   var currentVariant = null;
   var VARIANTS = {
@@ -279,7 +279,7 @@
       });
     _solUIWired = true;
   };
-  // Single capture-phase click dispatcher â€” fires before any element handlers, can't be double-called
+  // Single capture-phase click dispatcher — fires before any element handlers, can't be double-called
   var _solLastClick = 0;
   document.addEventListener(
     'click',

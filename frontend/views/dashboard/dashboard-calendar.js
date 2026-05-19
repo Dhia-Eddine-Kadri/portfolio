@@ -1,6 +1,6 @@
-﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+﻿// ============================================================================
 // GOOGLE CALENDAR WIDGET
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ============================================================================
 (function () {
   var _gcToken = null;
   var _gcExpiry = 0;
@@ -116,7 +116,7 @@
         } else if (e.message === 'api_not_enabled') {
           showToast(
             'Calendar API not enabled',
-            'Enable the Google Calendar API in Google Cloud Console â†’ APIs & Services.'
+            'Enable the Google Calendar API in Google Cloud Console → APIs & Services.'
           );
         } else showToast('Calendar error', e.message || 'Could not load events.');
       });
@@ -267,9 +267,9 @@
       '</span>' +
       '<span class="gcw-reminder-sub">Starting at ' +
       timeStr +
-      ' â€” in 30 minutes</span>' +
+      ' — in 30 minutes</span>' +
       '</div>' +
-      '<button class="gcw-reminder-close" id="gcwReminderClose">âœ•</button>';
+      '<button class="gcw-reminder-close" id="gcwReminderClose">✕</button>';
     document.body.appendChild(bar);
 
     document.getElementById('gcwReminderClose').addEventListener('click', function () {
@@ -306,7 +306,7 @@
       var html =
         '<button class="gcw-picker-year-btn" id="gcwPickerYrBtn">' +
         pickerY +
-        '<span class="gcw-picker-year-arrow">â–¼</span></button>' +
+        '<span class="gcw-picker-year-arrow">▼</span></button>' +
         '<div class="gcw-picker-months">';
       MONTH_NAMES.forEach(function (name, i) {
         var active = i === curM && pickerY === curY;
@@ -326,7 +326,7 @@
     function buildYears() {
       var html =
         '<button class="gcw-picker-year-btn" id="gcwPickerYrBtn" style="border-bottom:none">' +
-        'â† Months</button>' +
+        '← Months</button>' +
         '<div class="gcw-picker-years" id="gcwPickerYrList">';
       var startY = curY - 50,
         endY = curY + 20;
@@ -553,7 +553,7 @@
               var en = e.end && (e.end.dateTime || e.end.date);
               var timeStr = e.start.dateTime
                 ? new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
-                  ' â€” ' +
+                  ' — ' +
                   new Date(en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : 'All day';
               return (
@@ -711,7 +711,7 @@
         end: { dateTime: new Date(end).toISOString() }
       };
       var saveBtn = modal.querySelector('#gcwSaveBtn');
-      saveBtn.textContent = 'Savingâ€¦';
+      saveBtn.textContent = 'Saving…';
       saveBtn.disabled = true;
       if (isEdit) {
         _gcUpdateEvent(evId, body, function () {

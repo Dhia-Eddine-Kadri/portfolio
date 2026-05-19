@@ -51,11 +51,22 @@ def _word_count(text: str) -> int:
 def _system_prompt(profile_level: str, task_type: str, explanation_language: str) -> str:
     is_argumentative = task_type in ARGUMENTATIVE_TASK_TYPES
     is_c1_hochschule = profile_level == "C1 Hochschule"
-    return f"""You are a strict but encouraging German writing teacher grading a student text.
+    return f"""You are an honest, supportive German writing coach grading a student text.
 
 PROFILE LEVEL: {profile_level}
 TASK TYPE: {task_type}
 EXPLANATION LANGUAGE: {explanation_language}
+
+STUDENT DIGNITY — applies to every field you produce (strengths, scoreExplanation, explanation, longitudinalNote, every feedbackItem). Correct the writing, not the writer.
+- Describe the grammar / vocabulary / style point, NEVER the student. Diagnose the skill, not the level of the person.
+- Required style examples (mirror this voice):
+  * "Your meaning is clear. The grammar point to strengthen is adjective endings after definite articles."
+  * "For a {profile_level}-level text, a more precise expression would be ..."
+  * "This sentence is understandable; the word order needs adjustment."
+  * "The idea is almost right — the issue is the auxiliary verb in the Perfekt."
+- FORBIDDEN phrasings, no matter how poor the text is: "Your German is weak / bad / poor / too simple", "You write like a beginner", "Your vocabulary is too low for {profile_level}", "You don't understand cases", "You should already know this", "This is easy", "Stupid / dumb / careless mistake", "You keep messing up", "You are not ready". Avoid condescending softeners ("obviously", "clearly", "as I already said").
+- Never tell the student their text "is at A1 level" if they're working at C1 — describe what the specific sentence needs to reach C1.
+- If the student writes anything self-deprecating in the text, do not agree with it.
 
 Core rule: Evaluate the text according to the student's PROFILE LEVEL and TASK TYPE. A phrase can be grammatically correct but still inappropriate for the profile level — mark such cases as vocabulary or style upgrades, NOT as grammar mistakes.
 
@@ -341,11 +352,21 @@ def analyse_writing(
     system = _system_prompt(profile_level, task_type, explanation_language)
     user = _user_prompt(text, weakness_profile)
 
+    # Escalate to gpt-4o for advanced levels. C1 / C1 Hochschule / C2 grading
+    # needs subtle distinctions between actual mistake / vocab upgrade / style
+    # upgrade — gpt-4o-mini handles A1–B2 fine but blurs the line at academic
+    # German. A1–B2 stay on the cheaper default model.
     settings = get_settings()
+    strong_levels = {"C1", "C1 Hochschule", "C2"}
+    chosen_model = (
+        getattr(settings, "openai_generate_model_strong", None)
+        if profile_level in strong_levels
+        else getattr(settings, "openai_generate_model", None)
+    )
     result = chat_json(
         system=system,
         user=user,
-        model=getattr(settings, "openai_generate_model", None),
+        model=chosen_model,
         max_tokens=3500,
     )
     data = result.data if isinstance(result.data, dict) else {}
@@ -387,6 +408,27 @@ def analyse_writing(
 
     practice_raw = data.get("practiceRecommendations")
     practice = [s for s in practice_raw if isinstance(s, str) and s.strip()] if isinstance(practice_raw, list) else []
+
+    # Phase 3: feed Schreibtrainer mistakes into the shared mastery table so
+    # the dashboard "Your weak topics" widget surfaces writing weaknesses
+    # alongside course quiz weaknesses. Only actual grammar/style errors at
+    # medium-or-high severity count — vocab "upgrade" suggestions are not
+    # mistakes and shouldn't tar the student's mastery score.
+    try:
+        from .mastery import record_writing_weakness  # noqa: WPS433
+        weak_cats: list[str] = []
+        for it in items:
+            if not it.get("isActualError"):
+                continue
+            if it.get("severity") not in ("high", "medium"):
+                continue
+            cat = (it.get("category") or it.get("type") or "").strip()
+            if cat:
+                weak_cats.append(cat)
+        if weak_cats:
+            record_writing_weakness(user_id=user_id, weak_categories=weak_cats)
+    except Exception:  # noqa: BLE001
+        log.exception("schreibtrainer mastery sync failed (ignored)")
 
     return {
         "profileLevel": profile_level,

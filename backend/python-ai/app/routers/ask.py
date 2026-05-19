@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ..auth import require_internal_token
-from ..services.answer import generate_answer
+from ..services.answer import DEFAULT_TUTOR_MODE, generate_answer, normalise_tutor_mode
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
 from ..services.retrieval import (
     ExerciseHit,
@@ -223,6 +223,10 @@ class AskRequest(BaseModel):
     activeDocumentId: str | None = Field(default=None, description="Document the user is currently reading; +0.25 retrieval boost.")
     question: str
     bypassCache: bool = False
+    tutorMode: str | None = Field(
+        default=None,
+        description="Tutor-mode overlay: explain | solve | quiz. Defaults to 'solve'.",
+    )
 
 
 class AskSourcePayload(BaseModel):
@@ -244,6 +248,7 @@ class AskResponse(BaseModel):
     answer: str
     retrievalMode: str                          # strong | weak | none
     answerMode: str | None = None               # math | strong | weak  (Phase 9)
+    tutorMode: str | None = None                # explain | solve | quiz (phase 1 tutor)
     verification: VerificationPayload | None = None  # Phase 10
     groundedSources: list[AskSourcePayload]
     cacheHit: bool
@@ -270,9 +275,15 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
     if not question:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is required")
 
-    # ── 1. Cache lookup (skipped if no document scope or explicitly bypassed) ─
+    tutor_mode = normalise_tutor_mode(payload.tutorMode or DEFAULT_TUTOR_MODE)
+
+    # ── 1. Cache lookup ──────────────────────────────────────────────────────
+    # Only the legacy 'explain' mode is cacheable. 'solve' is conversational
+    # (the same question yields different turns depending on prior context)
+    # and 'quiz' is generative — caching either would defeat the mode.
     version_hash = ""
-    if payload.documentIds and not payload.bypassCache:
+    cacheable = tutor_mode == "explain"
+    if payload.documentIds and not payload.bypassCache and cacheable:
         version_hash = fetch_document_version_hash(
             payload.userId, payload.courseId, payload.documentIds
         )
@@ -300,6 +311,7 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
                 answer=cached.get("answer", ""),
                 retrievalMode=cached.get("retrievalMode", "strong"),
                 answerMode=cached.get("answerMode"),
+                tutorMode=cached.get("tutorMode") or tutor_mode,
                 verification=VerificationPayload(**cached_verification) if cached_verification else None,
                 groundedSources=[AskSourcePayload(**s) for s in cached.get("groundedSources", [])],
                 cacheHit=True,
@@ -360,18 +372,24 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             log.exception("doc_name backfill failed")
 
     # ── 3. Generate ──────────────────────────────────────────────────────────
+    # Phase 3: surface this student's weak topics for this course so the
+    # tutor system prompt can subtly reinforce them when relevant.
+    from ..services.mastery import fetch_weak_topics  # noqa: WPS433
+    weak_topics = fetch_weak_topics(payload.userId, payload.courseId)
     try:
         answer = generate_answer(
             question=question,
             chunks=chunks,
             doc_names=doc_name_map,
+            tutor_mode=tutor_mode,
+            weak_topics=weak_topics,
         )
     except Exception as e:  # noqa: BLE001
         log.exception("answer generation failed")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"answer generation failed: {e}")
 
     # ── 4. Save to cache for next time ───────────────────────────────────────
-    if version_hash and not payload.bypassCache:
+    if version_hash and not payload.bypassCache and cacheable:
         save_answer(
             user_id=payload.userId,
             course_id=payload.courseId,
@@ -414,6 +432,7 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         answer=answer["answer"],
         retrievalMode=answer["retrievalMode"],
         answerMode=answer.get("answerMode"),
+        tutorMode=answer.get("tutorMode") or tutor_mode,
         verification=VerificationPayload(**answer_verification) if answer_verification else None,
         groundedSources=[AskSourcePayload(**s) for s in answer.get("groundedSources", [])],
         cacheHit=False,

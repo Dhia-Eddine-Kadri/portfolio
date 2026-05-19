@@ -146,15 +146,18 @@ The platform is designed so a single subscriber cannot exceed the
   `expires_at`.
 - **Per-endpoint hourly rate limits** (`AI_ASK_RATE_LIMIT_MAX`,
   `NOTES_RATE_LIMIT_MAX`, …).
-- **Combined monthly fair-use cap** of 500 AI calls per user, across
-  every endpoint. Resets on the 1st of each calendar month UTC.
+- **Split monthly fair-use caps** per user, reset on the 1st of each
+  calendar month UTC: 2000 interactive calls (chat / RAG / writing-coach /
+  streaming asks) and 200 generation calls (quiz / flashcards / notes
+  summaries). Independent buckets so a quiz spree never locks out chat.
 - **Hard `max_tokens` caps** in every LLM call site.
 - **Cache-by-default** on RAG answers, keyed by document version hash so
   invalidation is automatic on document changes. Client cannot opt out.
 - **Cap is contractually backed** in the AGB §4 ("Fair-Use") so users
   cannot claim surprise.
 
-Worst-case spend at the cap: roughly $5/user/month at gpt-4o pricing,
+Worst-case spend at both caps: roughly $3-4/user/month with the default
+gpt-4o-mini baseline (writing-coach escalates to gpt-4o for C1+ levels),
 comfortably below the €11,99 list price.
 
 ## Security
@@ -188,7 +191,8 @@ monitoring SQL queries to keep an eye on after launch.
   transfers including DPF + SCC for the US, retention table, full Art.
   15-22 rights, and a documented response SLA.
 - **AGB** with the price (11,99 €/Monat), Fair-Use clause referencing
-  the 500-call/month cap, and digital-services Widerruf rules.
+  the split monthly caps (2000 interactive + 200 generation), and
+  digital-services Widerruf rules.
 - **Widerrufsbelehrung** with the standard 14-day form. The checkout
   flow captures explicit Widerruf-Verzicht consent (BGB §312j, §356(5))
   and persists it in Stripe metadata + the Netlify request log.

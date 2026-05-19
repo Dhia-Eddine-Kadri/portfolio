@@ -13,82 +13,82 @@
       <div class="sb-user" id="authIndicator">
         <div class="sb-avatar" id="authAvatar">?</div>
         <div class="sb-user-info">
-          <div class="sb-user-name" id="authName">Loading&#x2026;</div>
+          <div class="sb-user-name" id="authName" data-i18n="sb_loading">Loading&#x2026;</div>
           <div class="sb-user-uni" id="sbUserSub">TU Braunschweig</div>
         </div>
       </div>
 
       <div class="sb-nav">
-        <div class="sb-section-label">Workspace</div>
+        <div class="sb-section-label" data-i18n="sb_section_workspace">Workspace</div>
         <div class="sb-item psb on" id="psbDashboard" data-testid="sidebar-home">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="home"></span></div>
-          <span>Home</span>
+          <span data-i18n="nav_home">Home</span>
         </div>
         <div class="sb-item psb" id="pcStudip" data-testid="sidebar-courses">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="courses"></span></div>
-          <span>Courses</span>
+          <span data-i18n="nav_courses">Courses</span>
         </div>
         <!-- German learner nav &mdash; hidden for enrolled students -->
         <div class="sb-item psb" id="psbGerman" style="display: none">
           <div class="sb-item-icon">&#x1F1E9;&#x1F1EA;</div>
-          <span>Practice</span>
+          <span data-i18n="nav_practice">Practice</span>
         </div>
         <div class="sb-item psb" id="psbNotes" data-testid="sidebar-notes">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="notes"></span></div>
-          <span>Lecture Notes</span>
+          <span data-i18n="nav_notes">Lecture Notes</span>
         </div>
         <div class="sb-item psb" id="psbEditor" data-testid="sidebar-editor">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="editor"></span></div>
-          <span>Editor</span>
+          <span data-i18n="nav_editor">Editor</span>
         </div>
         <div class="sb-item psb" id="psbAIPage" data-testid="sidebar-chatbot">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="chatbot"></span></div>
-          <span>Chatbot</span>
+          <span data-i18n="nav_chatbot">Chatbot</span>
         </div>
         <div class="sb-item psb" id="psbChat" data-testid="sidebar-chat">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="chat"></span></div>
-          <span>Chat</span>
+          <span data-i18n="nav_chat">Chat</span>
         </div>
         <div class="sb-divider"></div>
-        <div class="sb-section-label">Activity</div>
+        <div class="sb-section-label" data-i18n="sb_section_activity">Activity</div>
         <div class="sb-item psb" id="psbNotifications" data-testid="sidebar-notifications" data-coming-soon="1" style="opacity: 0.65">
           <div class="sb-item-icon">
             <span class="sb-sprite" data-sprite="notifications"></span>
           </div>
-          <span>Notifications</span>
+          <span data-i18n="nav_notifications">Notifications</span>
         </div>
         <div class="sb-item psb" id="psbGames" data-testid="sidebar-games">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="games"></span></div>
-          <span>Games</span>
+          <span data-i18n="nav_games">Games</span>
         </div>
         <div class="sb-item psb" id="psbLounge" data-testid="sidebar-lounge">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="lounge"></span></div>
-          <span>Study Lounge</span>
+          <span data-i18n="nav_lounge">Study Lounge</span>
         </div>
         <div class="sb-divider"></div>
-        <div class="sb-section-label">Account</div>
+        <div class="sb-section-label" data-i18n="sb_section_account">Account</div>
         <div class="sb-item psb" id="psbProfile" data-testid="sidebar-profile">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="profile"></span></div>
-          <span>Profile</span>
+          <span data-i18n="nav_profile">Profile</span>
         </div>
         <div class="sb-item psb" id="psbSettings" data-testid="sidebar-settings">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="settings"></span></div>
-          <span>Settings</span>
+          <span data-i18n="nav_settings">Settings</span>
         </div>
         <div class="sb-item psb" id="psbSubscription" data-testid="sidebar-subscription">
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="subscription"></span></div>
-          <span>Subscription</span>
+          <span data-i18n="nav_subscription">Subscription</span>
         </div>
         <div class="sb-item psb" id="psbAdmin" style="display: none">
           <div class="sb-item-icon">&#x1F6E1;&#xFE0F;</div>
-          <span>Admin</span>
+          <span data-i18n="nav_admin">Admin</span>
         </div>
       </div>
 
       <div class="sb-bottom">
         <button class="sb-night-btn" id="nightBtn">
           <span class="sb-night-track" id="nightTrack">
-            <span class="sb-night-track-label" id="nightLabel">Night</span>
+            <span class="sb-night-track-label" id="nightLabel" data-i18n="sb_night">Night</span>
             <span class="sb-night-thumb" id="nightThumb">
               <span id="nightIcon"></span>
             </span>
@@ -102,15 +102,16 @@
     <!-- ---- MAIN ---- -->
     <div class="main">
       <div class="topbar">
-        <button class="ptb-back-btn" id="goPortal" style="display: none">&#x2190; Back</button>
-        <button id="portalHamburger" data-testid="portal-hamburger" aria-label="Open menu">&#x2630;</button>
-        <span class="tb-title" id="topTitle">Dashboard</span>
+        <button class="ptb-back-btn" id="goPortal" data-i18n="tb_back" style="display: none">&#x2190; Back</button>
+        <button id="portalHamburger" data-testid="portal-hamburger" data-i18n-aria="tb_menu_aria" aria-label="Open menu">&#x2630;</button>
+        <span class="tb-title" id="topTitle" data-i18n="nav_dashboard">Dashboard</span>
         <span class="tb-crumb" id="breadcrumb" style="display: none"></span>
         <div class="tb-spacer"></div>
         <button
           class="st-trigger-btn"
           id="studyTechBtn"
           style="display: none"
+          data-i18n-title="tb_study_title"
           title="Study Techniques"
         >
           <svg
@@ -126,7 +127,7 @@
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          <span>Study</span>
+          <span data-i18n="tb_study">Study</span>
         </button>
         <!-- Mini timer widget (shown when timer is running) -->
         <div class="st-mini-timer" id="stMiniTimer" style="display: none">
@@ -144,9 +145,9 @@
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <span id="stMiniTime">25:00</span>
-          <span class="st-mini-label" id="stMiniLabel">Focus</span>
-          <button class="st-mini-pause" id="stMiniPause" title="Pause">&#x23F8;</button>
-          <button class="st-mini-stop" id="stMiniStop" title="Stop">&#x25A0;</button>
+          <span class="st-mini-label" id="stMiniLabel" data-i18n="tb_focus_mini">Focus</span>
+          <button class="st-mini-pause" id="stMiniPause" data-i18n-title="tb_pause_title" title="Pause">&#x23F8;</button>
+          <button class="st-mini-stop" id="stMiniStop" data-i18n-title="tb_stop_title" title="Stop">&#x25A0;</button>
         </div>
       </div>
 
@@ -155,11 +156,11 @@
         <div class="st-popup st-popup-v2" id="stPopup">
           <div class="st-popup-head st-popup-head-v2">
             <div class="st-popup-head-text">
-              <span class="st-popup-pill">Study rhythm</span>
-              <span class="st-popup-title">Focus Session</span>
-              <span class="st-popup-sub">Set your timing and ambience before you start studying.</span>
+              <span class="st-popup-pill" data-i18n="st_rhythm">Study rhythm</span>
+              <span class="st-popup-title" data-i18n="st_focus_title">Focus Session</span>
+              <span class="st-popup-sub" data-i18n="st_focus_sub">Set your timing and ambience before you start studying.</span>
             </div>
-            <button class="st-popup-close" id="stClose" aria-label="Close">&#x2715;</button>
+            <button class="st-popup-close" id="stClose" data-i18n-aria="st_close_aria" aria-label="Close">&#x2715;</button>
           </div>
 
           <!-- Technique picker -->
@@ -167,29 +168,29 @@
             <button class="st-tech-card active" data-tech="pomodoro">
               <span class="st-tech-icon">&#x1F345;</span>
               <span class="st-tech-name">Pomodoro</span>
-              <span class="st-tech-desc">Classic focus rhythm &middot; 25 / 5</span>
+              <span class="st-tech-desc" data-i18n="st_pomodoro_desc">Classic focus rhythm &middot; 25 / 5</span>
             </button>
             <button class="st-tech-card" data-tech="5217">
               <span class="st-tech-icon">&#x26A1;</span>
               <span class="st-tech-name">52 / 17</span>
-              <span class="st-tech-desc">Longer deep-work block</span>
+              <span class="st-tech-desc" data-i18n="st_5217_desc">Longer deep-work block</span>
             </button>
             <button class="st-tech-card" data-tech="9020">
               <span class="st-tech-icon">&#x1F9E0;</span>
               <span class="st-tech-name">90 / 20</span>
-              <span class="st-tech-desc">Extended study sprint</span>
+              <span class="st-tech-desc" data-i18n="st_9020_desc">Extended study sprint</span>
             </button>
             <button class="st-tech-card" data-tech="custom">
               <span class="st-tech-icon">&#x2699;&#xFE0F;</span>
               <span class="st-tech-name">Custom</span>
-              <span class="st-tech-desc">Use your own intervals</span>
+              <span class="st-tech-desc" data-i18n="st_custom_desc">Use your own intervals</span>
             </button>
           </div>
 
           <!-- Settings -->
           <div class="st-settings">
             <div class="st-setting-row">
-              <label class="st-setting-label">Focus (min)</label>
+              <label class="st-setting-label" data-i18n="st_focus_min">Focus (min)</label>
               <div class="st-stepper">
                 <button class="st-step-btn" data-field="focus" data-dir="-1">&#x2212;</button>
                 <span class="st-step-val" id="stFocusVal">25</span>
@@ -197,7 +198,7 @@
               </div>
             </div>
             <div class="st-setting-row">
-              <label class="st-setting-label">Short break (min)</label>
+              <label class="st-setting-label" data-i18n="st_short_break_min">Short break (min)</label>
               <div class="st-stepper">
                 <button class="st-step-btn" data-field="shortBreak" data-dir="-1">&#x2212;</button>
                 <span class="st-step-val" id="stShortVal">5</span>
@@ -205,7 +206,7 @@
               </div>
             </div>
             <div class="st-setting-row">
-              <label class="st-setting-label">Long break (min)</label>
+              <label class="st-setting-label" data-i18n="st_long_break_min">Long break (min)</label>
               <div class="st-stepper">
                 <button class="st-step-btn" data-field="longBreak" data-dir="-1">&#x2212;</button>
                 <span class="st-step-val" id="stLongVal">15</span>
@@ -213,7 +214,7 @@
               </div>
             </div>
             <div class="st-setting-row">
-              <label class="st-setting-label">Cycles before long break</label>
+              <label class="st-setting-label" data-i18n="st_cycles_before_long">Cycles before long break</label>
               <div class="st-stepper">
                 <button class="st-step-btn" data-field="cycles" data-dir="-1">&#x2212;</button>
                 <span class="st-step-val" id="stCyclesVal">4</span>
@@ -224,7 +225,7 @@
 
           <!-- Music source picker -->
           <div class="st-music-section">
-            <div class="st-setting-label st-music-label">Ambience</div>
+            <div class="st-setting-label st-music-label" data-i18n="st_ambience">Ambience</div>
             <div class="st-music-sources" id="stMusicSources">
               <button class="st-music-src active" data-src="lofi">
                 <span class="st-music-src-icon">&#x1F3B5;</span>
@@ -248,10 +249,10 @@
               </button>
               <button class="st-music-src" data-src="none">
                 <span class="st-music-src-icon">&#x1F507;</span>
-                <span>None</span>
+                <span data-i18n="st_music_none">None</span>
               </button>
             </div>
-            <div class="st-music-src-hint" id="stMusicHint">Quiet Focus playlist &middot; always available</div>
+            <div class="st-music-src-hint" id="stMusicHint" data-i18n="st_music_hint_lofi">Quiet Focus playlist &middot; always available</div>
             <!-- Playlist selector &mdash; shown when YouTube is active -->
             <div class="st-playlist-selector" id="stPlaylistSelector" style="display: none">
               <select class="st-playlist-select" id="stPlaylistSelect"></select>
@@ -259,8 +260,8 @@
           </div>
 
           <div class="st-footer-row">
-            <button class="st-start-btn st-start-btn-v2" id="stStart">&#x25B6; Start focus session</button>
-            <button class="st-save-default-btn" id="stSaveDefault" type="button">Save as default</button>
+            <button class="st-start-btn st-start-btn-v2" id="stStart" data-i18n="st_start_focus">&#x25B6; Start focus session</button>
+            <button class="st-save-default-btn" id="stSaveDefault" type="button" data-i18n="st_save_default">Save as default</button>
           </div>
         </div>
       </div>
@@ -369,6 +370,7 @@
           >
             <div style="font-size: 2.8rem; margin-bottom: 10px">&#x1F393;</div>
             <h2
+              data-i18n="pw_welcome"
               style="
                 font-family: var(--font-main);
                 font-size: 1.7rem;
@@ -380,11 +382,12 @@
             </h2>
             <p
               data-paywall-desc
+              data-i18n="pw_desc"
               style="font-size: 0.85rem; color: var(--on-glass-muted); margin: 0 0 20px"
             >
               To access all features, start your free 7-day trial. No charge until the trial ends.
             </p>
-            <div class="sub-trial-badge" style="margin-bottom: 14px; display: inline-block">
+            <div class="sub-trial-badge" data-i18n="pw_trial_badge" style="margin-bottom: 14px; display: inline-block">
               &#x2728; 7-day free trial
             </div>
             <div
@@ -398,6 +401,7 @@
               &#x20AC;11.99
               <span
                 data-after-trial
+                data-i18n="pw_after_trial"
                 style="
                   font-size: 0.85rem;
                   font-family: var(--font-main);
@@ -416,11 +420,11 @@
                 gap: 7px;
               "
             >
-              <div class="sub-feat">Generous AI usage (fair-use, 500 calls/month)</div>
-              <div class="sub-feat">PDF reader &amp; lecture notes</div>
-              <div class="sub-feat">Multi-PDF summaries</div>
-              <div class="sub-feat">Chat rooms</div>
-              <div class="sub-feat">Priority support</div>
+              <div class="sub-feat" data-i18n="pw_feat_ai">Generous AI usage (fair-use: 2000 chat &middot; 200 generations / month)</div>
+              <div class="sub-feat" data-i18n="pw_feat_pdf">PDF reader &amp; lecture notes</div>
+              <div class="sub-feat" data-i18n="pw_feat_multi">Multi-PDF summaries</div>
+              <div class="sub-feat" data-i18n="pw_feat_chat">Chat rooms</div>
+              <div class="sub-feat" data-i18n="pw_feat_support">Priority support</div>
             </div>
             <button
               id="paywallUpgradeBtn"
@@ -431,6 +435,7 @@
             </button>
             <p
               data-cancel-note
+              data-i18n="pw_cancel_note"
               style="font-size: 0.72rem; color: var(--on-glass-muted); margin-top: 10px"
             >
               Cancel anytime. No charge during trial.
@@ -439,6 +444,7 @@
               <div id="paywallPaypal"></div>
             </div>
             <p
+              data-i18n="pw_pay_methods"
               style="
                 font-size: 0.7rem;
                 color: var(--on-glass-muted);
@@ -450,6 +456,7 @@
             </p>
             <button
               id="paywallLogoutBtn"
+              data-i18n="pw_signout"
               style="
                 margin-top: 18px;
                 background: none;
@@ -1269,7 +1276,7 @@
   </div>
   <!-- /shell -->
 
-  <!-- â”€â”€â”€ DOCUMENT RAIL + DRAWER (Task-01 shell) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  <!-- --- DOCUMENT RAIL + DRAWER (Task-01 shell) ----------------------------
        Visibility is controlled by JS (document-rail.ts) toggling the
        .is-pdf / .is-courses classes on this root. Hidden everywhere else. -->
   <div id="drRoot" class="dr-root">
@@ -1503,4 +1510,3 @@
 </div>
 
 <!-- Widget panel, FAB and drag ghost &mdash; injected by features/js/dashboard.js -->
-

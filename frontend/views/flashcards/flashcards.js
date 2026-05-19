@@ -117,11 +117,50 @@
     '</div>' +
   '</div>';
 
+  function _translateStatic(root) {
+    if (!root || typeof _t !== 'function') return;
+    var gen = root.querySelector('#fcGenerateBtn');
+    if (gen) gen.textContent = _t('fc_generate');
+    var search = root.querySelector('#fcSearchInput');
+    if (search) search.placeholder = _t('fc_search_ph');
+    var sort = root.querySelector('#fcSortSelect');
+    if (sort) sort.setAttribute('aria-label', _t('fc_sort_aria'));
+    [['recent', 'fc_sort_recent'], ['name', 'fc_sort_name'], ['size', 'fc_sort_size'], ['created', 'fc_sort_created']].forEach(function (pair) {
+      var opt = root.querySelector('#fcSortSelect option[value="' + pair[0] + '"]');
+      if (opt) opt.textContent = _t(pair[1]);
+    });
+    var view = root.querySelector('.fc-view-toggle');
+    if (view) view.setAttribute('aria-label', _t('fc_view_mode_aria'));
+    var grid = root.querySelector('.fc-view-btn[data-view="grid"]');
+    if (grid) grid.setAttribute('aria-label', _t('fc_grid_view_aria'));
+    var list = root.querySelector('.fc-view-btn[data-view="list"]');
+    if (list) list.setAttribute('aria-label', _t('fc_list_view_aria'));
+    var empty = root.querySelector('.fc-empty');
+    if (empty) empty.textContent = _t('fc_loading');
+    var all = root.querySelector('#fcViewAllRow');
+    if (all) all.childNodes[1].textContent = ' ' + _t('fc_view_all');
+    var name = root.querySelector('#fcStudyName');
+    if (name) name.textContent = _t('fc_select_deck');
+    var count = root.querySelector('#fcStudyCount');
+    if (count) count.textContent = _t('fc_zero_cards');
+    var settings = root.querySelector('#fcStudySettingsBtn');
+    if (settings) settings.textContent = _t('fc_study_settings');
+    var pick = root.querySelector('.fc-card-empty');
+    if (pick) pick.textContent = _t('fc_pick_deck');
+    var prev = root.querySelector('#fcPrevBtn');
+    if (prev) prev.textContent = _t('fc_previous');
+    var flip = root.querySelector('#fcFlipBtn');
+    if (flip) flip.textContent = _t('fc_flip');
+    var next = root.querySelector('#fcNextBtn');
+    if (next) next.textContent = _t('fc_next');
+  }
+
   window.mountFlashcards = function (target, course, options) {
     if (!target) return;
     options = options || {};
     target.innerHTML = _TEMPLATE_HTML;
     var root = target.querySelector('[data-flashcards-root]');
+    _translateStatic(root);
     if (root) _initShell(root, course, options);
   };
 

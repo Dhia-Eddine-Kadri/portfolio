@@ -1,4 +1,7 @@
 (function () {
+  function _subT(key, fallback) {
+    return (window._t && window._t(key)) || fallback;
+  }
   var feature = {
     sectionId: 'psec-subscription',
     html: 'views/subscription/subscription.html',
@@ -58,7 +61,7 @@ async function _activatePayPalSubscription(data, closePaywall) {
     var modal = document.getElementById('paywallModal');
     if (modal) modal.style.display = 'none';
   }
-  showToast('?? Pro activated!', 'Enjoy unlimited access.');
+  showToast(_subT('sub_pro_activated', 'Pro activated!'), _subT('sub_pro_enjoy', 'Enjoy unlimited access.'));
 }
 
 function applySubscription(sub) {
@@ -82,8 +85,8 @@ function applySubscription(sub) {
     if (proStatus) proStatus.style.display = 'none';
     if (upgradeBtn) {
       upgradeBtn.textContent = _hadTrial
-        ? '?? Subscribe � �11.99/month'
-        : '?? Start free 7-day trial';
+        ? _subT('sub_subscribe', 'Subscribe — €11.99/month')
+        : _subT('sub_start_trial', 'Start free 7-day trial');
       upgradeBtn.disabled = false;
       upgradeBtn.style.display = '';
       upgradeBtn.style.opacity = '';
@@ -129,21 +132,21 @@ function _initPayPalButton(attempt) {
             });
           },
           onApprove: async function (data) {
-            showToast('Payment received', 'Activating your Pro plan...');
+            showToast(_subT('sub_payment_received', 'Payment received'), _subT('sub_activating', 'Activating your Pro plan...'));
             try {
               await _activatePayPalSubscription(data, false);
               return;
             } catch (e) {
-              showToast('Activation error', 'Contact support.');
+              showToast(_subT('sub_activation_error', 'Activation error'), _subT('sub_activation_error_sub', 'Contact support.'));
             }
           },
           onError: function (err) {
             console.error('PayPal error:', err);
             showToast(
-              'PayPal error',
+              _subT('sub_paypal_error', 'PayPal error'),
               typeof err === 'string'
                 ? err
-                : (err && err.message) || 'Please try again or use card.'
+                : (err && err.message) || _subT('sub_paypal_error_default', 'Please try again or use card.')
             );
           }
         })
@@ -152,7 +155,7 @@ function _initPayPalButton(attempt) {
     .catch(function (err) {
       _paypalRendered = false;
       console.warn('PayPal plan config failed to load:', err);
-      showToast('Payment unavailable', 'Subscription configuration is missing.');
+      showToast(_subT('sub_payment_unavailable', 'Payment unavailable'), _subT('sub_payment_unavailable_sub', 'Subscription configuration is missing.'));
     })
     .finally(function () {
       _paypalRenderPending = false;
@@ -163,18 +166,27 @@ function _showPaywall() {
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
     btn.textContent = _hadTrial
-      ? '?? Subscribe � �11.99/month'
-      : '?? Start free 7-day trial';
+      ? _subT('sub_subscribe', 'Subscribe — €11.99/month')
+      : _subT('sub_start_trial', 'Start free 7-day trial');
   var modal = document.getElementById('paywallModal');
   if (_hadTrial && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
     var desc = modal.querySelector('[data-paywall-desc]');
-    if (desc) desc.textContent = 'Subscribe to access all Minallo features for �11.99/month.';
+    if (desc) {
+      desc.textContent = _subT('pw_desc_trialed', 'Subscribe to access all Minallo features for €11.99/month.');
+      desc.removeAttribute('data-i18n');
+    }
     var afterTrial = modal.querySelector('[data-after-trial]');
-    if (afterTrial) afterTrial.textContent = '/ month';
+    if (afterTrial) {
+      afterTrial.textContent = window._lang === 'de' ? '/ Monat' : '/ month';
+      afterTrial.removeAttribute('data-i18n');
+    }
     var cancelNote = modal.querySelector('[data-cancel-note]');
-    if (cancelNote) cancelNote.textContent = 'Cancel anytime.';
+    if (cancelNote) {
+      cancelNote.textContent = window._lang === 'de' ? 'Jederzeit kündbar.' : 'Cancel anytime.';
+      cancelNote.removeAttribute('data-i18n');
+    }
   }
   if (modal) modal.style.display = 'flex';
   if (!_paywallPaypalRendered && typeof paypal === 'undefined') {
@@ -210,17 +222,17 @@ function _showPaywall() {
                 });
               },
               onApprove: async function (data) {
-                showToast('Payment received', 'Activating your Pro plan...');
+                showToast(_subT('sub_payment_received', 'Payment received'), _subT('sub_activating', 'Activating your Pro plan...'));
                 try {
                   await _activatePayPalSubscription(data, true);
                   return;
                 } catch (e) {
-                  showToast('Activation error', 'Contact support.');
+                  showToast(_subT('sub_activation_error', 'Activation error'), _subT('sub_activation_error_sub', 'Contact support.'));
                 }
               },
               onError: function (err) {
                 console.error('PayPal error:', err);
-                showToast('PayPal error', 'Please try card instead.');
+                showToast(_subT('sub_paypal_error', 'PayPal error'), _subT('sub_paypal_error_default', 'Please try again or use card.'));
               }
             })
             .render('#paywallPaypal');
@@ -228,7 +240,7 @@ function _showPaywall() {
         .catch(function (err) {
           _paywallPaypalRendered = false;
           console.warn('PayPal plan config failed to load:', err);
-          showToast('Payment unavailable', 'Subscription configuration is missing.');
+          showToast(_subT('sub_payment_unavailable', 'Payment unavailable'), _subT('sub_payment_unavailable_sub', 'Subscription configuration is missing.'));
         })
         .finally(function () {
           _paywallPaypalRenderPending = false;
@@ -249,19 +261,19 @@ function _bindSubscriptionControls() {
     manageBtn.dataset.bound = '1';
     manageBtn.addEventListener('click', async function () {
       if (!_stripeCustomerId) {
-        showToast('Not available', 'No Stripe account found.');
+        showToast(_subT('sub_not_available', 'Not available'), _subT('sub_no_stripe', 'No Stripe account found.'));
         return;
       }
-      this.textContent = 'Loading...';
+      this.textContent = _subT('sub_loading', 'Loading...');
       this.disabled = true;
       try {
         var data = await window._subService.createPortalSession();
         if (data.url) location.href = data.url;
-        else showToast('Error', data.error || 'Could not open portal.');
+        else showToast(_subT('sub_error', 'Error'), data.error || _subT('sub_portal_failed', 'Could not open portal.'));
       } catch (e) {
-        showToast('Error', e.message);
+        showToast(_subT('sub_error', 'Error'), e.message);
       }
-      this.textContent = '⚙️ Manage / Cancel subscription';
+      this.textContent = _subT('sub_manage', '⚙️ Manage / Cancel subscription');
       this.disabled = false;
     });
   }
@@ -285,14 +297,14 @@ function _bindSubscriptionControls() {
     upgradeBtn.dataset.bound = '1';
     upgradeBtn.addEventListener('click', async function () {
       if (!_currentUser) {
-        showToast('Sign in required', 'Please log in first.');
+        showToast(_subT('sub_signin_required', 'Sign in required'), _subT('sub_login_first', 'Please log in first.'));
         return;
       }
       if (consentBox && !consentBox.checked) {
         showToast('Hinweis', 'Bitte bestaetige die Widerrufs-Information, bevor du fortfaehrst.');
         return;
       }
-      this.textContent = 'Redirecting...';
+      this.textContent = _subT('sub_redirecting', 'Redirecting...');
       this.disabled = true;
       try {
         var data = await window._subService.createCheckoutSession(_hadTrial, {
@@ -302,13 +314,13 @@ function _bindSubscriptionControls() {
         if (data.url) {
           location.href = data.url;
         } else {
-          showToast('Error', data.error || 'Could not start checkout.');
-          this.textContent = '?? Upgrade to Pro';
+          showToast(_subT('sub_error', 'Error'), data.error || _subT('sub_checkout_failed', 'Could not start checkout.'));
+          this.textContent = _subT('sub_upgrade', 'Upgrade to Pro');
           this.disabled = false;
         }
       } catch (e) {
-        showToast('Error', e.message);
-        this.textContent = '?? Upgrade to Pro';
+        showToast(_subT('sub_error', 'Error'), e.message);
+        this.textContent = _subT('sub_upgrade', 'Upgrade to Pro');
         this.disabled = false;
       }
     });
@@ -351,14 +363,26 @@ function _renderAiUsage() {
   window.refreshAiUsage().then(function (u) {
     if (!u) return;
     var wrap = document.getElementById('subUsage');
+    if (!wrap) return;
+    var interactive = u.interactive || { used: u.used, limit: u.limit, percentUsed: u.percentUsed };
+    var generation = u.generation || { used: 0, limit: 0, percentUsed: 0 };
+
     var fill = document.getElementById('subUsageFill');
     var count = document.getElementById('subUsageCount');
-    if (!wrap || !fill || !count) return;
+    if (fill && count) {
+      fill.style.width = Math.min(100, interactive.percentUsed) + '%';
+      count.textContent = interactive.used + ' / ' + interactive.limit + ' chat calls';
+    }
+    var fillGen = document.getElementById('subUsageFillGen');
+    var countGen = document.getElementById('subUsageCountGen');
+    if (fillGen && countGen) {
+      fillGen.style.width = Math.min(100, generation.percentUsed) + '%';
+      countGen.textContent = generation.used + ' / ' + generation.limit + ' generations';
+    }
     wrap.hidden = false;
-    fill.style.width = Math.min(100, u.percentUsed) + '%';
-    count.textContent = u.used + ' / ' + u.limit + ' AI calls';
-    wrap.classList.toggle('sub-usage--warn', u.percentUsed >= 80 && u.percentUsed < 100);
-    wrap.classList.toggle('sub-usage--cap', u.percentUsed >= 100);
+    var peak = Math.max(interactive.percentUsed, generation.percentUsed);
+    wrap.classList.toggle('sub-usage--warn', peak >= 80 && peak < 100);
+    wrap.classList.toggle('sub-usage--cap', peak >= 100);
   });
 }
 
@@ -370,6 +394,46 @@ document.addEventListener('click', function (e) {
       _renderAiUsage();
     }, 400);
 });
+
+// Also initialise when the user lands on the subscription view directly
+// (hash like #portal=subscription, or a page refresh while already there).
+// The click handler above only fires when the menu item is actually clicked.
+//
+// Two timing problems to handle:
+//   1. subscription.html is injected lazily by loader.js, so #subUsage may
+//      not exist when our module first runs. We poll briefly until it does.
+//   2. ss-ready (fired by loader.js when all features are loaded) is the
+//      best one-shot signal — listen for it too.
+function _initSubscriptionViewIfActive() {
+  var hash = String(window.location.hash || '');
+  if (!/portal=subscription/.test(hash)) return;
+  var tries = 0;
+  function attempt() {
+    var el = document.getElementById('subUsage');
+    if (el) {
+      _bindSubscriptionControls();
+      _initPayPalButton();
+      _renderAiUsage();
+      return;
+    }
+    if (tries++ < 20) setTimeout(attempt, 200);
+  }
+  attempt();
+}
+window.addEventListener('ss-ready', _initSubscriptionViewIfActive);
+window.addEventListener('hashchange', _initSubscriptionViewIfActive);
+// Re-apply translated button labels + paywall override text when the user
+// switches language; data-i18n covers static text but the upgrade button
+// label is set imperatively by applySubscription().
+window.addEventListener('minallo:lang-changed', function () {
+  try {
+    if (typeof applySubscription === 'function' && _userIsPro !== undefined) {
+      applySubscription({ plan: _userIsPro ? 'pro' : 'free', status: _userIsPro ? 'active' : 'inactive', had_trial: _hadTrial });
+    }
+  } catch (e) { /* ignore */ }
+});
+if (document.readyState !== 'loading') _initSubscriptionViewIfActive();
+else document.addEventListener('DOMContentLoaded', _initSubscriptionViewIfActive);
 
 document.addEventListener(
   'keydown',
@@ -384,7 +448,7 @@ document.addEventListener(
   if (params.get('payment') === 'success') {
     var sessionId = params.get('session_id');
     history.replaceState(null, '', location.pathname);
-    showToast('?? Payment successful!', 'Activating your Pro plan...');
+    showToast(_subT('sub_payment_success', 'Payment successful!'), _subT('sub_activating', 'Activating your Pro plan...'));
     var attempts = 0;
     var verify = setInterval(async function () {
       attempts++;
@@ -397,7 +461,7 @@ document.addEventListener(
           applySubscription({ plan: 'pro', status: 'active', expires_at: data.expires_at || null });
           var modal = document.getElementById('paywallModal');
           if (modal) modal.style.display = 'none';
-          showToast('✅ Pro activated!', 'Enjoy unlimited access.');
+          showToast(_subT('sub_pro_activated', '✅ Pro activated!'), _subT('sub_pro_enjoy', 'Enjoy unlimited access.'));
         }
       } catch (e) {
         console.warn('Verify payment error:', e);

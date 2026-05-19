@@ -22,15 +22,19 @@ log = logging.getLogger(__name__)
 
 _ACTIVE_STATUSES = {"active", "trialing"}
 
-# Same list of event types as backend/lib/rate-limit.ts so the two surfaces
-# count against one combined monthly budget.
-_AI_EVENT_TYPES = (
+# Two independent buckets, mirroring backend/lib/rate-limit.ts. Interactive
+# (chat / RAG / writing-coach / stream asks) is cheap per call and gets a
+# large allowance; generation (notes / quiz / flashcards) is heavier per
+# call and gets a tighter one.
+_INTERACTIVE_EVENT_TYPES = (
     "ai_ask",
-    "ai_generate",
     "ai_chat",
-    "notes_generate",
     "writing_coach_analyse",
     "ask_stream",
+)
+_GENERATION_EVENT_TYPES = (
+    "ai_generate",
+    "notes_generate",
 )
 
 
@@ -134,12 +138,12 @@ def enforce_rate_limit(
         log.exception("failed to log rate-limit hit")
 
 
-def enforce_monthly_ai_cap(user_id: str, max_events: int) -> None:
-    """Count every AI call this calendar month and raise 429 when over budget.
-
-    Mirrors backend/lib/rate-limit.ts::enforceMonthlyAiCap. Reset is the 1st
-    of the next month in UTC.
-    """
+def _enforce_bucket_cap(
+    user_id: str,
+    bucket: str,
+    event_types: tuple[str, ...],
+    max_events: int,
+) -> None:
     sb = get_supabase()
     now = datetime.now(timezone.utc)
     start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -148,12 +152,12 @@ def enforce_monthly_ai_cap(user_id: str, max_events: int) -> None:
             sb.table("security_events")
             .select("id", count="exact")
             .eq("user_id", user_id)
-            .in_("event_type", list(_AI_EVENT_TYPES))
+            .in_("event_type", list(event_types))
             .gte("created_at", start.isoformat())
             .execute()
         )
     except Exception:  # noqa: BLE001
-        log.exception("monthly-cap lookup failed for %s", user_id)
+        log.exception("monthly-cap lookup failed for %s/%s", user_id, bucket)
         # Fail open on transient DB issues — same trade-off as enforce_rate_limit.
         return
 
@@ -165,34 +169,60 @@ def enforce_monthly_ai_cap(user_id: str, max_events: int) -> None:
         sb.table("security_events").insert({
             "user_id": user_id,
             "event_type": "ai_monthly_cap_blocked",
-            "metadata": {"count": count, "cap": max_events},
+            "metadata": {"bucket": bucket, "count": count, "cap": max_events},
         }).execute()
     except Exception:  # noqa: BLE001
         log.exception("failed to log ai_monthly_cap_blocked")
 
-    # Seconds until the 1st of next month.
     if now.month == 12:
         next_reset = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         next_reset = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
     retry_after = max(60, int((next_reset - now).total_seconds()))
 
-    # Match the Netlify path: include a structured code + counters so the
-    # client can show a dedicated modal rather than a generic 429 toast.
+    if bucket == "interactive":
+        friendly = (
+            f"You've reached this month's chat + tutor allowance ({max_events} AI calls). "
+            "Resets on the 1st of next month."
+        )
+    else:
+        friendly = (
+            f"You've reached this month's quiz / flashcard / notes generation allowance "
+            f"({max_events} bulk operations). Chat and tutor still work. "
+            "Resets on the 1st of next month."
+        )
+
     raise HTTPException(
         status_code=429,
         detail={
             "code": "ai_monthly_cap",
-            "message": (
-                f"You've reached this month's fair-use limit ({max_events} AI calls). "
-                "It resets on the 1st of next month."
-            ),
+            "bucket": bucket,
+            "message": friendly,
             "used": count,
             "limit": max_events,
             "resetsAt": next_reset.isoformat(),
         },
         headers={"Retry-After": str(retry_after)},
     )
+
+
+def enforce_interactive_cap(user_id: str, max_events: int) -> None:
+    """Interactive bucket cap (chat / RAG / writing-coach / streaming asks)."""
+    _enforce_bucket_cap(user_id, "interactive", _INTERACTIVE_EVENT_TYPES, max_events)
+
+
+def enforce_generation_cap(user_id: str, max_events: int) -> None:
+    """Generation bucket cap (quiz / flashcards / notes summaries)."""
+    _enforce_bucket_cap(user_id, "generation", _GENERATION_EVENT_TYPES, max_events)
+
+
+def enforce_monthly_ai_cap(user_id: str, max_events: int) -> None:
+    """Deprecated wrapper — routes to the interactive bucket.
+
+    Existing callers passed the single combined cap; the interactive bucket
+    is the right home for chat / ask-stream traffic.
+    """
+    enforce_interactive_cap(user_id, max_events)
 
 
 def _parse_iso(value: Any) -> datetime | None:

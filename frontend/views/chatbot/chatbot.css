@@ -2625,3 +2625,44 @@ body.ncb-fullbleed .ncb-main {
   background: rgba(239, 68, 68, 0.12);
   border-color: rgba(239, 68, 68, 0.40);
 }
+
+/* ── Tutor mode pill row (phase 1 of tutor-mode plan) ────────────────────
+   Three small pills above the chat input: Solve with me / Explain / Quiz me.
+   Active pill is highlighted with the same blue tint the rest of the shell
+   uses for selected affordances. */
+.ncb-tutor-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+.ncb-tutor-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font: 600 0.74rem/1 var(--font-main, inherit);
+  color: var(--on-glass-muted, rgba(255, 255, 255, 0.65));
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.ncb-tutor-mode:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-glass, rgba(255, 255, 255, 0.92));
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.ncb-tutor-mode[aria-pressed="true"] {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.22));
+  color: #c7d2fe;
+  border-color: rgba(139, 92, 246, 0.55);
+}
+.ncb-tutor-mode .ncb-icon {
+  width: 14px;
+  height: 14px;
+}
+.ncb-tutor-mode-label {
+  white-space: nowrap;
+}

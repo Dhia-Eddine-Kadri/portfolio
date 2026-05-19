@@ -116,11 +116,50 @@
     '</div>' +
   '</div>';
 
+  function _translateStatic(root) {
+    if (!root || typeof _t !== 'function') return;
+    var gen = root.querySelector('#qzGenerateBtn');
+    if (gen) gen.textContent = _t('qz_generate');
+    var search = root.querySelector('#qzSearchInput');
+    if (search) search.placeholder = _t('qz_search_ph');
+    var sort = root.querySelector('#qzSortSelect');
+    if (sort) sort.setAttribute('aria-label', _t('qz_sort_aria'));
+    [['recent', 'qz_sort_recent'], ['name', 'qz_sort_name'], ['score', 'qz_sort_score'], ['created', 'qz_sort_created']].forEach(function (pair) {
+      var opt = root.querySelector('#qzSortSelect option[value="' + pair[0] + '"]');
+      if (opt) opt.textContent = _t(pair[1]);
+    });
+    var view = root.querySelector('.qz-view-toggle');
+    if (view) view.setAttribute('aria-label', _t('qz_view_mode_aria'));
+    var grid = root.querySelector('.qz-view-btn[data-view="grid"]');
+    if (grid) grid.setAttribute('aria-label', _t('qz_grid_view_aria'));
+    var list = root.querySelector('.qz-view-btn[data-view="list"]');
+    if (list) list.setAttribute('aria-label', _t('qz_list_view_aria'));
+    var empty = root.querySelector('.qz-empty');
+    if (empty) empty.textContent = _t('qz_loading');
+    var all = root.querySelector('#qzViewAllRow');
+    if (all) all.childNodes[1].textContent = ' ' + _t('qz_view_all');
+    var name = root.querySelector('#qzStudyName');
+    if (name) name.textContent = _t('qz_select_quiz');
+    var count = root.querySelector('#qzStudyCount');
+    if (count) count.textContent = _t('qz_zero_questions');
+    var settings = root.querySelector('#qzStudySettingsBtn');
+    if (settings) settings.textContent = _t('qz_settings');
+    var pick = root.querySelector('.qz-card-empty');
+    if (pick) pick.textContent = _t('qz_pick_quiz');
+    var prev = root.querySelector('#qzPrevBtn');
+    if (prev) prev.textContent = _t('qz_previous');
+    var submit = root.querySelector('#qzSubmitBtn');
+    if (submit) submit.textContent = _t('qz_submit');
+    var next = root.querySelector('#qzNextBtn');
+    if (next) next.textContent = _t('qz_next');
+  }
+
   window.mountQuiz = function (target, course, options) {
     if (!target) return;
     options = options || {};
     target.innerHTML = _TEMPLATE_HTML;
     var root = target.querySelector('[data-quiz-root]');
+    _translateStatic(root);
     if (root) _initShell(root, course, options);
   };
 
@@ -470,6 +509,12 @@
       if (q.bestScore == null || correct > q.bestScore) q.bestScore = correct;
       renderAll();
 
+      // Phase 2: record per-topic mastery for THIS submitted item.
+      _postQuizAttempt(courseId, [{
+        topic: q.items[idx] && q.items[idx].topic,
+        correct: q.answers[idx] === q.items[idx].answer
+      }]);
+
       // Check if all questions submitted — save to DB and show score popup
       var allDone = q.items.every(function(_, k) { return !!q.submitted[k]; });
       if (allDone) {
@@ -489,6 +534,51 @@
         _dbUpdateQuiz(q._dbId, { answers: q.answers, updated_at: new Date().toISOString() });
       }
     });
+
+    // ── Phase 2: mastery POST ──────────────────────────────────────────────
+    // Fire-and-forget. The backend filters items whose topic isn't a known
+    // primary_topic for this course, so passing null/unknown topics is safe
+    // — they just don't update anything. On the first quiz that does have
+    // topics we surface a small "mastery went X% → Y%" toast.
+    function _postQuizAttempt(cid, items) {
+      var BACKEND_URL = window.BACKEND_URL || '';
+      var token = window._sbToken || '';
+      var clean = (items || []).filter(function(it) {
+        return it && typeof it.topic === 'string' && it.topic.trim();
+      });
+      if (!clean.length) return;
+      // Snapshot current mastery so we can compute a delta after the write.
+      var before = {};
+      (state.mastery || []).forEach(function(r) { before[r.topic] = r.mastery_score; });
+
+      fetch(BACKEND_URL + '/api/ai/quiz-attempt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify({ courseId: cid, items: clean })
+      }).then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data || !Array.isArray(data.mastery)) return;
+          state.mastery = data.mastery;
+          // Toast for the topic(s) we just touched.
+          (data.updated || []).forEach(function(topic) {
+            var after = (data.mastery.find(function(m) { return m.topic === topic; }) || {}).mastery_score;
+            if (after == null) return;
+            var beforePct = Math.round((before[topic] || 0) * 100);
+            var afterPct  = Math.round(after * 100);
+            _toast(topic, 'Mastery: ' + beforePct + '% → ' + afterPct + '%');
+          });
+          // Let the dashboard widget re-render if it's listening.
+          try {
+            window.dispatchEvent(new CustomEvent('ss:mastery-updated', {
+              detail: { courseId: cid, mastery: data.mastery }
+            }));
+          } catch (e) { /* ignore */ }
+        })
+        .catch(function() { /* silent — mastery is best-effort */ });
+    }
 
     // ── Generation settings (persisted to localStorage per course) ──
     var _settingsKey = 'ss_quiz_settings_' + courseId;
@@ -812,7 +902,8 @@
                 options: opts,
                 answer: ansIdx,
                 explanation: item.explanation || '',
-                source: item.source || ''
+                source: item.source || '',
+                topic: (typeof item.topic === 'string' && item.topic.trim()) ? item.topic.trim() : null
               };
             }),
             createdAt: Date.now(),

@@ -8,6 +8,18 @@
 
 import { renderMarkdown } from '../ai-chat/ai-markdown.js';
 
+/** Tiny i18n wrapper: delegates to window._t (set up by language.ts) and
+ * falls back to the English string when the language store isn't ready yet
+ * or the key is unknown. Kept private to this module. */
+function tStr(key: string, fallback: string): string {
+  const w = window as unknown as { _t?: (k: string) => string };
+  if (typeof w._t === 'function') {
+    const v = w._t(key);
+    if (v && v !== key) return v;
+  }
+  return fallback;
+}
+
 export function initNewChatbotShell(): void {
   const newRoot = document.getElementById('ncbRoot') as HTMLElement | null;
   if (!newRoot) return;
@@ -28,10 +40,116 @@ export function initNewChatbotShell(): void {
   initTextareaAutoSize(newRoot);
   initActionCards(newRoot);
   initKeyboardShortcuts(newRoot);
+  initTutorModes(newRoot);
   initFullbleed();
 
   renderSidebar(newRoot);
   loadActiveChatIntoCenter(newRoot);
+  consumePracticeSeed(newRoot);
+
+  // The chatbot view is injected into the DOM after the global applyLanguage()
+  // pass on page load, so its data-i18n nodes haven't been translated yet.
+  // Re-run applyLanguage now so all data-i18n / data-i18n-ph / data-i18n-title
+  // / data-i18n-aria nodes inside chatbot.html get their localized strings.
+  // Also re-translate on live language switch via the minallo:lang-changed event.
+  applyChatbotI18n(newRoot);
+  if (!(window as unknown as { _ncbLangBound?: boolean })._ncbLangBound) {
+    (window as unknown as { _ncbLangBound?: boolean })._ncbLangBound = true;
+    window.addEventListener('minallo:lang-changed', () => {
+      const root = document.getElementById('ncbRoot') as HTMLElement | null;
+      if (root) applyChatbotI18n(root);
+    });
+  }
+}
+
+function applyChatbotI18n(root: HTMLElement): void {
+  // Scoped translation pass over the chatbot root only. We avoid calling
+  // window.applyLanguage here because it dispatches `minallo:lang-changed`
+  // and would loop our own listener.
+  const w = window as unknown as { _t?: (k: string) => string };
+  const tr = typeof w._t === 'function' ? w._t : null;
+  if (tr) {
+    root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      if (key) {
+        const v = tr(key);
+        if (v !== key) el.textContent = v;
+      }
+    });
+    root.querySelectorAll<HTMLElement>('[data-i18n-ph]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-ph');
+      if (key) {
+        const v = tr(key);
+        if (v !== key) (el as HTMLInputElement).placeholder = v;
+      }
+    });
+    root.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-title');
+      if (key) {
+        const v = tr(key);
+        if (v !== key) el.setAttribute('title', v);
+      }
+    });
+    root.querySelectorAll<HTMLElement>('[data-i18n-aria]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-aria');
+      if (key) {
+        const v = tr(key);
+        if (v !== key) el.setAttribute('aria-label', v);
+      }
+    });
+  }
+  // Tutor-mode pill labels are owned by initTutorModes (data-label-de/en),
+  // not by data-i18n. Refresh them whenever the language changes.
+  const useDe = (localStorage.getItem('ss_lang') || 'en') === 'de';
+  root.querySelectorAll<HTMLButtonElement>('.ncb-tutor-mode').forEach((pill) => {
+    const labelEl = pill.querySelector<HTMLElement>('.ncb-tutor-mode-label');
+    if (!labelEl) return;
+    const de = pill.getAttribute('data-label-de') || '';
+    const en = pill.getAttribute('data-label-en') || labelEl.textContent || '';
+    labelEl.textContent = useDe ? de : en;
+  });
+  // Sidebar section labels, chat meta (timestamps + counts), 'New chat'
+  // sentinel titles, and the active-chat header all need a re-render so
+  // their dynamic text picks up the new language. Guarded — early mount
+  // calls happen before the store is loaded.
+  try {
+    if (chatStore && Array.isArray(chatStore.chats)) {
+      renderSidebar(root);
+      const headerTitle = root.querySelector<HTMLElement>('.ncb-chat-header-title');
+      if (headerTitle) headerTitle.textContent = displayChatTitle(chatStore.getActive().title);
+    }
+  } catch { /* ignore — store not ready */ }
+}
+
+// Phase 3: the dashboard "Practice this" button writes a seed into
+// sessionStorage and navigates to the chatbot. On every chatbot mount we
+// drain that seed once: switch tutor mode to quiz, prefill the textarea
+// with the seeded prompt, focus it. We deliberately do NOT auto-send —
+// the student can edit the prompt or just hit Enter.
+function consumePracticeSeed(root: HTMLElement): void {
+  let raw: string | null = null;
+  try { raw = sessionStorage.getItem('ss_practice_seed'); } catch { return; }
+  if (!raw) return;
+  try { sessionStorage.removeItem('ss_practice_seed'); } catch { /* ignore */ }
+
+  let seed: { topic?: string; prompt?: string } | null = null;
+  try { seed = JSON.parse(raw); } catch { return; }
+  const prompt = (seed && typeof seed.prompt === 'string' ? seed.prompt : '').trim();
+  if (!prompt) return;
+
+  // Force quiz mode so the streamed response is an MCQ on the seeded topic.
+  currentTutorMode = 'quiz';
+  _writeStoredTutorMode('quiz');
+  root.querySelectorAll<HTMLButtonElement>('.ncb-tutor-mode').forEach((p) => {
+    p.setAttribute('aria-pressed', p.getAttribute('data-mode') === 'quiz' ? 'true' : 'false');
+  });
+
+  const textarea = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+  if (!textarea) return;
+  textarea.value = prompt;
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  // Slight delay to win against any late layout pass that resets focus.
+  setTimeout(() => { textarea.focus(); textarea.setSelectionRange(prompt.length, prompt.length); }, 0);
 }
 
 // PR-02 — sidebar behavior. Idempotent: each binding tags the node with
@@ -160,6 +278,72 @@ function bindSearch(sidebar: HTMLElement): void {
       label.style.display = visible === 0 ? 'none' : '';
     });
   });
+}
+
+// ============ Tutor-mode pills (phase 1) ============
+//
+// Three pills above the composer: Solve with me / Explain / Quiz me.
+// The selected mode is forwarded to /ask-stream as `tutorMode`. Default is
+// 'solve' so the experience signals "tutor" from turn 1. Persisted in
+// localStorage so the choice survives reloads but never spans logins.
+
+type TutorMode = 'explain' | 'solve' | 'quiz';
+const TUTOR_MODE_STORAGE_KEY = 'ncb_tutor_mode';
+const TUTOR_MODE_DEFAULT: TutorMode = 'solve';
+let currentTutorMode: TutorMode = TUTOR_MODE_DEFAULT;
+
+function _readStoredTutorMode(): TutorMode {
+  try {
+    const v = localStorage.getItem(TUTOR_MODE_STORAGE_KEY);
+    if (v === 'explain' || v === 'solve' || v === 'quiz') return v;
+  } catch { /* ignore */ }
+  return TUTOR_MODE_DEFAULT;
+}
+
+function _writeStoredTutorMode(m: TutorMode): void {
+  try { localStorage.setItem(TUTOR_MODE_STORAGE_KEY, m); } catch { /* ignore */ }
+}
+
+function _preferGerman(): boolean {
+  // Profile-driven when available, else fall back to navigator. We treat any
+  // de-* locale as German.
+  const profileLang = (window as unknown as { _userProfile?: { language?: string } })._userProfile?.language;
+  const lang = String(profileLang || navigator.language || '').toLowerCase();
+  return lang.startsWith('de');
+}
+
+function initTutorModes(root: HTMLElement): void {
+  const container = root.querySelector<HTMLElement>('.ncb-tutor-modes');
+  if (!container || container.dataset.ncbBound === '1') return;
+  container.dataset.ncbBound = '1';
+
+  currentTutorMode = _readStoredTutorMode();
+  const useDe = _preferGerman();
+
+  const pills = Array.from(container.querySelectorAll<HTMLButtonElement>('.ncb-tutor-mode'));
+  pills.forEach((pill) => {
+    const labelEl = pill.querySelector<HTMLElement>('.ncb-tutor-mode-label');
+    if (labelEl) {
+      const de = pill.getAttribute('data-label-de') || '';
+      const en = pill.getAttribute('data-label-en') || labelEl.textContent || '';
+      labelEl.textContent = useDe ? de : en;
+    }
+    const mode = pill.getAttribute('data-mode') as TutorMode | null;
+    pill.setAttribute('aria-pressed', mode === currentTutorMode ? 'true' : 'false');
+    pill.addEventListener('click', () => {
+      const next = pill.getAttribute('data-mode') as TutorMode | null;
+      if (!next || next === currentTutorMode) return;
+      currentTutorMode = next;
+      _writeStoredTutorMode(next);
+      pills.forEach((p) => {
+        p.setAttribute('aria-pressed', p.getAttribute('data-mode') === next ? 'true' : 'false');
+      });
+    });
+  });
+}
+
+function getCurrentTutorMode(): TutorMode {
+  return currentTutorMode;
 }
 
 // ============ PR-03: Conversation (input, send, paste, render, abort) ============
@@ -296,7 +480,7 @@ async function absorbPastedImages(
         (f.lastModified || Date.now()) +
         '-' +
         Math.random().toString(36).slice(2, 8),
-      name: f.name || 'Pasted screenshot',
+      name: f.name || tStr('cb_pasted_screenshot', 'Pasted screenshot'),
       mediaType: f.type || 'image/png',
       dataUrl,
     });
@@ -419,8 +603,8 @@ async function streamAiReply(
     if (bubble) {
       const isAbort = (err as Error)?.name === 'AbortError';
       bubble.innerHTML = isAbort
-        ? '<em class="ncb-bubble-aborted">Response stopped.</em>'
-        : renderInlineMarkdown('❌ ' + ((err as Error)?.message || 'Request failed.'));
+        ? '<em class="ncb-bubble-aborted">' + escapeHtml(tStr('cb_response_stopped', 'Response stopped.')) + '</em>'
+        : renderInlineMarkdown('❌ ' + ((err as Error)?.message || tStr('cb_request_failed', 'Request failed.')));
       if (!isAbort) attachErrorRetry(aiRow, bubble);
     }
   } finally {
@@ -487,7 +671,7 @@ async function streamFromAskStream(
     method: 'POST',
     signal: controller.signal,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ courseId, question }),
+    body: JSON.stringify({ courseId, question, tutorMode: getCurrentTutorMode() }),
   });
   if (!resp.ok || !resp.body || !resp.body.getReader) {
     const errText = await resp.text().catch(() => '');
@@ -531,12 +715,12 @@ async function streamFromAskStream(
   }
 
   // Re-render with full markdown now that we have the complete text.
-  if (bubble) bubble.innerHTML = renderInlineMarkdown(answerBuf || 'No response.');
+  if (bubble) bubble.innerHTML = renderInlineMarkdown(answerBuf || tStr('cb_no_response', 'No response.'));
 
   // Append sources + verification chip if the server included them.
   if (doneMeta && bubble) appendAskStreamMeta(bubble, doneMeta);
 
-  return answerBuf || 'No response.';
+  return answerBuf || tStr('cb_no_response', 'No response.');
 }
 
 
@@ -558,15 +742,15 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
         return line;
       })
       .join('');
-    footerHtml += '<details class="ncb-ask-sources"><summary>Sources</summary><ul>' + items + '</ul></details>';
+    footerHtml += '<details class="ncb-ask-sources"><summary>' + escapeHtml(tStr('cb_sources_summary', 'Sources')) + '</summary><ul>' + items + '</ul></details>';
   }
   if (verification && verification.status) {
     const label =
       verification.status === 'verified'
-        ? '✓ Verified'
+        ? tStr('cb_verified', '✓ Verified')
         : verification.status === 'partially_verified'
-          ? '⚠ Partially verified'
-          : '⚠ Missing context';
+          ? tStr('cb_partially_verified', '⚠ Partially verified')
+          : tStr('cb_missing_context', '⚠ Missing context');
     const reason = (verification.reasons || []).join('; ');
     footerHtml +=
       '<div class="ncb-ask-verify" data-status="' +
@@ -631,10 +815,10 @@ async function callGenericAi(
   }
   const data = (await resp.json()) as { content?: Array<{ text?: string }>; error?: { message?: string } };
   const raw = data.error
-    ? '❌ Error: ' + (data.error.message || JSON.stringify(data.error))
+    ? tStr('cb_error_prefix', '❌ Error: ') + (data.error.message || JSON.stringify(data.error))
     : data.content
       ? data.content.map((b) => b.text || '').join('')
-      : 'No response.';
+      : tStr('cb_no_response', 'No response.');
   // Type into the bubble for the same UX as before.
   await typeIntoBubble(bubble, raw, () => controller.signal.aborted);
   return raw;
@@ -688,8 +872,8 @@ function appendAiBubble(msgs: HTMLElement): HTMLElement {
     <div class="ncb-bubble ncb-bubble--ai">
       <div class="ncb-bubble-head">
         <div>
-          <p class="ncb-bubble-sender">Minallo AI</p>
-          <p class="ncb-bubble-subtitle">Answered using course context</p>
+          <p class="ncb-bubble-sender">${escapeHtml(tStr('cb_sender_minallo', 'Minallo AI'))}</p>
+          <p class="ncb-bubble-subtitle">${escapeHtml(tStr('cb_answered_using_context', 'Answered using course context'))}</p>
         </div>
       </div>
       <div class="ncb-bubble-body"></div>
@@ -752,10 +936,10 @@ function setSendBtnMode(btn: HTMLButtonElement, mode: 'send' | 'pause'): void {
     '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
   if (mode === 'pause') {
     btn.classList.add('ncb-send-btn--pause');
-    btn.setAttribute('aria-label', 'Stop AI response');
+    btn.setAttribute('aria-label', tStr('cb_stop_response_aria', 'Stop AI response'));
   } else {
     btn.classList.remove('ncb-send-btn--pause');
-    btn.setAttribute('aria-label', 'Send message');
+    btn.setAttribute('aria-label', tStr('cb_send_btn', 'Send message'));
   }
 }
 
@@ -881,22 +1065,22 @@ function appendBubbleActions(aiRow: HTMLElement, raw: string): void {
   const bar = document.createElement('div');
   bar.className = 'ncb-bubble-actions';
   bar.innerHTML = `
-    <button type="button" class="ncb-bubble-action" data-action="copy" title="Copy">
+    <button type="button" class="ncb-bubble-action" data-action="copy" title="${escapeAttr(tStr('cb_act_copy', 'Copy'))}">
       <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-      <span>Copy</span>
+      <span>${escapeHtml(tStr('cb_act_copy', 'Copy'))}</span>
     </button>
-    <button type="button" class="ncb-bubble-action" data-action="regen" title="Regenerate">
+    <button type="button" class="ncb-bubble-action" data-action="regen" title="${escapeAttr(tStr('cb_act_regen', 'Regenerate'))}">
       <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-      <span>Regenerate</span>
+      <span>${escapeHtml(tStr('cb_act_regen', 'Regenerate'))}</span>
     </button>
-    <button type="button" class="ncb-bubble-action" data-action="save" title="Bookmark this reply">
+    <button type="button" class="ncb-bubble-action" data-action="save" title="${escapeAttr(tStr('cb_act_bookmark_title', 'Bookmark this reply'))}">
       <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
-      <span>Bookmark</span>
+      <span>${escapeHtml(tStr('cb_act_bookmark', 'Bookmark'))}</span>
     </button>
-    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-up" aria-label="Thumbs up">
+    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-up" aria-label="${escapeAttr(tStr('cb_act_thumb_up', 'Thumbs up'))}">
       <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7"/></svg>
     </button>
-    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-down" aria-label="Thumbs down">
+    <button type="button" class="ncb-bubble-action ncb-bubble-action--icon" data-action="thumb-down" aria-label="${escapeAttr(tStr('cb_act_thumb_down', 'Thumbs down'))}">
       <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17"/></svg>
     </button>
   `;
@@ -917,7 +1101,7 @@ function appendBubbleActions(aiRow: HTMLElement, raw: string): void {
 
 function copyToClipboard(text: string, btn: HTMLElement): void {
   try {
-    void navigator.clipboard.writeText(text).then(() => flashAck(btn, 'Copied'));
+    void navigator.clipboard.writeText(text).then(() => flashAck(btn, tStr('cb_act_copied', 'Copied')));
   } catch {
     // older browsers — fall through quietly
   }
@@ -1011,7 +1195,7 @@ function listCourses(): SemCourse[] {
 }
 
 function courseLabel(c: SemCourse): string {
-  return c.name || c.title || c.id || 'Untitled course';
+  return c.name || c.title || c.id || tStr('cb_untitled_course', 'Untitled course');
 }
 
 function initImportModal(root: HTMLElement): void {
@@ -1062,7 +1246,7 @@ function initImportModal(root: HTMLElement): void {
 
   const renderList = (): void => {
     if (!activeCourse) {
-      renderEmpty('Open a course on Minallo first to import its files here.');
+      renderEmpty(tStr('cb_open_course_first', 'Open a course on Minallo first to import its files here.'));
       if (crumb) crumb.hidden = true;
       return;
     }
@@ -1077,7 +1261,7 @@ function initImportModal(root: HTMLElement): void {
       if (crumb) crumb.hidden = false;
       if (crumbPath) crumbPath.textContent = activeFolder.name;
       if (!files.length) {
-        renderEmpty('No files in this folder.');
+        renderEmpty(tStr('cb_no_files_in_folder', 'No files in this folder.'));
         return;
       }
       listEl.innerHTML = files.map((f) => fileRow(f, courseId, activeFolder!.id)).join('');
@@ -1090,7 +1274,7 @@ function initImportModal(root: HTMLElement): void {
         (f) => !q || (f.name || '').toLowerCase().includes(q)
       );
       if (!folders.length && !rootFiles.length) {
-        renderEmpty(searchTerm ? 'No matches.' : 'No files in this course.');
+        renderEmpty(searchTerm ? tStr('cb_no_matches', 'No matches.') : tStr('cb_no_files_in_course', 'No files in this course.'));
         return;
       }
       const folderHtml = folders.map((fd) => folderRow(fd, courseId)).join('');
@@ -1318,7 +1502,7 @@ function initImportModal(root: HTMLElement): void {
     if (importBtn.disabled) return;
     importBtn.disabled = true;
     const originalLabel = importBtn.textContent;
-    importBtn.textContent = 'Importing…';
+    importBtn.textContent = tStr('cb_importing', 'Importing…');
     const courseName = courseLabel(activeCourse);
     try {
       const items = await loadPickedDocuments(picked, activeCourse);
@@ -1624,7 +1808,7 @@ function saveReplyToNotes(aiRow: HTMLElement, raw: string, btn: HTMLElement): vo
   // De-dupe by exact text — Save twice should refuse, not double-add.
   const already = chat.savedReplies.find((r) => r.text === raw);
   if (already) {
-    flashAck(btn, 'Already saved');
+    flashAck(btn, tStr('cb_act_already_saved', 'Already saved'));
     return;
   }
 
@@ -1635,7 +1819,7 @@ function saveReplyToNotes(aiRow: HTMLElement, raw: string, btn: HTMLElement): vo
   });
   touchActiveChat();
   saveChatStore();
-  flashAck(btn, 'Saved');
+  flashAck(btn, tStr('cb_act_saved', 'Saved'));
 
   // If the Notes tab is currently visible, refresh it inline.
   const root = aiRow.closest<HTMLElement>('.ncb-root');
@@ -1662,7 +1846,7 @@ function renderNotesTab(root: HTMLElement): void {
 
   if (chat.savedReplies.length === 0) {
     list.innerHTML =
-      '<p class="ncb-notes-empty">Bookmark useful AI replies here by tapping the Bookmark button under any reply.</p>';
+      '<p class="ncb-notes-empty">' + escapeHtml(tStr('cb_notes_empty', 'Save useful AI replies here by tapping the Save to notes button under any reply.')) + '</p>';
     return;
   }
 
@@ -1674,10 +1858,10 @@ function renderNotesTab(root: HTMLElement): void {
         <div class="ncb-saved-foot">
           <span class="ncb-saved-time">${escapeHtml(relativeTime(r.createdAt))}</span>
           <div class="ncb-saved-actions">
-            <button type="button" class="ncb-saved-copy" title="Copy">
+            <button type="button" class="ncb-saved-copy" title="${escapeAttr(tStr('cb_act_copy', 'Copy'))}">
               <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
-            <button type="button" class="ncb-saved-remove" title="Remove" aria-label="Remove saved reply">
+            <button type="button" class="ncb-saved-remove" title="${escapeAttr(tStr('cb_menu_delete', 'Delete'))}" aria-label="${escapeAttr(tStr('cb_remove_saved_reply', 'Remove saved reply'))}">
               <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
@@ -1756,7 +1940,7 @@ function updateChatTitle(title: string): void {
   const root = document.getElementById('ncbRoot');
   if (root) {
     const headerTitle = root.querySelector<HTMLElement>('.ncb-chat-header-title');
-    if (headerTitle) headerTitle.textContent = title;
+    if (headerTitle) headerTitle.textContent = displayChatTitle(title);
     renderSidebar(root);
   }
 }
@@ -1948,10 +2132,10 @@ function saveChatStore(): void {
       const isQuota = (err as DOMException)?.name === 'QuotaExceededError';
       if (typeof w.showToast === 'function') {
         w.showToast(
-          isQuota ? 'Chat storage full' : 'Chats not saved',
+          isQuota ? tStr('cb_storage_full_title', 'Chat storage full') : tStr('cb_storage_blocked_title', 'Chats not saved'),
           isQuota
-            ? 'Browser storage is full. Delete some chats to keep new ones from being lost on reload.'
-            : 'Your browser blocked storage (private mode?). Chats will not persist across reloads.'
+            ? tStr('cb_storage_full_text', 'Browser storage is full. Delete some chats to keep new ones from being lost on reload.')
+            : tStr('cb_storage_blocked_text', 'Your browser blocked storage (private mode?). Chats will not persist across reloads.')
         );
       }
     }
@@ -1966,23 +2150,39 @@ function touchActiveChat(): void {
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
   const min = Math.floor(diff / 60000);
-  if (min < 1) return 'Just now';
-  if (min < 60) return min + ' min ago';
+  const isDe = (localStorage.getItem('ss_lang') || 'en') === 'de';
+  if (min < 1) return isDe ? 'Gerade eben' : 'Just now';
+  if (min < 60) return isDe ? `vor ${min} Min.` : `${min} min ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return hr + ' hr ago';
+  if (hr < 24) return isDe ? `vor ${hr} Std.` : `${hr} hr ago`;
   const d = Math.floor(hr / 24);
-  if (d < 7) return d + ' day' + (d === 1 ? '' : 's') + ' ago';
-  return new Date(ts).toLocaleDateString();
+  if (d < 7) return isDe ? `vor ${d} Tag${d === 1 ? '' : 'en'}` : `${d} day${d === 1 ? '' : 's'} ago`;
+  return new Date(ts).toLocaleDateString(isDe ? 'de-DE' : 'en-US');
+}
+
+// 'New chat' is the sentinel title for un-renamed chats. Translate at display
+// time so storage stays stable and language switches don't desync chat lists.
+function displayChatTitle(title: string): string {
+  if (title === 'New chat') return tStr('cb_chat_title_new', 'New chat');
+  return title;
 }
 
 function chatMeta(c: SavedChat): string {
   const attached = c.selectedSourceIds.length;
-  const fragment =
-    attached > 0
-      ? attached + ' source' + (attached === 1 ? '' : 's')
-      : c.messages.length === 0
-        ? 'Empty draft'
-        : c.messages.length + ' msg' + (c.messages.length === 1 ? '' : 's');
+  const isDe = (localStorage.getItem('ss_lang') || 'en') === 'de';
+  let fragment: string;
+  if (attached > 0) {
+    fragment = isDe
+      ? `${attached} ${attached === 1 ? 'Quelle' : 'Quellen'}`
+      : `${attached} source${attached === 1 ? '' : 's'}`;
+  } else if (c.messages.length === 0) {
+    fragment = tStr('cb_empty_draft', 'Empty draft');
+  } else {
+    const n = c.messages.length;
+    fragment = isDe
+      ? `${n} ${n === 1 ? 'Nachr.' : 'Nachr.'}`
+      : `${n} msg${n === 1 ? '' : 's'}`;
+  }
   return fragment + ' · ' + relativeTime(c.updatedAt);
 }
 
@@ -1995,11 +2195,11 @@ function renderSidebar(root: HTMLElement): void {
 
   const sections: string[] = [];
   if (pinned.length) {
-    sections.push('<p class="ncb-chat-section-label">Pinned</p>');
+    sections.push('<p class="ncb-chat-section-label">' + escapeHtml(tStr('cb_section_pinned', 'Pinned')) + '</p>');
     pinned.forEach((c) => sections.push(buildSidebarRow(c)));
   }
   if (recent.length) {
-    sections.push('<p class="ncb-chat-section-label">Recent</p>');
+    sections.push('<p class="ncb-chat-section-label">' + escapeHtml(tStr('cb_section_recent', 'Recent')) + '</p>');
     recent.forEach((c) => sections.push(buildSidebarRow(c)));
   }
   list.innerHTML = sections.join('');
@@ -2016,7 +2216,7 @@ function buildSidebarRow(c: SavedChat): string {
         <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>
       </span>
       <span class="ncb-chat-text">
-        <span class="ncb-chat-title">${escapeHtml(c.title)}</span>
+        <span class="ncb-chat-title">${escapeHtml(displayChatTitle(c.title))}</span>
         <span class="ncb-chat-meta">${escapeHtml(chatMeta(c))}</span>
       </span>
       <span class="ncb-chat-more" aria-hidden="true">
@@ -2065,7 +2265,7 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   renderFilesRow(root, state);
 
   // Header title.
-  if (headerTitle) headerTitle.textContent = chat.title;
+  if (headerTitle) headerTitle.textContent = displayChatTitle(chat.title);
   updateContextPill(root);
 
   // Stage mode: active iff there are any messages.
@@ -2397,7 +2597,7 @@ function runToolPrompt(root: HTMLElement, tool: string, btn: HTMLElement): void 
   const msgs = root.querySelector<HTMLElement>('.ncb-msgs');
   const state = liveState;
   if (!stage || !sendBtn || !msgs || !state || state.isSending) {
-    if (state?.isSending) flashAck(btn, 'Busy');
+    if (state?.isSending) flashAck(btn, tStr('cb_act_busy', 'Busy'));
     return;
   }
 
@@ -2414,7 +2614,7 @@ function runToolPrompt(root: HTMLElement, tool: string, btn: HTMLElement): void 
 function exportActiveChat(btn: HTMLElement): void {
   const chat = chatStore.getActive();
   if (!chat.messages.length) {
-    flashAck(btn, 'Nothing to export');
+    flashAck(btn, tStr('cb_act_nothing_export', 'Nothing to export'));
     return;
   }
   const lines: string[] = [`# ${chat.title}`, ''];
@@ -2442,7 +2642,7 @@ function exportActiveChat(btn: HTMLElement): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  flashAck(btn, 'Exported');
+  flashAck(btn, tStr('cb_act_exported', 'Exported'));
 }
 
 // ============ PR-10: chat-row menu, rename, delete, pin, clear-all ============
@@ -2477,9 +2677,9 @@ function openChatRowMenu(root: HTMLElement, chatId: string, anchor: HTMLElement)
   if (!chat) return;
   const menu = ensureMenuEl();
   menu.innerHTML = `
-    <button type="button" class="ncb-row-menu-item" data-act="pin">${chat.pinned ? 'Unpin' : 'Pin'}</button>
-    <button type="button" class="ncb-row-menu-item" data-act="rename">Rename</button>
-    <button type="button" class="ncb-row-menu-item ncb-row-menu-item--danger" data-act="delete">Delete</button>
+    <button type="button" class="ncb-row-menu-item" data-act="pin">${escapeHtml(chat.pinned ? tStr('cb_menu_unpin', 'Unpin') : tStr('cb_menu_pin', 'Pin'))}</button>
+    <button type="button" class="ncb-row-menu-item" data-act="rename">${escapeHtml(tStr('cb_menu_rename', 'Rename'))}</button>
+    <button type="button" class="ncb-row-menu-item ncb-row-menu-item--danger" data-act="delete">${escapeHtml(tStr('cb_menu_delete', 'Delete'))}</button>
   `;
   // Position below the anchor, right-aligned to its right edge.
   const r = anchor.getBoundingClientRect();
@@ -2518,7 +2718,7 @@ function beginRename(root: HTMLElement, chatId: string): void {
   input.type = 'text';
   input.value = chat.title;
   input.className = 'ncb-chat-rename-input';
-  input.setAttribute('aria-label', 'Rename chat');
+  input.setAttribute('aria-label', tStr('cb_rename_chat_aria', 'Rename chat'));
   titleEl.replaceWith(input);
   input.focus();
   input.select();
@@ -2552,7 +2752,12 @@ function beginRename(root: HTMLElement, chatId: string): void {
 function deleteChat(root: HTMLElement, chatId: string): void {
   const chat = chatStore.chats.find((c) => c.id === chatId);
   if (!chat) return;
-  const ok = window.confirm(`Delete "${chat.title}"? This can't be undone.`);
+  const isDe = (localStorage.getItem('ss_lang') || 'en') === 'de';
+  const ok = window.confirm(
+    isDe
+      ? `Chat „${chat.title}“ löschen? Das kann nicht rückgängig gemacht werden.`
+      : `Delete "${chat.title}"? This can't be undone.`
+  );
   if (!ok) return;
   const wasActive = chat.id === chatStore.activeId;
   chatStore.chats = chatStore.chats.filter((c) => c.id !== chatId);
@@ -2583,10 +2788,10 @@ function initClearAll(root: HTMLElement): void {
   btn.className = 'ncb-clear-all';
   btn.innerHTML = `
     <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-    <span>Clear all chats</span>
+    <span>${escapeHtml(tStr('cb_clear_all', 'Clear all chats'))}</span>
   `;
   btn.addEventListener('click', () => {
-    const ok = window.confirm('Delete every chat in the sidebar? This can\'t be undone.');
+    const ok = window.confirm(tStr('cb_clear_all_confirm', "Delete every chat in the sidebar? This can't be undone."));
     if (!ok) return;
     chatStore.chats = [];
     const fresh = chatStore.newChat();

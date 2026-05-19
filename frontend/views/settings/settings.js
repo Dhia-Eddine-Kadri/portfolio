@@ -54,7 +54,7 @@ async function saveSettings(patch) {
 (function bindSettingsControls() {
   function _markDirty() {
     var el = document.getElementById('settingsSaveState');
-    if (el) { el.textContent = 'Unsaved changes'; el.className = 'settings-save-state dirty'; }
+    if (el) { el.textContent = _t('set_unsaved'); el.className = 'settings-save-state dirty'; }
   }
 
   var settingsLanguage = document.getElementById('settingsLanguage');
@@ -150,7 +150,7 @@ async function saveSettings(patch) {
   var dangerBtn = document.getElementById('clearChatHistoryBtn');
   if (dangerBtn) {
     dangerBtn.addEventListener('click', function () {
-      if (!confirm('Clear all AI chat history? This cannot be undone.')) return;
+      if (!confirm(_t('settings_clear_confirm'))) return;
       Object.keys(localStorage)
         .filter(function (k) {
           return k.startsWith('ss_chat_');
@@ -169,7 +169,7 @@ async function saveSettings(patch) {
       var btn = this;
       var stateEl = document.getElementById('settingsSaveState');
       btn.disabled = true;
-      if (stateEl) { stateEl.textContent = 'Saving…'; stateEl.className = 'settings-save-state dirty'; }
+      if (stateEl) { stateEl.textContent = _t('set_saving'); stateEl.className = 'settings-save-state dirty'; }
       var lang =
         (document.getElementById('settingsLanguage') || {}).value ||
         window._lang ||
@@ -195,7 +195,7 @@ async function saveSettings(patch) {
           dark_mode: darkMode
         });
         showToast(_t('toast_settings_saved'), _t('toast_settings_saved_sub'));
-        if (stateEl) { stateEl.textContent = 'Saved ✓'; stateEl.className = 'settings-save-state saved'; }
+        if (stateEl) { stateEl.textContent = _t('set_saved'); stateEl.className = 'settings-save-state saved'; }
         setTimeout(function () {
           btn.disabled = false;
           var el = document.getElementById('settingsSaveState');
@@ -204,7 +204,7 @@ async function saveSettings(patch) {
       } catch (err) {
         console.error('saveSettings click error:', err);
         btn.disabled = false;
-        if (stateEl) { stateEl.textContent = 'Save failed'; stateEl.className = 'settings-save-state error'; }
+        if (stateEl) { stateEl.textContent = _t('set_save_failed'); stateEl.className = 'settings-save-state error'; }
       }
     });
   }
@@ -252,11 +252,11 @@ async function saveSettings(patch) {
       modal.innerHTML =
         '<div style="background:linear-gradient(135deg,#110d20,#0d0f1e);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:36px 32px;width:380px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;gap:16px;text-align:center">' +
         '<div style="font-size:2rem">!</div>' +
-        '<div style="font-family:\'Fredoka One\',cursive;font-size:1.3rem;color:#f87171">Delete your account?</div>' +
-        '<div style="font-size:.82rem;color:rgba(255,255,255,.5);font-weight:700;line-height:1.6">This will permanently delete your account and all associated data including notes, settings, and chat history. <strong style="color:rgba(239,68,68,.8)">This cannot be undone.</strong></div>' +
+        '<div style="font-family:\'Fredoka One\',cursive;font-size:1.3rem;color:#f87171">' + _t('settings_delete_modal_title') + '</div>' +
+        '<div style="font-size:.82rem;color:rgba(255,255,255,.5);font-weight:700;line-height:1.6">' + _t('settings_delete_modal_desc') + '</div>' +
         '<div style="display:flex;gap:10px;margin-top:4px">' +
-        '<button id="delAccCancel" style="flex:1;padding:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:rgba(255,255,255,.7);cursor:pointer">Cancel</button>' +
-        '<button id="delAccConfirm" style="flex:1;padding:12px;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:#f87171;cursor:pointer">Yes, delete</button>' +
+        '<button id="delAccCancel" style="flex:1;padding:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:rgba(255,255,255,.7);cursor:pointer">' + _t('settings_delete_modal_cancel') + '</button>' +
+        '<button id="delAccConfirm" style="flex:1;padding:12px;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:#f87171;cursor:pointer">' + _t('settings_delete_modal_confirm') + '</button>' +
         '</div></div>';
       document.body.appendChild(modal);
 
@@ -266,7 +266,7 @@ async function saveSettings(patch) {
 
       document.getElementById('delAccConfirm').addEventListener('click', async function () {
         var btn = this;
-        btn.textContent = 'Deleting...';
+        btn.textContent = _t('set_deleting');
         btn.disabled = true;
         var token = _sbToken || sessionStorage.getItem('sb_sess_token');
         var uid = _currentUser && _currentUser.id;
@@ -300,13 +300,30 @@ async function saveSettings(patch) {
             } catch (e) {}
           }
         }
+        // Auth-user deletion must succeed before we wipe local state and
+        // reload — otherwise the user signs back in to a still-alive account
+        // (FK constraints to auth.users without ON DELETE CASCADE cause the
+        // Supabase Auth Admin API to return a 500 here; surface it instead of
+        // silently pretending the account was deleted).
+        var deleteOk = false;
         try {
-          await fetch('/api/admin-users', {
+          var delRes = await fetch('/api/admin-users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
             body: JSON.stringify({ action: 'deleteself', token: token })
           });
-        } catch (e) {}
+          deleteOk = delRes.ok;
+        } catch (e) { deleteOk = false; }
+        if (!deleteOk) {
+          btn.textContent = _t('set_yes_delete');
+          btn.disabled = false;
+          showToast(
+            'Delete failed',
+            'Your account could not be deleted. Please contact support.'
+          );
+          return;
+        }
+        try { if (window._sb && window._sb.auth) await window._sb.auth.signOut(); } catch (e) {}
         localStorage.clear();
         sessionStorage.clear();
         document.body.removeChild(modal);

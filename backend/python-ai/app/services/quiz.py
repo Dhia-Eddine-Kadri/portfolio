@@ -41,13 +41,30 @@ _DEFAULT_TYPES = ["mcq", "true_false", "short_answer"]
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
-def _system_prompt(count: int, difficulty: str, types: list[str]) -> str:
+def _system_prompt(count: int, difficulty: str, types: list[str], known_topics: list[str] | None = None) -> str:
     diff_guide = {
         "easy":   "Mostly definition recall and single-step identification.",
         "medium": "Mix of concept application, formula use, and 1-step calculations.",
         "hard":   "Multi-step reasoning, formula application, spotting wrong steps. Tough but fair.",
         "mixed":  "Balanced spread across easy, medium, and hard.",
     }.get(difficulty, "Balanced.")
+
+    # Topic-tagging block: when the indexer extracted topics for this course
+    # we hand them to the model and require it to label every item with one
+    # of them so Phase 2 mastery tracking can attribute results to a topic.
+    topic_block = ""
+    if known_topics:
+        topic_block = (
+            "\n\nKNOWN TOPICS FOR THIS COURSE:\n- "
+            + "\n- ".join(known_topics[:40])
+            + "\n\nEach item MUST include a \"topic\" field whose value is one of the "
+              "topics listed above (verbatim). Pick the single best match. If no listed "
+              "topic fits, set \"topic\" to null."
+        )
+    else:
+        topic_block = (
+            "\n\nNo course-level topic list is available; you may set \"topic\" to null."
+        )
 
     return f"""You are an expert university professor writing an exam-quality quiz for a student.
 
@@ -65,6 +82,7 @@ Rules:
 6. Cite the source like "filename, p.N" using the [Source N] header for every item.
 7. Math in KaTeX: $...$ inline, $$...$$ display.
 8. Match the language of the context (German if the slides are German).
+{topic_block}
 
 CRITICAL: emit EXACTLY {count} items in "items". Do not stop short. Do not pad with junk — quality must hold.
 
@@ -78,6 +96,7 @@ Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
       "answer": "A",
       "explanation": "...",
       "difficulty": "easy|medium|hard",
+      "topic": "one of KNOWN TOPICS or null",
       "source": "filename, p.X"
     }},
     {{
@@ -86,6 +105,7 @@ Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
       "answer": true,
       "explanation": "...",
       "difficulty": "easy|medium|hard",
+      "topic": "one of KNOWN TOPICS or null",
       "source": "filename, p.X"
     }},
     {{
@@ -94,6 +114,7 @@ Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
       "answer": "expected key answer",
       "explanation": "...",
       "difficulty": "easy|medium|hard",
+      "topic": "one of KNOWN TOPICS or null",
       "source": "filename, p.X"
     }}
   ]
@@ -102,7 +123,7 @@ Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
 
 # ── Normalisation + de-dup ───────────────────────────────────────────────────
 
-def _normalize(item: Any) -> dict[str, Any] | None:
+def _normalize(item: Any, known_topics: set[str] | None = None) -> dict[str, Any] | None:
     if not isinstance(item, dict):
         return None
     qtype = (item.get("type") or "").strip().lower()
@@ -115,6 +136,14 @@ def _normalize(item: Any) -> dict[str, Any] | None:
     explanation = (item.get("explanation") or "").strip()
     source = (item.get("source") or "").strip()
     difficulty = item.get("difficulty") if item.get("difficulty") in ("easy", "medium", "hard") else "medium"
+    # Topic is optional; only kept when it matches a known course topic so a
+    # hallucinated label can't pollute user_topic_mastery downstream.
+    raw_topic = item.get("topic")
+    topic: str | None = None
+    if isinstance(raw_topic, str):
+        t = raw_topic.strip()
+        if t and (known_topics is None or t in known_topics):
+            topic = t
 
     if qtype == "mcq":
         opts_in = item.get("options")
@@ -144,6 +173,7 @@ def _normalize(item: Any) -> dict[str, Any] | None:
             "answer": answer,
             "explanation": explanation,
             "difficulty": difficulty,
+            "topic": topic,
             "source": source,
         }
 
@@ -164,6 +194,7 @@ def _normalize(item: Any) -> dict[str, Any] | None:
             "answer": answer,
             "explanation": explanation,
             "difficulty": difficulty,
+            "topic": topic,
             "source": source,
         }
 
@@ -176,6 +207,7 @@ def _normalize(item: Any) -> dict[str, Any] | None:
             "answer": answer.strip(),
             "explanation": explanation,
             "difficulty": difficulty,
+            "topic": topic,
             "source": source,
         }
 
@@ -197,6 +229,32 @@ def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # ── Public surface ───────────────────────────────────────────────────────────
 
 
+def _fetch_course_topics(course_id: str, document_ids: list[str] | None) -> list[str]:
+    """Distinct primary_topic values for this course (optionally narrowed to docs).
+
+    Used to give the quiz LLM a closed-set list to choose from when labeling
+    items, and later to validate that the user_topic_mastery writes only
+    reference real topics from the corpus. Returns at most 40.
+    """
+    try:
+        sb = get_supabase()
+        q = sb.table("document_chunks").select("primary_topic").eq("course_id", course_id)
+        if document_ids:
+            q = q.in_("document_id", document_ids)
+        resp = q.filter("primary_topic", "not.is", "null").limit(2000).execute()
+        seen: list[str] = []
+        seen_set: set[str] = set()
+        for row in (resp.data or []):
+            t = (row.get("primary_topic") or "").strip()
+            if t and t not in seen_set:
+                seen_set.add(t)
+                seen.append(t)
+        return seen[:40]
+    except Exception:
+        log.exception("quiz: fetch course topics failed")
+        return []
+
+
 def _context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]) -> str:
     parts: list[str] = []
     for i, c in enumerate(chunks, 1):
@@ -216,6 +274,7 @@ def _context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]) -> s
 def _run_one_quiz_shard(
     *, shard_count: int, diff: str, types: list[str], context: str,
     already_taken: list[str], diversity_hint: str | None = None,
+    known_topics: list[str] | None = None,
 ) -> LlmResult | None:
     """Single LLM call for one shard's worth of items. Thread-safe."""
     avoid_block = ""
@@ -226,7 +285,7 @@ def _run_one_quiz_shard(
     diversity = ""
     if diversity_hint:
         diversity = f"\n\nFor this batch specifically: emphasise {diversity_hint}."
-    system = _system_prompt(shard_count, diff, types) + avoid_block + diversity
+    system = _system_prompt(shard_count, diff, types, known_topics) + avoid_block + diversity
     # Per-shard completion budget — each MCQ with options + explanation +
     # source runs ~250-400 tokens. 6 items × 400 = 2400; round up to 3000.
     max_completion = min(4000, 800 + shard_count * 380)
@@ -273,6 +332,8 @@ def generate_quiz(
         }
 
     context = _context_block(chunks, doc_names)
+    known_topics_list = _fetch_course_topics(course_id, document_ids)
+    known_topics_set = set(known_topics_list) if known_topics_list else None
     collected: list[dict[str, Any]] = []
     seen_questions: set[str] = set()
     diagnostics: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
@@ -302,6 +363,7 @@ def generate_quiz(
                 context=context,
                 already_taken=[],   # round 1: no avoid list — diversity hints carry the load
                 diversity_hint=diversity_hints[i % len(diversity_hints)],
+                known_topics=known_topics_list,
             )
             for i in range(shard_count)
         ]
@@ -319,7 +381,7 @@ def generate_quiz(
         for raw in raw_items:
             if len(collected) >= requested:
                 break
-            norm = _normalize(raw)
+            norm = _normalize(raw, known_topics_set)
             if not norm:
                 continue
             key = re.sub(r"\W+", " ", (norm["question"] or "").lower()).strip()
@@ -335,6 +397,7 @@ def generate_quiz(
             diff=diff, types=types, context=context,
             already_taken=[it.get("question") or "" for it in collected],
             diversity_hint="any high-value concepts not yet asked about",
+            known_topics=known_topics_list,
         )
         if backfill is not None:
             diagnostics["prompt_tokens"] += backfill.prompt_tokens or 0
@@ -344,7 +407,7 @@ def generate_quiz(
                 for raw in raw_items:
                     if len(collected) >= requested:
                         break
-                    norm = _normalize(raw)
+                    norm = _normalize(raw, known_topics_set)
                     if not norm:
                         continue
                     key = re.sub(r"\W+", " ", (norm["question"] or "").lower()).strip()

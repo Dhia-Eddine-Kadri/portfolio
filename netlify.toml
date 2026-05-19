@@ -148,6 +148,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/ai/quiz-attempt"
+  to = "/.netlify/functions/ai-quiz-attempt"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/mastery"
+  to = "/.netlify/functions/ai-mastery"
+  status = 200
+
+[[redirects]]
   from = "/api/notes/generate"
   to = "/.netlify/functions/notes-generate"
   status = 200

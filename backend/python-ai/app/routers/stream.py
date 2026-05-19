@@ -20,10 +20,11 @@ from pydantic import BaseModel
 
 from ..jwt_auth import verify_supabase_jwt
 from ..services.access_control import (
-    enforce_monthly_ai_cap,
+    enforce_interactive_cap,
     enforce_rate_limit,
     require_active_subscription,
 )
+from ..services.answer import DEFAULT_TUTOR_MODE, normalise_tutor_mode
 from ..services.answer_stream import stream_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
 from ..services.retrieval import retrieve_chunks, retrieve_exercise_block, retrieve_formula_block
@@ -37,9 +38,10 @@ _ASK_STREAM_RATE_LIMIT_MAX = 30
 _ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 _MAX_STREAM_QUESTION_CHARS = 8000
 _MAX_STREAM_OPEN_FILE_CTX_CHARS = 20000
-# Mirror backend/lib/rate-limit.ts default. Override at deploy time by editing
-# the constant if a more generous cap is needed.
-_AI_MONTHLY_CAP = 500
+# Mirror backend/lib/rate-limit.ts INTERACTIVE_MONTHLY_CAP. /ask-stream is an
+# interactive RAG call (cheap per request on gpt-4o-mini) so it lives in the
+# interactive bucket alongside /api/ai/ask and the writing coach.
+_INTERACTIVE_MONTHLY_CAP = 2000
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +80,8 @@ class AskStreamRequest(BaseModel):
     # retrieval doesn't surface the exact chunk. Both optional.
     activeFileName: str | None = None
     openFileContext: str | None = None
+    # Tutor-mode overlay: explain | solve | quiz. Defaults to 'solve'.
+    tutorMode: str | None = None
     # bypassCache is intentionally NOT exposed on the public API. The cache
     # is keyed by document_version_hash so it invalidates automatically when
     # documents change; letting the client opt out defeats the single biggest
@@ -93,7 +97,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     user_id = user["id"]
     # Paid feature — verify subscription before doing anything expensive.
     require_active_subscription(user_id, "ask_stream")
-    enforce_monthly_ai_cap(user_id, _AI_MONTHLY_CAP)
+    enforce_interactive_cap(user_id, _INTERACTIVE_MONTHLY_CAP)
     enforce_rate_limit(
         user_id,
         "ask_stream",
@@ -118,6 +122,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is required")
     if len(question) > _MAX_STREAM_QUESTION_CHARS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is too long")
+
+    tutor_mode = normalise_tutor_mode(payload.tutorMode or DEFAULT_TUTOR_MODE)
     if payload.openFileContext and len(payload.openFileContext) > _MAX_STREAM_OPEN_FILE_CTX_CHARS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
 
@@ -129,7 +135,11 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     version_hash = ""
     cached = None
     has_open_ctx = bool(payload.openFileContext and payload.openFileContext.strip())
-    if payload.documentIds and not has_open_ctx:
+    # Cache only makes sense for the legacy 'explain' mode. 'solve' is
+    # conversational and 'quiz' is generative, so we never want to serve
+    # a stale answer for either.
+    cacheable = tutor_mode == "explain"
+    if payload.documentIds and not has_open_ctx and cacheable:
         version_hash = fetch_document_version_hash(user_id, payload.courseId, payload.documentIds)
         cached = lookup_answer(
             user_id=user_id, course_id=payload.courseId,
@@ -226,12 +236,19 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     full_text_buf: list[str] = []
     captured_meta: dict[str, Any] = {}
 
+    # Phase 3: per-student weak-topic coaching note. Best-effort; failure
+    # here must never block answering.
+    from ..services.mastery import fetch_weak_topics  # noqa: WPS433
+    weak_topics = fetch_weak_topics(user_id, payload.courseId)
+
     def gen():
         import json
         gen_iter = stream_answer(
             question=question, chunks=chunks, doc_names=doc_name_map,
+            tutor_mode=tutor_mode,
             active_file_name=payload.activeFileName,
             open_file_context=payload.openFileContext,
+            weak_topics=weak_topics,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.

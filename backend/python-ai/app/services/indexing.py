@@ -33,6 +33,7 @@ from .embeddings import embed_texts
 from .extraction import extract_pages_text
 from .markdown_indexing import PageMarkdown, page_to_markdown
 from .storage import download_document_bytes
+from .topic_extraction import extract_topics, topic_extraction_summary
 
 log = logging.getLogger(__name__)
 
@@ -122,6 +123,27 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
             )
             raise IndexingError("embedding count mismatch")
 
+        # Phase 1 tutor-mode: extract topic labels + assign one primary topic
+        # per chunk. Best-effort — failure leaves the columns NULL and the
+        # rest of indexing proceeds. Runs BEFORE the chunk insert so the
+        # primary_topic values land in the same row write.
+        doc_topics: list[str] = []
+        primary_topics: list[str | None] = [None] * len(chunks)
+        try:
+            file_name_for_topics = doc.get("file_name") or ""
+            doc_topics, primary_topics = extract_topics(
+                file_name=file_name_for_topics, chunks=chunks
+            )
+            log.info(
+                "topic extraction for %s: %s",
+                document_id,
+                topic_extraction_summary(doc_topics, primary_topics),
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("topic extraction failed — proceeding without topic tags")
+            doc_topics = []
+            primary_topics = [None] * len(chunks)
+
         _replace_chunks(
             sb,
             document_id=document_id,
@@ -130,6 +152,8 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
             source_type=source_type,
             chunks=chunks,
             vectors=vectors,
+            doc_topics=doc_topics,
+            primary_topics=primary_topics,
         )
 
         # Phase 5: exact-match exercise / formula blocks. Failures here must
@@ -279,11 +303,15 @@ def _replace_chunks(
     source_type: str,
     chunks: list[Chunk],
     vectors: list[list[float]],
+    doc_topics: list[str] | None = None,
+    primary_topics: list[str | None] | None = None,
 ) -> None:
     sb.table("document_chunks").delete().eq("document_id", document_id).execute()
     rows = []
+    topics_array = doc_topics or []
+    primary = primary_topics or [None] * len(chunks)
     for idx, (chunk, embedding) in enumerate(zip(chunks, vectors)):
-        rows.append({
+        row: dict[str, Any] = {
             "document_id": document_id,
             "user_id": user_id,
             "course_id": course_id,
@@ -296,7 +324,15 @@ def _replace_chunks(
             "chunk_type": chunk.chunk_type,
             "token_count": chunk.token_count,
             "embedding": embedding,
-        })
+        }
+        # Topic columns are additive (added by migration 20260519_000006).
+        # Skip writing them when extraction returned nothing — the DB default
+        # leaves them NULL and queries don't break.
+        if topics_array:
+            row["topics"] = topics_array
+        if idx < len(primary) and primary[idx]:
+            row["primary_topic"] = primary[idx]
+        rows.append(row)
     for start in range(0, len(rows), 100):
         sb.table("document_chunks").insert(rows[start:start + 100]).execute()
 

@@ -132,8 +132,11 @@ export async function analyzeParagraph(opts: AnalyzeOptions): Promise<WritingAna
   if (!res.ok) {
     let detail = 'HTTP ' + res.status;
     try {
-      const j = (await res.json()) as { error?: string };
-      if (j.error) detail = j.error;
+      // Backend uses two shapes: fail() returns { error: { message } },
+      // while some handlers return { error: "string" }. Accept both.
+      const j = (await res.json()) as { error?: string | { message?: string } };
+      if (typeof j.error === 'string') detail = j.error;
+      else if (j.error && typeof j.error.message === 'string') detail = j.error.message;
     } catch { /* ignore */ }
     throw new Error(detail);
   }

@@ -55,6 +55,31 @@ function _clearSemsCourses() {
   Object.keys(SEMS).forEach(function (sid) { SEMS[sid].courses = []; });
 }
 
+// One-time migration: the Minallo courses redesign added a new "SS 2026"
+// dropdown option backed by sid `ss2526` and made it the default-selected
+// semester. Courses created before that change still live under the old
+// `ws2526` bucket (which the redesign re-labeled "WS 2025/26"). Move them
+// over so the user's courses appear under the semester they're actually
+// studying right now (SS 2026 is the live German summer semester in 2026).
+//
+// Idempotent: once `ws2526` is empty for this user the function is a no-op.
+// Non-destructive: if both buckets contain a course with the same id we
+// keep the version that's already in `ss2526` (assumed newer).
+function _migrateWs2526ToSs2526() {
+  if (!SEMS.ws2526 || !SEMS.ss2526) return false;
+  var src = SEMS.ws2526.courses || [];
+  if (!src.length) return false;
+  var dst = SEMS.ss2526.courses || [];
+  var existingIds = {};
+  dst.forEach(function (c) { if (c && c.id) existingIds[c.id] = true; });
+  src.forEach(function (c) {
+    if (c && c.id && !existingIds[c.id]) dst.push(c);
+  });
+  SEMS.ss2526.courses = dst;
+  SEMS.ws2526.courses = [];
+  return true;
+}
+
 // One-time sync hydration: if a user is already on window (warm reload),
 // load THEIR courses from the scoped key. Never trust the legacy global key
 // because that's the leak vector — wipe it instead.
@@ -67,6 +92,16 @@ function _clearSemsCourses() {
         Object.keys(saved).forEach(function (sid) {
           if (SEMS[sid] && Array.isArray(saved[sid])) SEMS[sid].courses = saved[sid];
         });
+        // Apply the ws2526 -> ss2526 migration on warm reload before any UI
+        // renders. Persist back to the scoped key only; the server write
+        // happens later via _saveUserCourses once auth is ready.
+        if (uid && _migrateWs2526ToSs2526()) {
+          var migrated = {};
+          Object.keys(SEMS).forEach(function (sid) {
+            migrated[sid] = SEMS[sid].courses.map(_stripCourseForSave);
+          });
+          _writeUserCoursesLs(uid, migrated);
+        }
       }
     }
     // Drop the legacy unscoped key — its only effect now is leaking data
@@ -252,9 +287,17 @@ function _loadUserCourses(data) {
       SEMS[sid].courses = data[sid];
     }
   });
+  // One-time ws2526 → ss2526 migration. Runs server-side persistence too
+  // so the move sticks across devices, not just this browser.
+  var didMigrate = _migrateWs2526ToSs2526();
   // Cache scoped by user id so accounts can't leak into each other.
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
   if (uid) _writeUserCoursesLs(uid, data);
+  if (didMigrate) {
+    // _saveUserCourses re-reads SEMS, so the migrated state is what gets
+    // pushed to both localStorage (overwriting the line above) and Supabase.
+    try { _saveUserCourses(); } catch (e) { /* ignore */ }
+  }
   sdRenderCourses();
   // Fire-and-forget: pre-fetch every course's files now so cards show real
   // counts and opening a course is instant. Fire on next microtask so the

@@ -49,6 +49,14 @@ interface YTPlayerVars {
   list?: string;
 }
 
+function _stT(key: string): string {
+  try {
+    return typeof window._t === 'function' ? window._t(key) : key;
+  } catch {
+    return key;
+  }
+}
+
 interface YTPlayerConfig {
   height: string;
   width: string;
@@ -492,7 +500,11 @@ function _stUpdateMini(): void {
   if (t) t.textContent = _stFmt(_stSecondsLeft);
   if (l)
     l.textContent =
-      _stPhase === 'focus' ? 'Focus' : _stPhase === 'short' ? 'Short break' : 'Long break';
+      _stPhase === 'focus'
+        ? _stT('tb_focus_mini')
+        : _stPhase === 'short'
+          ? _stT('st_short_break')
+          : _stT('st_long_break');
   _syncCourseStudyBtn();
 }
 
@@ -527,7 +539,7 @@ function _syncStudyBtnFor(wrapId: string, btnId: string, controlsId: string): vo
 
   const timerText = _stFmt(_stSecondsLeft);
   const pauseGlyph = _stPaused ? '&#x25B6;' : '&#x23F8;';
-  const pauseTitle = _stPaused ? 'Resume' : 'Pause';
+  const pauseTitle = _stPaused ? _stT('tb_resume_title') : _stT('tb_pause_title');
   const pauseBtnId = controlsId + 'Pause';
   const stopBtnId = controlsId + 'Stop';
 
@@ -554,7 +566,7 @@ function _syncStudyBtnFor(wrapId: string, btnId: string, controlsId: string): vo
       pauseGlyph +
     '</button>' +
     '<span class="co-study-timer">' + timerText + '</span>' +
-    '<button id="' + stopBtnId + '" class="co-study-ctrl co-study-ctrl-stop" type="button" title="Stop">' +
+    '<button id="' + stopBtnId + '" class="co-study-ctrl co-study-ctrl-stop" type="button" title="' + _stT('tb_stop_title') + '">' +
       '&#x25A0;' +
     '</button>';
 }
@@ -901,10 +913,10 @@ export function initStudyTimer(): void {
         _stMusicSrc = src;
       }
       const hints: Record<MusicSrc, string> = {
-        lofi: 'Lofi Girl radio — always available',
-        youtube: 'Choose a saved playlist below',
-        spotify: 'Controls your Spotify playback',
-        none: 'No music during session',
+        lofi: _stT('st_music_hint_lofi_radio'),
+        youtube: _stT('st_music_hint_youtube'),
+        spotify: _stT('st_music_hint_spotify'),
+        none: _stT('st_music_hint_none'),
       };
       const hint = document.getElementById('stMusicHint');
       if (hint) hint.textContent = hints[_stMusicSrc] || '';
@@ -936,7 +948,7 @@ export function initStudyTimer(): void {
       // already writes everything to localStorage). Show a small toast.
       _stPersist();
       const t = window.showToast;
-      if (typeof t === 'function') t('Default focus session saved', '');
+      if (typeof t === 'function') t(_stT('st_default_saved'), '');
       return;
     }
 

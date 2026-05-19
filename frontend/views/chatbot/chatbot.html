@@ -14,8 +14,8 @@
           </svg>
         </div>
         <div class="ncb-header-text">
-          <h1 class="ncb-header-title">Chatbot</h1>
-          <p class="ncb-header-subtitle">Course-aware AI tutor</p>
+          <h1 class="ncb-header-title" data-i18n="cb_header_title">Chatbot</h1>
+          <p class="ncb-header-subtitle" data-i18n="cb_header_subtitle">Course-aware AI tutor</p>
         </div>
       </div>
 
@@ -27,7 +27,7 @@
           </svg>
           <span>TM1</span>
         </button>
-        <button type="button" class="ncb-panel-open-btn" aria-label="Open context panel">
+        <button type="button" class="ncb-panel-open-btn" data-i18n-aria="cb_open_panel" aria-label="Open context panel">
           <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect width="18" height="18" x="3" y="3" rx="2"/>
             <path d="M15 3v18"/>
@@ -42,10 +42,10 @@
         <aside class="ncb-sidebar" aria-label="Chat history">
           <div class="ncb-sidebar-head">
             <div class="ncb-sidebar-head-text">
-              <p class="ncb-eyebrow">Minallo</p>
-              <h2 class="ncb-sidebar-title">AI Chats</h2>
+              <p class="ncb-eyebrow" data-i18n="cb_sidebar_eyebrow">Minallo</p>
+              <h2 class="ncb-sidebar-title" data-i18n="cb_sidebar_title">AI Chats</h2>
             </div>
-            <button type="button" class="ncb-collapse-btn" aria-label="Collapse sidebar">
+            <button type="button" class="ncb-collapse-btn" data-i18n-aria="cb_collapse_sidebar" aria-label="Collapse sidebar">
               <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m15 18-6-6 6-6"/>
               </svg>
@@ -56,7 +56,7 @@
             <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14"/><path d="M12 5v14"/>
             </svg>
-            <span>New chat</span>
+            <span data-i18n="cb_new_chat">New chat</span>
           </button>
 
           <div class="ncb-search">
@@ -64,7 +64,7 @@
               <circle cx="11" cy="11" r="8"/>
               <path d="m21 21-4.3-4.3"/>
             </svg>
-            <input type="text" class="ncb-search-input" placeholder="Search chats..." aria-label="Search chats" />
+            <input type="text" class="ncb-search-input" data-i18n-ph="cb_search_chats" data-i18n-aria="cb_search_chats_aria" placeholder="Search chats..." aria-label="Search chats" />
           </div>
 
           <div class="ncb-chat-list ncb-no-scrollbar">
@@ -77,9 +77,9 @@
                 <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
                 <path d="m9 12 2 2 4-4"/>
               </svg>
-              <span>Course-safe mode</span>
+              <span data-i18n="cb_safe_title">Course-safe mode</span>
             </div>
-            <p class="ncb-safe-text">
+            <p class="ncb-safe-text" data-i18n="cb_safe_text">
               Answers can be restricted to uploaded lectures, exercises, and course files.
             </p>
           </div>
@@ -90,10 +90,10 @@
             <div class="ncb-empty" data-state="empty">
               <div class="ncb-chat-header">
                 <div class="ncb-chat-header-text">
-                  <p class="ncb-eyebrow">Current chat</p>
-                  <h2 class="ncb-chat-header-title">New chat</h2>
+                  <p class="ncb-eyebrow" data-i18n="cb_current_chat">Current chat</p>
+                  <h2 class="ncb-chat-header-title" data-i18n="cb_chat_title_new">New chat</h2>
                 </div>
-                <span class="ncb-chat-context-pill">Course context active</span>
+                <span class="ncb-chat-context-pill" data-i18n="cb_context_active">Course context active</span>
               </div>
 
               <div class="ncb-msgs"></div>
@@ -106,13 +106,54 @@
                   </svg>
                   <span>Hi Mohamed Ali Mariam &mdash; ready to study smarter?</span>
                 </div>
-                <h2 class="ncb-empty-title">What are we studying today?</h2>
-                <p class="ncb-empty-subtitle">
+                <h2 class="ncb-empty-title" data-i18n="cb_empty_title">What are we studying today?</h2>
+                <p class="ncb-empty-subtitle" data-i18n="cb_empty_subtitle">
                   Upload a lecture, import a course file, solve an exercise, create notes, or ask Minallo to explain the topic like a personal tutor.
                 </p>
               </div>
 
               <div class="ncb-input">
+                <!-- Tutor-mode pill row. Locale-aware labels (DE / EN) are
+                     applied by the shell on init. Default is 'solve' so the
+                     experience signals "tutor" from turn 1. The shell reads
+                     data-mode and forwards it to /ask-stream as tutorMode. -->
+                <div class="ncb-tutor-modes" role="radiogroup" data-i18n-aria="cb_tutor_group_aria" aria-label="Tutor mode" data-testid="chatbot-tutor-modes">
+                  <button type="button" class="ncb-tutor-mode" data-mode="solve" aria-pressed="true"
+                          data-label-de="Gemeinsam lösen" data-label-en="Solve with me"
+                          data-i18n-title="cb_tutor_solve_title"
+                          title="Socratic — guides you step by step instead of revealing the full answer">
+                    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                      <path d="M12 17h.01"/>
+                    </svg>
+                    <span class="ncb-tutor-mode-label">Solve with me</span>
+                  </button>
+                  <button type="button" class="ncb-tutor-mode" data-mode="explain" aria-pressed="false"
+                          data-label-de="Erklären" data-label-en="Explain"
+                          data-i18n-title="cb_tutor_explain_title"
+                          title="Direct explanation grounded in your course files">
+                    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 9V5a3 3 0 0 0-6 0v4"/>
+                      <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                    </svg>
+                    <span class="ncb-tutor-mode-label">Explain</span>
+                  </button>
+                  <button type="button" class="ncb-tutor-mode" data-mode="quiz" aria-pressed="false"
+                          data-label-de="Quiz mich" data-label-en="Quiz me"
+                          data-i18n-title="cb_tutor_quiz_title"
+                          title="Generates a short MCQ check on this topic from your course files">
+                    <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9.5 14.5 3 21"/>
+                      <path d="M16 3.549 7.12 20.171"/>
+                      <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2"/>
+                      <path d="M16 2v4"/>
+                      <path d="M14 4h4"/>
+                    </svg>
+                    <span class="ncb-tutor-mode-label">Quiz me</span>
+                  </button>
+                </div>
+
                 <!-- Attachment / paste / files previews. Empty by default,
                      populated by JS when the user attaches things. Each
                      is auto-hidden when empty via CSS :empty. -->
@@ -126,6 +167,7 @@
                      textarea → send. ChatGPT-style. -->
                 <div class="ncb-input-row">
                   <button type="button" class="ncb-input-action-btn ncb-upload-btn" data-testid="chatbot-upload"
+                          data-i18n-title="cb_upload_btn" data-i18n-aria="cb_upload_btn"
                           title="Upload photos & files" aria-label="Upload photos & files">
                     <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M13.234 20.252 21 12.3"/>
@@ -133,6 +175,7 @@
                     </svg>
                   </button>
                   <button type="button" class="ncb-input-action-btn ncb-import-btn" data-testid="import-course"
+                          data-i18n-title="cb_import_btn" data-i18n-aria="cb_import_btn"
                           title="Import from Course" aria-label="Import from Course">
                     <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>
@@ -141,10 +184,12 @@
                   <textarea
                     class="ncb-input-textarea"
                     data-testid="chatbot-input"
+                    data-i18n-ph="cb_input_placeholder"
+                    data-i18n-aria="cb_input_aria"
                     placeholder="Ask anything about your lectures, exercises, or course files..."
                     aria-label="Type your message"
                   ></textarea>
-                  <button type="button" class="ncb-send-btn" data-testid="chatbot-send" title="Send message" aria-label="Send message">
+                  <button type="button" class="ncb-send-btn" data-testid="chatbot-send" data-i18n-title="cb_send_btn" data-i18n-aria="cb_send_btn" title="Send message" aria-label="Send message">
                     <svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 19V5"/>
                       <path d="m5 12 7-7 7 7"/>
@@ -163,8 +208,8 @@
                       <path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
                     </svg>
                   </span>
-                  <span class="ncb-action-title">Summarize lecture</span>
-                  <span class="ncb-action-desc">Turn PDFs into clean notes</span>
+                  <span class="ncb-action-title" data-i18n="cb_action_summarize_title">Summarize lecture</span>
+                  <span class="ncb-action-desc" data-i18n="cb_action_summarize_desc">Turn PDFs into clean notes</span>
                 </button>
 
                 <button type="button" class="ncb-action-card" data-testid="quick-solve"
@@ -181,8 +226,8 @@
                       <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>
                     </svg>
                   </span>
-                  <span class="ncb-action-title">Solve exercise</span>
-                  <span class="ncb-action-desc">Step-by-step with formulas</span>
+                  <span class="ncb-action-title" data-i18n="cb_action_solve_title">Solve exercise</span>
+                  <span class="ncb-action-desc" data-i18n="cb_action_solve_desc">Step-by-step with formulas</span>
                 </button>
 
                 <button type="button" class="ncb-action-card" data-testid="quick-exam-answer"
@@ -194,8 +239,8 @@
                       <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>
                     </svg>
                   </span>
-                  <span class="ncb-action-title">Exam answer</span>
-                  <span class="ncb-action-desc">Short, structured, precise</span>
+                  <span class="ncb-action-title" data-i18n="cb_action_exam_title">Exam answer</span>
+                  <span class="ncb-action-desc" data-i18n="cb_action_exam_desc">Short, structured, precise</span>
                 </button>
 
                 <button type="button" class="ncb-action-card" data-testid="quick-flashcards"
@@ -207,8 +252,8 @@
                       <path d="M16 2v20"/>
                     </svg>
                   </span>
-                  <span class="ncb-action-title">Create flashcards</span>
-                  <span class="ncb-action-desc">Save key concepts fast</span>
+                  <span class="ncb-action-title" data-i18n="cb_action_flash_title">Create flashcards</span>
+                  <span class="ncb-action-desc" data-i18n="cb_action_flash_desc">Save key concepts fast</span>
                 </button>
               </div>
             </div>
@@ -219,10 +264,10 @@
           <div class="ncb-context-inner ncb-no-scrollbar">
             <div class="ncb-context-head">
               <div class="ncb-context-head-text">
-                <p class="ncb-eyebrow">Context</p>
-                <h2 class="ncb-context-title">Study panel</h2>
+                <p class="ncb-eyebrow" data-i18n="cb_ctx_eyebrow">Context</p>
+                <h2 class="ncb-context-title" data-i18n="cb_ctx_title">Study panel</h2>
               </div>
-              <button type="button" class="ncb-context-close-btn" aria-label="Close context panel">
+              <button type="button" class="ncb-context-close-btn" data-i18n-aria="cb_close_panel" aria-label="Close context panel">
                 <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect width="18" height="18" x="3" y="3" rx="2"/>
                   <path d="M15 3v18"/>
@@ -238,7 +283,7 @@
                   <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/>
                   <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>
                 </svg>
-                <span>Files</span>
+                <span data-i18n="cb_tab_files">Files</span>
               </button>
               <button type="button" class="ncb-mini-tab">
                 <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -246,7 +291,7 @@
                   <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
                   <path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
                 </svg>
-                <span>Sources</span>
+                <span data-i18n="cb_tab_sources">Sources</span>
               </button>
               <button type="button" class="ncb-mini-tab">
                 <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -254,17 +299,17 @@
                   <rect width="16" height="20" x="4" y="2" rx="2"/>
                   <path d="M16 2v20"/>
                 </svg>
-                <span>Notes</span>
+                <span data-i18n="cb_tab_notes">Notes</span>
               </button>
             </div>
 
             <section class="ncb-notes-card" hidden>
               <div class="ncb-context-card-head">
-                <h3 class="ncb-context-card-title">Saved replies</h3>
+                <h3 class="ncb-context-card-title" data-i18n="cb_notes_card_title">Saved replies</h3>
                 <span class="ncb-files-pill ncb-notes-count">0</span>
               </div>
               <div class="ncb-notes-list">
-                <p class="ncb-notes-empty">
+                <p class="ncb-notes-empty" data-i18n="cb_notes_empty">
                   Save useful AI replies here by tapping the Save to notes button under any reply.
                 </p>
               </div>
@@ -272,20 +317,20 @@
 
             <section class="ncb-context-card ncb-sources-card">
               <div class="ncb-context-card-head">
-                <h3 class="ncb-context-card-title">Sources used</h3>
-                <span class="ncb-files-pill ncb-sources-count">0 files</span>
+                <h3 class="ncb-context-card-title" data-i18n="cb_sources_card_title">Sources used</h3>
+                <span class="ncb-files-pill ncb-sources-count" data-i18n="cb_sources_count_zero">0 files</span>
               </div>
               <!-- Populated by renderSourcesCard() from chat.attachedFolders. -->
               <div class="ncb-source-list"></div>
             </section>
 
             <section class="ncb-context-card">
-              <h3 class="ncb-context-card-title">AI tools</h3>
+              <h3 class="ncb-context-card-title" data-i18n="cb_tools_title">AI tools</h3>
               <div class="ncb-tools-grid">
-                <button type="button" class="ncb-tool-btn" data-tool="quiz">Quiz me</button>
-                <button type="button" class="ncb-tool-btn" data-tool="flashcards">Flashcards</button>
-                <button type="button" class="ncb-tool-btn" data-tool="summary">Summary</button>
-                <button type="button" class="ncb-tool-btn" data-tool="export">Export</button>
+                <button type="button" class="ncb-tool-btn" data-tool="quiz" data-i18n="cb_tool_quiz">Quiz me</button>
+                <button type="button" class="ncb-tool-btn" data-tool="flashcards" data-i18n="cb_tool_flashcards">Flashcards</button>
+                <button type="button" class="ncb-tool-btn" data-tool="summary" data-i18n="cb_tool_summary">Summary</button>
+                <button type="button" class="ncb-tool-btn" data-tool="export" data-i18n="cb_tool_export">Export</button>
               </div>
             </section>
 
@@ -295,9 +340,9 @@
                   <circle cx="12" cy="12" r="10"/>
                   <path d="M12 6v6l4 2"/>
                 </svg>
-                <h3 class="ncb-streak-title">Study streak</h3>
+                <h3 class="ncb-streak-title" data-i18n="cb_streak_title">Study streak</h3>
               </div>
-              <p class="ncb-streak-text">
+              <p class="ncb-streak-text" data-i18n="cb_streak_text">
                 You are one focused session away from keeping today&rsquo;s streak alive.
               </p>
             </section>
@@ -313,29 +358,29 @@
   <div class="ncb-modal" role="dialog" aria-modal="true" aria-labelledby="ncbImportTitle">
     <div class="ncb-modal-head">
       <div>
-        <p class="ncb-eyebrow">Course files</p>
-        <h3 id="ncbImportTitle" class="ncb-modal-title">Import from Course</h3>
+        <p class="ncb-eyebrow" data-i18n="cb_modal_eyebrow">Course files</p>
+        <h3 id="ncbImportTitle" class="ncb-modal-title" data-i18n="cb_modal_title">Import from Course</h3>
       </div>
-      <button type="button" class="ncb-modal-close" aria-label="Close">
+      <button type="button" class="ncb-modal-close" data-i18n-aria="cb_modal_close" aria-label="Close">
         <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </div>
 
     <div class="ncb-modal-body">
       <div class="ncb-modal-row">
-        <select class="ncb-modal-select" aria-label="Course"></select>
+        <select class="ncb-modal-select" data-i18n-aria="cb_modal_course_aria" aria-label="Course"></select>
         <svg class="ncb-icon ncb-icon--sm ncb-modal-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </div>
 
       <div class="ncb-modal-row ncb-modal-search">
         <svg class="ncb-icon ncb-icon--sm ncb-modal-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" class="ncb-modal-search-input" placeholder="Search folders or files..." aria-label="Search folders or files" />
+        <input type="text" class="ncb-modal-search-input" data-i18n-ph="cb_modal_search_ph" data-i18n-aria="cb_modal_search_aria" placeholder="Search folders or files..." aria-label="Search folders or files" />
       </div>
 
       <div class="ncb-folder-breadcrumb" hidden>
         <button type="button" class="ncb-folder-back">
           <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-          <span>Back</span>
+          <span data-i18n="cb_modal_back">Back</span>
         </button>
         <span class="ncb-folder-crumb-path"></span>
       </div>
@@ -345,8 +390,8 @@
       <div class="ncb-modal-hint">
         <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
         <div>
-          <p class="ncb-modal-hint-title">Smart import</p>
-          <p class="ncb-modal-hint-text">Imported course files are attached to this chat context and can be used for citations, summaries, and exercise solving.</p>
+          <p class="ncb-modal-hint-title" data-i18n="cb_modal_hint_title">Smart import</p>
+          <p class="ncb-modal-hint-text" data-i18n="cb_modal_hint_text">Imported course files are attached to this chat context and can be used for citations, summaries, and exercise solving.</p>
         </div>
       </div>
     </div>
@@ -354,8 +399,8 @@
     <div class="ncb-modal-foot">
       <p class="ncb-modal-count"><span class="ncb-modal-count-num">1</span> folder selected</p>
       <div class="ncb-modal-btns">
-        <button type="button" class="ncb-modal-cancel">Cancel</button>
-        <button type="button" class="ncb-modal-import">Import</button>
+        <button type="button" class="ncb-modal-cancel" data-i18n="cb_modal_cancel">Cancel</button>
+        <button type="button" class="ncb-modal-import" data-i18n="cb_modal_import">Import</button>
       </div>
     </div>
   </div>
