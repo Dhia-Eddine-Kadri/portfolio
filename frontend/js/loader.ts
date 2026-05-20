@@ -357,7 +357,7 @@ interface LandingTranslation {
       'css/styles.css?v=7',
       'css/courses-redesign.css?v=33',
       'css/app-design-system.css?v=5',
-      'css/layout.css?v=5',
+      'css/layout.css?v=6',
       'css/document-rail.css?v=15',
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',

@@ -422,10 +422,12 @@ body:not(.night) #portal .sidebar .sb-item.active .sb-item-icon {
     max-width 260ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Bottom (pinned theme button) */
+/* Bottom (pinned theme button) — margin-top:auto pins it to the bottom of
+ * the sidebar even when the nav doesn't fill the column height, so the dark-
+ * mode toggle is never below the viewport fold. */
 .sb-bottom {
   flex-shrink: 0;
-  margin-top: 12px;
+  margin-top: auto;
   padding: 12px 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
   display: flex;
