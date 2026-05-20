@@ -68,6 +68,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/apply-retention-discount"
+  to = "/.netlify/functions/apply-retention-discount"
+  status = 200
+
+[[redirects]]
   from = "/api/activate-paypal-subscription"
   to = "/.netlify/functions/activate-paypal-subscription"
   status = 200
