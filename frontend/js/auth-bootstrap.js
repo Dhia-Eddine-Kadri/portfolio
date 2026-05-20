@@ -52,12 +52,13 @@
     window.Minallo.emit('auth:boot-route', { loggedIn: loggedIn });
   }
 
-  // Light mode is disabled site-wide (looks broken in the current design).
-  // Force night class on regardless of saved preference; ss_dark stays as
-  // a no-op key so future re-enable doesn't lose user history.
+  // Honour the saved theme preference. Default to night when nothing is set
+  // (matches the prior site-wide force).
   try {
-    document.body.classList.add('night');
-    localStorage.setItem('ss_dark', '1');
+    var saved = localStorage.getItem('ss_dark');
+    var nightOn = saved === null ? true : saved !== '0';
+    document.body.classList.toggle('night', nightOn);
+    if (saved === null) localStorage.setItem('ss_dark', '1');
   } catch (e) {}
 
   if (loggedIn) {

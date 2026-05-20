@@ -887,6 +887,30 @@ export function closeStudyPopup(): void {
   closeStudyPopup?: () => void;
 }).closeStudyPopup = closeStudyPopup;
 
+/** Kick off a 25-min focus Pomodoro immediately — no popup, no navigation.
+ * Used by the "25 min focus session" next-step button on courses overview. */
+export function startQuickPomodoro(minutes = 25): void {
+  if (_stTimer) clearInterval(_stTimer);
+  _stStopMusic();
+  _stRunning = true;
+  _stPaused = false;
+  _stPhase = 'focus';
+  _stCycle = 0;
+  _stSettings = { ..._stSettings, focus: minutes };
+  _stSecondsLeft = minutes * 60;
+  _stMusicMuted = false;
+  _stMusicEnabled = _stMusicSrc !== 'none';
+  const mini = document.getElementById('stMiniTimer');
+  if (mini) mini.style.display = 'flex';
+  _stUpdateMini();
+  _stStartTimer();
+  _stLockGames(true);
+  if (_stMusicEnabled) _stPlayMusic();
+  _syncCourseStudyBtn();
+}
+(window as unknown as { startQuickPomodoro?: (m?: number) => void }).startQuickPomodoro =
+  startQuickPomodoro;
+
 export function initStudyTimer(): void {
   (window as unknown as { openStudyPopup?: () => void }).openStudyPopup = openStudyPopup;
   document.addEventListener('click', (e) => {

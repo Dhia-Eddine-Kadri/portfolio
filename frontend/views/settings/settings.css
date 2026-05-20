@@ -39,9 +39,9 @@
   color: var(--on-glass);
 }
 .settings-row-ico {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--card-inner);
   border: 1px solid var(--card-inner-border);
   display: flex;
@@ -49,6 +49,36 @@
   justify-content: center;
   font-size: 0.85rem;
   flex-shrink: 0;
+  color: #a78bfa;
+}
+.settings-row-ico svg {
+  display: block;
+}
+/* Coloured variants — soft tinted square with same-hue stroke icon. */
+.settings-row-ico--violet {
+  background: rgba(167, 139, 250, 0.16);
+  border-color: rgba(167, 139, 250, 0.32);
+  color: #7c5cff;
+}
+.settings-row-ico--red {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.32);
+  color: #ef4444;
+}
+.settings-row-ico--green {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.32);
+  color: #22c55e;
+}
+body:not(.night) .settings-row-ico--violet {
+  background: rgba(124, 92, 255, 0.12);
+  border-color: rgba(124, 92, 255, 0.28);
+  color: #6d4ee6;
+}
+body:not(.night) .settings-row-ico--red {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #dc2626;
 }
 .toggle {
   position: relative;

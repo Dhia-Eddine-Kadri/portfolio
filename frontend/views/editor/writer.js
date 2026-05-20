@@ -1954,6 +1954,12 @@
           else _edGoToHub();
         });
       }
+      // Back button on the writer dashboard (My Documents view) — always
+      // returns to the editor hub.
+      var _writerBackBtn = document.getElementById('editorWriterBackBtn');
+      if (_writerBackBtn) {
+        _writerBackBtn.addEventListener('click', _edGoToHub);
+      }
       _wire('editorSaveBtn', _edSaveDoc);
       _wire('editorDuplicateBtn', _edDuplicateDoc);
       // Export dropdown

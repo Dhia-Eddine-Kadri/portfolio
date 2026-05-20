@@ -267,7 +267,10 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
     const av = document.getElementById('authAvatar');
     const nm = document.getElementById('authName');
     if (av) av.textContent = initial;
-    if (nm) nm.textContent = name;
+    if (nm) {
+      nm.removeAttribute('data-i18n');
+      nm.textContent = name;
+    }
     const ai = document.getElementById('authIndicator');
     if (ai) ai.style.display = 'flex';
     const dcAv = document.getElementById('dcUserAv');

@@ -2340,7 +2340,11 @@
   </div>
 
   <div class="editor-card">
-    <!-- ── TOP BAR ── -->
+    <!-- ── TOP BAR ──
+         Hidden while the dashboard (editorEmptyState) is showing — the
+         "Untitled" title input + "+ New" button belong inside the editor
+         itself, not on the writer dashboard. writer.js toggles the
+         `is-empty` class on .editor-card when no document is open. -->
     <div class="editor-topbar">
       <div class="editor-topbar-left">
         <button class="editor-top-btn" id="editorHubBackBtn" title="Back to tools">
@@ -2358,25 +2362,16 @@
           </svg>
           Back
         </button>
+        <!-- #editorBackBtn removed — duplicate of #editorHubBackBtn above.
+             A hidden stub stays so writer.js queries that reference the ID
+             don't throw; it's display:none + aria-hidden and never shown. -->
         <button
           class="editor-back-btn"
           id="editorBackBtn"
-          title="All documents"
-          style="display: none"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
+          aria-hidden="true"
+          tabindex="-1"
+          style="display: none !important"
+        ></button>
         <svg
           width="15"
           height="17"
@@ -3149,6 +3144,26 @@
         <div class="ed-home" id="editorEmptyState">
           <div class="ed-home-bar">
             <div class="ed-home-bar-left">
+              <button
+                type="button"
+                class="ed-home-back-btn"
+                id="editorWriterBackBtn"
+                title="Back to tools"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Back
+              </button>
               <svg
                 width="20"
                 height="20"

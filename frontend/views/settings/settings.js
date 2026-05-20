@@ -211,35 +211,23 @@ async function saveSettings(patch) {
 
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', function () {
-      localStorage.removeItem('sb_token');
-      localStorage.removeItem('sb_refresh');
-      sessionStorage.removeItem('sb_sess_refresh');
+    logoutBtn.addEventListener('click', async function () {
+      // Defer to supabase.js — it already clears sb_sess_token/sb_sess_refresh
+      // in BOTH localStorage and sessionStorage, wipes per-course caches, and
+      // revokes the token server-side. The previous hand-rolled cleanup only
+      // touched sessionStorage so the persistent localStorage token survived
+      // and auth-bootstrap.js re-flagged the user as logged in on reload.
+      try {
+        if (window._sb && window._sb.auth) await window._sb.auth.signOut();
+      } catch (e) { /* network failure is fine — local state is already wiped */ }
       localStorage.removeItem('ss_user_type');
-      sessionStorage.removeItem('sb_sess_token');
-      sessionStorage.removeItem('ss_last_active');
-      sessionStorage.removeItem('ss_logged_in');
+      // Trial-device markers must clear too, otherwise a re-login on the
+      // same browser still reads _deviceHadTrial=true.
+      localStorage.removeItem('minallo_trial_used');
       window._userType = 'enrolled';
       window._germanTest = '';
       window._germanLevel = '';
-      _applyUserTypeUI();
-      _sbToken = null;
-      _currentUser = null;
-      var portal = document.getElementById('portal');
-      if (portal) {
-        portal.classList.remove('show');
-        portal.style.display = 'none';
-      }
-      var ai = document.getElementById('authIndicator');
-      if (ai) ai.style.display = 'none';
-      if (typeof _setAuthMode === 'function') _setAuthMode('signin');
-      var emailEl = document.getElementById('authEmail');
-      var pwEl = document.getElementById('authPassword');
-      if (emailEl) emailEl.value = '';
-      if (pwEl) pwEl.value = '';
-      var authModal = document.getElementById('authModal');
-      if (authModal) authModal.style.display = 'flex';
-      showToast(_t('toast_signed_out'), _t('toast_signed_out_sub'));
+      window.location.reload();
     });
   }
 

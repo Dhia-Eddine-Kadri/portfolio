@@ -494,8 +494,22 @@ body:not(.night) #authIndicator {
   border: 1px solid rgba(37, 99, 235, 0.2) !important;
   backdrop-filter: blur(12px);
 }
-body:not(.night) #authName {
-  color: rgba(30, 58, 138, 0.75) !important;
+body:not(.night) #authName,
+body:not(.night) #portal #authName {
+  color: var(--lm-text) !important;
+  font-weight: 700 !important;
+}
+body:not(.night) #sbUserSub,
+body:not(.night) #portal #sbUserSub {
+  color: var(--lm-muted) !important;
+}
+body:not(.night) .sb-avatar {
+  background: linear-gradient(145deg, #2563eb, #6366f1) !important;
+  border: 1px solid rgba(37, 99, 235, 0.45) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 4px 14px rgba(37, 99, 235, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
 /* Portal: pc-name / pc-desc are already covered but ensure inline color override */

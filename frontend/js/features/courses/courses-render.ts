@@ -473,9 +473,10 @@ function _renderNextStepsBelowGrid(
       id: 'focus-session',
       icon: '⏱',
       title: '25 min focus session',
-      text: 'Start a Pomodoro in the Study Lounge to build momentum.',
+      text: 'Start a Pomodoro session right now.',
       action: () => {
-        if (typeof window.showPortalSection === 'function') window.showPortalSection('lounge');
+        const w = window as unknown as { startQuickPomodoro?: (m?: number) => void };
+        if (typeof w.startQuickPomodoro === 'function') w.startQuickPomodoro(25);
       },
     });
   }

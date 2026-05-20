@@ -687,9 +687,8 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
         if (typeof window.openAI === 'function') window.openAI();
         else if (typeof window.pinAI === 'function') window.pinAI();
       } else if (action === 'focus-session') {
-        const hidden = document.getElementById('studyTechBtn') as HTMLButtonElement | null;
-        if (hidden) { hidden.click(); return; }
-        if (typeof window.showPortalSection === 'function') window.showPortalSection('lounge');
+        const w = window as unknown as { startQuickPomodoro?: (m?: number) => void };
+        if (typeof w.startQuickPomodoro === 'function') w.startQuickPomodoro(25);
       } else if (action === 'review-files') {
         // Switch to Files tab and scroll the panel into view.
         const filesTab = co.querySelector<HTMLElement>('[data-course-tab="files"]');

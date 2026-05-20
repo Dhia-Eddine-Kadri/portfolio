@@ -36,9 +36,9 @@ export function initPortalUi(options: PortalUiOptions): { applyTheme: (toNight: 
       document.body.classList.toggle('night', toNight);
       const nbIcon = document.getElementById('nightIcon');
       if (nbIcon) {
-        nbIcon.innerHTML = toNight ? NIGHT_ICON_MOON : NIGHT_ICON_SUN;
+        nbIcon.innerHTML = toNight ? NIGHT_ICON_SUN : NIGHT_ICON_MOON;
         const nbLbl = document.getElementById('nightLabel');
-        if (nbLbl) nbLbl.textContent = toNight ? 'Night' : 'Day';
+        if (nbLbl) nbLbl.textContent = toNight ? 'Light mode' : 'Dark mode';
       }
       const dm = document.getElementById('settingsDarkMode') as HTMLInputElement | null;
       if (dm) dm.checked = toNight;
@@ -75,9 +75,9 @@ export function initPortalUi(options: PortalUiOptions): { applyTheme: (toNight: 
   (function syncNightButton(): void {
     const isNight = !!options.getNightOn();
     const bIcon = document.getElementById('nightIcon');
-    if (bIcon) bIcon.innerHTML = isNight ? NIGHT_ICON_MOON : NIGHT_ICON_SUN;
+    if (bIcon) bIcon.innerHTML = isNight ? NIGHT_ICON_SUN : NIGHT_ICON_MOON;
     const bLbl = document.getElementById('nightLabel');
-    if (bLbl) bLbl.textContent = isNight ? 'Night' : 'Day';
+    if (bLbl) bLbl.textContent = isNight ? 'Light mode' : 'Dark mode';
   })();
 
   bindIf('nightBtn', 'click', function () {

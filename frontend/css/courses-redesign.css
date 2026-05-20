@@ -1559,14 +1559,7 @@ body.minallo-in-course .topbar {
   animation: st-popup-open 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Light/Day mode toggles disabled site-wide (looks broken; re-enable
- *    once the light-theme tokens are revisited). Sidebar pill toggle and
- *    the settings page checkbox row both hidden. ──────────────────────── */
-#nightBtn,
-.sb-night-btn,
-.settings-row-new:has(#settingsDarkMode) {
-  display: none !important;
-}
+/* Light/Day mode toggle re-enabled — keep sidebar pill + settings row visible. */
 
 /* The course view stacks four containers that ALL paint near-black
  * (var(--dp-solid) = #020617 in night mode). Even with #app transparent

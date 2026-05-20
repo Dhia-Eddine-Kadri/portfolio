@@ -101,6 +101,25 @@ export async function cancelSubscription(): Promise<Record<string, unknown>> {
   return payload;
 }
 
+export async function applyRetentionDiscount(): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/apply-retention-discount', {
+    method: 'POST',
+    headers: _authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
+  if (!res.ok) {
+    const message =
+      typeof payload.error === 'object' && payload.error?.message
+        ? payload.error.message
+        : typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not apply discount';
+    throw new Error(message);
+  }
+  return payload;
+}
+
 export async function verifyPayment(sessionId: string): Promise<unknown> {
   const res = await fetch('/api/verify-payment', {
     method: 'POST',
