@@ -338,11 +338,18 @@ async function _refreshSubscriptionState() {
 function _initPayPalButton(attempt) {
   if (_paypalRendered || _paypalRenderPending) return;
   var container = document.getElementById('paypalButtonContainer');
-  if (!container) return;
+  if (!container) {
+    // subscription.html may not be injected yet; retry briefly.
+    if ((attempt || 0) < 25) setTimeout(function () { _initPayPalButton((attempt || 0) + 1); }, 200);
+    return;
+  }
   if (typeof paypal === 'undefined') {
     _ssEnsurePayPalSdk()
       .then(function () {
-        _initPayPalButton(attempt || 0);
+        // Reset the pending flag in case a prior attempt silently bailed,
+        // then schedule a fresh call so the render actually runs.
+        _paypalRenderPending = false;
+        setTimeout(function () { _initPayPalButton((attempt || 0) + 1); }, 50);
       })
       .catch(function (err) {
         console.warn('PayPal SDK failed to load:', err);
