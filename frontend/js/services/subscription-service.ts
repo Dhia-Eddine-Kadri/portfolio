@@ -16,7 +16,8 @@ export interface CheckoutConsent {
 
 export async function createCheckoutSession(
   noTrial?: boolean,
-  consent?: CheckoutConsent
+  consent?: CheckoutConsent,
+  trialDeviceId?: string
 ): Promise<{ url?: string }> {
   const res = await fetch('/api/create-checkout', {
     method: 'POST',
@@ -24,7 +25,8 @@ export async function createCheckoutSession(
     body: JSON.stringify({
       noTrial: !!noTrial,
       consentWiderrufVerzicht: !!(consent && consent.consentWiderrufVerzicht),
-      consentTimestamp: (consent && consent.consentTimestamp) || ''
+      consentTimestamp: (consent && consent.consentTimestamp) || '',
+      trialDeviceId: trialDeviceId || ''
     }),
   });
   return res.json().catch(() => ({}));
@@ -39,6 +41,66 @@ export async function createPortalSession(): Promise<{ url?: string }> {
   return res.json().catch(() => ({}));
 }
 
+export async function pauseSubscription(
+  resumeAt: string,
+  reason?: string
+): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/pause-subscription', {
+    method: 'POST',
+    headers: _authHeaders(),
+    body: JSON.stringify({ resumeAt, reason: reason || 'Vacation pause' }),
+  });
+  const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
+  if (!res.ok) {
+    const message =
+      typeof payload.error === 'object' && payload.error?.message
+        ? payload.error.message
+        : typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not pause subscription';
+    throw new Error(message);
+  }
+  return payload;
+}
+
+export async function resumeSubscription(): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/resume-subscription', {
+    method: 'POST',
+    headers: _authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
+  if (!res.ok) {
+    const message =
+      typeof payload.error === 'object' && payload.error?.message
+        ? payload.error.message
+        : typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not resume subscription';
+    throw new Error(message);
+  }
+  return payload;
+}
+
+export async function cancelSubscription(): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/cancel-subscription', {
+    method: 'POST',
+    headers: _authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
+  if (!res.ok) {
+    const message =
+      typeof payload.error === 'object' && payload.error?.message
+        ? payload.error.message
+        : typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not cancel subscription';
+    throw new Error(message);
+  }
+  return payload;
+}
+
 export async function verifyPayment(sessionId: string): Promise<unknown> {
   const res = await fetch('/api/verify-payment', {
     method: 'POST',
@@ -48,11 +110,14 @@ export async function verifyPayment(sessionId: string): Promise<unknown> {
   return res.json().catch(() => ({}));
 }
 
-export async function activatePayPalSubscription(subscriptionID: string): Promise<unknown> {
+export async function activatePayPalSubscription(
+  subscriptionID: string,
+  trialDeviceId?: string
+): Promise<unknown> {
   const res = await fetch('/api/activate-paypal-subscription', {
     method: 'POST',
     headers: _authHeaders(),
-    body: JSON.stringify({ subscriptionID }),
+    body: JSON.stringify({ subscriptionID, trialDeviceId: trialDeviceId || '' }),
   });
   const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
   if (!res.ok) {

@@ -2,6 +2,7 @@ interface SbAuthClient {
   signUp: (email: string, password: string, redirect?: string) => Promise<SignAuthResult>;
   signIn: (email: string, password: string) => Promise<SignAuthResult>;
   signOut: () => Promise<unknown>;
+  recover?: (email: string, redirectTo?: string) => Promise<{ ok: boolean; status: number; body: { msg?: string; error_description?: string; error?: string } }>;
   onAuthStateChange?: (cb: (event: string, data: unknown) => void) => unknown;
 }
 
@@ -202,7 +203,7 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
 
         const signUpResult = await sb.auth.signUp(email, password, 'https://minallo.de/');
         if (signUpResult.error || signUpResult.error_description) {
-          throw new Error(signUpResult.error_description || signUpResult.error || 'Signup failed');
+          throw new Error(signUpResult.error_description || signUpResult.error || t('auth_signup_failed'));
         }
         sessionStorage.setItem('pendingConfirm', email);
 
@@ -222,7 +223,7 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
           }
           return;
         }
-        throw new Error('Signup failed - please try again.');
+        throw new Error(t('auth_signup_failed_retry'));
       }
 
       const signInResult = await sb.auth.signIn(email, password);
@@ -349,6 +350,48 @@ export function initAuthModal(options: AuthModalOptions): AuthModalHandle {
   });
   googleSignIn?.addEventListener('click', () => {
     if (typeof window._googleAuth === 'function') window._googleAuth();
+  });
+
+  // ── Password recovery ──────────────────────────────────────────────────
+  // Clicking "Forgot password?" prompts for the email (prefilled from the
+  // sign-in form) and POSTs to Supabase's /auth/v1/recover. Supabase then
+  // sends the email defined in the "Reset Password" template, which links
+  // to /reset-password.html where the user picks a new password.
+  const authForgotLink = document.getElementById('authForgotLink');
+  authForgotLink?.addEventListener('click', async (e: Event) => {
+    e.preventDefault();
+    if (!sb || !sb.auth.recover) {
+      showAuthError(t('err_connection'));
+      return;
+    }
+    const prefill = authEmail?.value.trim() || '';
+    const entered = window.prompt(t('auth_forgot_prompt'), prefill);
+    if (entered === null) return;
+    const email = entered.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showAuthError(t('err_invalid_email'));
+      return;
+    }
+    hideAuthError();
+    if (authSubmit) {
+      setSubmitText('auth_please_wait');
+      authSubmit.disabled = true;
+    }
+    try {
+      const redirect = window.location.origin + '/reset-password.html';
+      const res = await sb.auth.recover(email, redirect);
+      if (res.ok || res.status === 200) {
+        showAuthError(t('auth_forgot_sent'));
+        if (authError) authError.style.color = '#22c55e';
+      } else {
+        const msg = res.body?.error_description || res.body?.error || res.body?.msg || t('auth_forgot_failed');
+        showAuthError(msg);
+      }
+    } catch {
+      showAuthError(t('err_network'));
+    } finally {
+      setSubmitIdleLabel();
+    }
   });
 
   if (sb && sb.auth && typeof sb.auth.onAuthStateChange === 'function') {

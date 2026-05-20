@@ -14,9 +14,10 @@
 //
 // Events handled:
 //   - BILLING.SUBSCRIPTION.CANCELLED  → status=cancelled, expires_at=now()
-//   - BILLING.SUBSCRIPTION.SUSPENDED  → status=past_due,  expires_at=now()
+//   - BILLING.SUBSCRIPTION.SUSPENDED  → status=paused,    expires_at=now()
 //   - BILLING.SUBSCRIPTION.EXPIRED    → status=cancelled, expires_at=now()
-//   - PAYMENT.SALE.COMPLETED          → extend expires_at by 31 days
+//   - BILLING.SUBSCRIPTION.ACTIVATED  → status=active,    extend expires_at
+//   - PAYMENT.SALE.COMPLETED          → status=active,    extend expires_at
 // Any other event type is acknowledged but not acted on.
 
 import https from 'https';
@@ -237,12 +238,15 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       await supaWriteOrThrow('PATCH',
         'subscriptions?paypal_subscription_id=eq.' + encodeURIComponent(subId),
         {
-          status: 'past_due',
+          status: 'paused',
           expires_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
         serviceKey, prefer);
-    } else if (parsed.event_type === 'PAYMENT.SALE.COMPLETED') {
+    } else if (
+      parsed.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED' ||
+      parsed.event_type === 'PAYMENT.SALE.COMPLETED'
+    ) {
       // A successful renewal payment. Extend access by 31 days. Use the
       // existing user_id and plan; only update access fields.
       const expires = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
@@ -251,6 +255,9 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         {
           status: 'active',
           expires_at: expires,
+          pause_started_at: null,
+          pause_resumes_at: null,
+          pause_reason: null,
           updated_at: new Date().toISOString()
         },
         serviceKey, prefer);

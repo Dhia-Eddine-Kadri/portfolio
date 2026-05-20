@@ -3,6 +3,7 @@ import { jsonResponse, fail, handleOptions } from '../lib/responses';
 import { stripeGet } from '../lib/stripe';
 import { supaRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
+import { recordDeviceTrial } from '../lib/trial-device';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 interface StripeSession {
@@ -10,7 +11,7 @@ interface StripeSession {
   payment_status?: string;
   subscription?: string | null;
   customer?: string | null;
-  metadata?: { user_id?: string; no_trial?: string };
+  metadata?: { user_id?: string; no_trial?: string; trial_device_hash?: string };
   error?: { message?: string };
 }
 
@@ -110,7 +111,17 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       },
       serviceKey, { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
-    return jsonResponse(200, { ok: true, expires_at: expires });
+    if (isTrialCheckout && session.metadata?.trial_device_hash) {
+      await recordDeviceTrial(
+        serviceKey,
+        session.metadata.trial_device_hash,
+        userId,
+        session.subscription || null,
+        'stripe'
+      );
+    }
+
+    return jsonResponse(200, { ok: true, expires_at: expires, had_trial: isTrialCheckout });
   } catch {
     return fail(500, 'Could not verify payment');
   }

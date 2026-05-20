@@ -129,6 +129,14 @@ body:not(.night) .sub-feat::before {
   box-shadow: none;
   transform: none;
 }
+.sub-card .sub-btn-danger {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.sub-card .sub-btn-danger:hover {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.16);
+}
 .sub-pay-methods {
   display: flex;
   align-items: center;
@@ -237,6 +245,47 @@ body:not(.night) .sub-feat::before {
   font-size: 0.78rem;
   color: var(--on-glass-muted);
   text-align: right;
+}
+
+.sub-pause-panel {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+.sub-pause-panel-active {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+.sub-pause-title {
+  font-family: var(--font-main);
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: var(--on-glass);
+}
+.sub-pause-copy {
+  margin: 4px 0 10px;
+  color: var(--on-glass-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.sub-pause-label {
+  display: block;
+  color: var(--on-glass-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+.sub-pause-input {
+  width: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--row-bg);
+  color: var(--on-glass);
+  padding: 10px 11px;
+  margin-bottom: 10px;
+  font: inherit;
 }
 
 @media (max-width: 768px) {

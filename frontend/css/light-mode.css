@@ -1,0 +1,540 @@
+/* ──────────────────────────────────────────────────────────────────────────
+ * LIGHT MODE — unified surface system
+ *
+ * Loaded LAST so its rules win source-order ties against feature CSS that
+ * still hard-codes greys. The rule of thumb:
+ *
+ *   - Body background: soft blue-grey, NEVER pure white.
+ *   - Every card / panel / section frame: clean white fill + soft blue border.
+ *   - Inputs / textareas: near-white blue-grey fill + visible blue border.
+ *   - Secondary buttons: white with blue border + soft shadow + hover bump.
+ *   - Primary CTAs (brand-gradient, .sub-btn-upgrade, etc.): UNTOUCHED.
+ *   - Dark mode (body.night): UNTOUCHED — every selector is scoped to
+ *     `body:not(.night)`.
+ *
+ * Token re-tuning (root) covers any card that already consumed semantic
+ * tokens like `var(--glass-bg)`, `var(--card-inner)`. The explicit selector
+ * blocks below catch cards that hard-coded their backgrounds in feature CSS.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+body:not(.night) {
+  /* Soft blue-grey page background — not white, not muddy. */
+  --bg: #dbe5f3;
+  --dp-solid: #dbe5f3;
+  --dp-bg:
+    radial-gradient(circle at 12% 0%, rgba(96, 165, 250, 0.18) 0%, transparent 42%),
+    radial-gradient(circle at 88% 100%, rgba(14, 165, 233, 0.16) 0%, transparent 46%),
+    linear-gradient(160deg, #eef3fa 0%, #d9e3f2 55%, #dbe5f3 100%);
+  --dp-modal: linear-gradient(155deg, #ffffff 0%, #f5f8fd 100%);
+
+  /* Text colours — dark navy, not grey-on-grey. */
+  --text: #172033;
+  --muted: #53647f;
+  --on-glass: #172033;
+  --on-glass-muted: #53647f;
+  --on-glass-faint: #6b7b94;
+
+  /* Surface tokens — one consistent white fill across the whole app. */
+  --glass-bg: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(37, 99, 235, 0.22);
+  --glass-border-top: rgba(255, 255, 255, 0.98);
+  --card-inner: rgba(255, 255, 255, 0.96);
+  --card-inner-border: rgba(37, 99, 235, 0.18);
+  --row-bg: rgba(255, 255, 255, 0.92);
+  --row-border: rgba(37, 99, 235, 0.16);
+  --section-label: #53647f;
+  --divider: rgba(37, 99, 235, 0.14);
+  --badge-bg: rgba(37, 99, 235, 0.1);
+  --badge-border: rgba(37, 99, 235, 0.22);
+  --badge-color: #1d4ed8;
+  --slot-bg: rgba(255, 255, 255, 0.92);
+
+  --lm-card-bg: rgba(255, 255, 255, 0.94);
+  --lm-card-border: rgba(37, 99, 235, 0.22);
+  --lm-card-border-strong: rgba(37, 99, 235, 0.32);
+  --lm-card-shadow:
+    0 18px 46px rgba(37, 99, 235, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  --lm-nested-bg: rgba(255, 255, 255, 0.96);
+  --lm-nested-border: rgba(37, 99, 235, 0.18);
+  --lm-nested-shadow:
+    0 8px 22px rgba(37, 99, 235, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+
+  --lm-input-bg: rgba(247, 250, 255, 0.92);
+  --lm-input-border: rgba(30, 64, 175, 0.26);
+  --lm-input-color: #172033;
+  --lm-input-placeholder: #7a879d;
+
+  --lm-btn-bg: rgba(255, 255, 255, 0.94);
+  --lm-btn-border: rgba(30, 64, 175, 0.24);
+  --lm-btn-color: #172033;
+  --lm-btn-shadow:
+    0 8px 22px rgba(46, 68, 107, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  --lm-btn-hover-bg: rgba(255, 255, 255, 0.98);
+  --lm-btn-hover-border: rgba(37, 99, 235, 0.42);
+  --lm-btn-hover-shadow:
+    0 12px 32px rgba(37, 99, 235, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Page chrome ──────────────────────────────────────────────────────────── */
+body:not(.night) {
+  background: var(--dp-bg);
+  color: var(--text);
+}
+
+/* The app shell paints --dp-bg on a wrapper inline-styled in HTML; cover the
+ * common containers so nothing falls back to pure white. */
+body:not(.night) #portal,
+body:not(.night) #studipDash,
+body:not(.night) #courseOverview,
+body:not(.night) .portal-shell,
+body:not(.night) #aiTutor,
+body:not(.night) .ed-page,
+body:not(.night) .editor-portal-section,
+body:not(.night) .games-hub,
+body:not(.night) .gl-shell,
+body:not(.night) .lounge-page,
+body:not(.night) .practice-page {
+  background: var(--dp-bg) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * MAIN CARDS / FRAMES — one consistent white surface
+ *
+ * Every visible frame that contains buttons, lists, or content gets the same
+ * white fill + soft blue border. Buttons inside keep their own treatment.
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) .glass-card,
+body:not(.night) .nl-card,
+body:not(.night) .nl-glass,
+body:not(.night) .nl-paths__hero-card,
+body:not(.night) .nl-paths__preview-card,
+body:not(.night) .nl-pipeline__panel,
+body:not(.night) .nl-price-card,
+body:not(.night) .nl-tp-panel,
+body:not(.night) .nl-workflow__card,
+body:not(.night) .nl-lifestyle__card,
+body:not(.night) .nl-path-card,
+body:not(.night) .pc,
+body:not(.night) .sub-card,
+body:not(.night) .sub-pause-panel,
+body:not(.night) .sub-pause-panel-active,
+body:not(.night) .editor-card,
+body:not(.night) .editor-pages-panel,
+body:not(.night) .editor-props-panel,
+body:not(.night) .ed-hub-card,
+body:not(.night) .ed-hub-card-blue,
+body:not(.night) .ed-hub-card-purple,
+body:not(.night) .ed-hub-card-green,
+body:not(.night) .ed-home-empty,
+body:not(.night) .gh-card,
+body:not(.night) .gh-card-preview,
+body:not(.night) .qz-deck-card,
+body:not(.night) .qz-card-empty,
+body:not(.night) .fc-deck-card,
+body:not(.night) .fc-card-empty,
+body:not(.night) .ln-card,
+body:not(.night) .ln-modal,
+body:not(.night) .ln-section,
+body:not(.night) .review-card,
+body:not(.night) .cta-box,
+body:not(.night) .wc-card-glass,
+body:not(.night) .wc-feature-card,
+body:not(.night) .gl-skill-card,
+body:not(.night) .gl-skill-card-v2,
+body:not(.night) .gl-hero-v2,
+body:not(.night) .lounge-stat-card,
+body:not(.night) .widget-card,
+body:not(.night) .widget-panel,
+body:not(.night) .chess-panel,
+body:not(.night) .chess-waiting-box,
+body:not(.night) .chess-wld-box,
+body:not(.night) .chess-overlay-box,
+body:not(.night) .dc-members-panel,
+body:not(.night) .dc-members-section,
+body:not(.night) .ncb-card,
+body:not(.night) .ncb-action-card,
+body:not(.night) .ncb-context-card,
+body:not(.night) .ncb-notes-card,
+body:not(.night) .ncb-safe-card,
+body:not(.night) .ncb-sources-card,
+body:not(.night) .ncb-streak-card,
+body:not(.night) .msm-box,
+body:not(.night) .chat-friend-box,
+body:not(.night) .ai-input-box,
+body:not(.night) .gen-overlay-box,
+body:not(.night) .np-gen-box,
+body:not(.night) .ob-card,
+body:not(.night) .ob-path-card,
+body:not(.night) .ob-test-card,
+body:not(.night) .st-tech-card,
+body:not(.night) .st-music-section,
+body:not(.night) .nl-tp-panel,
+body:not(.night) .ext-banner,
+body:not(.night) .legal-card,
+body:not(.night) .settings-block,
+body:not(.night) .profile-hero,
+body:not(.night) .profile-fields,
+body:not(.night) .pf-group,
+body:not(.night) .dash-greeting {
+  background: var(--lm-card-bg) !important;
+  border: 1px solid var(--lm-card-border) !important;
+  box-shadow: var(--lm-card-shadow) !important;
+  color: var(--text);
+}
+
+/* Nested smaller cards — slightly softer border. */
+body:not(.night) .co-card,
+body:not(.night) .co-file,
+body:not(.night) .ln-card-preview,
+body:not(.night) .fc-card-content,
+body:not(.night) .qz-card-question,
+body:not(.night) .nl-tp-tab,
+body:not(.night) .ncb-context-card-head,
+body:not(.night) .na-mini-card,
+body:not(.night) .sub-feat,
+body:not(.night) .sub-trial-badge,
+body:not(.night) .wc-feature-card-left,
+body:not(.night) .chess-mode-btn,
+body:not(.night) .lounge-section-hdr,
+body:not(.night) .gl-hero-stat-pill,
+body:not(.night) .gl-level-chip-readonly,
+body:not(.night) .settings-row-new {
+  background: var(--lm-nested-bg) !important;
+  border: 1px solid var(--lm-nested-border) !important;
+  box-shadow: var(--lm-nested-shadow) !important;
+  color: var(--text);
+}
+
+/* Hover lift on big card frames — keeps the “premium” feel. */
+body:not(.night) .glass-card:hover,
+body:not(.night) .nl-card:hover,
+body:not(.night) .sub-card:hover,
+body:not(.night) .ed-hub-card:hover,
+body:not(.night) .gh-card:hover,
+body:not(.night) .qz-deck-card:hover,
+body:not(.night) .fc-deck-card:hover,
+body:not(.night) .ln-card:hover,
+body:not(.night) .gl-skill-card-v2:hover,
+body:not(.night) .lounge-stat-card:hover,
+body:not(.night) .widget-card:hover {
+  border-color: var(--lm-card-border-strong) !important;
+  box-shadow:
+    0 24px 56px rgba(37, 99, 235, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98) !important;
+}
+
+/* Catch-all for elements that hard-coded a grey panel background.
+ * High-specificity so we win even against feature CSS, but scoped to
+ * common surface markers via [class*=]. */
+body:not(.night) [class*='-panel']:not([class*='--ghost']):not(.na-buddy):not(.nl-path-card__items):not(.gh-card-meta):not(.chess-panel-tabs),
+body:not(.night) [class*='-frame'],
+body:not(.night) .glass-card,
+body:not(.night) .sub-card {
+  color: var(--text);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * TEXT — readable navy on white
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) {
+  color: var(--text);
+}
+body:not(.night) .pc-name,
+body:not(.night) .ws-title,
+body:not(.night) .nl-card__title,
+body:not(.night) .nl-paths__hero-title,
+body:not(.night) .nl-paths__preview-title,
+body:not(.night) .nl-tp-panel__title,
+body:not(.night) .nl-pipeline__title,
+body:not(.night) .nl-price-card__name,
+body:not(.night) .nl-workflow__card-title,
+body:not(.night) .nl-lifestyle__card-title,
+body:not(.night) .nl-path-card__title,
+body:not(.night) .nl-tp-chat__name,
+body:not(.night) .nl-tp-tab__title,
+body:not(.night) .ed-home-title,
+body:not(.night) .ed-home-empty-title,
+body:not(.night) .ed-hub-card .gh-card-name,
+body:not(.night) .gh-card-name,
+body:not(.night) .ln-card-title,
+body:not(.night) .gl-skill-name,
+body:not(.night) .gl-hero-title,
+body:not(.night) .lounge-stat-card-title,
+body:not(.night) .wc-feature-card-title,
+body:not(.night) .review-name,
+body:not(.night) .ncb-card-title {
+  color: var(--text) !important;
+}
+body:not(.night) .nl-card__text,
+body:not(.night) .nl-lifestyle__card-text,
+body:not(.night) .nl-workflow__card-text,
+body:not(.night) .nl-path-card__desc,
+body:not(.night) .nl-paths__preview-text,
+body:not(.night) .nl-paths__hero-text,
+body:not(.night) .nl-pipeline__step-text,
+body:not(.night) .nl-price-card__sub,
+body:not(.night) .nl-tp-panel__eyebrow,
+body:not(.night) .nl-tp-tab__sub,
+body:not(.night) .nl-tp-chat__mode,
+body:not(.night) .nl-hero__subtitle,
+body:not(.night) .nl-lead,
+body:not(.night) .nl-body,
+body:not(.night) .pc-desc,
+body:not(.night) .ws-sub,
+body:not(.night) .ed-home-empty-sub,
+body:not(.night) .gh-card-desc,
+body:not(.night) .gl-skill-sub,
+body:not(.night) .gl-hero-sub,
+body:not(.night) .ln-card-meta,
+body:not(.night) .wc-feature-card-sub,
+body:not(.night) .lounge-stat-card-text,
+body:not(.night) .review-meta {
+  color: var(--muted) !important;
+}
+body:not(.night) .sb-section-label,
+body:not(.night) .chess-section-label,
+body:not(.night) [class*='__eyebrow'],
+body:not(.night) .nl-eyebrow {
+  color: var(--on-glass-faint) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * INPUTS / TEXTAREAS / SELECTS
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+body:not(.night) textarea,
+body:not(.night) select,
+body:not(.night) .ai-textarea,
+body:not(.night) .chat-friend-search,
+body:not(.night) .chess-room-input,
+body:not(.night) .pf-input,
+body:not(.night) .wc-textarea,
+body:not(.night) .settings-select-new {
+  background: var(--lm-input-bg) !important;
+  border: 1px solid var(--lm-input-border) !important;
+  color: var(--lm-input-color) !important;
+}
+body:not(.night) input::placeholder,
+body:not(.night) textarea::placeholder {
+  color: var(--lm-input-placeholder) !important;
+  opacity: 1;
+}
+body:not(.night) input:focus,
+body:not(.night) textarea:focus,
+body:not(.night) select:focus {
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
+  outline: none !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * SECONDARY / WHITE BUTTONS — visible border + soft shadow + hover lift
+ *
+ * The primary-CTA list (selectors below this block) re-wins because of
+ * source order. Anything not on that list is a "secondary" button.
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) button:not([disabled]):not(.primary),
+body:not(.night) .btn:not(.primary),
+body:not(.night) .co-nav-btn,
+body:not(.night) .ed-tb-btn,
+body:not(.night) .editor-top-btn,
+body:not(.night) .editor-back-btn,
+body:not(.night) .game-back-btn,
+body:not(.night) .ed-home-new-btn,
+body:not(.night) .nl-btn--ghost,
+body:not(.night) .nl-btn--secondary,
+body:not(.night) .nl-lang-btn,
+body:not(.night) .psb,
+body:not(.night) .tetris-ctrl-btn,
+body:not(.night) .chess-ptab,
+body:not(.night) .chess-mode-btn,
+body:not(.night) .dc-top-btn,
+body:not(.night) .dc-hdr-icon-btn,
+body:not(.night) .dc-input-btn,
+body:not(.night) .epdf-mode-btn,
+body:not(.night) .sem-btn,
+body:not(.night) .night-btn,
+body:not(.night) .sub-btn-current:not(.sub-btn-danger):not(.sub-btn-upgrade) {
+  background: var(--lm-btn-bg);
+  border: 1px solid var(--lm-btn-border);
+  color: var(--lm-btn-color);
+  box-shadow: var(--lm-btn-shadow);
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+body:not(.night) button:not([disabled]):not(.primary):hover,
+body:not(.night) .btn:not(.primary):hover,
+body:not(.night) .co-nav-btn:hover,
+body:not(.night) .ed-tb-btn:hover,
+body:not(.night) .editor-top-btn:hover,
+body:not(.night) .editor-back-btn:hover,
+body:not(.night) .game-back-btn:hover,
+body:not(.night) .ed-home-new-btn:hover,
+body:not(.night) .nl-btn--ghost:hover,
+body:not(.night) .nl-btn--secondary:hover,
+body:not(.night) .nl-lang-btn:hover,
+body:not(.night) .psb:hover,
+body:not(.night) .tetris-ctrl-btn:hover,
+body:not(.night) .chess-ptab:hover,
+body:not(.night) .chess-mode-btn:hover,
+body:not(.night) .dc-top-btn:hover,
+body:not(.night) .dc-hdr-icon-btn:hover,
+body:not(.night) .dc-input-btn:hover,
+body:not(.night) .epdf-mode-btn:hover,
+body:not(.night) .sem-btn:hover {
+  background: var(--lm-btn-hover-bg);
+  border-color: var(--lm-btn-hover-border);
+  box-shadow: var(--lm-btn-hover-shadow);
+}
+
+/* Active/pressed tab look — keep the brand tint but on the same white base */
+body:not(.night) .co-nav-btn.active,
+body:not(.night) .psb.on,
+body:not(.night) .chess-ptab.chess-ptab-active,
+body:not(.night) .epdf-mode-btn.epdf-mode-active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(14, 165, 233, 0.10)) !important;
+  border-color: rgba(37, 99, 235, 0.36) !important;
+  color: var(--brand-primary) !important;
+  box-shadow:
+    0 6px 20px rgba(37, 99, 235, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * PRIMARY CTAs — explicitly KEEP their colored brand gradient
+ *
+ * These re-declare after the secondary-button block so they always win
+ * inside light mode. Do not lighten or whitewash them.
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) .nl-btn--primary,
+body:not(.night) .nl-btn--dark,
+body:not(.night) .na-submit,
+body:not(.night) .na-google,
+body:not(.night) .ncb-panel-open-btn,
+body:not(.night) .gl-start-btn,
+body:not(.night) .gl-skill-open-btn,
+body:not(.night) .sub-btn-upgrade,
+body:not(.night) .sub-btn-danger,
+body:not(.night) .settings-save-btn,
+body:not(.night) .profile-save-btn,
+body:not(.night) .editor-export-btn,
+body:not(.night) .editor-save-doc-btn,
+body:not(.night) .tetris-start-btn,
+body:not(.night) .chess-big-btn,
+body:not(.night) .dc-send-btn,
+body:not(.night) .msm-save-btn,
+body:not(.night) #subPauseBtn,
+body:not(.night) #subResumeBtn,
+body:not(.night) #subCancelBtn,
+body:not(.night) #paywallUpgradeBtn,
+body:not(.night) #authSubmit,
+body:not(.night) [data-i18n='sd_add_subject'],
+body:not(.night) .ed-hub-action-primary {
+  background: var(--brand-gradient) !important;
+  border: 1px solid transparent !important;
+  color: #fff !important;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.32) !important;
+}
+body:not(.night) .nl-btn--primary:hover,
+body:not(.night) .nl-btn--dark:hover,
+body:not(.night) .na-submit:hover,
+body:not(.night) .sub-btn-upgrade:hover,
+body:not(.night) .settings-save-btn:hover,
+body:not(.night) .profile-save-btn:hover,
+body:not(.night) .editor-export-btn:hover,
+body:not(.night) .editor-save-doc-btn:hover,
+body:not(.night) .tetris-start-btn:hover,
+body:not(.night) .chess-big-btn:hover,
+body:not(.night) .dc-send-btn:hover,
+body:not(.night) .gl-start-btn:hover,
+body:not(.night) .gl-skill-open-btn:hover,
+body:not(.night) .msm-save-btn:hover,
+body:not(.night) #authSubmit:hover {
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.42) !important;
+  transform: translateY(-1px);
+}
+
+/* Danger / cancel keeps a red-tinted CTA so destructive actions read clearly. */
+body:not(.night) .sub-btn-danger,
+body:not(.night) #subCancelBtn,
+body:not(.night) .ln-modal-del {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  box-shadow: 0 10px 26px rgba(220, 38, 38, 0.28) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * DEUTSCH SCHREIBTRAINER — feedback chip colours
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) .wc-fb-grammar,
+body:not(.night) [data-fb-type='grammar'] {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+  border: 1px solid rgba(185, 28, 28, 0.22) !important;
+}
+body:not(.night) .wc-fb-vocab,
+body:not(.night) [data-fb-type='vocab'],
+body:not(.night) [data-fb-type='vocabulary'] {
+  background: #fef3c7 !important;
+  color: #78350f !important;
+  border: 1px solid rgba(146, 64, 14, 0.22) !important;
+}
+body:not(.night) .wc-fb-style,
+body:not(.night) [data-fb-type='style'],
+body:not(.night) [data-fb-type='register'] {
+  background: #ede9fe !important;
+  color: #5b21b6 !important;
+  border: 1px solid rgba(109, 40, 217, 0.22) !important;
+}
+body:not(.night) .wc-fb-suggest,
+body:not(.night) .wc-fb-corrected,
+body:not(.night) [data-fb-type='suggestion'],
+body:not(.night) [data-fb-type='corrected'] {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+  border: 1px solid rgba(22, 101, 52, 0.22) !important;
+}
+body:not(.night) .wc-fb-arrow,
+body:not(.night) [class*='fb'][class*='arrow'] {
+  color: #334155 !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * MISC POLISH
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Soft scrollbars on light surfaces. */
+body:not(.night) ::-webkit-scrollbar-thumb {
+  background: rgba(37, 99, 235, 0.22);
+  border-radius: 10px;
+}
+body:not(.night) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(37, 99, 235, 0.36);
+}
+body:not(.night) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Tetris / chess game overlays: white card over the canvas reads cleaner. */
+body:not(.night) .tetris-overlay {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid rgba(37, 99, 235, 0.22) !important;
+  color: var(--text) !important;
+}
+
+/* Notes / lecture-note empty states. */
+body:not(.night) .qz-card-empty,
+body:not(.night) .fc-card-empty,
+body:not(.night) .lounge-empty {
+  color: var(--muted) !important;
+}
+
+/* Code blocks + inline code stay readable on a white surface. */
+body:not(.night) code,
+body:not(.night) pre {
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a;
+  border-radius: 6px;
+}

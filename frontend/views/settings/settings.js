@@ -317,17 +317,14 @@ async function saveSettings(patch) {
         if (!deleteOk) {
           btn.textContent = _t('set_yes_delete');
           btn.disabled = false;
-          showToast(
-            'Delete failed',
-            'Your account could not be deleted. Please contact support.'
-          );
+          showToast(_t('settings_delete_failed'), _t('settings_delete_failed_sub'));
           return;
         }
         try { if (window._sb && window._sb.auth) await window._sb.auth.signOut(); } catch (e) {}
         localStorage.clear();
         sessionStorage.clear();
         document.body.removeChild(modal);
-        showToast('Account deleted', 'Your account has been permanently removed.');
+        showToast(_t('settings_account_deleted'), _t('settings_account_deleted_sub'));
         setTimeout(function () {
           window.location.reload();
         }, 1800);

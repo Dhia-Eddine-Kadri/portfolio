@@ -4,6 +4,11 @@ import { supaRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { logSecurityEvent } from '../lib/logger';
 import { requireEnv, optionalEnv } from '../lib/env';
+import {
+  normalizeTrialDeviceId,
+  hashTrialDeviceId,
+  recordDeviceTrial
+} from '../lib/trial-device';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 const PAYPAL_API_BASE = optionalEnv('PAYPAL_API_BASE', 'https://api-m.paypal.com');
@@ -99,6 +104,9 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const subscriptionId = (body.subscriptionID || body.subscriptionId) as unknown;
   if (!subscriptionId || typeof subscriptionId !== 'string') return fail(400, 'Missing PayPal subscription ID');
 
+  const trialDeviceId = normalizeTrialDeviceId(body.trialDeviceId);
+  const trialDeviceHash = trialDeviceId ? hashTrialDeviceId(trialDeviceId) : '';
+
   try {
     const user = await verifySupabaseToken(token);
     if (!user) return fail(401, 'Unauthorized');
@@ -128,11 +136,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       {
         id: user.id, user_id: user.id, plan: 'pro', status: 'active',
         paypal_subscription_id: subscriptionId,
+        had_trial: true,
         expires_at: expiresAt, updated_at: new Date().toISOString()
       },
       serviceKey, { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
     if (writeRes.status < 200 || writeRes.status >= 300) throw new Error('Could not activate subscription');
+
+    if (trialDeviceHash) {
+      await recordDeviceTrial(serviceKey, trialDeviceHash, user.id, subscriptionId, 'paypal');
+    }
 
     await logSecurityEvent(serviceKey, user.id, 'paypal_subscription_activated', {
       subscription_id: subscriptionId, paypal_status: status

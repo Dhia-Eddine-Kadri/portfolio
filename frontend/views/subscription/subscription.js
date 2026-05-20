@@ -19,8 +19,13 @@
 })();
 
 var _userIsPro = false;
+var _userIsPaused = false;
 var _stripeCustomerId = null;
+var _paypalSubscriptionId = null;
 var _hadTrial = false;
+var _deviceHadTrial = false;
+var _pauseResumesAt = null;
+var _lastSubscription = {};
 var _paypalRendered = false;
 var _paywallPaypalRendered = false;
 var _paypalRenderPending = false;
@@ -34,6 +39,36 @@ function _loadBillingConfig() {
     ? window._subService.loadBillingConfig()
     : Promise.reject(new Error('Subscription service not ready'));
   return _billingConfigPromise;
+}
+
+function _trialDeviceId() {
+  var key = 'minallo_trial_device_id';
+  try {
+    var existing = localStorage.getItem(key);
+    if (existing) return existing;
+    var id = (crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+    localStorage.setItem(key, id);
+    return id;
+  } catch (e) {
+    return '';
+  }
+}
+
+function _deviceTrialUsed() {
+  try {
+    return localStorage.getItem('minallo_trial_used') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function _markDeviceTrialUsed() {
+  _deviceHadTrial = true;
+  try {
+    localStorage.setItem('minallo_trial_used', '1');
+  } catch (e) { /* ignore */ }
 }
 
 function _ensurePayPalPlanId() {
@@ -55,7 +90,7 @@ function _ensurePayPalPlanId() {
 
 async function _activatePayPalSubscription(data, closePaywall) {
   if (!_currentUser) return;
-  await window._subService.activatePayPalSubscription(data && data.subscriptionID);
+  await window._subService.activatePayPalSubscription(data && data.subscriptionID, _trialDeviceId());
   applySubscription({ plan: 'pro', status: 'active' });
   if (closePaywall) {
     var modal = document.getElementById('paywallModal');
@@ -65,26 +100,80 @@ async function _activatePayPalSubscription(data, closePaywall) {
 }
 
 function applySubscription(sub) {
+  _lastSubscription = sub || {};
   var expiresAt = sub && sub.expires_at ? Date.parse(sub.expires_at) : null;
-  var isExpired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
-  _userIsPro = !!(sub && sub.plan === 'pro' && (sub.status === 'active' || sub.status === 'trialing') && !isExpired);
+  var isPaused = !!(sub && sub.status === 'paused');
+  var isExpired = !isPaused && Number.isFinite(expiresAt) && expiresAt <= Date.now();
+  var status = sub && sub.status ? String(sub.status) : '';
+  var hasBillingProvider = !!(sub && (sub.stripe_subscription_id || sub.stripe_customer_id || sub.paypal_subscription_id));
+  var dbManagedPro =
+    !!(sub && sub.plan === 'pro' && !hasBillingProvider && ['cancelled', 'expired', 'past_due', 'paused'].indexOf(status) === -1);
+  _userIsPro = !!(
+    sub &&
+    sub.plan === 'pro' &&
+    ((status === 'active' || status === 'trialing') || dbManagedPro) &&
+    !isExpired
+  );
+  _userIsPaused = isPaused;
+  _pauseResumesAt = sub && sub.pause_resumes_at ? sub.pause_resumes_at : null;
   if (sub && sub.stripe_customer_id) _stripeCustomerId = sub.stripe_customer_id;
+  if (sub && sub.paypal_subscription_id) _paypalSubscriptionId = sub.paypal_subscription_id;
   if (sub && sub.had_trial) _hadTrial = true;
+  if (_deviceTrialUsed()) _deviceHadTrial = true;
   var proStatus = document.getElementById('subProStatus');
   var upgradeBtn = document.getElementById('subUpgradeBtn');
   var manageBtn = document.getElementById('subManageBtn');
+  var cancelBtn = document.getElementById('subCancelBtn');
+  var pausePanel = document.getElementById('subPausePanel');
+  var resumePanel = document.getElementById('subResumePanel');
+  var pausedUntil = document.getElementById('subPausedUntil');
   var payMethods = document.getElementById('subPayMethods');
   var paypalCont = document.getElementById('paypalButtonContainer');
   if (_userIsPro) {
-    if (proStatus) proStatus.style.display = '';
+    var scheduledCancel = !!(sub && sub.cancel_at_period_end);
+    if (proStatus) {
+      if (scheduledCancel && expiresAt) {
+        var endStr = new Date(expiresAt).toLocaleDateString();
+        proStatus.textContent =
+          _subT('sub_status_ends_pre', '⏳ Pro access until ') + endStr;
+      } else {
+        proStatus.textContent = _subT('sub_status_active', '✓ Active subscription');
+      }
+      proStatus.style.display = '';
+    }
     if (upgradeBtn) upgradeBtn.style.display = 'none';
-    if (manageBtn) manageBtn.style.display = '';
+    if (manageBtn) manageBtn.style.display = _stripeCustomerId ? '' : 'none';
+    // Hide the standalone Cancel button when a Stripe customer exists OR when
+    // cancellation is already scheduled — there's nothing more to cancel.
+    if (cancelBtn) cancelBtn.style.display = (_stripeCustomerId || scheduledCancel) ? 'none' : '';
+    // No vacation pause when a cancellation is already pending.
+    if (pausePanel) pausePanel.style.display = scheduledCancel ? 'none' : '';
+    if (resumePanel) resumePanel.style.display = 'none';
+    if (payMethods) payMethods.style.display = 'none';
+    if (paypalCont) paypalCont.style.display = 'none';
+  } else if (_userIsPaused) {
+    if (proStatus) {
+      proStatus.style.display = '';
+      proStatus.textContent = _subT('sub_paused_status', 'Paused subscription');
+    }
+    if (upgradeBtn) upgradeBtn.style.display = 'none';
+    if (manageBtn) manageBtn.style.display = _stripeCustomerId ? '' : 'none';
+    if (cancelBtn) cancelBtn.style.display = _stripeCustomerId ? 'none' : '';
+    if (pausePanel) pausePanel.style.display = 'none';
+    if (resumePanel) resumePanel.style.display = '';
+    if (pausedUntil) {
+      var dt = _pauseResumesAt ? new Date(_pauseResumesAt) : null;
+      pausedUntil.textContent =
+        dt && Number.isFinite(dt.getTime())
+          ? _subT('sub_paused_until_pre', 'Pro access is paused until ') + dt.toLocaleDateString() + '.'
+          : _subT('sub_paused_copy', 'Pro access is paused during your vacation.');
+    }
     if (payMethods) payMethods.style.display = 'none';
     if (paypalCont) paypalCont.style.display = 'none';
   } else {
     if (proStatus) proStatus.style.display = 'none';
     if (upgradeBtn) {
-      upgradeBtn.textContent = _hadTrial
+      upgradeBtn.textContent = (_hadTrial || _deviceHadTrial)
         ? _subT('sub_subscribe', 'Subscribe — €11.99/month')
         : _subT('sub_start_trial', 'Start free 7-day trial');
       upgradeBtn.disabled = false;
@@ -92,10 +181,63 @@ function applySubscription(sub) {
       upgradeBtn.style.opacity = '';
     }
     if (manageBtn) manageBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (pausePanel) pausePanel.style.display = 'none';
+    if (resumePanel) resumePanel.style.display = 'none';
     if (payMethods) payMethods.style.display = '';
     if (paypalCont) paypalCont.style.display = '';
   }
   _bindSubscriptionControls();
+}
+
+async function _refreshSubscriptionState() {
+  if (!_currentUser || !_currentUser.id) return;
+  var sub = null;
+  try {
+    if (window._sb && window._sb.from) {
+      sub = await window._sb.from('subscriptions').select('*').eq('user_id', _currentUser.id).single();
+    }
+  } catch (e) {
+    sub = null;
+  }
+
+  if (sub && sub.status !== 'paused' && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
+    sub = Object.assign({}, sub, { status: 'expired' });
+  }
+
+  var status = sub && sub.status ? String(sub.status) : '';
+  var hasBillingProvider = !!(sub && (sub.stripe_subscription_id || sub.stripe_customer_id || sub.paypal_subscription_id));
+  var dbManagedPro =
+    !!(sub && sub.plan === 'pro' && !hasBillingProvider && ['cancelled', 'expired', 'past_due', 'paused'].indexOf(status) === -1);
+  if (sub && sub.plan === 'pro' && (['active', 'trialing', 'paused'].indexOf(status) !== -1 || dbManagedPro)) {
+    applySubscription(dbManagedPro ? Object.assign({}, sub, { status: status || 'active' }) : sub);
+    return;
+  }
+
+  try {
+    var adminRes = await fetch('/api/admin-users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + (window._sbToken || '')
+      },
+      body: JSON.stringify({ action: 'status' })
+    });
+    var adminData = adminRes.ok ? await adminRes.json().catch(function () { return null; }) : null;
+    if (adminData && adminData.isAdmin) {
+      applySubscription(Object.assign({}, sub || {}, {
+        plan: 'pro',
+        status: sub && sub.status === 'paused' ? 'paused' : 'active',
+        admin_managed: true
+      }));
+      return;
+    }
+  } catch (e) {
+    // Local Vite without Netlify dev can fail this route; the DB row above is
+    // still enough for normal subscribed accounts.
+  }
+
+  applySubscription(sub || {});
 }
 
 function _initPayPalButton(attempt) {
@@ -165,11 +307,11 @@ function _initPayPalButton(attempt) {
 function _showPaywall() {
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
-    btn.textContent = _hadTrial
+    btn.textContent = (_hadTrial || _deviceHadTrial)
       ? _subT('sub_subscribe', 'Subscribe — €11.99/month')
       : _subT('sub_start_trial', 'Start free 7-day trial');
   var modal = document.getElementById('paywallModal');
-  if (_hadTrial && modal) {
+  if ((_hadTrial || _deviceHadTrial) && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
     var desc = modal.querySelector('[data-paywall-desc]');
@@ -307,10 +449,10 @@ function _bindSubscriptionControls() {
       this.textContent = _subT('sub_redirecting', 'Redirecting...');
       this.disabled = true;
       try {
-        var data = await window._subService.createCheckoutSession(_hadTrial, {
+        var data = await window._subService.createCheckoutSession(_hadTrial || _deviceHadTrial, {
           consentWiderrufVerzicht: !!(consentBox && consentBox.checked),
           consentTimestamp: new Date().toISOString()
-        });
+        }, _trialDeviceId());
         if (data.url) {
           location.href = data.url;
         } else {
@@ -323,6 +465,139 @@ function _bindSubscriptionControls() {
         this.textContent = _subT('sub_upgrade', 'Upgrade to Pro');
         this.disabled = false;
       }
+    });
+  }
+
+  var pauseDate = document.getElementById('subPauseResumeAt');
+  if (pauseDate && !pauseDate.dataset.initialized) {
+    pauseDate.dataset.initialized = '1';
+    var now = new Date();
+    var min = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    var max = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    var toDateValue = function (d) {
+      return d.toISOString().slice(0, 10);
+    };
+    pauseDate.min = toDateValue(min);
+    pauseDate.max = toDateValue(max);
+    pauseDate.value = toDateValue(min);
+  }
+
+  var pauseBtn = document.getElementById('subPauseBtn');
+  if (pauseBtn && !pauseBtn.dataset.bound) {
+    pauseBtn.dataset.bound = '1';
+    pauseBtn.addEventListener('click', async function () {
+      if (!_currentUser) return;
+      var dateInput = document.getElementById('subPauseResumeAt');
+      var resumeAt = dateInput && dateInput.value ? dateInput.value + 'T12:00:00.000Z' : '';
+      if (!resumeAt) {
+        showToast(_subT('sub_error', 'Error'), 'Choose a resume date.');
+        return;
+      }
+      this.textContent = _subT('sub_pausing', 'Pausing...');
+      this.disabled = true;
+      try {
+        var data = await window._subService.pauseSubscription(resumeAt, 'Vacation pause');
+        applySubscription({
+          plan: 'pro',
+          status: 'paused',
+          pause_resumes_at: data.pause_resumes_at || null,
+          stripe_customer_id: _stripeCustomerId,
+          paypal_subscription_id: _paypalSubscriptionId,
+          had_trial: _hadTrial
+        });
+        // Backend signals auto_resumes=false for PayPal — PayPal /suspend has
+        // no scheduled resume, so tell the user they must manually press
+        // Resume on the chosen date instead of promising it happens for them.
+        if (data && data.auto_resumes === false) {
+          showToast(
+            _subT('sub_paused_toast_title', 'Subscription paused'),
+            _subT(
+              'sub_paused_manual_resume',
+              'Your Pro access is paused. PayPal subscriptions do not auto-resume — come back here on your return date and tap Resume.'
+            )
+          );
+        } else {
+          showToast(
+            _subT('sub_paused_toast_title', 'Subscription paused'),
+            _subT('sub_paused_toast_body', 'Your Pro access is paused until the selected date.')
+          );
+        }
+      } catch (e) {
+        showToast(_subT('sub_error', 'Error'), e.message || _subT('sub_pause_failed', 'Could not pause subscription.'));
+      }
+      this.textContent = _subT('sub_pause_btn', 'Pause subscription');
+      this.disabled = false;
+    });
+  }
+
+  var resumeBtn = document.getElementById('subResumeBtn');
+  if (resumeBtn && !resumeBtn.dataset.bound) {
+    resumeBtn.dataset.bound = '1';
+    resumeBtn.addEventListener('click', async function () {
+      if (!_currentUser) return;
+      this.textContent = _subT('sub_resuming', 'Resuming...');
+      this.disabled = true;
+      try {
+        var data = await window._subService.resumeSubscription();
+        applySubscription({
+          plan: 'pro',
+          status: 'active',
+          expires_at: data.expires_at || null,
+          stripe_customer_id: _stripeCustomerId,
+          paypal_subscription_id: _paypalSubscriptionId,
+          had_trial: _hadTrial
+        });
+        showToast(
+          _subT('sub_resumed_toast_title', 'Subscription resumed'),
+          _subT('sub_resumed_toast_body', 'Your Pro access is active again.')
+        );
+      } catch (e) {
+        showToast(_subT('sub_error', 'Error'), e.message || _subT('sub_resume_failed', 'Could not resume subscription.'));
+      }
+      this.textContent = _subT('sub_resume_btn', 'Resume now');
+      this.disabled = false;
+    });
+  }
+
+  var cancelBtn = document.getElementById('subCancelBtn');
+  if (cancelBtn && !cancelBtn.dataset.bound) {
+    cancelBtn.dataset.bound = '1';
+    cancelBtn.addEventListener('click', async function () {
+      if (!_currentUser) return;
+      if (!confirm(_subT('sub_cancel_confirm', 'Cancel this subscription now?'))) return;
+      this.textContent = _subT('sub_cancelling', 'Cancelling...');
+      this.disabled = true;
+      try {
+        var data = await window._subService.cancelSubscription();
+        if (data && data.status === 'scheduled' && data.expires_at) {
+          // Stripe cancel-at-period-end — user still has Pro until expires_at.
+          applySubscription({
+            plan: 'pro',
+            status: 'active',
+            expires_at: data.expires_at,
+            cancel_at_period_end: true,
+            stripe_customer_id: _stripeCustomerId,
+            paypal_subscription_id: _paypalSubscriptionId,
+            had_trial: _hadTrial
+          });
+          var endDate = new Date(data.expires_at);
+          var endStr = Number.isFinite(endDate.getTime()) ? endDate.toLocaleDateString() : '';
+          showToast(
+            _subT('sub_cancelled_scheduled_title', 'Cancellation scheduled'),
+            _subT('sub_cancelled_scheduled_body_pre', 'You will keep Pro access until ') + endStr + '.'
+          );
+        } else {
+          applySubscription({ plan: 'free', status: 'cancelled', had_trial: _hadTrial });
+          showToast(
+            _subT('sub_cancelled_title', 'Subscription cancelled'),
+            _subT('sub_cancelled_body', 'Your subscription has been cancelled.')
+          );
+        }
+      } catch (e) {
+        showToast(_subT('sub_error', 'Error'), e.message || _subT('sub_cancel_failed', 'Could not cancel subscription.'));
+      }
+      this.textContent = _subT('sub_cancel_btn', 'Cancel subscription');
+      this.disabled = false;
     });
   }
 
@@ -411,9 +686,13 @@ function _initSubscriptionViewIfActive() {
   function attempt() {
     var el = document.getElementById('subUsage');
     if (el) {
+      applySubscription(_lastSubscription);
       _bindSubscriptionControls();
       _initPayPalButton();
       _renderAiUsage();
+      _refreshSubscriptionState().then(function () {
+        _bindSubscriptionControls();
+      });
       return;
     }
     if (tries++ < 20) setTimeout(attempt, 200);
@@ -422,13 +701,19 @@ function _initSubscriptionViewIfActive() {
 }
 window.addEventListener('ss-ready', _initSubscriptionViewIfActive);
 window.addEventListener('hashchange', _initSubscriptionViewIfActive);
+window.addEventListener('ss-profile-updated', _initSubscriptionViewIfActive);
 // Re-apply translated button labels + paywall override text when the user
 // switches language; data-i18n covers static text but the upgrade button
 // label is set imperatively by applySubscription().
 window.addEventListener('minallo:lang-changed', function () {
   try {
     if (typeof applySubscription === 'function' && _userIsPro !== undefined) {
-      applySubscription({ plan: _userIsPro ? 'pro' : 'free', status: _userIsPro ? 'active' : 'inactive', had_trial: _hadTrial });
+      var current = Object.assign({}, _lastSubscription || {}, {
+        plan: _userIsPro || _userIsPaused ? 'pro' : ((_lastSubscription || {}).plan || 'free'),
+        status: _userIsPaused ? 'paused' : (_userIsPro ? 'active' : ((_lastSubscription || {}).status || 'inactive')),
+        had_trial: _hadTrial
+      });
+      applySubscription(current);
     }
   } catch (e) { /* ignore */ }
 });
@@ -458,6 +743,7 @@ document.addEventListener(
       try {
         var data = await window._subService.verifyPayment(sessionId);
         if (data.ok) {
+          if (data.had_trial) _markDeviceTrialUsed();
           applySubscription({ plan: 'pro', status: 'active', expires_at: data.expires_at || null });
           var modal = document.getElementById('paywallModal');
           if (modal) modal.style.display = 'none';

@@ -79,6 +79,8 @@ export class AppPage {
         const hasAuthUi =
           !!document.querySelector('#authEmail') ||
           !!document.querySelector('#authModal') ||
+          !!document.querySelector('#nlNavSignIn') ||
+          !!document.querySelector('#nlNavStartFree') ||
           !!document.querySelector('#landingLoginBtn') ||
           !!document.querySelector('[data-i18n="landing_nav_login"]');
 
@@ -139,7 +141,7 @@ export class AppPage {
 
     // Session expired or invalid — find and click the login button
     const loginBtn = this.page.locator(
-      '[data-i18n="landing_nav_login"], #landingLoginBtn, button:has-text("Login"), button:has-text("Sign in")'
+      '#nlNavSignIn, [data-i18n="nav.signIn"], [data-i18n="landing_nav_login"], #landingLoginBtn, button:has-text("Login"), button:has-text("Sign in")'
     ).first();
 
     if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {

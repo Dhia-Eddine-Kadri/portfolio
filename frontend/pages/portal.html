@@ -282,8 +282,8 @@
         <!-- ADMIN -->
         <div id="psec-admin" class="portal-section" style="display: none">
           <div class="dash-greeting">
-            <h1>&#x1F6E1;&#xFE0F; Admin</h1>
-            <p>Manage user subscriptions</p>
+            <h1><span data-i18n="admin_title">🛡️ Admin</span></h1>
+            <p data-i18n="admin_subtitle">Manage user subscriptions</p>
           </div>
           <div style="max-width: 640px; margin: 0 auto">
             <div style="display: flex; gap: 10px; margin-bottom: 18px">
@@ -291,6 +291,7 @@
                 id="adminSearchInput"
                 class="chat-friend-search"
                 type="text"
+                data-i18n-ph="admin_search_email_ph"
                 placeholder="Search by email..."
                 style="flex: 1"
               />
@@ -299,7 +300,7 @@
                 class="sub-btn sub-btn-upgrade"
                 style="width: auto; padding: 10px 20px"
               >
-                Search
+                <span data-i18n="admin_search_btn">Search</span>
               </button>
             </div>
             <div id="adminResults"></div>
@@ -307,10 +308,9 @@
 
           <!-- RETRIEVAL INSPECTOR -->
           <div style="max-width: 960px; margin: 36px auto 0">
-            <h2 style="font-size: 1.1rem; margin-bottom: 6px">&#x1F50D; Retrieval inspector</h2>
-            <p style="color: var(--on-glass-muted); font-size: .8rem; margin-bottom: 14px">
-              Inspect the most recent <code>retrieval_debug_log</code> rows to see
-              which chunks the AI saw for a given question.
+            <h2 style="font-size: 1.1rem; margin-bottom: 6px" data-i18n="admin_retr_title">🔍 Retrieval inspector</h2>
+            <p style="color: var(--on-glass-muted); font-size: .8rem; margin-bottom: 14px" data-i18n="admin_retr_sub">
+              Inspect the most recent retrieval_debug_log rows to see which chunks the AI saw for a given question.
             </p>
             <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px">
               <input
@@ -332,7 +332,7 @@
                 class="sub-btn sub-btn-upgrade"
                 style="width: auto; padding: 10px 20px"
               >
-                Load
+                <span data-i18n="admin_retr_load">Load</span>
               </button>
             </div>
             <div id="retrInspectorList"></div>
@@ -484,13 +484,13 @@
                 <div class="sd-hero-left">
                   <div class="sd-hero-eyebrow">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg>
-                    <span>AI-ready course workspace</span>
+                    <span data-i18n="sd_eyebrow">AI-ready course workspace</span>
                   </div>
                   <h1 class="sd-hero-title">
                     <span class="sd-hero-emoji" aria-hidden="true">&#x1F4DA;</span>
-                    <span>My Courses</span>
+                    <span data-i18n="sd_title">My Courses</span>
                   </h1>
-                  <p class="sd-hero-sub">
+                  <p class="sd-hero-sub" data-i18n="sd_sub">
                     Organize your semester, upload lecture files, and open AI, notes, or summaries directly from each subject.
                   </p>
                   <div class="sd-hero-stats" id="sdHeroStats">
@@ -531,7 +531,7 @@
                   </div>
                   <button id="courseAddBtn" class="sd-add-btn" type="button">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    <span>Add Subject</span>
+                    <span data-i18n="sd_add_subject">Add Subject</span>
                   </button>
                 </div>
               </div>
@@ -548,6 +548,7 @@
                   id="courseSearchInput"
                   class="sd-search-input"
                   type="text"
+                  data-i18n-ph="sd_search_ph"
                   placeholder="Search subjects..."
                   autocomplete="off"
                 />
@@ -557,7 +558,7 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>
                 </svg>
-                <span>Manage layout</span>
+                <span data-i18n="sd_manage_layout">Manage layout</span>
               </button>
             </div>
 
@@ -599,21 +600,21 @@
               <div class="notif-header-left">
                 <div class="notif-title-icon">&#x1F514;</div>
                 <div>
-                  <div class="notif-title">Notifications</div>
-                  <div class="notif-subtitle" id="notifCount">All caught up</div>
+                  <div class="notif-title" data-i18n="nav_notifications">Notifications</div>
+                  <div class="notif-subtitle" id="notifCount" data-i18n="notif_all_caught">All caught up</div>
                 </div>
               </div>
-              <button class="notif-mark-all" id="notifMarkAll">Mark all read</button>
+              <button class="notif-mark-all" id="notifMarkAll" data-i18n="notif_mark_all">Mark all read</button>
             </div>
             <div class="notif-tabs">
-              <button class="notif-tab active" data-tab="all">All</button>
-              <button class="notif-tab" data-tab="unread">Unread</button>
+              <button class="notif-tab active" data-tab="all" data-i18n="notif_tab_all">All</button>
+              <button class="notif-tab" data-tab="unread" data-i18n="notif_tab_unread">Unread</button>
             </div>
             <div class="notif-list" id="notifList">
               <div class="notif-empty">
                 <div class="notif-empty-icon">&#x1F514;</div>
-                <div class="notif-empty-title">You're all caught up!</div>
-                <div class="notif-empty-sub">New notifications will appear here</div>
+                <div class="notif-empty-title" data-i18n="notif_empty_title">You're all caught up!</div>
+                <div class="notif-empty-sub" data-i18n="notif_empty_sub">New notifications will appear here</div>
               </div>
             </div>
           </div>
@@ -625,8 +626,8 @@
         <!-- STUDY LOUNGE -->
         <div id="psec-lounge" class="portal-section" style="display: none">
           <div class="dash-greeting">
-            <h1>&#x1F4CA; Study Lounge</h1>
-            <p>Your personal learning overview</p>
+            <h1 data-i18n="lounge_title">&#x1F4CA; Study Lounge</h1>
+            <p data-i18n="lounge_subtitle">Your personal learning overview</p>
           </div>
 
           <!-- Streak banner -->
@@ -634,9 +635,9 @@
             <div class="lounge-streak-flame">&#x1F525;</div>
             <div>
               <div class="lounge-streak-val" id="loungeStreakVal">0</div>
-              <div class="lounge-streak-lbl">day streak</div>
+              <div class="lounge-streak-lbl" data-i18n="lounge_day_streak">day streak</div>
             </div>
-            <div class="lounge-streak-msg" id="loungeStreakMsg">Start studying today!</div>
+            <div class="lounge-streak-msg" id="loungeStreakMsg" data-i18n="lounge_streak_msg_start">Start studying today!</div>
           </div>
 
           <!-- Main stat cards -->
@@ -644,51 +645,51 @@
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x23F1;&#xFE0F;</div>
               <div class="lounge-stat-val" id="lsHours">0h 0m</div>
-              <div class="lounge-stat-lbl">Study Time</div>
-              <div class="lounge-stat-sub" id="lsHoursSub">Total time with files open</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_time">Study Time</div>
+              <div class="lounge-stat-sub" id="lsHoursSub" data-i18n="lounge_stat_time_sub">Total time with files open</div>
             </div>
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x1F4C2;</div>
               <div class="lounge-stat-val" id="lsFiles">0</div>
-              <div class="lounge-stat-lbl">Files Opened</div>
-              <div class="lounge-stat-sub" id="lsFilesSub">Unique PDFs studied</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_files">Files Opened</div>
+              <div class="lounge-stat-sub" id="lsFilesSub" data-i18n="lounge_stat_files_sub">Unique PDFs studied</div>
             </div>
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x1F393;</div>
               <div class="lounge-stat-val" id="lsCourses">0</div>
-              <div class="lounge-stat-lbl">Courses</div>
-              <div class="lounge-stat-sub" id="lsCoursesSub">Subjects you've explored</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_courses">Courses</div>
+              <div class="lounge-stat-sub" id="lsCoursesSub" data-i18n="lounge_stat_courses_sub">Subjects you've explored</div>
             </div>
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x1F916;</div>
               <div class="lounge-stat-val" id="lsAI">0</div>
-              <div class="lounge-stat-lbl">AI Messages</div>
-              <div class="lounge-stat-sub">Questions asked to AI</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_ai">AI Messages</div>
+              <div class="lounge-stat-sub" data-i18n="lounge_stat_ai_sub">Questions asked to AI</div>
             </div>
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x1F4DD;</div>
               <div class="lounge-stat-val" id="lsNotes">0</div>
-              <div class="lounge-stat-lbl">Lecture Notes</div>
-              <div class="lounge-stat-sub">Auto-summaries created</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_notes">Lecture Notes</div>
+              <div class="lounge-stat-sub" data-i18n="lounge_stat_notes_sub">Auto-summaries created</div>
             </div>
             <div class="lounge-stat-card">
               <div class="lounge-stat-icon">&#x1F3AE;</div>
               <div class="lounge-stat-val" id="lsGames">0</div>
-              <div class="lounge-stat-lbl">Games Played</div>
-              <div class="lounge-stat-sub">Break sessions</div>
+              <div class="lounge-stat-lbl" data-i18n="lounge_stat_games">Games Played</div>
+              <div class="lounge-stat-sub" data-i18n="lounge_stat_games_sub">Break sessions</div>
             </div>
           </div>
 
           <!-- Courses list -->
-          <div class="lounge-section-hdr">&#x1F4DA; Courses Studied</div>
+          <div class="lounge-section-hdr" data-i18n="lounge_courses_studied">&#x1F4DA; Courses Studied</div>
           <div class="lounge-course-chips" id="loungeCourseChips">
-            <div class="lounge-empty-msg">No courses yet &mdash; open a subject to get started</div>
+            <div class="lounge-empty-msg" data-i18n="lounge_no_courses">No courses yet &mdash; open a subject to get started</div>
           </div>
 
           <!-- Recent files -->
-          <div class="lounge-section-hdr">&#x1F4C4; Recently Opened Files</div>
+          <div class="lounge-section-hdr" data-i18n="lounge_recent_files">&#x1F4C4; Recently Opened Files</div>
           <div class="lounge-recent-list" id="loungeRecentList">
-            <div class="lounge-empty-msg">No files opened yet</div>
+            <div class="lounge-empty-msg" data-i18n="lounge_no_files">No files opened yet</div>
           </div>
 
           <!-- Reset -->
@@ -696,6 +697,7 @@
             <button
               class="settings-danger-btn"
               id="loungeResetBtn"
+              data-i18n="lounge_reset"
               style="font-size: 0.75rem; padding: 7px 18px"
             >
               Reset Stats

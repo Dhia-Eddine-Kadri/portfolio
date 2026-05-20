@@ -394,14 +394,22 @@ function _updateHeroStats(
   const courseLbl = document.getElementById('sdHeroCoursesLabel');
   const filesLbl = document.getElementById('sdHeroFilesLabel');
   const progressLbl = document.getElementById('sdHeroProgressLabel');
-  if (courseLbl) courseLbl.textContent = data.length + ' course' + (data.length === 1 ? '' : 's');
+  const tFn = window._t;
+  const courseWord = data.length === 1
+    ? (tFn ? tFn('sd_course_one') : 'course')
+    : (tFn ? tFn('sd_course_many') : 'courses');
+  if (courseLbl) courseLbl.textContent = data.length + ' ' + courseWord;
   const totalFiles = data.reduce((s, d) => s + d.progress.files, 0);
-  if (filesLbl) filesLbl.textContent = totalFiles + ' file' + (totalFiles === 1 ? '' : 's');
+  const fileWord = totalFiles === 1
+    ? (tFn ? tFn('sd_file_one') : 'file')
+    : (tFn ? tFn('sd_file_many') : 'files');
+  if (filesLbl) filesLbl.textContent = totalFiles + ' ' + fileWord;
   const tracked = data.filter((d) => d.progress.files > 0);
   const avg = tracked.length
     ? Math.round(tracked.reduce((s, d) => s + d.progress.total, 0) / tracked.length)
     : 0;
-  if (progressLbl) progressLbl.textContent = avg + '% avg progress';
+  const avgLabel = tFn ? tFn('sd_avg_progress') : 'avg progress';
+  if (progressLbl) progressLbl.textContent = avg + '% ' + avgLabel;
 }
 
 // ── Next steps panel ─────────────────────────────────────────────────────────

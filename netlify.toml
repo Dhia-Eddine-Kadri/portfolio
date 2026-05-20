@@ -53,6 +53,21 @@
   status = 200
 
 [[redirects]]
+  from = "/api/pause-subscription"
+  to = "/.netlify/functions/pause-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/resume-subscription"
+  to = "/.netlify/functions/resume-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/cancel-subscription"
+  to = "/.netlify/functions/cancel-subscription"
+  status = 200
+
+[[redirects]]
   from = "/api/activate-paypal-subscription"
   to = "/.netlify/functions/activate-paypal-subscription"
   status = 200
@@ -220,4 +235,4 @@
     Cross-Origin-Opener-Policy = "same-origin-allow-popups"
     Cross-Origin-Resource-Policy = "same-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(self)"
-    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://accounts.google.com https://www.youtube.com https://www.paypal.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://cdn.jsdelivr.net https://fonts.bunny.net; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.bunny.net; connect-src 'self' https://minallo.de https://wprfkjeiawxlcnitsfdr.supabase.co https://python-ai.fly.dev https://api-m.paypal.com https://api.paypal.com https://accounts.spotify.com https://api.spotify.com wss://wprfkjeiawxlcnitsfdr.supabase.co https://unpkg.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob: https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com https://www.paypal.com; form-action 'self'; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://accounts.google.com https://www.youtube.com https://www.paypal.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://cdn.jsdelivr.net https://fonts.bunny.net; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.bunny.net; connect-src 'self' https://minallo.de https://accounts.google.com https://wprfkjeiawxlcnitsfdr.supabase.co https://python-ai.fly.dev https://api-m.paypal.com https://api.paypal.com https://accounts.spotify.com https://api.spotify.com wss://wprfkjeiawxlcnitsfdr.supabase.co https://unpkg.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob: https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com https://www.paypal.com; form-action 'self'; upgrade-insecure-requests"

@@ -59,6 +59,9 @@ import { runMultiSummary as _runMultiSummary } from './features/ai-chat/multi-su
 import {
   createCheckoutSession as _createCheckoutSession,
   createPortalSession as _createPortalSession,
+  pauseSubscription as _pauseSubscription,
+  resumeSubscription as _resumeSubscription,
+  cancelSubscription as _cancelSubscription,
   verifyPayment as _verifyPayment,
   activatePayPalSubscription as _activatePayPalSubscription,
   loadBillingConfig as _loadBillingConfig,
@@ -718,6 +721,9 @@ initLandingAuthBridge({ authBridge: _authBridge });
 (window as unknown as { _subService: Record<string, unknown> })._subService = {
   createCheckoutSession: _createCheckoutSession,
   createPortalSession: _createPortalSession,
+  pauseSubscription: _pauseSubscription,
+  resumeSubscription: _resumeSubscription,
+  cancelSubscription: _cancelSubscription,
   verifyPayment: _verifyPayment,
   activatePayPalSubscription: _activatePayPalSubscription,
   loadBillingConfig: _loadBillingConfig,

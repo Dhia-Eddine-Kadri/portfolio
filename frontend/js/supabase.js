@@ -211,6 +211,35 @@ var _sb = {
         headers: logoutHeaders
       }).catch(function () {});
     },
+    // Send a password-recovery email. Supabase renders the "Reset Password"
+    // email template (configured in dashboard) with a magic link to
+    // SITE_URL + redirectTo + #access_token=...&type=recovery.
+    recover: async function (email, redirectTo) {
+      var url = SUPA_URL + '/auth/v1/recover';
+      if (redirectTo) url += '?redirect_to=' + encodeURIComponent(redirectTo);
+      var r = await fetch(url, {
+        method: 'POST',
+        headers: _sbHeaders(),
+        body: JSON.stringify({ email: email })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      return { ok: r.ok, status: r.status, body: d };
+    },
+    // Update the password of the currently-authenticated user. Used by the
+    // reset-password page after Supabase has set a recovery JWT via the email
+    // link redirect.
+    updatePassword: async function (newPassword, recoveryToken) {
+      var headers = recoveryToken
+        ? Object.assign({}, _sbHeaders(), { Authorization: 'Bearer ' + recoveryToken })
+        : _sbHeaders();
+      var r = await fetch(SUPA_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify({ password: newPassword })
+      });
+      var d = await r.json().catch(function () { return {}; });
+      return { ok: r.ok, status: r.status, body: d };
+    },
     getUser: function () {
       if (!_sbToken) return Promise.resolve(null);
       return fetch(SUPA_URL + '/auth/v1/user', {

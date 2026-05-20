@@ -1233,9 +1233,10 @@ function initImportModal(root: HTMLElement): void {
 
   const syncCount = (): void => {
     const n = picked.size;
-    const word = n === 1 ? 'item' : 'items';
+    const word = n === 1 ? tStr('cb_count_one', 'item') : tStr('cb_count_many', 'items');
+    const selectedWord = tStr('cb_count_selected', 'selected');
     if (countLabel) {
-      countLabel.innerHTML = `<span class="ncb-modal-count-num">${n}</span> ${word} selected`;
+      countLabel.innerHTML = `<span class="ncb-modal-count-num">${n}</span> ${word} ${selectedWord}`;
     }
     if (importBtn) importBtn.disabled = n === 0;
   };
@@ -1795,7 +1796,7 @@ function initContextTabs(root: HTMLElement): void {
       if (notesCard) notesCard.hidden = !showNotes;
 
       const cardTitle = sourcesCard?.querySelector<HTMLElement>('.ncb-context-card-title');
-      if (cardTitle && !showNotes) cardTitle.textContent = label === 'Sources' ? 'Sources used' : label;
+      if (cardTitle && !showNotes) cardTitle.textContent = label === 'Sources' ? tStr('cb_sources_used', 'Sources used') : label;
 
       if (showNotes) renderNotesTab(root);
     });

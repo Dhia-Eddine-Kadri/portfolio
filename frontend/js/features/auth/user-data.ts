@@ -20,8 +20,12 @@ interface SettingsRow {
 }
 
 interface SubscriptionRow {
+  plan?: string;
   status?: string;
   expires_at?: string;
+  stripe_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  paypal_subscription_id?: string | null;
   [k: string]: unknown;
 }
 
@@ -94,8 +98,18 @@ export async function loadUserData(uid: string): Promise<void> {
     let sub = (await sb.from('subscriptions').select('*').eq('user_id', uid).single()) as
       | SubscriptionRow
       | null;
-    if (sub && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
+    if (sub && sub.status !== 'paused' && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
       sub = { ...sub, status: 'expired' };
+    }
+    if (
+      sub &&
+      sub.plan === 'pro' &&
+      !sub.stripe_subscription_id &&
+      !sub.stripe_customer_id &&
+      !sub.paypal_subscription_id &&
+      !['cancelled', 'expired', 'past_due', 'paused'].includes(String(sub.status || ''))
+    ) {
+      sub = { ...sub, status: sub.status || 'active' };
     }
     if (window.applySubscription) window.applySubscription(sub || {});
 
@@ -112,6 +126,14 @@ export async function loadUserData(uid: string): Promise<void> {
         if (isAdmin) {
           const btn = document.getElementById('psbAdmin');
           if (btn) btn.style.display = '';
+          if (!window._userIsPro && window.applySubscription) {
+            window.applySubscription({
+              ...(sub || {}),
+              plan: 'pro',
+              status: sub && sub.status === 'paused' ? 'paused' : 'active',
+              admin_managed: true,
+            });
+          }
         }
         if (!window._userIsPro && !isAdmin && window._showPaywall) {
           setTimeout(window._showPaywall, 800);
@@ -197,8 +219,10 @@ export function applyUserTypeUI(): void {
 
   const sub = document.getElementById('sbUserSub');
   if (sub) {
+    const tFn = window._t;
+    const germanTestLabel = tFn ? tFn('profile_german_test') : 'German Test';
     sub.textContent = isLearner
-      ? (germanTest || 'German Test') + (germanLevel ? ' · ' + germanLevel : '')
+      ? (germanTest || germanTestLabel) + (germanLevel ? ' · ' + germanLevel : '')
       : 'TU Braunschweig';
   }
   const coursesNav = document.getElementById('pcStudip');
@@ -208,7 +232,12 @@ export function applyUserTypeUI(): void {
 
   const glSub = document.getElementById('glTestBadge');
   const glChip = document.getElementById('glLevelChip');
-  if (glSub) glSub.textContent = (germanTest || 'German Test') + ' preparation';
+  if (glSub) {
+    const tFn = window._t;
+    const germanTestLabel = tFn ? tFn('profile_german_test') : 'German Test';
+    const prepWord = tFn ? tFn('user_preparation') : 'preparation';
+    glSub.textContent = (germanTest || germanTestLabel) + ' ' + prepWord;
+  }
   if (glChip) glChip.textContent = germanLevel || '–';
 
   document.querySelectorAll<HTMLElement>('.pf-enrolled-field').forEach((el) => {

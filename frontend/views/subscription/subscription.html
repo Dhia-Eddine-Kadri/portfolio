@@ -70,6 +70,27 @@
     >
       &#x2699;&#xFE0F; Manage / Cancel subscription
     </button>
+    <button
+      class="sub-btn sub-btn-current sub-btn-danger"
+      id="subCancelBtn"
+      type="button"
+      data-i18n="sub_cancel_btn"
+      style="display: none; margin-top: 8px"
+    >
+      Cancel subscription
+    </button>
+    <div class="sub-pause-panel" id="subPausePanel" style="display: none">
+      <div class="sub-pause-title" data-i18n="sub_pause_title">Vacation pause</div>
+      <p class="sub-pause-copy" data-i18n="sub_pause_copy">Pause billing and Pro access while you are away.</p>
+      <label class="sub-pause-label" for="subPauseResumeAt" data-i18n="sub_pause_resume_label">Resume on</label>
+      <input class="sub-pause-input" type="date" id="subPauseResumeAt" />
+      <button class="sub-btn sub-btn-current" id="subPauseBtn" type="button" data-i18n="sub_pause_btn">Pause subscription</button>
+    </div>
+    <div class="sub-pause-panel sub-pause-panel-active" id="subResumePanel" style="display: none">
+      <div class="sub-pause-title" data-i18n="sub_paused_title">Subscription paused</div>
+      <p class="sub-pause-copy" id="subPausedUntil" data-i18n="sub_paused_copy">Pro access is paused during your vacation.</p>
+      <button class="sub-btn sub-btn-current" id="subResumeBtn" type="button" data-i18n="sub_resume_btn">Resume now</button>
+    </div>
     <p
       data-i18n="sub_cancel_note"
       style="

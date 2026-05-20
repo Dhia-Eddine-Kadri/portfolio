@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { requireEnv } from '../lib/env';
 import { supaRequest } from '../lib/supabase-admin';
 import { stripeGet } from '../lib/stripe';
+import { recordDeviceTrial } from '../lib/trial-device';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 interface StripeEvent<T = unknown> {
@@ -16,7 +17,7 @@ interface StripeEvent<T = unknown> {
 }
 
 interface CheckoutSession {
-  metadata?: { user_id?: string; no_trial?: string };
+  metadata?: { user_id?: string; no_trial?: string; trial_device_hash?: string };
   subscription?: string | null;
   customer?: string | null;
 }
@@ -26,6 +27,8 @@ interface SubscriptionObject {
   status?: string;
   customer?: string;
   current_period_end?: number;
+  pause_collection?: unknown;
+  cancel_at_period_end?: boolean;
 }
 
 interface InvoiceObject {
@@ -204,6 +207,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
             updated_at: new Date().toISOString()
           },
           serviceKey, prefer);
+
+        if (!noTrial && session.metadata?.trial_device_hash) {
+          await recordDeviceTrial(
+            serviceKey,
+            session.metadata.trial_device_hash,
+            userId,
+            session.subscription || null,
+            'stripe'
+          );
+        }
       }
     }
 
@@ -229,13 +242,24 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       const cusId = sub.customer;
       if (cusId) {
         const isActive = sub.status === 'active' || sub.status === 'trialing';
+        const isPaused = Boolean(sub.pause_collection);
         const patch: Record<string, unknown> = {
-          status: isActive ? 'active' : sub.status,
+          status: isPaused ? 'paused' : (isActive ? 'active' : sub.status),
           stripe_subscription_id: sub.id || null,
+          // Mirror Stripe's flag so UI stays in sync if the user toggles
+          // cancellation on/off from the customer portal.
+          cancel_at_period_end: Boolean(sub.cancel_at_period_end),
           updated_at: new Date().toISOString()
         };
         const periodEnd = isoOrNull(sub.current_period_end);
-        if (periodEnd) patch.expires_at = periodEnd;
+        if (isPaused) {
+          patch.expires_at = new Date().toISOString();
+        } else if (periodEnd) {
+          patch.expires_at = periodEnd;
+          patch.pause_started_at = null;
+          patch.pause_resumes_at = null;
+          patch.pause_reason = null;
+        }
         await supaWriteOrThrow('PATCH',
           'subscriptions?stripe_customer_id=eq.' + encodeURIComponent(cusId),
           patch, serviceKey, prefer);
