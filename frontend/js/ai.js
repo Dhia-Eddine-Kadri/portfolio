@@ -287,10 +287,14 @@ askAI = function (question, skipUserBubble) {
       document.getElementById('aiSend').classList.remove('is-stop');
     });
 };
-window.askAI = askAI;
-// ai-ask-bridge captures _legacyAskAI at init time, which runs before ai.js
-// loads — so publish it explicitly so snipped/attached images reach the
-// rendered user bubble + the backend.
+// IMPORTANT: do NOT publish this legacy askAI as window.askAI. The TS bridge
+// (frontend/js/features/ai-chat/ai-ask.ts) installs a RAG-first askAI that
+// routes every course question to /ask-stream so Phase-1 verification +
+// confidence-from-verification + math-template gating apply. Overwriting it
+// here would silently bypass all grounding and let the model invent textbook
+// formulas (the Nachgiebigkeit / Schweißnaht regression). The legacy is kept
+// only as _legacyAskAI so the image-attachment hook in ai-ask-bridge can still
+// reach a vision-capable path when the user snips/attaches an image.
 window._legacyAskAI = askAI;
 
 // ── chipPrompt — quick action buttons ────────────────────────────────────
