@@ -356,13 +356,17 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                     answer_json={
                         "answer": "".join(full_text_buf),
                         "retrievalMode": captured_meta.get("retrievalMode", "strong"),
-                        # Review-2 finding #7: persist verification too so
-                        # cached replays carry the same confidence label the
-                        # original answer earned. Without this the cached-
-                        # stream branch falls back to a retrievalMode-only
-                        # mapping that lies about confidence.
+                        # Review-2 finding #7 (also follow-up nit): persist
+                        # verification + confidence so cached replays carry
+                        # the same confidence label the original answer
+                        # earned. Also persist answerMode (math|strong|
+                        # partial|weak) and tutorMode (explain|solve|quiz)
+                        # so the cached UI badge + downstream consumers see
+                        # the same mode classification.
                         "verification": captured_meta.get("verification"),
                         "confidence":   captured_meta.get("confidence"),
+                        "answerMode":   captured_meta.get("answerMode"),
+                        "tutorMode":    captured_meta.get("tutorMode"),
                         "groundedSources": [
                             {
                                 "fileName": s.get("file_name"),

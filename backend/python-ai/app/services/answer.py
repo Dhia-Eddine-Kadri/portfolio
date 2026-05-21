@@ -74,7 +74,7 @@ Rules:
 4. Write math using KaTeX: $...$ inline, $$...$$ display.
 5. Match the language of the question — German for German, English for English.
 
-Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry a `[Source N]` or `(filename, p.N)` reference next to it. Do NOT list sources up front; only cite the ones you actually use, where you use them.
+Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry an `[Source N]` reference next to it. `[Source N]` is the ONLY format the verifier accepts. You MAY also append `(filename, p.N)` after the `[Source N]` for the reader, but a filename-only reference without `[Source N]` does NOT count as a citation. Do NOT list sources up front; only cite the ones you actually use, where you use them.
 
 ### Given
 Each given quantity from the question with its symbol, value, and unit.
@@ -352,7 +352,7 @@ Hard rules for this mode:
    - C) <option>
    - D) <option>
 
-   At the end of the whole quiz, add a single section titled "Antworten" (German) / "Answers" (English) with the correct letters and a one-line justification per question, each justification citing the source the same way as normal answers ("[Source N]" / "(filename, p.X)").
+   At the end of the whole quiz, add a single section titled "Antworten" (German) / "Answers" (English) with the correct letters and a one-line justification per question, each justification citing the source with a `[Source N]` tag — the only citation format the verifier accepts. A filename-only reference like `(filename, p.X)` is NOT a valid citation on its own; it may be appended next to a `[Source N]` for the reader but cannot stand alone.
 4. Match the language of the student's question.
 5. Do NOT also produce a regular prose answer to the original question — the quiz IS the response.
 """
