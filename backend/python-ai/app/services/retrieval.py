@@ -53,13 +53,32 @@ _TOC_RE = re.compile(r"^\s*\d+\s*\.{3,}", re.MULTILINE)
 # another doc held the actual answer. Drop to a tie-breaker level — enough
 # to win when similarity is comparable, but not enough to override a
 # materially more relevant chunk from a different document.
-# Was 0.10 — far too small to pull the open PDF into the top-K when other
-# docs win on raw vector similarity. A real session showed AG_9.1 (the open
-# file) completely absent from the top 12 while two old Klausur PDFs took
-# every slot. The active doc is where the user's question is rooted; it
-# should dominate ranking unless there is a strong reason not to.
-_ACTIVE_DOC_BOOST = 1.00      # chunks from the doc the user is reading
+# Active-doc boost tuning has two failure modes worth balancing:
+#   * Too low (was 0.10): the open PDF lost the top-K entirely to bigger /
+#     keyword-denser docs. AG_9.1 had ZERO chunks in the top 12 for a
+#     Nachgiebigkeit question — old Klausuren took every slot.
+#   * Too high (was 1.00): the open PDF took ALL 12 top slots and the
+#     Formelzettel/lecture chunks that would actually contain the precise
+#     formula couldn't break in. Model fell back to a generic δ = L/(A·E)
+#     textbook formula because the Formelzettel never made it into the
+#     context window.
+# 0.40 is a working compromise: enough to keep the open PDF in the top
+# slots but small enough that a strongly-matching chunk from another doc
+# (e.g. the course formula sheet for the exact symbol the question asks
+# about) can still surface.
+_ACTIVE_DOC_BOOST = 0.40      # chunks from the doc the user is reading
 _PREFERRED_DOC_BOOST = 0.20   # chunks from the user-selected document set (when used as a hint, not a filter)
+# Boost for "formula sheet" documents matched by filename. The TU course
+# template explicitly names theirs ``...Formelzettel...`` / ``...Formula
+# Sheet...``; without this boost, formula-sheet chunks score lower than
+# lecture chunks (sparse text, low keyword density) and rarely make the
+# top-K — which is exactly the source the student WANTS retrieved for any
+# computational question.
+_FORMULA_SHEET_BOOST = 0.40
+_FORMULA_SHEET_FILENAME_RE = re.compile(
+    r"formel(?:zettel|sammlung)?|formula[\s_-]*sheet|formulary",
+    re.IGNORECASE,
+)
 _QUALITY_PENALTY_WEAK = 0.15
 _QUALITY_PENALTY_FAILED = 0.30
 
@@ -247,6 +266,17 @@ def _study_score(
     # ── Phase 8 ─────────────────────────────────────────────────────────────
 
     doc_meta_row = doc_meta.get(doc_id) if (doc_meta and doc_id) else None
+
+    # Phase 3 follow-up — formula-sheet boost (read filename from doc_meta).
+    # Files named "Formelzettel" / "Formula Sheet" / "Formelsammlung" etc.
+    # get an extra boost so their chunks can break into top-K alongside the
+    # active doc. Without this, the active-doc boost crowded every top-K
+    # slot with the exercise PDF and the precise formula never reached the
+    # model — falling back to a generic textbook approximation.
+    if doc_meta_row:
+        fn_raw = doc_meta_row.get("file_name") or ""
+        if _FORMULA_SHEET_FILENAME_RE.search(fn_raw):
+            score += _FORMULA_SHEET_BOOST
 
     # +0.20: chunk text mentions the exact exercise number from the query.
     if exercise_number and exercise_number in chunk_text:
