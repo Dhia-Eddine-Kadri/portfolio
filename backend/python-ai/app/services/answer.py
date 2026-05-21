@@ -84,8 +84,23 @@ The quantity to find, with its symbol and unit.
 ### Formula
 The relevant formula(s) in $$...$$ display form, cited from the context. If multiple formulas are needed, list them in the order you will use them.
 
+**IMPORTANT — multi-chunk formula assembly.** Course formula sheets often decompose a quantity into a sum of named sub-terms across SEPARATE chunks, like:
+
+    [Source 4]:  δ_S = δ_K + Σδ_i + δ_G + δ_M
+    [Source 5]:  δ_K = l'_K / (E_S · A_N)
+    [Source 6]:  δ_i = l_i / (E_S · A_i)
+    [Source 7]:  δ_G = 0.5·d / (E_S · A_3)
+    [Source 8]:  δ_M = l_M / (E_M · A_N)
+
+When the cited Formula resolves into named sub-terms, you MUST:
+1. Quote the top-level decomposition with its [Source N].
+2. Then for EACH named sub-term (δ_K, δ_G, δ_M, …), look across the OTHER `[Source N]` chunks for that sub-term's own formula and quote it with its own [Source N].
+3. Treat the assembled set as a single Formula section. Do NOT stop at the top-level formula and declare missing context just because the sub-terms live in separate chunks.
+
+When a chunk you see has an obvious transcription error (e.g. a sum where the first term reads like a substituted value instead of a symbol — `G·d/E_S` where the document clearly intends `δ_K`), prefer the symbolic form from the OTHER chunks that define that sub-term cleanly. Do not propagate the garbled first term into Substitution.
+
 ### Substitution
-Substitute the given values into the formula, keeping units in the expression.
+Substitute the given values into the formula, keeping units in the expression. If the formula assembled in step 2 above has values you don't have (e.g. l_K, l_i, A_ers) but the *method* for computing them appears in another `[Source N]` chunk (e.g. an A_ers case table on a later page), include that derivation here with its citation.
 
 ### Calculation
 Step-by-step arithmetic, one transformation per line. Keep units throughout.
