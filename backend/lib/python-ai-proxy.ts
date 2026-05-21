@@ -10,7 +10,7 @@ import https from 'https';
 import { optionalEnv } from './env';
 import type { PythonProxyResult } from './types';
 
-const _UPSTREAM_TIMEOUT_MS = 26000;
+const _UPSTREAM_TIMEOUT_MS = parseInt(optionalEnv('AI_UPSTREAM_TIMEOUT_MS', '26000'), 10);
 
 function _config(): { serviceUrl: string; internalToken: string } {
   return {

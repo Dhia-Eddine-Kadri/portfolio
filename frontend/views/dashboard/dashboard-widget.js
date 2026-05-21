@@ -37,21 +37,25 @@
       GAP = 14;
 
     function _t(key, fallback) {
-      return (window._t && window._t(key)) || fallback;
+      var v = window._t && window._t(key);
+      // window._t returns the key itself when no translation exists — treat that as "missing"
+      // and use the explicit fallback string the caller provided.
+      if (!v || v === key) return fallback;
+      return v;
     }
     var DEFS = [
-      { type: 'courses', icon: '📚', nameKey: 'wdg_courses_name', descKey: 'wdg_courses_desc', cols: 2, rows: 1 },
-      { type: 'mail', icon: '✉️', nameKey: 'wdg_mail_name', descKey: 'wdg_mail_desc', cols: 2, rows: 2 },
-      { type: 'notes', icon: '📝', nameKey: 'wdg_notes_name', descKey: 'wdg_notes_desc', cols: 2, rows: 2 },
-      { type: 'stats', icon: '📊', nameKey: 'wdg_stats_name', descKey: 'wdg_stats_desc', cols: 2, rows: 1 },
-      { type: 'deadlines', icon: '⏰', nameKey: 'wdg_deadlines_name', descKey: 'wdg_deadlines_desc', cols: 2, rows: 2 },
-      { type: 'weather', icon: '🌤️', nameKey: 'wdg_weather_name', descKey: 'wdg_weather_desc', cols: 1, rows: 1 },
-      { type: 'ai', icon: '🤖', nameKey: 'wdg_ai_name', descKey: 'wdg_ai_desc', cols: 2, rows: 2 },
-      { type: 'gcal', icon: '📆', nameKey: 'wdg_gcal_name', descKey: 'wdg_gcal_desc', cols: 1, rows: 3 },
-      { type: 'mastery', icon: '🎯', nameKey: 'wdg_mastery_name', descKey: 'wdg_mastery_desc', cols: 2, rows: 2 }
+      { type: 'courses', icon: '📚', nameKey: 'wdg_courses_name', name: 'Course shortcuts', descKey: 'wdg_courses_desc', desc: 'Jump into a course', cols: 2, rows: 1 },
+      { type: 'notes', icon: '📝', nameKey: 'wdg_notes_name', name: 'Quick notes', descKey: 'wdg_notes_desc', desc: 'Personal notepad', cols: 2, rows: 2 },
+      { type: 'stats', icon: '📊', nameKey: 'wdg_stats_name', name: 'Study stats', descKey: 'wdg_stats_desc', desc: 'Files & notes counts', cols: 2, rows: 1 },
+      { type: 'deadlines', icon: '⏰', nameKey: 'wdg_deadlines_name', name: 'Deadlines', descKey: 'wdg_deadlines_desc', desc: 'Upcoming calendar events', cols: 2, rows: 2 },
+      { type: 'wordOfDay', icon: '🇩🇪', nameKey: 'wdg_word_name', name: 'Word of the day', descKey: 'wdg_word_desc', desc: 'A new German word at your level', cols: 2, rows: 2,
+        requires: function () { return !!(window._germanLevel); } },
+      { type: 'ai', icon: '🤖', nameKey: 'wdg_ai_name', name: 'AI quick chat', descKey: 'wdg_ai_desc', desc: 'Ask anything', cols: 2, rows: 2 },
+      { type: 'gcal', icon: '📆', nameKey: 'wdg_gcal_name', name: 'Google Calendar', descKey: 'wdg_gcal_desc', desc: 'View & edit events', cols: 1, rows: 3 },
+      { type: 'mastery', icon: '🎯', nameKey: 'wdg_mastery_name', name: 'Practice focus', descKey: 'wdg_mastery_desc', desc: 'Weak topics from your quizzes', cols: 2, rows: 2 }
     ];
-    function defName(def) { return _t(def.nameKey, def.nameKey); }
-    function defDesc(def) { return _t(def.descKey, def.descKey); }
+    function defName(def) { return _t(def.nameKey, def.name || def.nameKey); }
+    function defDesc(def) { return _t(def.descKey, def.desc || def.descKey); }
 
     var now = new Date();
     var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -148,8 +152,6 @@
           '</div>'
         );
       }
-      if (type === 'mail')
-        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">Mail sync is not connected yet.</div>';
       if (type === 'notes')
         return (
           '<div class="nw-list"></div>' +
@@ -174,16 +176,31 @@
         });
         return (
           '<div class="sw-chips"><div class="sw-chip"><div class="sw-val">' + fileCount + '</div><div class="sw-lbl">Files</div></div>' +
-          '<div class="sw-chip"><div class="sw-val">' + ((window._qnNotes || []).length) + '</div><div class="sw-lbl">Notes</div></div>' +
-          '<div class="sw-chip"><div class="sw-val">0h</div><div class="sw-lbl">This week</div></div></div>' +
-          '<div class="sw-bar-row"><span>Weekly goal</span><span>Not set</span></div>' +
-          '<div class="sw-bar"><div class="sw-bar-fill" style="width:0%"></div></div>'
+          '<div class="sw-chip"><div class="sw-val">' + ((window._qnNotes || []).length) + '</div><div class="sw-lbl">Notes</div></div></div>'
         );
       }
-      if (type === 'deadlines')
-        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">No deadline source connected yet.</div>';
-      if (type === 'weather')
-        return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">Weather data is not connected yet.</div>';
+      if (type === 'wordOfDay') {
+        return (
+          '<div class="wod-root" style="display:flex;flex-direction:column;height:100%;gap:6px">' +
+            '<div class="wod-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">' +
+              '<div style="opacity:.55;font-size:.78rem;text-align:center;padding:14px;color:var(--muted)">' +
+                _t('wod_loading', 'Loading word of the day…') +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      if (type === 'deadlines') {
+        return (
+          '<div class="dlw-root" style="display:flex;flex-direction:column;height:100%;gap:6px">' +
+            '<div class="dlw-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">' +
+              '<div class="dlw-empty" style="opacity:.5;font-size:.78rem;text-align:center;padding:14px">' +
+                _t('dlw_loading', 'Loading upcoming events…') +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }
       if (type === 'ai')
         return (
           '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anything…"/><button class="aw-btn">→</button></div>' +
@@ -256,7 +273,7 @@
             if (Array.isArray(saved) && saved.length)
               state = saved
                 .filter(function (w) {
-                  return w.type !== 'today';
+                  return ['today', 'mail', 'weather'].indexOf(w.type) === -1;
                 })
                 .map(function (w) {
                   return Object.assign({}, w, { uid: uid++ });
@@ -549,6 +566,266 @@
         });
         inp.addEventListener('keydown', function (e) {
           if (e.key === 'Enter') _sendWidgetAI(body);
+        });
+      });
+
+      // ── Word of the Day widget binding (German learners) ──────────────────
+      canvas.querySelectorAll('.dw-body').forEach(function (body) {
+        var root = body.querySelector('.wod-root');
+        if (!root || body._wodBound) return;
+        body._wodBound = true;
+        var bodyEl = root.querySelector('.wod-body');
+
+        function _wodEsc(s) {
+          return String(s == null ? '' : s).replace(/[&<>]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+          });
+        }
+
+        function _wodRender(d) {
+          if (!d || !d.word) {
+            bodyEl.innerHTML =
+              '<div style="opacity:.55;font-size:.78rem;text-align:center;padding:14px;color:var(--text)">' +
+              _t('wod_error', 'Could not load the word of the day. Try again later.') +
+              '</div>';
+            return;
+          }
+          var formsHtml = '';
+          if (d.forms && Array.isArray(d.forms.rows) && d.forms.rows.length) {
+            formsHtml =
+              '<div style="margin-top:4px">' +
+                '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);opacity:.75;margin-bottom:4px">' +
+                  _wodEsc(d.forms.label || _t('wod_forms', 'Forms')) +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.74rem">' +
+                  d.forms.rows.map(function (r) {
+                    return (
+                      '<span style="color:var(--muted)">' + _wodEsc(r[0]) + '</span>' +
+                      '<span style="color:var(--text)">' + _wodEsc(r[1]) + '</span>'
+                    );
+                  }).join('') +
+                '</div>' +
+              '</div>';
+          }
+          bodyEl.innerHTML =
+            '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">' +
+              '<span style="font-size:1.15rem;font-weight:800;color:var(--text)">' + _wodEsc(d.word) + '</span>' +
+              (d.pos ? '<span style="font-size:.7rem;color:var(--muted);font-style:italic">' + _wodEsc(d.pos) + '</span>' : '') +
+              '<span style="margin-left:auto;font-size:.66rem;padding:2px 7px;border-radius:10px;background:rgba(59,130,246,.18);color:#3b82f6;font-weight:700">' + _wodEsc(window._germanLevel || '') + '</span>' +
+            '</div>' +
+            (d.translation ? '<div style="font-size:.82rem;color:var(--text);opacity:.92">' + _wodEsc(d.translation) + '</div>' : '') +
+            (d.example && d.example.de ? (
+              '<div style="padding:8px 10px;background:rgba(127,127,127,.08);border-radius:8px">' +
+                '<div style="font-size:.78rem;color:var(--text);line-height:1.4">' + _wodEsc(d.example.de) + '</div>' +
+                (d.example.en ? '<div style="font-size:.72rem;color:var(--muted);margin-top:2px">' + _wodEsc(d.example.en) + '</div>' : '') +
+              '</div>'
+            ) : '') +
+            formsHtml;
+        }
+
+        function _wodLoad() {
+          var level = window._germanLevel;
+          if (!level) {
+            bodyEl.innerHTML =
+              '<div style="opacity:.75;font-size:.78rem;text-align:center;padding:14px;line-height:1.5;color:var(--muted)">' +
+              _t('wod_set_level', 'Set your German level on your profile to see a daily word.') +
+              '</div>';
+            return;
+          }
+          var uid = (_currentUser && (_currentUser.id || _currentUser.sub)) || 'anon';
+          var today = new Date().toISOString().slice(0, 10);
+          var cacheKey = 'ss_wod_' + uid + '_' + level + '_' + today;
+          var historyKey = 'ss_wod_history_' + uid + '_' + level;
+          try {
+            var cached = localStorage.getItem(cacheKey);
+            if (cached) {
+              _wodRender(JSON.parse(cached));
+              return;
+            }
+          } catch (e) {}
+
+          var history = [];
+          try {
+            var hraw = localStorage.getItem(historyKey);
+            if (hraw) history = JSON.parse(hraw) || [];
+            if (!Array.isArray(history)) history = [];
+          } catch (e) { history = []; }
+          var recentWords = history.slice(0, 30).map(function (h) { return h && h.word; }).filter(Boolean);
+
+          bodyEl.innerHTML =
+            '<div style="opacity:.55;font-size:.78rem;text-align:center;padding:14px;color:var(--muted)">' +
+            _t('wod_loading', 'Loading word of the day…') +
+            '</div>';
+
+          var exclusionLine = recentWords.length
+            ? '\nDo NOT pick any of these words (the learner has already seen them recently): ' +
+              recentWords.join(', ') + '.'
+            : '';
+
+          var prompt =
+            'Pick ONE German word appropriate for a learner at CEFR level ' + level +
+            ' to learn on ' + today + '. Vary the part of speech day-to-day.' +
+            exclusionLine + '\n' +
+            'Return ONLY this JSON, no markdown, no commentary:\n' +
+            '{"word":"...","pos":"noun|verb|adjective|adverb|preposition|conjunction",' +
+            '"translation":"<short English>","example":{"de":"<one natural German sentence using the word>","en":"<English translation>"},' +
+            '"forms":{"label":"<Conjugation|Declension|Comparison|Usage>","rows":[["form","value"], ...]}}\n' +
+            'For verbs: forms.rows = 6 present-tense persons (ich/du/er-sie-es/wir/ihr/sie-Sie) + Infinitiv + Präteritum (ich-form). ' +
+            'For nouns: forms.rows = Artikel, Plural, Genitiv (singular), Genus (m/f/n). ' +
+            'For adjectives: Komparativ, Superlativ. ' +
+            'For other parts of speech: 2-3 short usage notes as rows.';
+
+          fetch((window.BACKEND_URL || '') + '/api/ai', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer ' + (window._sbToken || '')
+            },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 600,
+              messages: [{ role: 'user', content: prompt }]
+            })
+          })
+            .then(function (r) {
+              if (r.status === 402) {
+                bodyEl.innerHTML =
+                  '<div style="opacity:.85;font-size:.78rem;text-align:center;padding:14px;line-height:1.5;color:var(--muted)">' +
+                  _t('wod_paywall', 'An active Minallo subscription is required to see your daily German word.') +
+                  '</div>';
+                return null;
+              }
+              return r.json();
+            })
+            .then(function (data) {
+              if (!data) return;
+              var text = data && data.content
+                ? data.content.map(function (b) { return b.text || ''; }).join('')
+                : '';
+              var json = null;
+              try {
+                var m = text.match(/\{[\s\S]*\}/);
+                if (m) json = JSON.parse(m[0]);
+              } catch (e) {}
+              if (json && json.word) {
+                try { localStorage.setItem(cacheKey, JSON.stringify(json)); } catch (e) {}
+                try {
+                  var newHist = [{ word: json.word, date: today }]
+                    .concat(history.filter(function (h) { return h && h.word !== json.word; }))
+                    .slice(0, 60);
+                  localStorage.setItem(historyKey, JSON.stringify(newHist));
+                } catch (e) {}
+                _wodRender(json);
+              } else {
+                _wodRender(null);
+              }
+            })
+            .catch(function () { _wodRender(null); });
+        }
+
+        _wodLoad();
+      });
+
+      // ── Deadlines widget binding (Google Calendar) ────────────────────────
+      canvas.querySelectorAll('.dw-body').forEach(function (body) {
+        var root = body.querySelector('.dlw-root');
+        if (!root || body._dlwBound) return;
+        body._dlwBound = true;
+        var list = root.querySelector('.dlw-list');
+
+        function _dlwEsc(s) {
+          return String(s == null ? '' : s).replace(/[&<>]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+          });
+        }
+
+        function _dlwFmt(ev) {
+          var s = ev.start && (ev.start.dateTime || ev.start.date);
+          if (!s) return '';
+          var d = new Date(s);
+          var allDay = !ev.start.dateTime;
+          var now = new Date();
+          var msDay = 86400000;
+          var dayDiff = Math.floor(
+            (new Date(d.getFullYear(), d.getMonth(), d.getDate()) -
+              new Date(now.getFullYear(), now.getMonth(), now.getDate())) /
+              msDay
+          );
+          var label;
+          if (dayDiff === 0) label = _t('dlw_today', 'Today');
+          else if (dayDiff === 1) label = _t('dlw_tomorrow', 'Tomorrow');
+          else if (dayDiff > 1 && dayDiff < 7)
+            label = d.toLocaleDateString([], { weekday: 'long' });
+          else label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+          if (!allDay) {
+            label +=
+              ' · ' +
+              d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+          return label;
+        }
+
+        function _dlwRender(events) {
+          if (!events || !events.length) {
+            list.innerHTML =
+              '<div class="dlw-empty" style="opacity:.55;font-size:.78rem;text-align:center;padding:14px">' +
+              _t('dlw_no_events', 'No upcoming events in the next 30 days.') +
+              '</div>';
+            return;
+          }
+          list.innerHTML = events
+            .slice(0, 8)
+            .map(function (ev) {
+              var title = _dlwEsc(ev.summary || '(No title)');
+              var when = _dlwEsc(_dlwFmt(ev));
+              return (
+                '<div style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:rgba(255,255,255,.05);border-radius:8px">' +
+                  '<div style="font-size:.8rem;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+                  title + '">' + title + '</div>' +
+                  '<div style="font-size:.7rem;color:rgba(255,255,255,.55)">' + when + '</div>' +
+                '</div>'
+              );
+            })
+            .join('');
+        }
+
+        function _dlwRenderConnect() {
+          list.innerHTML =
+            '<div class="dlw-empty" style="opacity:.7;font-size:.78rem;text-align:center;padding:14px;line-height:1.5">' +
+            _t('dlw_connect', 'Connect Google Calendar to see upcoming deadlines.') +
+            '</div>';
+        }
+
+        function _dlwLoad() {
+          var tok = null;
+          try {
+            var raw = sessionStorage.getItem('ss_gcal_token');
+            if (raw) {
+              var d = JSON.parse(raw);
+              if (d && d.token && d.expiry > Date.now()) tok = d.token;
+            }
+          } catch (e) {}
+          if (!tok) {
+            _dlwRenderConnect();
+            return;
+          }
+          var now = new Date();
+          var end = new Date(now.getTime() + 30 * 86400000);
+          var url =
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events' +
+            '?singleEvents=true&orderBy=startTime&maxResults=20' +
+            '&timeMin=' + encodeURIComponent(now.toISOString()) +
+            '&timeMax=' + encodeURIComponent(end.toISOString());
+          fetch(url, { headers: { Authorization: 'Bearer ' + tok } })
+            .then(function (r) { return r.ok ? r.json() : { items: [] }; })
+            .then(function (data) { _dlwRender((data && data.items) || []); })
+            .catch(function () { _dlwRender([]); });
+        }
+
+        _dlwLoad();
+
+        window.addEventListener('ss:gcal-events-updated', function () {
+          _dlwLoad();
         });
       });
 
@@ -953,6 +1230,8 @@
     }
 
     function openPanel() {
+      buildPicker();
+      updateCards();
       panel.classList.add('open');
       overlay.classList.add('show');
       fab.classList.add('open');
@@ -965,7 +1244,9 @@
 
     function buildPicker() {
       wpGrid.innerHTML = '';
-      DEFS.forEach(function (def) {
+      DEFS.filter(function (def) {
+        return !def.requires || def.requires();
+      }).forEach(function (def) {
         var card = document.createElement('div');
         card.className = 'wp-card';
         card.dataset.type = def.type;

@@ -108,6 +108,9 @@
     )
       .then(function (d) {
         _gcEvents = d.items || [];
+        try {
+          window.dispatchEvent(new CustomEvent('ss:gcal-events-updated'));
+        } catch (e) {}
         if (callback) callback();
       })
       .catch(function (e) {

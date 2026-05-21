@@ -301,6 +301,16 @@
 @keyframes wc-spin {
   to { transform: rotate(360deg); }
 }
+body:not(.night) .wc-loading {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(37, 99, 235, 0.22);
+  color: #172033;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.06);
+}
+body:not(.night) .wc-spinner {
+  border-color: rgba(37, 99, 235, 0.2);
+  border-top-color: #2563eb;
+}
 
 /* Results */
 .wc-results {
