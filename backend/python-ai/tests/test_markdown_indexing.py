@@ -364,3 +364,49 @@ def test_compound_uebungsaufgabe_recognised_as_heading_directly() -> None:
     assert _looks_like_heading("Uebungsaufgabe 9.2")
     assert _looks_like_heading("Exercise 3")
     assert _looks_like_heading("Beispiel 2 b")
+
+
+# ── Unicode math-symbol normalisation ───────────────────────────────────────
+
+
+def test_unicode_math_symbols_get_normalised_to_ascii() -> None:
+    """German engineering Formelzettel PDFs typeset formulas in the
+    Mathematical Alphanumeric Symbols block (U+1D400-1D7FF). Without
+    NFKC normalisation pdfminer hands the chunker text like
+    ``𝐴𝑒𝑟𝑠 = 𝜋/4 (𝐷𝐴² − 𝑑ℎ²)`` and:
+      * the assignment-pattern math detector misses it because the LHS
+        identifier is non-ASCII;
+      * the chunk_text isn't lexically searchable from a normal query.
+    Normalising at the top of ``page_to_markdown`` makes the same content
+    surface as ``Aers = π/4 (DA2 − dh2)``."""
+    from app.services.markdown_indexing import page_to_markdown, _looks_like_math
+
+    raw = "Aers-Formel\n\n𝐴𝑒𝑟𝑠 = 𝜋/4 (𝐷𝐴² − 𝑑ℎ²)"
+    pm = page_to_markdown(raw, 1)
+
+    # The Unicode italic letters must be gone from the stored markdown —
+    # if they survive, downstream retrieval can't lexically match a query
+    # for "Aers" or "DA".
+    assert "𝐴" not in pm.markdown
+    assert "𝜋" not in pm.markdown
+    assert "Aers" in pm.markdown
+    # π is a normal Greek letter (U+03C0) which IS searchable and used by
+    # Phase-2 math detection — NFKC maps the math-italic π (U+1D70B) to it.
+    assert "π" in pm.markdown
+
+    # The post-normalisation assignment line should now be recognised as
+    # math by `_looks_like_math` so the chunker's formula-companion code
+    # fires on reindex.
+    assert _looks_like_math("Aers = π/4 (DA2 − dh2)")
+
+
+def test_unicode_math_normalisation_leaves_plain_text_alone() -> None:
+    """Regression guard: NFKC must not corrupt ordinary German lecture
+    prose (umlauts, ß, etc.)."""
+    from app.services.markdown_indexing import _normalise_math_unicode
+
+    plain = (
+        "Die Schubspannung in der Schweißnaht ergibt sich aus der "
+        "Kraft geteilt durch die Querschnittsfläche."
+    )
+    assert _normalise_math_unicode(plain) == plain

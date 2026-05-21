@@ -26,8 +26,44 @@ Each conversion also returns an *extraction quality* tag:
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Iterable
+
+
+# ── Unicode math normalisation ───────────────────────────────────────────────
+#
+# Some PDFs (TU course Formelzettel template, in particular) typeset formulas
+# using the **Mathematical Alphanumeric Symbols** block (U+1D400–1D7FF). To
+# pdfminer this is just text, so chunks come out containing characters like
+# ``𝐴𝑒𝑟𝑠 = 𝜋/4 (𝐷𝐴² − 𝑑ℎ²)``. Downstream:
+#   * the math-line detector misses it (the operators count fine but the
+#     italic-style letters confuse the assignment-line regex which expects
+#     plain ASCII identifiers),
+#   * the chunker never emits a ``$$...$$`` block, so no formula companion
+#     chunk is created,
+#   * a user query for "Querschnittsfläche A_S" never lexically matches the
+#     ``𝐴𝑆`` in the chunk text.
+#
+# NFKC compatibility-normalises these to their plain ASCII / Greek letter
+# equivalents:
+#   ``𝐴𝑒𝑟𝑠 = 𝜋/4`` → ``Aers = π/4``
+#   ``𝛿`` → ``δ``
+# After normalisation the formula is searchable AND the existing Phase-2
+# detectors (assignment-pattern, math-operator-ratio, Greek-letter) fire
+# normally, so chunk_type='formula' companions get emitted on reindex.
+
+
+def _normalise_math_unicode(text: str) -> str:
+    """NFKC-normalise Mathematical Alphanumeric Symbols to plain letters.
+
+    Applied at the top of ``page_to_markdown`` so every downstream stage
+    (heading detection, math detection, chunking, embedding, retrieval text)
+    sees the same searchable form. NFKC is a standard Python normalisation
+    — no custom mapping table to maintain."""
+    if not text:
+        return text
+    return unicodedata.normalize("NFKC", text)
 
 # ── Tunables ─────────────────────────────────────────────────────────────────
 
@@ -133,7 +169,7 @@ def page_to_markdown(page_text: str, page_number: int) -> PageMarkdown:
     obviously-garbled pages surface as `[unclear]` so retrieval can downweight
     them.
     """
-    text = (page_text or "").strip()
+    text = _normalise_math_unicode((page_text or "").strip())
     if not text:
         return PageMarkdown(page_number=page_number, markdown="[unclear]", quality="failed")
 
