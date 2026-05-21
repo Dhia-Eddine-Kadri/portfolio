@@ -55,8 +55,9 @@
           var txt = wrap.getAttribute('data-q') || bubble.textContent || '';
           out.push({ role: 'user', text: txt.trim() });
         } else {
-          // Bot: store only raw text; re-render on load to avoid XSS from stored HTML
-          out.push({ role: 'bot', text: bubble.textContent || '' });
+          // Bot: store the raw markdown source (set on data-raw at write time).
+          // textContent flattens KaTeX + rendered HTML into a corrupted glob.
+          out.push({ role: 'bot', text: bubble.getAttribute('data-raw') || bubble.textContent || '' });
         }
       });
       return out;
@@ -142,6 +143,7 @@
               '</div>' +
               '</div>';
             var botBubble = wrap.querySelector('.ai-bubble.bot');
+            botBubble.setAttribute('data-raw', m.text || '');
             if (typeof renderMarkdown === 'function') {
               botBubble.innerHTML = renderMarkdown(m.text || '');
             } else {
