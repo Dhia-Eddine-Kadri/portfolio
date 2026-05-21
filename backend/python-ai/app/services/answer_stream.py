@@ -208,6 +208,19 @@ def stream_answer(
     cited = _cited_indices(full_answer, len(used_chunks))
     filtered_sources = [_source_payload(c) for i, c in enumerate(used_chunks, start=1) if i in cited]
 
+    # [Source 0] = the visible PDF text snippet the model received when the
+    # question was deictic ("explain this"). _cited_indices only handles
+    # 1..N (the retrieved chunks); [Source 0] needs an explicit pass.
+    # Without this, the answer would show "grounded in [Source 0]" inline
+    # but the final Sources block would be missing that source entirely —
+    # a misleading UX gap the user can't tell from a fabricated citation.
+    if include_open_source and active_file_name and re.search(r"\[Source\s+0\]", full_answer, re.IGNORECASE):
+        filtered_sources.insert(0, {
+            "file_name": active_file_name,
+            "pages": "currently visible",
+            "section": "Open PDF (visible page)",
+        })
+
     # Phase 10 — deterministic verification on the streamed answer.
     # Include the open-file text in the haystack so formulas / numbers the
     # model lifted from [Source 0] aren't flagged as ungrounded.

@@ -216,6 +216,54 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             log.exception("document classification failed — continuing without it")
 
+        # Phase 12 follow-up: surface OCR-failure to the operator + UI.
+        # When the indexer flagged N pages for OCR but recovered fewer
+        # than half of them, the resulting chunks are likely missing real
+        # content (scanned formula table, broken column extraction, …).
+        # Force the rollup quality down to 'weak' so the frontend badge
+        # warns the student that this doc may answer poorly, and stash
+        # the counts into ocr_assessment for ops visibility.
+        if ocr_pages_run > 0 and ocr_pages_recovered * 2 < ocr_pages_run:
+            log.warning(
+                "indexing.ocr_partial_failure document_id=%s attempted=%d recovered=%d — demoting extraction_quality to weak",
+                document_id, ocr_pages_run, ocr_pages_recovered,
+            )
+            if rollup_quality == "good":
+                rollup_quality = "weak"
+            if isinstance(ocr_assessment_json, dict):
+                ocr_assessment_json = {
+                    **ocr_assessment_json,
+                    "indexer_ocr_attempted": ocr_pages_run,
+                    "indexer_ocr_recovered": ocr_pages_recovered,
+                    "indexer_ocr_status": "partial_failure",
+                }
+            else:
+                ocr_assessment_json = {
+                    "indexer_ocr_attempted": ocr_pages_run,
+                    "indexer_ocr_recovered": ocr_pages_recovered,
+                    "indexer_ocr_status": "partial_failure",
+                }
+        elif ocr_pages_run > 0:
+            # Successful OCR pass — still record the counts so we can
+            # spot patterns ("docs always need 5+ OCR pages = expensive").
+            if isinstance(ocr_assessment_json, dict):
+                ocr_assessment_json = {
+                    **ocr_assessment_json,
+                    "indexer_ocr_attempted": ocr_pages_run,
+                    "indexer_ocr_recovered": ocr_pages_recovered,
+                    "indexer_ocr_status": (
+                        "succeeded" if ocr_pages_recovered == ocr_pages_run else "partial"
+                    ),
+                }
+            else:
+                ocr_assessment_json = {
+                    "indexer_ocr_attempted": ocr_pages_run,
+                    "indexer_ocr_recovered": ocr_pages_recovered,
+                    "indexer_ocr_status": (
+                        "succeeded" if ocr_pages_recovered == ocr_pages_run else "partial"
+                    ),
+                }
+
         now = datetime.now(timezone.utc).isoformat()
         update_payload: dict[str, Any] = {
             "processing_status": "ready",

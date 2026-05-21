@@ -282,7 +282,15 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
     # (the same question yields different turns depending on prior context)
     # and 'quiz' is generative — caching either would defeat the mode.
     version_hash = ""
-    cacheable = tutor_mode == "explain"
+    # Cache scope tightened — also disable cache entirely for deictic
+    # questions ("explain this", "warum hier", etc.) because the answer
+    # references the visible PDF section, which the question string alone
+    # doesn't carry.
+    from ..services.answer_stream import _is_deictic_question  # noqa: WPS433
+    cacheable = (
+        tutor_mode == "explain"
+        and not _is_deictic_question(question)
+    )
     if payload.documentIds and not payload.bypassCache and cacheable:
         version_hash = fetch_document_version_hash(
             payload.userId, payload.courseId, payload.documentIds
@@ -292,6 +300,11 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             course_id=payload.courseId,
             question=question,
             version_hash=version_hash,
+            tutor_mode=tutor_mode,
+            active_document_id=payload.activeDocumentId,
+            # Non-stream /ask doesn't accept a visibleContext payload yet.
+            # Streaming does — covered below.
+            visible_context=None,
         )
         if cached:
             record_retrieval_debug(DebugPayload(
@@ -396,6 +409,9 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             question=question,
             version_hash=version_hash,
             answer_json=answer,
+            tutor_mode=tutor_mode,
+            active_document_id=payload.activeDocumentId,
+            visible_context=None,
         )
 
     record_retrieval_debug(DebugPayload(

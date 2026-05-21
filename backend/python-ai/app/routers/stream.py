@@ -137,13 +137,27 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     has_open_ctx = bool(payload.openFileContext and payload.openFileContext.strip())
     # Cache only makes sense for the legacy 'explain' mode. 'solve' is
     # conversational and 'quiz' is generative, so we never want to serve
-    # a stale answer for either.
-    cacheable = tutor_mode == "explain"
+    # a stale answer for either. Also bypass cache for deictic questions
+    # ("explain this", "warum hier") even in explain mode — the answer
+    # depends on the visible PDF section which we're now folding into the
+    # cache key anyway, but skipping the lookup is faster.
+    from ..services.answer_stream import _is_deictic_question  # noqa: WPS433
+    cacheable = (
+        tutor_mode == "explain"
+        and not _is_deictic_question(question)
+    )
     if payload.documentIds and not has_open_ctx and cacheable:
         version_hash = fetch_document_version_hash(user_id, payload.courseId, payload.documentIds)
         cached = lookup_answer(
             user_id=user_id, course_id=payload.courseId,
             question=question, version_hash=version_hash,
+            tutor_mode=tutor_mode,
+            active_document_id=payload.activeDocumentId,
+            # Streaming path: visibleContext == openFileContext when set.
+            # has_open_ctx is False here (cache only checked when not),
+            # but pass it through for symmetry — if a future codepath
+            # caches with open context, the key reflects it.
+            visible_context=payload.openFileContext,
         )
 
     def cached_stream():
@@ -305,6 +319,9 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                 save_answer(
                     user_id=user_id, course_id=payload.courseId,
                     question=question, version_hash=version_hash,
+                    tutor_mode=tutor_mode,
+                    active_document_id=payload.activeDocumentId,
+                    visible_context=payload.openFileContext,
                     answer_json={
                         "answer": "".join(full_text_buf),
                         "retrievalMode": captured_meta.get("retrievalMode", "strong"),
