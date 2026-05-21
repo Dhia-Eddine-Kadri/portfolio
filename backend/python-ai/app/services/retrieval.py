@@ -53,20 +53,22 @@ _TOC_RE = re.compile(r"^\s*\d+\s*\.{3,}", re.MULTILINE)
 # another doc held the actual answer. Drop to a tie-breaker level — enough
 # to win when similarity is comparable, but not enough to override a
 # materially more relevant chunk from a different document.
-# Active-doc boost tuning has two failure modes worth balancing:
-#   * Too low (was 0.10): the open PDF lost the top-K entirely to bigger /
+# Active-doc boost tuning — three failure modes seen in real sessions:
+#   * 0.10 (original): open PDF lost the top-K entirely to bigger /
 #     keyword-denser docs. AG_9.1 had ZERO chunks in the top 12 for a
 #     Nachgiebigkeit question — old Klausuren took every slot.
-#   * Too high (was 1.00): the open PDF took ALL 12 top slots and the
-#     Formelzettel/lecture chunks that would actually contain the precise
-#     formula couldn't break in. Model fell back to a generic δ = L/(A·E)
-#     textbook formula because the Formelzettel never made it into the
-#     context window.
-# 0.40 is a working compromise: enough to keep the open PDF in the top
-# slots but small enough that a strongly-matching chunk from another doc
-# (e.g. the course formula sheet for the exact symbol the question asks
-# about) can still surface.
-_ACTIVE_DOC_BOOST = 0.40      # chunks from the doc the user is reading
+#   * 1.00 (first attempt): open PDF took ALL 12 top slots. Formelzettel
+#     never made it in — model fell back to a generic δ = L/(A·E) textbook
+#     formula.
+#   * 0.40 (second attempt): better balance, but AG_9.1 still took 5-6
+#     slots and Formelzettel only got 1-2 slots at the BOTTOM of top-12,
+#     where the model under-reads them.
+# 0.25 is the current compromise. With exercise-exact prepended (score 99)
+# the active doc already has its statement chunk locked in slot 1; we
+# don't need the boost to also dominate slots 2-12. Smaller boost lets
+# the formula sheet / lecture notes / definitions chunks compete on raw
+# relevance for those middle slots.
+_ACTIVE_DOC_BOOST = 0.25      # chunks from the doc the user is reading
 _PREFERRED_DOC_BOOST = 0.20   # chunks from the user-selected document set (when used as a hint, not a filter)
 # Boost for "formula sheet" documents matched by filename. The TU course
 # template explicitly names theirs ``...Formelzettel...`` / ``...Formula
@@ -74,7 +76,12 @@ _PREFERRED_DOC_BOOST = 0.20   # chunks from the user-selected document set (when
 # lecture chunks (sparse text, low keyword density) and rarely make the
 # top-K — which is exactly the source the student WANTS retrieved for any
 # computational question.
-_FORMULA_SHEET_BOOST = 0.40
+#
+# Bumped 0.40 → 0.60: with vision OCR enabled the Formelzettel now
+# produces clean structured formula chunks. The +0.40 boost was only
+# enough to put them at the bottom of top-12, where the model under-reads
+# them. +0.60 lands them in slots 3-5 where they actually get attention.
+_FORMULA_SHEET_BOOST = 0.60
 _FORMULA_SHEET_FILENAME_RE = re.compile(
     r"formel(?:zettel|sammlung)?|formula[\s_-]*sheet|formulary",
     re.IGNORECASE,
