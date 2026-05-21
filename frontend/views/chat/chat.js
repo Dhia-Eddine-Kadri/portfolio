@@ -49,6 +49,10 @@
         if (wrap.classList.contains('typing-wrap')) return;
         var bubble = wrap.querySelector('.ai-bubble');
         if (!bubble) return;
+        // Skip bubbles that are still streaming so an in-progress save (panel
+        // close, course switch, refresh) doesn't persist a cropped half-stream
+        // on top of the prior complete answer. finalize() removes the flag.
+        if (bubble.getAttribute('data-streaming') === 'true') return;
         var isUser = bubble.classList.contains('user');
         // For user messages store plain text (stored in data-q on the wrap or inner text)
         if (isUser) {
