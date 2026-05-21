@@ -64,10 +64,14 @@ _SYSTEM_PROMPT_MATH = """You are Minallo's exam-prep tutor for a university stud
 The question is mathematical or asks you to solve an exercise. Answer it STRICTLY using the COURSE CONTEXT below.
 
 Rules:
-1. Use ONLY the context. Do not invent formulas, numbers, or symbols. Do not silently fall back to general knowledge.
-2. Cite the source like "(filename, p.3)" using the [Source N] header for every formula and every step that comes from the context.
-3. Write math using KaTeX: $...$ inline, $$...$$ display.
-4. Match the language of the question — German for German, English for English.
+1. Use ONLY the context. Do not invent formulas, numbers, or symbols. Do not silently fall back to general knowledge or generic textbook equations (e.g. do NOT write `τ = F/A`, `σ = M·y/I`, `A = π·d²/4`, or any other "standard" formula unless it appears verbatim — symbol-for-symbol — in the COURSE CONTEXT).
+2. Before writing the Formula section, verify the formula appears in at least one chunk. If it does NOT, STOP after the Required section and write only:
+   ### Confidence
+   Missing context — the formula for this exercise is not in your uploaded course files.
+   Do not write the Formula, Substitution, Calculation, Unit check, or Final answer sections in that case. Do not invent the formula from general knowledge.
+3. Every formula and every numeric step must carry an inline `[Source N]` citation pointing to the chunk it came from. A `(filename, p.N)` reference written without a matching `[Source N]` is forbidden — only cite filenames that appear in the `[Source N]` headers above.
+4. Write math using KaTeX: $...$ inline, $$...$$ display.
+5. Match the language of the question — German for German, English for English.
 
 Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry a `[Source N]` or `(filename, p.N)` reference next to it. Do NOT list sources up front; only cite the ones you actually use, where you use them.
 
@@ -114,6 +118,28 @@ Behaviour (keep the response short — under ~120 words):
 
 
 _SOURCE_REF_RE = re.compile(r"\bSources?\s+([0-9 ,andund&]+)\b", re.IGNORECASE)
+
+# Cheap "this chunk contains an actual formula" detector. Matches assignment
+# patterns (`x = ...`, `A_S = ...`), TeX-ish markup (`\frac`, `\sqrt`, `^`,
+# `_{`), or math operators. Used to gate the rigid math worksheet template:
+# if NO retrieved chunk contains a formula, we must not commit to the
+# Given/Required/Formula/Substitution/... structure — the model will end up
+# inventing the Formula section from general knowledge, which is exactly the
+# hallucination we're trying to prevent.
+_CHUNK_FORMULA_RE = re.compile(
+    r"[=≈∑∫∂√π·×÷±]|\\frac|\\sqrt|\\sum|\\int|\\pi|\\cdot|\\times|\\boxed|"
+    r"\b[A-Za-z](?:_\{?[A-Za-z0-9,]+\}?)?\s*=",
+)
+
+
+def _any_chunk_has_formula(chunks: list[RetrievedChunk] | None) -> bool:
+    if not chunks:
+        return False
+    for c in chunks:
+        text = getattr(c, "text", "") or ""
+        if _CHUNK_FORMULA_RE.search(text):
+            return True
+    return False
 
 
 # ── Tutor-mode overlays (phase 1) ────────────────────────────────────────────
@@ -281,22 +307,27 @@ def pick_system_prompt(
         from .query_expansion import is_math_question  # noqa: WPS433
         use_math = False
         if tutor_mode != "quiz" and is_math_question(question):
-            # Only commit to the rigid math template when at least one retrieved
-            # chunk is (a) classified as an exercise or solution AND (b) actually
-            # on-topic (similarity above the strong threshold). A spurious
-            # exercise chunk with weak similarity isn't enough to ground the
-            # Given/Required/Formula/... structure. If chunks weren't passed
-            # (legacy callers / unit tests) we keep the historical behaviour.
+            # Only commit to the rigid math template when:
+            #   (a) at least one retrieved chunk is classified exercise/solution
+            #       AND has similarity above the strong threshold (proves the
+            #       question matches a real exercise in the corpus), AND
+            #   (b) at least one retrieved chunk actually contains a formula
+            #       (proves the model has the formula text to copy from — without
+            #       this it fills the "Formula" section by hallucinating standard
+            #       textbook equations and slapping fake (filename, p.N) refs
+            #       on them).
+            # Legacy callers / unit tests that don't pass chunks keep the
+            # historical behaviour.
             if chunks is None:
                 use_math = True
             else:
-                for c in chunks:
-                    if (
-                        getattr(c, "chunk_type", None) in ("exercise", "solution")
-                        and getattr(c, "similarity", 0.0) >= _STRONG_SIMILARITY
-                    ):
-                        use_math = True
-                        break
+                has_exercise_anchor = any(
+                    getattr(c, "chunk_type", None) in ("exercise", "solution")
+                    and getattr(c, "similarity", 0.0) >= _STRONG_SIMILARITY
+                    for c in chunks
+                )
+                if has_exercise_anchor and _any_chunk_has_formula(chunks):
+                    use_math = True
         if use_math:
             base, label = _SYSTEM_PROMPT_MATH, "math"
         else:
@@ -442,11 +473,14 @@ def generate_answer(
     verification: dict[str, Any] = {"status": "missing_context", "reasons": [], "details": {}}
     try:
         from .verification import verify_answer  # noqa: WPS433
+        allowed_filenames = [doc_names.get(c.document_id) for c in used_chunks]
+        allowed_filenames = [f for f in allowed_filenames if f]
         verification = verify_answer(
             answer_text=answer_text,
             chunk_texts=[c.text for c in used_chunks],
             question=question,
             answer_mode=answer_mode,
+            allowed_filenames=allowed_filenames,
         ).to_api()
     except Exception:  # noqa: BLE001
         log.exception("verify_answer failed — emitting default missing_context")

@@ -73,11 +73,14 @@ def test_self_report_missing_context_wins() -> None:
 # ── partial-verification paths ──────────────────────────────────────────────
 
 
-def test_missing_citation_downgrades_to_partial() -> None:
+def test_missing_citation_collapses_to_missing_context() -> None:
+    # Updated contract: a `[Source N]` tag is the ONLY accepted citation
+    # anchor. Without one, no part of the answer is verifiable — collapse
+    # straight to missing_context rather than partially_verified.
     chunk = "Newton's second law: $$ F = m a $$"
     answer = "The formula is $$ F = m a $$ — applied force equals mass times acceleration."
     res = verify_answer(answer_text=answer, chunk_texts=[chunk])
-    assert res.status == "partially_verified"
+    assert res.status == "missing_context"
     assert any("citation" in r for r in res.reasons)
 
 
