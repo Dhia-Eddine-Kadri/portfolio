@@ -82,19 +82,41 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         pages = extract_pages_text(pdf_bytes)
 
         # Phase 12: vision OCR fallback for image-only / heavily-scanned
-        # pages. Gated by env flag + Phase 11 detector; no-op otherwise.
+        # pages AND structurally garbled pages (multi-column formula sheets
+        # where pdfminer pulled tokens out of reading order). Gated by env
+        # flag; no-op otherwise.
+        ocr_pages_run = 0
+        ocr_pages_recovered = 0
         try:
             from .vision_ocr import pages_via_vision, select_pages_needing_ocr  # noqa: WPS433
             bad_idx = select_pages_needing_ocr(pages)
             if bad_idx:
+                ocr_pages_run = len(bad_idx)
                 ocr_results = pages_via_vision(pdf_bytes, bad_idx)
                 for idx, text in ocr_results.items():
                     if 0 <= idx < len(pages):
                         pages[idx] = text
+                ocr_pages_recovered = len(ocr_results)
                 if ocr_results:
-                    log.info("vision OCR recovered %d/%d bad pages", len(ocr_results), len(bad_idx))
+                    log.info(
+                        "vision OCR recovered %d/%d bad pages",
+                        ocr_pages_recovered, ocr_pages_run,
+                    )
         except Exception:  # noqa: BLE001
             log.exception("vision OCR pass failed — continuing with pdfminer text only")
+
+        # Per-doc OCR cost-tracking line. Single structured log entry the
+        # operator can grep for to see "how many OCR calls did indexing
+        # actually make for THIS document". Counted at the indexer, not in
+        # vision_ocr.py, so it survives even when the OCR call itself
+        # raises and gets swallowed by the broad except above.
+        log.info(
+            "indexing.ocr_summary document_id=%s file=%s pages_attempted=%d pages_recovered=%d",
+            document_id,
+            (doc.get("file_name") or "?"),
+            ocr_pages_run,
+            ocr_pages_recovered,
+        )
 
         if not pages or not any(p.strip() for p in pages):
             _mark_failed(

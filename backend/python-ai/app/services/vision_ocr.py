@@ -188,10 +188,87 @@ def pages_via_vision(pdf_bytes: bytes, page_indices: Iterable[int]) -> dict[int,
     return out
 
 
+def _looks_structurally_garbled(text: str) -> bool:
+    """A page that has plenty of characters but no usable structure.
+
+    Symptom: pdfminer pulled tokens out of reading order from a multi-column
+    table or boxed-formula layout. Letter count passes the main ``letters
+    < 80`` bar, but the result is gibberish from the model's perspective —
+    fractions collapsed, formula→label pairs separated, short identifier
+    fragments interleaved.
+
+    Concrete case the heuristic was tuned against (Formelzettel page 8):
+
+        ``δK = ′ lK ES ⋅ AN ′ = 0,5 ⋅ d lK δi = li ES ⋅ Ai δG = 0,5 ⋅ d ES ⋅ A3 …``
+
+    pdfminer's text count says "1474 chars, looks fine", but no model can
+    parse that back into the proper ``δ_K = l'_K / (E_S · A_N)`` form
+    because the fraction operators are gone and the label column got
+    appended to the end of the page.
+
+    The four signals together — formula-heavy (`=`), fraction-starved
+    (few `/`), math-flavoured (Greek/operators), and short-token-dense
+    (formula fragments) — make false positives unlikely:
+
+      * A prose page with one ``F = ma`` has too few ``=`` (< 4).
+      * A list of numerical results (``Wert 1 = 5 mm``) lacks Greek /
+        math-operator characters → ``has_math_signal`` False.
+      * A clean formula sheet has roughly one ``/`` per ``=`` →
+        ``fraction_starved`` False.
+    """
+    if not text or len(text) < 200:
+        return False
+
+    eq_count = text.count("=")
+    if eq_count < 4:
+        return False  # not a formula-heavy page
+
+    # Look at WHAT comes right after each `=`. On a clean formula sheet
+    # almost every `=` is followed within ~15 chars by a fraction marker
+    # — `/`, `(`, or `\frac` — because formulas resolve to a bracketed
+    # or divided expression. On a column-collapsed extraction the
+    # fraction operators are gone, so the RHS is just identifier soup.
+    #
+    # NB: we deliberately do NOT just count `/` globally — German PDFs
+    # have many `/` characters as German/English label separators
+    # (e.g. "Vorspannkraftverlust / loss of preload"), which would
+    # otherwise hide a genuinely garbled formula run from the heuristic.
+    clean_rhs_count = 0
+    for m in re.finditer(r"=", text):
+        window = text[m.end(): m.end() + 15]
+        if "/" in window or "(" in window or "\\frac" in window:
+            clean_rhs_count += 1
+    # Garbled when fewer than a third of `=` have a fraction-shaped RHS.
+    if clean_rhs_count * 3 >= eq_count:
+        return False
+
+    # Require some formula DNA — Greek letters or math-typesetting
+    # operators (⋅ ± ≤ ≥ ≈ ∑ ∫). Without this, ``Wert 1 = 5 mm`` style
+    # numeric lists get false-positive flagged.
+    has_math_signal = bool(re.search(r"[α-ωΑ-Ω]|⋅|±|≤|≥|≈|∑|∫", text))
+    if not has_math_signal:
+        return False
+
+    # Short-token density. Formula sheets that LOST structure dissolve
+    # into a soup of 1-3-char identifiers (δK, lK, ES, AN, …). A coherent
+    # prose paragraph has plenty of multi-char German/English words.
+    tokens = re.findall(r"\w+", text)
+    if not tokens:
+        return False
+    short_tokens = sum(1 for t in tokens if 1 <= len(t) <= 3)
+    short_ratio = short_tokens / len(tokens)
+    return short_ratio > 0.45
+
+
 def select_pages_needing_ocr(pages: list[str]) -> list[int]:
     """Helper for the indexer: returns the 0-based indices of pages that
-    look bad enough to retry with vision OCR. Mirrors the Phase 11
-    per-page bucketing without importing it (kept local for testability).
+    look bad enough to retry with vision OCR.
+
+    Two failure modes covered:
+      * Image-heavy / scanned page  → pdfminer extracts < 80 letters
+      * Structurally garbled page   → plenty of text but column / fraction
+        order is destroyed (formula sheets, multi-col tables). Caught by
+        ``_looks_structurally_garbled``.
     """
     bad: list[int] = []
     for i, text in enumerate(pages):
@@ -199,8 +276,10 @@ def select_pages_needing_ocr(pages: list[str]) -> list[int]:
             bad.append(i)
             continue
         letters = sum(1 for c in text if c.isalpha())
-        # Same "almost no text / image heavy / likely scanned" threshold.
         if letters < 80:
+            bad.append(i)
+            continue
+        if _looks_structurally_garbled(text):
             bad.append(i)
     return bad
 

@@ -152,3 +152,120 @@ def test_strip_outer_code_fence_handles_empty() -> None:
     from app.services.vision_ocr import _strip_outer_code_fence
 
     assert _strip_outer_code_fence("") == ""
+
+
+# ── Structurally-garbled detection ──────────────────────────────────────────
+
+
+def test_jumbled_formula_sheet_is_flagged_for_ocr() -> None:
+    """The Formelzettel page 8 case: 1474 characters of text — passes the
+    letter-count check — but pdfminer dumped the two-column table out of
+    reading order, collapsing fractions and separating formulas from
+    their German labels. Must trigger vision OCR retry."""
+    from app.services.vision_ocr import _looks_structurally_garbled, select_pages_needing_ocr
+
+    # Real chunk text from GdK_F2026_Formelzettel_IK-IFL.pdf page 8 after
+    # NFKC normalisation, abbreviated to the formula-dense portion.
+    jumbled = (
+        "Schraubenberechnung / bolt calculation "
+        "FZ = fZ δS + δP n δS = δK + ∑ δi + δG + δM i=1 "
+        "δK = ′ lK ES ⋅ AN ′ = 0,5 ⋅ d lK ′ = 0,4 ⋅ d lK "
+        "δi = li ES ⋅ Ai δG = 0,5 ⋅ d ES ⋅ A3 δM = lM EM ⋅ AN "
+        "Vorspannkraftverlust / loss of preload "
+        "Elastische Schraubennachgiebigkeit / elastic resilience of the bolt "
+        "Nachgiebigkeit des Schraubenkopfes / resilience of the bolt head "
+        "Sechskantschrauben / hexagon head bolt "
+        "lM = 0,4 ⋅ d, EM = ES lM = 0,33 ⋅ d, EM = EP "
+        "δP = lK EP ⋅ Aers"
+    )
+    assert _looks_structurally_garbled(jumbled)
+    # And from the indexer's POV, this page index should be flagged.
+    assert 0 in select_pages_needing_ocr([jumbled])
+
+
+def test_clean_formula_sheet_is_not_flagged() -> None:
+    """The same formulas in clean form (fractions intact, one formula per
+    line) must NOT be flagged — pdfminer got the layout right and a
+    re-OCR would just waste tokens."""
+    from app.services.vision_ocr import _looks_structurally_garbled
+
+    clean = (
+        "Schraubenberechnung / bolt calculation\n"
+        "FZ = fZ / (δS + δP)\n"
+        "δS = δK + Σδi + δG + δM\n"
+        "δK = l'K / (ES · AN)\n"
+        "δi = li / (ES · Ai)\n"
+        "δG = (0,5 · d) / (ES · A3)\n"
+        "δM = lM / (EM · AN)\n"
+        "δP = lK / (EP · Aers)\n"
+    )
+    assert not _looks_structurally_garbled(clean)
+
+
+def test_plain_prose_with_one_formula_is_not_flagged() -> None:
+    """A lecture page with a single ``F = ma`` style equation embedded in
+    prose must NOT trigger vision OCR. Most of the corpus looks like this
+    and OCR'ing it would burn cost for no benefit."""
+    from app.services.vision_ocr import _looks_structurally_garbled
+
+    prose = (
+        "Die Schubspannung in einer Schweißnaht ergibt sich aus der "
+        "wirkenden Kraft F geteilt durch die wirksame Querschnittsfläche A "
+        "der Naht. Daraus folgt direkt die Beziehung τ = F / A. Diese gilt "
+        "unter der Annahme idealisierter, gleichmäßig verteilter Belastung "
+        "über die Naht und konstanter Materialeigenschaften. In der Praxis "
+        "weichen die Bedingungen davon ab, weshalb in der Regel ein "
+        "zusätzlicher Sicherheitsfaktor berücksichtigt wird."
+    )
+    assert not _looks_structurally_garbled(prose)
+
+
+def test_value_list_without_math_signal_is_not_flagged() -> None:
+    """A page of measured values (``Wert 1 = 5 mm. Wert 2 = …``) has many
+    ``=`` and few ``/`` — but no Greek letters or formula operators — so
+    it shouldn't be confused for a garbled formula sheet."""
+    from app.services.vision_ocr import _looks_structurally_garbled
+
+    values = (
+        "Wert 1 = 0,5 mm. Wert 2 = 1,0 mm. Wert 3 = 2,0 mm. "
+        "Wert 4 = 3,5 mm. Wert 5 = 5,0 mm. Wert 6 = 7,5 mm. "
+        "Wert 7 = 10,0 mm. Wert 8 = 12,5 mm. Wert 9 = 15,0 mm."
+    )
+    assert not _looks_structurally_garbled(values)
+
+
+def test_empty_or_tiny_text_is_not_flagged_by_garble_check() -> None:
+    """Short pages fall through to the letter-count branch instead. The
+    structural-garble heuristic refuses to make a call on < 200 chars."""
+    from app.services.vision_ocr import _looks_structurally_garbled
+
+    assert not _looks_structurally_garbled("")
+    assert not _looks_structurally_garbled("F = ma")
+    assert not _looks_structurally_garbled("δK = ′ lK ES ⋅ AN")  # too short alone
+
+
+def test_select_pages_needing_ocr_combines_both_signals() -> None:
+    """Verify the indexer-facing helper catches both failure modes:
+    image-heavy / scanned (letter-starved) AND structurally-garbled."""
+    from app.services.vision_ocr import select_pages_needing_ocr
+
+    scanned = ""  # PDF extracted nothing — scanned page
+    # Clean prose needs ≥80 letters to clear the original letter-count
+    # check, otherwise the test isn't actually exercising the garble path.
+    clean_prose = (
+        "Newton's second law relates force, mass, and acceleration. "
+        "In its simplest form, F = ma. This equation underlies most of "
+        "classical mechanics and is taught in every introductory physics "
+        "course around the world."
+    )
+    garbled = (
+        "δK = ′ lK ES ⋅ AN ′ = 0,5 ⋅ d lK ′ = 0,4 ⋅ d lK "
+        "δi = li ES ⋅ Ai δG = 0,5 ⋅ d ES ⋅ A3 δM = lM EM ⋅ AN "
+        "δP = lK EP ⋅ Aers FZ = fZ δS + δP "
+        "Elastische Schraubennachgiebigkeit Nachgiebigkeit des Schraubenkopfes"
+    )
+
+    flagged = select_pages_needing_ocr([scanned, clean_prose, garbled])
+    assert 0 in flagged   # letter-starved
+    assert 1 not in flagged  # clean
+    assert 2 in flagged   # structurally garbled
