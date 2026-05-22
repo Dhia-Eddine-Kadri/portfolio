@@ -227,8 +227,10 @@ export function applyUserTypeUI(): void {
   }
   const coursesNav = document.getElementById('pcStudip');
   const germanNav = document.getElementById('psbGerman');
+  const problemRailBtn = document.querySelector<HTMLElement>('.dr-rail-btn[data-dr-mode="problem"]');
   if (coursesNav) coursesNav.style.display = isLearner ? 'none' : '';
   if (germanNav) germanNav.style.display = isLearner ? '' : 'none';
+  if (problemRailBtn) problemRailBtn.style.display = isLearner ? 'none' : '';
 
   const glSub = document.getElementById('glTestBadge');
   const glChip = document.getElementById('glLevelChip');

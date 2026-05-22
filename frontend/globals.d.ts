@@ -160,7 +160,18 @@ declare global {
     setNavActive?: (id: string) => void;
 
     // ── ai-ask bridge ──────────────────────────────────────────────────
-    askAI?: (q: string, skipUserBubble?: boolean, opts?: { forceRefresh?: boolean }) => unknown;
+    askAI?: (
+      q: string,
+      skipUserBubble?: boolean,
+      opts?: {
+        forceRefresh?: boolean;
+        problemSolver?: {
+          mode: string;
+          problem: string;
+          studentWork?: string;
+        };
+      }
+    ) => unknown;
     addBotMsg?: (text: string) => HTMLElement | null;
     _legacyAskAI?: (q: string) => unknown;
     addTyping?: () => unknown;

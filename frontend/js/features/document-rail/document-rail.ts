@@ -12,7 +12,7 @@
 // toolbar callers use) and avoids parallel implementations.
 
 export type DocRailRoute = 'pdf' | 'courses' | 'other';
-export type DocRailMode = 'ai' | 'notes' | 'summary';
+export type DocRailMode = 'ai' | 'problem' | 'notes' | 'summary';
 
 interface NotesPanelApi {
   open: () => void;
@@ -29,6 +29,18 @@ interface DocRailWindow extends Window {
     close: () => void;
   };
   openAI?: () => void;
+  askAI?: (
+    prompt: string,
+    skipUserBubble?: boolean,
+    opts?: {
+      forceRefresh?: boolean;
+      problemSolver?: {
+        mode: string;
+        problem: string;
+        studentWork?: string;
+      };
+    }
+  ) => unknown;
   _notesPanel?: NotesPanelApi;
 }
 
@@ -71,6 +83,7 @@ function saveWidth(w: number): void {
 
 const HEADER_COPY: Record<DocRailMode, { title: string; subtitle: string }> = {
   ai: { title: 'AI', subtitle: 'Ask this document' },
+  problem: { title: 'Problem', subtitle: 'Solve engineering exercises' },
   notes: { title: 'Notes', subtitle: 'AI-generated notes from this PDF' },
   summary: { title: 'Summary', subtitle: 'AI-generated summary of this PDF' },
 };
@@ -101,7 +114,7 @@ function applyWidth(drawer: HTMLElement, w: number): void {
 }
 
 function updateDrawerModeClass(drawer: HTMLElement, mode: DocRailMode | null): void {
-  drawer.classList.remove('dr-mode-ai', 'dr-mode-notes', 'dr-mode-summary');
+  drawer.classList.remove('dr-mode-ai', 'dr-mode-problem', 'dr-mode-notes', 'dr-mode-summary');
   if (mode) drawer.classList.add('dr-mode-' + mode);
 }
 
@@ -120,6 +133,18 @@ function configureTrash(mode: DocRailMode): void {
       const btn = document.getElementById('aiClearBtn') as HTMLButtonElement | null;
       if (btn) btn.click();
     };
+  } else if (mode === 'problem') {
+    trash.title = 'Clear problem';
+    trash.setAttribute('aria-label', 'Clear problem');
+    trash.onclick = () => {
+      const form = document.getElementById('drProblemForm') as HTMLFormElement | null;
+      if (form) form.reset();
+      document.querySelectorAll<HTMLButtonElement>('.dr-problem-mode').forEach((btn, idx) => {
+        const active = idx === 0;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    };
   } else {
     // Notes / Summary — delete the currently-loaded note for this tab.
     trash.title = 'Delete current note';
@@ -133,6 +158,117 @@ function configureTrash(mode: DocRailMode): void {
       trash.title = 'Coming soon';
     }
   }
+}
+
+function getSelectedText(): string {
+  try {
+    return window.getSelection()?.toString().trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function buildProblemChatText(mode: string, problem: string, work: string): string {
+  const modeLabels: Record<string, string> = {
+    hint: 'Hint ladder',
+    setup: 'Set up equations',
+    check: 'Check my work',
+    solve: 'Full solution',
+    practice: 'Generate similar practice',
+  };
+  return [
+    'Problem Solver - ' + (modeLabels[mode] || mode),
+    'Student problem:',
+    problem,
+    work ? '\nStudent work:\n' + work : '',
+  ].filter(Boolean).join('\n');
+}
+
+function mountProblemPanel(): void {
+  const content = getContentEl();
+  if (!content) return;
+  content.innerHTML =
+    '<form id="drProblemForm" class="dr-problem">' +
+      '<div class="dr-problem-hero">' +
+        '<div class="dr-problem-kicker">Engineering workflow</div>' +
+        '<h2>Turn a problem into a clean solution path.</h2>' +
+        '<p>Paste the exercise, add your attempt if you have one, then send it to the AI tutor with the right solving mode.</p>' +
+      '</div>' +
+      '<div class="dr-problem-modes" role="group" aria-label="Problem solver mode">' +
+        '<button type="button" class="dr-problem-mode is-active" data-mode="hint" aria-pressed="true">Hint</button>' +
+        '<button type="button" class="dr-problem-mode" data-mode="setup" aria-pressed="false">Setup</button>' +
+        '<button type="button" class="dr-problem-mode" data-mode="check" aria-pressed="false">Check</button>' +
+        '<button type="button" class="dr-problem-mode" data-mode="solve" aria-pressed="false">Solve</button>' +
+        '<button type="button" class="dr-problem-mode" data-mode="practice" aria-pressed="false">Practice</button>' +
+      '</div>' +
+      '<label class="dr-problem-field">' +
+        '<span>Problem statement</span>' +
+        '<textarea id="drProblemText" rows="8" placeholder="Paste the exercise, task, or selected PDF text here"></textarea>' +
+      '</label>' +
+      '<label class="dr-problem-field">' +
+        '<span>Your work optional</span>' +
+        '<textarea id="drProblemWork" rows="4" placeholder="Paste your equations or partial solution if you want it checked"></textarea>' +
+      '</label>' +
+      '<div class="dr-problem-actions">' +
+        '<button type="button" class="dr-problem-secondary" id="drProblemUseSelection">Use selection</button>' +
+        '<button type="submit" class="dr-problem-primary">Send to AI</button>' +
+      '</div>' +
+      '<p class="dr-problem-foot">Tip: select text in the PDF first, then use selection.</p>' +
+    '</form>';
+
+  content.querySelectorAll<HTMLButtonElement>('.dr-problem-mode').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      content.querySelectorAll<HTMLButtonElement>('.dr-problem-mode').forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    });
+  });
+
+  const problemText = content.querySelector<HTMLTextAreaElement>('#drProblemText');
+  const workText = content.querySelector<HTMLTextAreaElement>('#drProblemWork');
+  content.querySelector<HTMLButtonElement>('#drProblemUseSelection')?.addEventListener('click', () => {
+    const selected = getSelectedText();
+    if (!selected || !problemText) return;
+    problemText.value = problemText.value
+      ? problemText.value.trim() + '\n\n' + selected
+      : selected;
+    problemText.focus();
+  });
+
+  content.querySelector<HTMLFormElement>('#drProblemForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const problem = (problemText?.value || '').trim();
+    const work = (workText?.value || '').trim();
+    if (!problem) {
+      problemText?.focus();
+      return;
+    }
+    const activeMode =
+      content.querySelector<HTMLButtonElement>('.dr-problem-mode.is-active')?.dataset.mode || 'hint';
+    const chatText = buildProblemChatText(activeMode, problem, work);
+    const w = window as DocRailWindow;
+    openDrawer('ai');
+    window.setTimeout(() => {
+      if (typeof w.askAI === 'function') {
+        w.askAI(chatText, false, {
+          problemSolver: {
+            mode: activeMode,
+            problem,
+            studentWork: work || undefined,
+          },
+        });
+      }
+    }, 80);
+  });
+}
+
+function applyUserTypeVisibility(): void {
+  const w = window as Window & { _userType?: string };
+  const problemBtn = document.querySelector<HTMLElement>('.dr-rail-btn[data-dr-mode="problem"]');
+  if (problemBtn) problemBtn.style.display = w._userType === 'learner' ? 'none' : '';
+  if (w._userType === 'learner' && _openMode === 'problem') closeDrawer();
 }
 
 // ── Host content area helpers ────────────────────────────────────────────
@@ -327,6 +463,8 @@ function renderModeContent(mode: DocRailMode): void {
   configureTrash(mode);
   if (mode === 'ai') {
     mountAiPanel();
+  } else if (mode === 'problem') {
+    mountProblemPanel();
   } else {
     mountNotesPanel(mode);
   }
@@ -482,6 +620,7 @@ function wireClose(): void {
 function setRouteVisibility(route: DocRailRoute): void {
   const root = $('drRoot');
   if (!root) return;
+  applyUserTypeVisibility();
   root.hidden = false;
   root.classList.toggle('is-pdf', route === 'pdf');
   root.classList.toggle('is-courses', route === 'courses');
@@ -506,6 +645,8 @@ export function initDocumentRail(): void {
   wireRailButtons();
   wireClose();
   wireResize();
+  applyUserTypeVisibility();
+  window.addEventListener('ss-profile-updated', applyUserTypeVisibility);
 
   const w: DocRailWindow = window as DocRailWindow;
   w.__minalloDocRail = {

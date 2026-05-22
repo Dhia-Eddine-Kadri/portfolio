@@ -37,6 +37,12 @@ interface RagMeta {
   answerCacheId?: string | null;
 }
 
+interface ProblemSolverOptions {
+  mode: string;
+  problem: string;
+  studentWork?: string;
+}
+
 interface SseDoneEvent {
   done: true;
   sources?: Array<{ file_name?: string; pages?: string | null; section?: string | null }>;
@@ -242,11 +248,15 @@ export function clearCourseHistory(courseId: string): void {
 
 export function initAskAI(
   state: AskAiState
-): (question: string, skipUserBubble?: boolean, opts?: { forceRefresh?: boolean }) => unknown {
+): (
+  question: string,
+  skipUserBubble?: boolean,
+  opts?: { forceRefresh?: boolean; problemSolver?: ProblemSolverOptions }
+) => unknown {
   return function askAI(
     question: string,
     skipUserBubble?: boolean,
-    opts?: { forceRefresh?: boolean }
+    opts?: { forceRefresh?: boolean; problemSolver?: ProblemSolverOptions }
   ): unknown {
     if (!question) return;
     if (window._abortCurrentStream) window._abortCurrentStream();
@@ -276,6 +286,7 @@ export function initAskAI(
     const aiPanel = document.getElementById('aiPanel');
     _ensureScrollTracker();
     _userScrolledUp = false;
+    const _isProblemSolver = !!opts?.problemSolver;
 
     const thinkWrap = document.createElement('div');
     thinkWrap.className = 'ai-msg-wrap typing-wrap';
@@ -285,8 +296,8 @@ export function initAskAI(
     aiMsgs.appendChild(thinkWrap);
     aiMsgs.scrollTop = aiMsgs.scrollHeight;
 
-    const pdfDoc = window.pdfDoc as PdfDocLike | null | undefined;
-    let pdfFullText = window.pdfFullText || '';
+    const pdfDoc = _isProblemSolver ? null : (window.pdfDoc as PdfDocLike | null | undefined);
+    let pdfFullText = _isProblemSolver ? '' : window.pdfFullText || '';
     const _lang = window._lang || localStorage.getItem('ss_lang') || 'en';
     const activeFileName = window.activeFileName || '';
     const currentCourseShort = window.currentCourseShort || '';
@@ -306,7 +317,7 @@ export function initAskAI(
       _MATH_PROMPT;
 
     const _textReady =
-      pdfDoc && !pdfFullText.trim()
+      !_isProblemSolver && pdfDoc && !pdfFullText.trim()
         ? extractPdfText(pdfDoc, 30).then((t) => {
             if (t) {
               window.pdfFullText = t;
@@ -316,7 +327,7 @@ export function initAskAI(
         : Promise.resolve();
 
     _textReady
-      .then(() => (pdfDoc ? pdfToImages(8) : []))
+      .then(() => (_isProblemSolver || !pdfDoc ? [] : pdfToImages(8)))
       .then(async (pageImages: string[]) => {
         let userContent: unknown;
         const isHandwritten = pdfFullText.trim().length < 100;
@@ -669,6 +680,8 @@ export function initAskAI(
                 // Recent chat history so the model can resolve anaphoric
                 // references ("the formula above", "explain that again").
                 previousTurns: _previousTurns.length ? _previousTurns : undefined,
+                tutorMode: opts?.problemSolver?.mode === 'hint' ? 'solve' : 'explain',
+                problemSolver: opts?.problemSolver || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
             })

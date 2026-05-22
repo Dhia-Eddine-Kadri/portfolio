@@ -115,6 +115,36 @@ def test_trim_previous_turns_handles_none_and_empty() -> None:
     assert _trim_previous_turns([]) == []
 
 
+# ── Problem Solver helpers ──────────────────────────────────────────────────
+
+
+def test_problem_solver_overlay_check_mode_requires_student_work() -> None:
+    """Check mode should not quietly become a full-solution prompt when
+    the student did not paste an attempt."""
+    from app.services.answer_stream import _problem_solver_overlay
+
+    overlay = _problem_solver_overlay("check", {"mode": "check", "problem": "Find F"})
+    assert "Selected mode: CHECK MY WORK" in overlay
+    assert "no student work attached" in overlay
+    assert "identify the first incorrect or risky step" in overlay
+
+
+def test_problem_solver_user_block_keeps_problem_and_student_work_separate() -> None:
+    """The retrieval query can stay focused on the problem while the LLM
+    still receives the optional attempt as a separate section."""
+    from app.services.answer_stream import _problem_solver_user_block
+
+    block = _problem_solver_user_block({
+        "mode": "check",
+        "problem": "Given R=10 Ohm and U=5 V, find I.",
+        "studentWork": "I = U * R = 50 A",
+    })
+    assert "Problem statement:" in block
+    assert "Given R=10 Ohm" in block
+    assert "Student work to check:" in block
+    assert "I = U * R = 50 A" in block
+
+
 # ── Cache key fold-in for previousTurns ─────────────────────────────────────
 
 

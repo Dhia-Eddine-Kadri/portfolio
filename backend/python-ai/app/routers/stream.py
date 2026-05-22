@@ -78,6 +78,12 @@ class PreviousTurn(BaseModel):
     text: str
 
 
+class ProblemSolverPayload(BaseModel):
+    mode: str
+    problem: str
+    studentWork: str | None = None
+
+
 class AskStreamRequest(BaseModel):
     courseId: str
     documentIds: list[str] | None = None
@@ -96,6 +102,7 @@ class AskStreamRequest(BaseModel):
     # total) so the prompt size stays predictable even if the client
     # sends a long history.
     previousTurns: list[PreviousTurn] | None = None
+    problemSolver: ProblemSolverPayload | None = None
     # bypassCache is intentionally NOT exposed on the public API. The cache
     # is keyed by document_version_hash so it invalidates automatically when
     # documents change; letting the client opt out defeats the single biggest
@@ -159,6 +166,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     cacheable = (
         tutor_mode == "explain"
         and not _is_deictic_question(question)
+        and payload.problemSolver is None
     )
     if payload.documentIds and not has_open_ctx and cacheable:
         version_hash = fetch_document_version_hash(user_id, payload.courseId, payload.documentIds)
@@ -308,6 +316,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             open_file_context=payload.openFileContext,
             weak_topics=weak_topics,
             previous_turns=previous_turns_payload,
+            problem_solver=payload.problemSolver.model_dump() if payload.problemSolver else None,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.

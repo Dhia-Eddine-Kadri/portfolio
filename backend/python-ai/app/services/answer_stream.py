@@ -115,6 +115,98 @@ def _sse(event: dict[str, Any]) -> bytes:
     return ("data: " + json.dumps(event, ensure_ascii=False) + "\n\n").encode("utf-8")
 
 
+_PROBLEM_SOLVER_MODES = {"hint", "setup", "check", "solve", "practice"}
+
+
+def _normalise_problem_solver_mode(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    mode = value.strip().lower()
+    return mode if mode in _PROBLEM_SOLVER_MODES else None
+
+
+def _problem_solver_user_block(problem_solver: dict[str, Any]) -> str:
+    problem = str(problem_solver.get("problem") or "").strip()
+    student_work = str(problem_solver.get("studentWork") or "").strip()
+    parts = [
+        "\n\nPROBLEM SOLVER INPUT:",
+        "Problem statement:",
+        problem,
+    ]
+    if student_work:
+        parts.extend(["", "Student work to check:", student_work])
+    return "\n".join(parts)
+
+
+def _problem_solver_overlay(mode: str, problem_solver: dict[str, Any]) -> str:
+    has_work = bool(str(problem_solver.get("studentWork") or "").strip())
+    common = """
+
+PROBLEM SOLVER MODE.
+You are helping an engineering student work through a problem set. Treat the
+PROBLEM SOLVER INPUT as the task to answer. Use COURSE CONTEXT as ground truth
+for formulas, notation, assumptions, and source citations.
+
+Always use this compact engineering structure unless the selected mode says otherwise:
+1. Given
+2. Find
+3. Relevant concepts
+4. Formula choice
+5. Work
+6. Unit check
+7. Common mistake
+
+Rules:
+- Extract all numeric values and units before solving.
+- State missing data explicitly before making assumptions.
+- Cite source material with [Source N] tags exactly as the base prompt requires.
+- Do not invent course-specific formulas. If the needed formula is absent, say what is missing.
+"""
+    mode_rules = {
+        "hint": """
+
+Selected mode: HINT.
+Do not reveal the final answer or full derivation. Give a hint ladder with:
+- Hint 1: what to identify first
+- Hint 2: which principle/formula family applies
+- Hint 3: how to start the setup
+End with one focused question for the student. No final numeric result.
+""",
+        "setup": """
+
+Selected mode: SETUP.
+Stop after the mathematical setup. Provide Given / Find / assumptions, choose
+the formula(s), define every symbol, and write the equations to solve. Do not
+complete the arithmetic unless it is needed to clarify the setup.
+""",
+        "check": """
+
+Selected mode: CHECK MY WORK.
+First inspect the student's submitted work. If no student work was provided,
+ask them to paste their attempt and give only a starting checklist. If work was
+provided, identify the first incorrect or risky step, explain why, and provide
+the corrected next step. Do not replace the whole attempt with a full solution
+unless the work is already essentially complete.
+""",
+        "solve": """
+
+Selected mode: FULL SOLUTION.
+Give a complete worked solution. Show symbolic formula, numeric substitution,
+intermediate result, final answer with units, and a short plausibility check.
+""",
+        "practice": """
+
+Selected mode: PRACTICE.
+Generate three similar practice problems based on the same concept:
+1 easier, 1 similar, 1 harder. Include brief solution outlines and final
+answers only if the COURSE CONTEXT supports the required formulas.
+""",
+    }
+    if mode == "check" and not has_work:
+        return common + mode_rules[mode] + "\nThe request has no student work attached."
+    return common + mode_rules.get(mode, "")
+
+
 def stream_answer(
     *,
     question: str,
@@ -127,6 +219,7 @@ def stream_answer(
     tutor_mode: str = DEFAULT_TUTOR_MODE,
     weak_topics: list[str] | None = None,
     previous_turns: list[dict[str, str]] | None = None,
+    problem_solver: dict[str, str] | None = None,
 ) -> Generator[bytes, None, None]:
     """Generator that yields SSE byte chunks. Pluggable into FastAPI's
     StreamingResponse with media_type='text/event-stream'.
@@ -170,10 +263,15 @@ def stream_answer(
         else strength
     )
     tutor_mode_norm = normalise_tutor_mode(tutor_mode)
+    problem_mode = _normalise_problem_solver_mode(
+        problem_solver.get("mode") if problem_solver else None
+    )
     system_prompt, answer_mode = pick_system_prompt(
         question, effective_strength, used_chunks, tutor_mode=tutor_mode_norm,
         weak_topics=weak_topics,
     )
+    if problem_mode:
+        system_prompt += _problem_solver_overlay(problem_mode, problem_solver or {})
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Must compute AFTER
     # pick_system_prompt because we need its returned label. Math reasoning
@@ -184,7 +282,7 @@ def stream_answer(
     # predictable.
     if model:
         target_model = model
-    elif answer_mode == "math":
+    elif answer_mode == "math" or problem_mode in {"setup", "check", "solve"}:
         target_model = settings.openai_generate_model_strong
     else:
         target_model = settings.openai_generate_model
@@ -217,6 +315,8 @@ def stream_answer(
         )
 
     user_message = "QUESTION:\n" + question.strip()
+    if problem_mode and problem_solver:
+        user_message += _problem_solver_user_block(problem_solver)
     if context_block:
         user_message += "\n\nCOURSE CONTEXT:\n\n" + context_block
 

@@ -383,14 +383,73 @@ async function _ufDeleteRemote(uid, course, name, folder, storageName) {
 // firing a duplicate Supabase storage list.
 var _ufMergeInFlight = {};
 
+function _ufCloneMergedFile(f, course, folder) {
+  var copy = Object.assign({}, f);
+  copy._course = course;
+  if (folder) copy._folder = folder;
+  else delete copy._folder;
+  return copy;
+}
+
+function _ufCopyMergedState(fromCourse, toCourse) {
+  if (!fromCourse || !toCourse || fromCourse === toCourse) return;
+  var localFiles = (toCourse.files || []).filter(function (f) {
+    return !f._uploaded;
+  });
+  var uploadedRoot = (fromCourse.files || []).filter(function (f) {
+    return f._uploaded && !f._folder;
+  }).map(function (f) {
+    return _ufCloneMergedFile(f, toCourse, null);
+  });
+  toCourse.files = localFiles.concat(uploadedRoot);
+  if (Array.isArray(fromCourse.userFolders)) {
+    toCourse.userFolders = fromCourse.userFolders.map(function (fd) {
+      return {
+        name: fd.name,
+        files: (fd.files || []).map(function (f) {
+          return _ufCloneMergedFile(f, toCourse, fd.name);
+        })
+      };
+    });
+  }
+  toCourse._filesLoading = false;
+}
+
 // Merge remote file list into course.files + course.userFolders (called on openCourse)
 function _ufMerge(course) {
   if (!course || !course.id) return Promise.resolve();
-  if (_ufMergeInFlight[course.id]) return _ufMergeInFlight[course.id];
+  var inFlight = _ufMergeInFlight[course.id];
+  if (inFlight) {
+    if (inFlight.course === course) return inFlight.promise;
+    var copyRootBeforeViewRenders = function (ev) {
+      var detail = ev && ev.detail;
+      if (!detail || detail.courseId !== course.id) return;
+      _ufCopyMergedState(inFlight.course, course);
+      window.removeEventListener('uf-merge-root-done', copyRootBeforeViewRenders, true);
+    };
+    window.addEventListener('uf-merge-root-done', copyRootBeforeViewRenders, true);
+    if (
+      (inFlight.course.files || []).some(function (f) { return f._uploaded; }) ||
+      (inFlight.course.userFolders || []).some(function (fd) { return fd.files && fd.files.length; })
+    ) {
+      _ufCopyMergedState(inFlight.course, course);
+      setTimeout(function () {
+        try {
+          window.dispatchEvent(new CustomEvent('uf-merge-root-done', {
+            detail: { courseId: course.id, course: course }
+          }));
+        } catch (e) {}
+      }, 0);
+    }
+    return inFlight.promise.then(function () {
+      window.removeEventListener('uf-merge-root-done', copyRootBeforeViewRenders, true);
+      _ufCopyMergedState(inFlight.course, course);
+    });
+  }
   var p = _ufMergeImpl(course).finally(function () {
     delete _ufMergeInFlight[course.id];
   });
-  _ufMergeInFlight[course.id] = p;
+  _ufMergeInFlight[course.id] = { promise: p, course: course };
   return p;
 }
 

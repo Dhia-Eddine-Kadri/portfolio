@@ -106,7 +106,18 @@ window.addUserMsg = (text: string) => _addUserMsg(text);
 window._setAiChipsVisible = _setAiChipsVisible;
 
 // ── GLOBAL STUBS (reassigned after init) ────────────────────────────────
-let askAI: (q: string, skipUserBubble?: boolean, opts?: { forceRefresh?: boolean }) => unknown =
+let askAI: (
+  q: string,
+  skipUserBubble?: boolean,
+  opts?: {
+    forceRefresh?: boolean;
+    problemSolver?: {
+      mode: string;
+      problem: string;
+      studentWork?: string;
+    };
+  }
+) => unknown =
   (_q): void => { console.warn('AI not ready yet'); };
 let openAI: () => void = (): void => {};
 let closeAI: () => void = (): void => {};
