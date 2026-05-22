@@ -71,9 +71,40 @@ export function initAiRenderBridge(options?: RenderBridgeOptions): {
       .catch((err: unknown) => console.warn('KaTeX failed to load:', err));
   }
 
+  // Apply syntax highlighting to all <pre><code> blocks under `el`.
+  // Lazy-loads highlight.js on first use; runs idempotently (hljs marks
+  // elements with `data-highlighted` after processing, so re-runs no-op).
+  function highlightCode(el: Element | null): void {
+    if (!el) return;
+    const blocks = el.querySelectorAll('pre code');
+    if (!blocks.length) return;
+    const apply = (): void => {
+      const hljs = (window as unknown as { hljs?: { highlightElement: (el: Element) => void } }).hljs;
+      if (!hljs) return;
+      blocks.forEach((block) => {
+        if ((block as HTMLElement).dataset.highlighted) return;
+        try {
+          hljs.highlightElement(block);
+        } catch {
+          /* swallow hljs errors — leave the block as plain monospace */
+        }
+      });
+    };
+    if ((window as unknown as { hljs?: unknown }).hljs) {
+      apply();
+      return;
+    }
+    const ensure = (window as unknown as { _ssEnsureHljs?: () => Promise<void> })._ssEnsureHljs;
+    if (!ensure) return;
+    ensure()
+      .then(apply)
+      .catch((err: unknown) => console.warn('highlight.js failed to load:', err));
+  }
+
   window._ssScheduleKatexRender = scheduleKatexRender;
   window.renderMarkdown = renderMarkdown;
   window._renderMath = renderMath;
+  window._renderCode = highlightCode;
 
   if (typeof opts.getWelcomeText === 'function') {
     setTimeout(() => {

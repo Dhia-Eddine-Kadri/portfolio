@@ -191,6 +191,9 @@ declare global {
     _ssScheduleKatexRender?: () => void;
     renderMarkdown?: (text: string) => string;
     _renderMath?: (el: Element | null) => void;
+    _renderCode?: (el: Element | null) => void;
+    _ssEnsureHljs?: () => Promise<void>;
+    hljs?: { highlightElement: (el: Element) => void };
     renderMathInElement?: (el: Element, opts: unknown) => void;
 
     // ── Message-actions extras (set by ai-message-actions.ts) ──────────

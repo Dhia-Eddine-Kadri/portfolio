@@ -31,6 +31,53 @@ from .retrieval import RetrievedChunk
 
 log = logging.getLogger(__name__)
 
+_DIAGRAM_REQUEST_RE = re.compile(
+    r"\b(diagram|sketch|draw|drawing|visuali[sz]e|visual|picture|graph|free[- ]body|fbd|"
+    r"kraftbild|skizze|zeichnen|schaubild|freik[oö]rper|freischnitt)\b",
+    re.IGNORECASE,
+)
+
+
+def _wants_diagram(question: str) -> bool:
+    return bool(_DIAGRAM_REQUEST_RE.search(question or ""))
+
+
+def _diagram_overlay(has_context: bool) -> str:
+    source_rule = (
+        "First inspect COURSE CONTEXT for matching figures, geometry, labels, setup, notation, "
+        "or values. Cite source-derived details with [Source N]."
+        if has_context
+        else
+        "If COURSE CONTEXT has no match, create a conceptual diagram from standard engineering "
+        "knowledge and label the caption 'Conceptual diagram (general knowledge)'."
+    )
+    return f"""
+
+DIAGRAM RENDERING MODE.
+When a diagram/sketch/visual is requested, include a renderable diagram after
+the explanation. {source_rule}
+
+Use this exact fenced block format:
+```minallo-diagram
+{{
+  "title": "Short diagram title",
+  "caption": "One sentence",
+  "nodes": [
+    {{"id": "a", "label": "Object / component", "x": 160, "y": 160, "shape": "rect"}},
+    {{"id": "b", "label": "Second item", "x": 430, "y": 160, "shape": "circle"}}
+  ],
+  "edges": [
+    {{"from": "a", "to": "b", "label": "relation / force / flow"}}
+  ],
+  "labels": [
+    {{"text": "Given values or assumptions", "x": 80, "y": 380}}
+  ]
+}}
+```
+Return valid JSON only inside the fenced block. Keep coordinates within
+x=30..770 and y=36..420. Do not claim exact scale unless a source gives it.
+"""
+
 
 # Tunables. Mirrored from the existing JS pipeline so behaviour stays consistent
 # during cutover; tighten/loosen later as we gather eval data.
@@ -47,6 +94,7 @@ Rules:
 2. Cite EVERY fact, formula, or paraphrase with an inline `[Source N]` tag (e.g. `[Source 2]`). This is the ONLY citation format that counts toward grounding — verification accepts nothing else. You MAY also add `(filename, p.3)` for the reader's convenience next to the `[Source N]`, but the `[Source N]` itself is what makes the citation valid.
 3. If the context contradicts itself, acknowledge it and present both views.
 4. Write math using KaTeX: $...$ for inline, $$...$$ for display.
+4a. Code: wrap any code in triple-backtick fences with a language tag (```python, ```java, ```c, ```sql, ...). Inline identifiers, function names, file paths, CLI commands use `single backticks`. NEVER wrap code in `$...$` math delimiters — that breaks the renderer. Preserve indentation exactly.
 5. Match the language of the question. If the question is in German, answer in German.
 6. Be concise but thorough. Use bullet points for steps and definitions; use explanatory prose for conceptual questions.
 7. Match the format to the question and to the source material:
@@ -72,6 +120,8 @@ Rules:
    Do not write the Formula, Substitution, Calculation, Unit check, or Final answer sections in that case. Do not invent the formula from general knowledge.
 3. Every formula and every numeric step must carry an inline `[Source N]` citation pointing to the chunk it came from. A `(filename, p.N)` reference written without a matching `[Source N]` is forbidden — only cite filenames that appear in the `[Source N]` headers above.
 4. Write math using KaTeX: $...$ inline, $$...$$ display.
+4a. Code: wrap any code in triple-backtick fences with a language tag (```python, ```java, ```c, ```sql, ...). Inline identifiers, function names, file paths, CLI commands use `single backticks`. NEVER wrap code in math `$...$` delimiters. Preserve indentation exactly.
+4b. If the question is a CODING problem (asking to implement, debug, trace, or analyse code) rather than a math problem, IGNORE the Given/Required/Formula structure below. Use instead: ### Problem (restate it) → ### Approach (1-3 sentences of strategy) → ### Code (one or more fenced code blocks) → ### Trace (walk through an example input/output) → ### Complexity (time and space, or "not applicable"). Still cite course material with `[Source N]` where it grounds the answer.
 5. Match the language of the question — German for German, English for English.
 
 Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry an `[Source N]` reference next to it. `[Source N]` is the ONLY format the verifier accepts. You MAY also append `(filename, p.N)` after the `[Source N]` for the reader, but a filename-only reference without `[Source N]` does NOT count as a citation. Do NOT list sources up front; only cite the ones you actually use, where you use them.
@@ -137,6 +187,7 @@ Behaviour (keep the response short — under ~180 words):
 4. End with: "Upload the {missing material} and I can give a full solution." (Adapt to what's missing.)
 5. Do NOT attempt to solve. Do NOT inject general-knowledge formulas. Do NOT fabricate citations.
 6. Match the language of the question (German for German). Math via KaTeX: $...$ inline, $$...$$ display.
+7. Code: triple-backtick fences with a language tag (```python, ```java, ...). Inline identifiers in `single backticks`. Never wrap code in `$...$`.
 
 This is the PARTIAL mode. It is structurally different from a full solution: the goal is to surface what's available and explain what's missing, not to produce the worksheet."""
 
@@ -151,7 +202,8 @@ Behaviour (keep the response short — under ~120 words):
 2. Briefly say what is likely missing for this question — pick whichever applies: the lecture slides for the topic, the exercise sheet the question came from, the formula sheet / Formelsammlung, the worked solutions / Musterlösung. Be specific (e.g. "the formula sheet for chapter on bending moments") rather than generic.
 3. Offer a one-line follow-up: "I can give a general textbook explanation if you reply 'general' — but it may not match your professor's approach."
 4. Do NOT provide the general explanation now. Do NOT fabricate citations or invent course-specific content.
-5. Match the language of the question (German for German). Write math with KaTeX: $...$ inline, $$...$$ display."""
+5. Match the language of the question (German for German). Write math with KaTeX: $...$ inline, $$...$$ display.
+6. Code: triple-backtick fences with a language tag (```python, ```java, ...). Inline identifiers in `single backticks`. Never wrap code in `$...$`."""
 
 
 _SOURCE_REF_RE = re.compile(r"\bSources?\s+([0-9 ,andund&]+)\b", re.IGNORECASE)
@@ -626,6 +678,9 @@ def generate_answer(
         question, strength, used_chunks, tutor_mode=tutor_mode,
         weak_topics=weak_topics,
     )
+    wants_diagram = _wants_diagram(question)
+    if wants_diagram:
+        system_prompt += _diagram_overlay(bool(used_chunks))
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Math reasoning is
     # where mini gets variable distinctions wrong (d vs d_3) and silently
@@ -635,7 +690,7 @@ def generate_answer(
     # is tight enough to keep cost predictable.
     if model:
         target_model = model
-    elif answer_mode == "math":
+    elif answer_mode == "math" or wants_diagram:
         target_model = settings.openai_generate_model_strong
     else:
         target_model = settings.openai_generate_model

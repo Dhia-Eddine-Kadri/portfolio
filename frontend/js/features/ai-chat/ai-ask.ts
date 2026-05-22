@@ -680,7 +680,11 @@ export function initAskAI(
                 // Recent chat history so the model can resolve anaphoric
                 // references ("the formula above", "explain that again").
                 previousTurns: _previousTurns.length ? _previousTurns : undefined,
-                tutorMode: opts?.problemSolver?.mode === 'hint' ? 'solve' : 'explain',
+                // Only the explicit "solve" problem-solver mode wants the
+                // base "solve" tutor mode; hint/setup/check/practice all want
+                // the softer "explain" base so the overlay can shape behavior
+                // without the base prompt fighting it.
+                tutorMode: opts?.problemSolver?.mode === 'solve' ? 'solve' : 'explain',
                 problemSolver: opts?.problemSolver || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
@@ -877,6 +881,7 @@ export function initAskAI(
             if (window._ssEnsureKatex) {
               window._ssEnsureKatex().then(() => {
                 if (window._renderMath && streamBubble) window._renderMath(streamBubble);
+                if (window._renderCode && streamBubble) window._renderCode(streamBubble);
                 streamBubble.querySelectorAll<HTMLElement>('.ss-rendered-block').forEach((sd) => {
                   sd.style.opacity = '1';
                 });
@@ -973,6 +978,7 @@ export function initAskAI(
             if (idx >= tokens.length) {
               bubble!.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : escapeHtml(rawTextLocal);
               if (window._renderMath) window._renderMath(bubble);
+              if (window._renderCode) window._renderCode(bubble);
               meta!.style.display = 'flex';
               if (!ansWrap.querySelector('.ai-action-bar') && window._aiResponseActions) {
                 const mb = ansWrap.querySelector<HTMLElement>('.msg-body');

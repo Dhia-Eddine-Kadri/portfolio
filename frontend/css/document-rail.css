@@ -1340,3 +1340,56 @@
   color: #020617;
   stroke: #020617;
 }
+
+/* ── Problem Solver → AI mode "collapsed" strip ───────────────────────────
+   Shown at the top of the AI panel when the user arrived via the Problem
+   Solver flow. Clicking it returns to the Problem panel with the inputs
+   restored. Cleared when the user clicks the Problem panel trash. */
+.dr-problem-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  margin: 0;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(56, 189, 248, 0.02));
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.dr-problem-strip:hover,
+.dr-problem-strip:focus-visible {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(56, 189, 248, 0.04));
+  outline: none;
+}
+.dr-problem-strip-tag {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #0ea5e9;
+  white-space: nowrap;
+}
+.dr-problem-strip-preview {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dr-problem-strip-action {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}

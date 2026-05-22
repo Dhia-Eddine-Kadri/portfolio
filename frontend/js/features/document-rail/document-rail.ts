@@ -53,6 +53,25 @@ let _initialized = false;
 let _openMode: DocRailMode | null = null;
 let _drawerWidth = WIDTH_DEFAULT;
 
+// Snapshot of the last Problem Solver submission so we can:
+//   * restore form fields when the user clicks the strip to return,
+//   * render the collapsed strip at the top of the AI panel while the
+//     answer is being read.
+// Persists until cleared via the Problem mode trash button.
+interface ProblemSubmission {
+  mode: string;
+  problem: string;
+  work: string;
+}
+let _lastProblemSubmission: ProblemSubmission | null = null;
+const PROBLEM_MODE_LABELS: Record<string, string> = {
+  hint: 'Hint ladder',
+  setup: 'Set up equations',
+  check: 'Check my work',
+  solve: 'Full solution',
+  practice: 'Generate similar practice',
+};
+
 // Track original parents/styles so we can restore the legacy panels on close.
 let _aiHomeParent: HTMLElement | null = null;
 let _notesHomeParent: HTMLElement | null = null;
@@ -132,6 +151,10 @@ function configureTrash(mode: DocRailMode): void {
     trash.onclick = () => {
       const btn = document.getElementById('aiClearBtn') as HTMLButtonElement | null;
       if (btn) btn.click();
+      // The Problem Solver strip lives in the AI content area; once the
+      // chat is cleared it's pointing at a context that no longer exists.
+      _lastProblemSubmission = null;
+      document.querySelector('.dr-problem-strip')?.remove();
     };
   } else if (mode === 'problem') {
     trash.title = 'Clear problem';
@@ -144,6 +167,9 @@ function configureTrash(mode: DocRailMode): void {
         btn.classList.toggle('is-active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
+      // Also drop the snapshot so the AI-mode strip doesn't reappear
+      // with stale content next time the AI panel mounts.
+      _lastProblemSubmission = null;
     };
   } else {
     // Notes / Summary — delete the currently-loaded note for this tab.
@@ -169,19 +195,49 @@ function getSelectedText(): string {
 }
 
 function buildProblemChatText(mode: string, problem: string, work: string): string {
-  const modeLabels: Record<string, string> = {
-    hint: 'Hint ladder',
-    setup: 'Set up equations',
-    check: 'Check my work',
-    solve: 'Full solution',
-    practice: 'Generate similar practice',
-  };
-  return [
-    'Problem Solver - ' + (modeLabels[mode] || mode),
-    'Student problem:',
-    problem,
-    work ? '\nStudent work:\n' + work : '',
-  ].filter(Boolean).join('\n');
+  // Short chat-bubble text. The full problem + studentWork ride along as
+  // structured fields in `problemSolver`, so the backend assembles the
+  // canonical PROBLEM SOLVER INPUT block and doesn't need a second copy
+  // here. Keep a short preview so the user can recognise the entry in
+  // their chat history without scrolling back to the Problem panel.
+  const flatProblem = problem.replace(/\s+/g, ' ').trim();
+  const preview = flatProblem.length > 120 ? flatProblem.slice(0, 117) + '...' : flatProblem;
+  const workTag = work.trim() ? ' (with work attached)' : '';
+  return 'Problem Solver — ' + (PROBLEM_MODE_LABELS[mode] || mode) + workTag + '\n\n> ' + preview;
+}
+
+function renderProblemStrip(content: HTMLElement): void {
+  if (!_lastProblemSubmission) return;
+  // Idempotent — bail if the strip is already in this content area.
+  if (content.querySelector('.dr-problem-strip')) return;
+
+  const sub = _lastProblemSubmission;
+  const label = PROBLEM_MODE_LABELS[sub.mode] || sub.mode;
+  const flat = sub.problem.replace(/\s+/g, ' ').trim();
+  const preview = flat.length > 70 ? flat.slice(0, 67) + '...' : flat;
+
+  const strip = document.createElement('button');
+  strip.type = 'button';
+  strip.className = 'dr-problem-strip';
+  strip.setAttribute('aria-label', 'Edit Problem Solver inputs');
+  strip.title = 'Click to edit the Problem Solver inputs';
+
+  const tag = document.createElement('span');
+  tag.className = 'dr-problem-strip-tag';
+  tag.textContent = 'Problem Solver — ' + label;
+  const previewEl = document.createElement('span');
+  previewEl.className = 'dr-problem-strip-preview';
+  previewEl.textContent = preview;
+  const action = document.createElement('span');
+  action.className = 'dr-problem-strip-action';
+  action.textContent = 'Edit';
+
+  strip.appendChild(tag);
+  strip.appendChild(previewEl);
+  strip.appendChild(action);
+  strip.addEventListener('click', () => openDrawer('problem'));
+
+  content.insertBefore(strip, content.firstChild);
 }
 
 function mountProblemPanel(): void {
@@ -237,6 +293,19 @@ function mountProblemPanel(): void {
     problemText.focus();
   });
 
+  // Restore previous submission so "Edit" from the AI-mode strip lands
+  // the user back on the exact form state they sent.
+  if (_lastProblemSubmission) {
+    if (problemText) problemText.value = _lastProblemSubmission.problem;
+    if (workText) workText.value = _lastProblemSubmission.work;
+    const restoreMode = _lastProblemSubmission.mode;
+    content.querySelectorAll<HTMLButtonElement>('.dr-problem-mode').forEach((btn) => {
+      const active = btn.dataset.mode === restoreMode;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
   content.querySelector<HTMLFormElement>('#drProblemForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const problem = (problemText?.value || '').trim();
@@ -248,9 +317,11 @@ function mountProblemPanel(): void {
     const activeMode =
       content.querySelector<HTMLButtonElement>('.dr-problem-mode.is-active')?.dataset.mode || 'hint';
     const chatText = buildProblemChatText(activeMode, problem, work);
+    // Snapshot the submission so the strip in AI mode + the "Edit"
+    // round-trip back to Problem mode can restore the exact inputs.
+    _lastProblemSubmission = { mode: activeMode, problem, work };
     const w = window as DocRailWindow;
-    openDrawer('ai');
-    window.setTimeout(() => {
+    const send = () => {
       if (typeof w.askAI === 'function') {
         w.askAI(chatText, false, {
           problemSolver: {
@@ -260,7 +331,17 @@ function mountProblemPanel(): void {
           },
         });
       }
-    }, 80);
+    };
+    if (_openMode === 'ai') {
+      // AI panel already mounted — send now, no need to wait for the
+      // ready event (it won't fire because openDrawer is a no-op).
+      send();
+    } else {
+      // Wait for mountAiPanel to finish, then send. Deterministic
+      // replacement for the previous magic 80ms setTimeout.
+      document.addEventListener('minallo-ai-panel-ready', send, { once: true });
+      openDrawer('ai');
+    }
   });
 }
 
@@ -318,6 +399,10 @@ function mountAiPanel(): void {
   // Make sure the legacy bridge treats the panel as visible so renders run.
   panel.classList.add('visible');
   content.appendChild(panel);
+  // If the user opened AI via the Problem Solver flow, prepend the
+  // collapsed strip so the problem stays visible while they read the
+  // streaming answer. Cleared via the Problem trash button.
+  renderProblemStrip(content);
   // Restore chat history via existing bridge.
   const w = window as DocRailWindow & { pinAI?: () => void };
   if (typeof w.openAI === 'function') {
@@ -339,6 +424,11 @@ function mountAiPanel(): void {
       input.focus();
     }
   }, 240);
+  // Signal callers (like the Problem Solver submit flow) that the AI
+  // panel is mounted and `window.askAI` can be invoked against a live
+  // panel. Dispatched at the end of mountAiPanel so any listener fires
+  // synchronously after DOM work completes.
+  document.dispatchEvent(new CustomEvent('minallo-ai-panel-ready'));
 }
 
 function restoreAiPanel(): void {

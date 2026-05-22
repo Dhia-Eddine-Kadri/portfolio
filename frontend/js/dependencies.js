@@ -165,6 +165,20 @@
       });
   }
 
+  function ensureHljs() {
+    if (window.hljs) return Promise.resolve();
+    // SRI deferred: cdnjs is already trusted (we load other libs without
+    // SRI from it). Add SRI hashes here when we lock the version.
+    return loadStyleOnce(
+      'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'
+    ).then(function () {
+      if (window.hljs) return;
+      return loadScriptOnce(
+        'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'
+      );
+    });
+  }
+
   window._ssLoadScriptOnce = loadScriptOnce;
   window._ssLoadStyleOnce = loadStyleOnce;
   window._ssEnsureJsPdf = ensureJsPdf;
@@ -173,7 +187,11 @@
   window._ssEnsurePdfExportDeps = ensurePdfExportDeps;
   window._ssEnsurePayPalSdk = ensurePayPalSdk;
   window._ssEnsureKatex = ensureKatex;
+  window._ssEnsureHljs = ensureHljs;
 
   // Pre-load KaTeX immediately so math renders without delay on first answer
   ensureKatex().catch(function () {});
+  // Pre-load hljs too — CS students see code from the very first answer,
+  // and a 50KB JS + 5KB CSS is cheap insurance against perceived latency.
+  ensureHljs().catch(function () {});
 })();

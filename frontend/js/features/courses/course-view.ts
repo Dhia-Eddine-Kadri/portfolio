@@ -82,6 +82,41 @@ function _isFileStudied(courseId: string, fileName: string): boolean {
   } catch { return false; }
 }
 
+function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
+  const startedAt = Date.now();
+  const TIMEOUT_MS = 6000;
+
+  return new Promise((resolve, reject) => {
+    const tryStart = (): void => {
+      const user = window._currentUser;
+      const hasUser = !!(user && (user.id || user.sub));
+      if (hasUser && typeof window._ufMerge === 'function') {
+        try {
+          Promise.resolve(window._ufMerge(course)).then(resolve, reject);
+        } catch (err) {
+          reject(err);
+        }
+        return;
+      }
+      if (Date.now() - startedAt >= TIMEOUT_MS) {
+        reject(new Error('Course files are not ready yet'));
+        return;
+      }
+      window.setTimeout(tryStart, 120);
+    };
+    tryStart();
+  });
+}
+
+function _courseFileCount(course: LegacyCourse): number {
+  const rootCount = course.files?.length || 0;
+  const folderCount = (course.userFolders || []).reduce(
+    (sum, fd) => sum + (fd.files ? fd.files.length : 0),
+    0
+  );
+  return rootCount + folderCount;
+}
+
 function fileRowHtml(f: CourseFileLike, inFolder: string | null, courseId?: string): string {
   const eName = escapeHtml(f.name);
   const eSname = f._storageName ? escapeHtml(f._storageName) : '';
@@ -440,6 +475,19 @@ export function openCourse(course: LegacyCourse): void {
   };
   window.addEventListener('uf-merge-root-done', onRootDone);
 
+  let lastSeenFileCount = _courseFileCount(course);
+  const repaintIfFilesArrive = (): void => {
+    if (myCourseSeq !== window._courseOpenSeq) return;
+    const nextCount = _courseFileCount(course);
+    if (nextCount <= 0 || nextCount === lastSeenFileCount) return;
+    lastSeenFileCount = nextCount;
+    course._filesLoading = false;
+    window._ssRestoring = true;
+    showCourseSection(course, 'files');
+    window._ssRestoring = false;
+  };
+  const repaintTimer = window.setInterval(repaintIfFilesArrive, 150);
+
   // 10-second timeout fallback — if _ufMerge hangs entirely (auth race / network
   // dead), don't leave the user staring at the spinner forever.
   const fallbackTimer = window.setTimeout(() => {
@@ -455,9 +503,10 @@ export function openCourse(course: LegacyCourse): void {
   const cleanup = (): void => {
     window.removeEventListener('uf-merge-root-done', onRootDone);
     window.clearTimeout(fallbackTimer);
+    window.clearInterval(repaintTimer);
   };
 
-  window._ufMerge?.(course)
+  _waitForCourseFileMerge(course)
     .then(() => {
       cleanup();
       course._filesLoading = false;

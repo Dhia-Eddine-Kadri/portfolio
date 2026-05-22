@@ -154,13 +154,13 @@ function _prewarmCourses(opts) {
   var uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
   if (!uid) return; // need an authed user
   if (_coursePrewarmRan && !(opts && opts.force)) return;
-  _coursePrewarmRan = true;
 
   var allCourses = [];
   Object.keys(SEMS).forEach(function (sid) {
     (SEMS[sid].courses || []).forEach(function (c) { allCourses.push(c); });
   });
   if (!allCourses.length) return;
+  _coursePrewarmRan = true;
 
   // Skip courses that already have a cache entry — they're already warm.
   var todo = allCourses.filter(function (c) {
@@ -219,7 +219,10 @@ function _prewarmCourses(opts) {
     if (cursor >= todo.length) return Promise.resolve();
     var c = todo[cursor++];
     return window._ufMerge(c)
-      .then(function () { _persistCourseCache(c); })
+      .then(function () {
+        _persistCourseCache(c);
+        if (typeof window.sdRenderCourses === 'function') window.sdRenderCourses();
+      })
       .catch(function () { /* leave for the on-open path to retry */ })
       .then(_next);
   }

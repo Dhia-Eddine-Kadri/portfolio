@@ -143,13 +143,15 @@ export async function loadUserData(uid: string): Promise<void> {
         if (!window._userIsPro && window._showPaywall) setTimeout(window._showPaywall, 800);
       });
 
+    if (typeof window._dwLoadAndRender === 'function') window._dwLoadAndRender();
     const loadLectureNotes = window._lnLoadFromSupabase || window.lnLoadFromSupabase;
     if (loadLectureNotes) {
-      await loadLectureNotes(uid);
+      loadLectureNotes(uid).catch(() => {
+        console.warn('Lecture notes load failed');
+      });
     } else {
       console.warn('Lecture notes loader is not ready yet');
     }
-    if (typeof window._dwLoadAndRender === 'function') window._dwLoadAndRender();
   } catch (e: unknown) {
     console.warn('loadUserData error:', e);
   }

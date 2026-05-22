@@ -257,14 +257,23 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
     # ── Retrieve ─────────────────────────────────────────────────────────────
+    # When the Problem Solver is active, the visible `question` is just a
+    # short label ("Problem Solver — Hint mode"). Use the structured problem
+    # text for retrieval so embeddings target the actual exercise, not the
+    # label. Intentionally exclude `studentWork` from the retrieval query —
+    # a student's mistaken equation would pull in irrelevant chunks.
+    retrieval_query = (
+        (payload.problemSolver.problem or question).strip()
+        if payload.problemSolver else question
+    )
     exercise_hit = retrieve_exercise_block(
-        user_id=user_id, course_id=payload.courseId, query=question,
+        user_id=user_id, course_id=payload.courseId, query=retrieval_query,
         document_ids=payload.documentIds,
         active_document_id=payload.activeDocumentId,
     )
     chunks = retrieve_chunks(
         user_id=user_id, course_id=payload.courseId,
-        query=question, document_ids=payload.documentIds,
+        query=retrieval_query, document_ids=payload.documentIds,
         active_document_id=payload.activeDocumentId, top_k=12,
     )
     if exercise_hit:
@@ -272,7 +281,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         chunks = _prepend_exercise_chunks(exercise_hit, chunks)
 
     formula_hits = retrieve_formula_block(
-        user_id=user_id, course_id=payload.courseId, query=question,
+        user_id=user_id, course_id=payload.courseId, query=retrieval_query,
         document_ids=payload.documentIds,
         active_document_id=payload.activeDocumentId,
     )

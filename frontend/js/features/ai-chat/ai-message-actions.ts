@@ -103,6 +103,7 @@ export function addBotMsg(text: string): HTMLElement | null {
         ._ssEnsureKatex()
         .then(() => {
           if (window._renderMath && botBubble) window._renderMath(botBubble);
+          if (window._renderCode && botBubble) window._renderCode(botBubble);
         })
         .catch(() => {});
     }

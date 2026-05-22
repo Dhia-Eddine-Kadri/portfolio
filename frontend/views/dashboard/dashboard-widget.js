@@ -3,6 +3,7 @@
   var container = document.getElementById('psec-dashboard');
   if (!container) return;
 
+  /*
   fetch('views/dashboard/dashboard.html')
     .then(function (r) {
       return r.text();
@@ -30,6 +31,33 @@
     .catch(function (err) {
       console.error('dashboard.html load error:', err);
     });
+  */
+
+  if (!document.getElementById('dashCanvas')) {
+    container.innerHTML =
+      '<div id="dashEmpty" class="dash-empty">' +
+        '<div class="dash-empty-glyph">&#x229E;</div>' +
+        '<div class="dash-empty-title" data-i18n="dash_empty_title">Your dashboard is empty</div>' +
+        '<div class="dash-empty-sub"><span data-i18n="dash_empty_sub_pre">Click </span><kbd>+</kbd><span data-i18n="dash_empty_sub_post"> to add widgets</span></div>' +
+      '</div>' +
+      '<div id="dashCanvas" class="dash-canvas"></div>';
+  }
+  if (!document.getElementById('wpOverlay')) {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div id="wpOverlay" class="wp-overlay"></div>' +
+      '<div id="widgetPanel" class="widget-panel">' +
+        '<div class="wp-header">' +
+          '<span class="wp-title" data-i18n="wp_title">&#x2736; Add Widgets</span>' +
+          '<button class="wp-close" id="wpClose">&#xD7;</button>' +
+        '</div>' +
+        '<div class="wp-body"><div class="wp-grid" id="wpGrid"></div></div>' +
+      '</div>' +
+      '<button class="add-widget-fab" id="addWidgetFab">+</button>' +
+      '<div id="dragGhost"></div>'
+    );
+  }
+  _init();
 
   function _init() {
     var COLS = 4,

@@ -70,6 +70,20 @@ def _is_math_block(block: str) -> bool:
     return bool(_MATH_OPEN_OR_INLINE.match(block))
 
 
+# Phase 5 — code fence support. A block starts with triple-backticks (with
+# an optional language tag) when emitted by `_split_blocks` for a fenced
+# code region. Code blocks are atomic just like math blocks: they never
+# split across chunks, even if that means one over-budget chunk. CS lecture
+# slides often have a single function or algorithm body that's hundreds of
+# tokens; ripping it mid-function destroys retrieval value.
+_CODE_FENCE_LINE = re.compile(r"^\s*```")
+
+
+def _is_code_block(block: str) -> bool:
+    first_line = block.splitlines()[0] if block else ""
+    return bool(_CODE_FENCE_LINE.match(first_line))
+
+
 # Phase 3 Step C — exercise headings open a no-split region.
 # Reuses block_detection's pattern so the chunker, the exercise-table
 # extractor, and any future exact-match retrieval all agree on what counts
@@ -247,6 +261,31 @@ def chunk_pages(
                     current_exercise_subpart = None
                 continue
 
+            # ── Code fence: atomic, never split. May exceed budget. ──
+            # CS course material treats a function body / algorithm listing
+            # as one inseparable unit. Same flush-before-overflow logic as
+            # math; no formula companion (a code block isn't a formula).
+            if _is_code_block(block):
+                c_tokens = _count_tokens(block)
+                if (
+                    not in_exercise
+                    and current_tokens > 0
+                    and current_tokens + c_tokens > target_tokens
+                ):
+                    tail = _overlap_tail(current_text_parts, overlap_tokens)
+                    flush("size-before-code")
+                    if tail:
+                        current_text_parts = [tail]
+                        current_tokens = _count_tokens(tail)
+                        current_page_start = page_number
+                        current_page_end = page_number
+                current_text_parts.append(block)
+                current_tokens += c_tokens
+                if current_page_start is None:
+                    current_page_start = page_number
+                current_page_end = page_number
+                continue
+
             # ── Math display block: atomic, never split. May exceed budget. ──
             if _is_math_block(block):
                 m_tokens = _count_tokens(block)
@@ -347,12 +386,37 @@ def _normalise_pages(pages: list[PageInput]) -> list[PageMarkdown]:
 
 def _split_blocks(md: str) -> Iterable[str]:
     """Split Markdown into paragraph-shaped blocks on blank lines, preserving
-    multi-line math fences as a single block."""
+    multi-line math fences AND code fences as single blocks.
+
+    A code fence (triple-backtick line) opens an inviolable region that
+    accumulates every subsequent line — including blank lines — until the
+    matching closing fence. This matters for CS course material: ``def foo():
+    \\n\\n    pass`` would otherwise be ripped apart on the inner blank line."""
     blocks: list[str] = []
     buf: list[str] = []
     in_math = False
+    in_code = False
     for line in md.splitlines():
         stripped = line.strip()
+        # Code fence open/close. Triple-backticks with optional language tag.
+        # Inside a code fence we never split on blank lines and never treat
+        # `$$` or other fence-shaped lines as openers.
+        if stripped.startswith("```"):
+            if not in_code:
+                if buf:
+                    blocks.append("\n".join(buf).strip())
+                    buf = []
+                buf.append(line)
+                in_code = True
+            else:
+                buf.append(line)
+                blocks.append("\n".join(buf).strip())
+                buf = []
+                in_code = False
+            continue
+        if in_code:
+            buf.append(line)
+            continue
         # Single-line "$$ x = y $$" form — emits as its own block.
         if not in_math and re.match(r"^\s*\$\$.+\$\$\s*$", stripped):
             if buf:
@@ -379,7 +443,7 @@ def _split_blocks(md: str) -> Iterable[str]:
         if in_math:
             buf.append(line)
             continue
-        # Blank line outside math — paragraph break.
+        # Blank line outside math/code — paragraph break.
         if not stripped:
             if buf:
                 blocks.append("\n".join(buf).strip())

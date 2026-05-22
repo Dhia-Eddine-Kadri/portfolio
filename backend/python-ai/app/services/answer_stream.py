@@ -116,6 +116,11 @@ def _sse(event: dict[str, Any]) -> bytes:
 
 
 _PROBLEM_SOLVER_MODES = {"hint", "setup", "check", "solve", "practice"}
+_DIAGRAM_REQUEST_RE = re.compile(
+    r"\b(diagram|sketch|draw|drawing|visuali[sz]e|visual|picture|graph|free[- ]body|fbd|"
+    r"kraftbild|skizze|zeichnen|schaubild|freik[oö]rper|freischnitt)\b",
+    re.IGNORECASE,
+)
 
 
 def _normalise_problem_solver_mode(value: Any) -> str | None:
@@ -143,11 +148,21 @@ def _problem_solver_overlay(mode: str, problem_solver: dict[str, Any]) -> str:
     common = """
 
 PROBLEM SOLVER MODE.
-You are helping an engineering student work through a problem set. Treat the
+You are helping a university student work through a problem. Treat the
 PROBLEM SOLVER INPUT as the task to answer. Use COURSE CONTEXT as ground truth
-for formulas, notation, assumptions, and source citations.
+for formulas, notation, assumptions, code conventions, and source citations.
 
-Always use this compact engineering structure unless the selected mode says otherwise:
+FIRST decide the problem TYPE from the PROBLEM SOLVER INPUT text:
+  * ENGINEERING / MATH (formulas, numeric values, units, derivations, proofs)
+    → use the 7-step ENGINEERING structure below.
+  * CODE / CS (asks to implement, debug, trace, analyse, or explain code;
+    contains code blocks; mentions algorithms, data structures, syntax,
+    complexity, "function", "class", "compile", "runtime")
+    → use the 5-step CODE structure below instead.
+When the problem mixes both (e.g. "implement Newton's method"), prefer the
+CODE structure and embed any math inside it.
+
+ENGINEERING / MATH structure:
 1. Given
 2. Find
 3. Relevant concepts
@@ -156,55 +171,124 @@ Always use this compact engineering structure unless the selected mode says othe
 6. Unit check
 7. Common mistake
 
+CODE / CS structure:
+1. Problem (one-line restatement)
+2. Approach (1-3 sentences of strategy — pick the data structures / algorithms)
+3. Code (one or more triple-backtick fenced blocks with language tag)
+4. Trace (walk through a small example input → output)
+5. Complexity (time and space; say "not applicable" if it doesn't fit)
+
 Rules:
-- Extract all numeric values and units before solving.
-- State missing data explicitly before making assumptions.
+- For math problems: extract all numeric values and units before solving. State missing data explicitly before making assumptions.
+- For code problems: write code in triple-backtick fences with a language tag (```python, ```java, ```c, ```sql, ...). Inline identifiers, function names, paths in `single backticks`. Preserve indentation exactly. NEVER wrap code in `$...$` math delimiters.
 - Cite source material with [Source N] tags exactly as the base prompt requires.
-- Do not invent course-specific formulas. If the needed formula is absent, say what is missing.
+- Do not invent course-specific formulas, APIs, or library functions. If the needed material is absent, say what is missing.
+- Reply in the same language the student is writing in (German or English). Section headings translate too ("Given" → "Gegeben", "Approach" → "Vorgehen", "Complexity" → "Komplexität", ...).
 """
     mode_rules = {
         "hint": """
 
 Selected mode: HINT.
-Do not reveal the final answer or full derivation. Give a hint ladder with:
-- Hint 1: what to identify first
-- Hint 2: which principle/formula family applies
-- Hint 3: how to start the setup
-End with one focused question for the student. No final numeric result.
+Skip both the 7-step and the 5-step structures for this mode — use the hint
+ladder below instead. Do not reveal the final answer, full derivation, or
+working code. Give a hint ladder with:
+- Hint 1: what to identify first (key variable / data structure / formula family)
+- Hint 2: which principle / algorithm / formula family applies
+- Hint 3: how to start the setup (engineering) or the first 1-2 lines of code (CS)
+End with one focused question for the student. No final numeric result and no complete function body.
 """,
         "setup": """
 
 Selected mode: SETUP.
-Stop after the mathematical setup. Provide Given / Find / assumptions, choose
-the formula(s), define every symbol, and write the equations to solve. Do not
-complete the arithmetic unless it is needed to clarify the setup.
+Stop after the SETUP. For math: Given / Find / assumptions, formula choice with
+defined symbols, equations to solve, no arithmetic. For code: Problem
+restatement / Approach / function signature(s) and skeleton with `# TODO`
+markers where the real logic goes. Do not complete the implementation.
 """,
         "check": """
 
 Selected mode: CHECK MY WORK.
 First inspect the student's submitted work. If no student work was provided,
 ask them to paste their attempt and give only a starting checklist. If work was
-provided, identify the first incorrect or risky step, explain why, and provide
-the corrected next step. Do not replace the whole attempt with a full solution
-unless the work is already essentially complete.
+provided, identify the FIRST incorrect or risky step (math: wrong formula /
+unit / sign; code: off-by-one, wrong type, missing edge case, broken loop
+invariant), explain why, and provide the corrected next step. Do not replace
+the whole attempt with a full solution unless the work is already essentially
+complete.
 """,
         "solve": """
 
 Selected mode: FULL SOLUTION.
-Give a complete worked solution. Show symbolic formula, numeric substitution,
-intermediate result, final answer with units, and a short plausibility check.
+Give a complete worked solution. For math: symbolic formula → numeric
+substitution → intermediate result → final answer with units → short
+plausibility check. For code: complete working implementation in a fenced
+block, a Trace through one example, and a Complexity line.
 """,
         "practice": """
 
 Selected mode: PRACTICE.
-Generate three similar practice problems based on the same concept:
-1 easier, 1 similar, 1 harder. Include brief solution outlines and final
-answers only if the COURSE CONTEXT supports the required formulas.
+Generate three similar practice problems based on the same concept: 1 easier,
+1 similar, 1 harder. For math: include brief solution outlines + final answers
+only when the COURSE CONTEXT supports the required formulas. For code: include
+a one-line problem statement plus a small example input/output for each, and
+optional starter signatures — do not provide full solution code (the student
+should attempt them).
 """,
     }
     if mode == "check" and not has_work:
         return common + mode_rules[mode] + "\nThe request has no student work attached."
     return common + mode_rules.get(mode, "")
+
+
+def _wants_diagram(question: str, problem_solver: dict[str, Any] | None = None) -> bool:
+    text = question or ""
+    if problem_solver:
+        text += "\n" + str(problem_solver.get("problem") or "")
+    return bool(_DIAGRAM_REQUEST_RE.search(text))
+
+
+def _diagram_overlay(has_context: bool) -> str:
+    source_rule = (
+        "First inspect COURSE CONTEXT for any matching figure, diagram, labels, geometry, setup, "
+        "or notation. If you use source-derived geometry, labels, formulas, or values, cite the "
+        "sentence that introduces them with [Source N]."
+        if has_context
+        else
+        "No matching COURSE CONTEXT may be available. In that case create a conceptual diagram "
+        "from standard engineering knowledge and explicitly label it as general knowledge."
+    )
+    return f"""
+
+DIAGRAM RENDERING MODE.
+When the student's question asks for a diagram, sketch, free-body diagram, graph,
+or visual explanation, include one renderable diagram after the short explanation.
+{source_rule}
+
+Use this exact fenced block format so the browser can render it:
+```minallo-diagram
+{{
+  "title": "Short diagram title",
+  "caption": "One sentence. Say 'Conceptual diagram (general knowledge)' if no source matched.",
+  "nodes": [
+    {{"id": "a", "label": "Object / step / component", "x": 160, "y": 160, "shape": "rect"}},
+    {{"id": "b", "label": "Second item", "x": 430, "y": 160, "shape": "circle"}}
+  ],
+  "edges": [
+    {{"from": "a", "to": "b", "label": "relation / force / flow"}}
+  ],
+  "labels": [
+    {{"text": "Given values or assumptions", "x": 80, "y": 380}}
+  ]
+}}
+```
+
+Rules for diagram JSON:
+- Return valid JSON only inside the fenced block. No comments, no trailing commas.
+- Keep coordinates within x=30..770 and y=36..420.
+- Use simple labels. Do not rely on exact drawing scale unless a source gives dimensions.
+- For free-body diagrams, create nodes for the body and supports/loads, and edges for forces.
+- For processes/circuits/block diagrams, create nodes for components/steps and directed edges.
+"""
 
 
 def stream_answer(
@@ -272,6 +356,9 @@ def stream_answer(
     )
     if problem_mode:
         system_prompt += _problem_solver_overlay(problem_mode, problem_solver or {})
+    wants_diagram = _wants_diagram(question, problem_solver)
+    if wants_diagram:
+        system_prompt += _diagram_overlay(bool(used_chunks or (has_open and deictic)))
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Must compute AFTER
     # pick_system_prompt because we need its returned label. Math reasoning
@@ -282,7 +369,7 @@ def stream_answer(
     # predictable.
     if model:
         target_model = model
-    elif answer_mode == "math" or problem_mode in {"setup", "check", "solve"}:
+    elif answer_mode == "math" or problem_mode in {"setup", "check", "solve"} or wants_diagram:
         target_model = settings.openai_generate_model_strong
     else:
         target_model = settings.openai_generate_model
