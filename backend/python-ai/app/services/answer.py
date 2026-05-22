@@ -668,6 +668,18 @@ def generate_answer(
     msg = completion.choices[0].message if completion.choices else None
     answer_text = (msg.content if msg else "") or ""
 
+    # Diagram refusal-recovery — see answer_stream.py:_force_render_diagram
+    # for the rationale. If the student asked for a diagram and the model
+    # refused with prose only, a structured-output fallback fills in the
+    # fenced minallo-diagram block.
+    if wants_diagram and "```minallo-diagram" not in answer_text:
+        from .answer_stream import _force_render_diagram  # noqa: WPS433
+        fence = _force_render_diagram(
+            client, target_model, question, used_chunks, None,
+        )
+        if fence:
+            answer_text += fence
+
     cited = _cited_indices(answer_text, len(used_chunks))
     sources = [
         {
