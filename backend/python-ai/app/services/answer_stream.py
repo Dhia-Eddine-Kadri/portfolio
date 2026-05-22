@@ -118,6 +118,126 @@ def _sse(event: dict[str, Any]) -> bytes:
 from .diagram_overlay import diagram_overlay as _diagram_overlay
 from .diagram_overlay import wants_diagram as _wants_diagram
 
+
+# JSON schema for the structured-output fallback call that recovers from a
+# diagram-refusal. Mirrors the fenced ``minallo-diagram`` shape consumed by
+# ai-markdown.ts so the fallback fence is renderer-compatible without any
+# frontend changes.
+_DIAGRAM_JSON_SCHEMA = {
+    "name": "minallo_diagram",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["title", "caption", "nodes", "edges", "labels"],
+        "properties": {
+            "title": {"type": "string"},
+            "caption": {"type": "string"},
+            "nodes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["id", "label", "shape"],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "label": {"type": "string"},
+                        "shape": {
+                            "type": "string",
+                            "enum": ["rect", "circle", "triangle", "ground", "arrow"],
+                        },
+                    },
+                },
+            },
+            "edges": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["from", "to", "label"],
+                    "properties": {
+                        "from": {"type": "string"},
+                        "to": {"type": "string"},
+                        "label": {"type": "string"},
+                    },
+                },
+            },
+            "labels": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["text"],
+                    "properties": {"text": {"type": "string"}},
+                },
+            },
+        },
+    },
+}
+
+
+def _force_render_diagram(
+    client: Any,
+    model: str,
+    question: str,
+    used_chunks: list[Any],
+    open_ctx: str | None,
+) -> str | None:
+    """Refusal-recovery for diagram requests.
+
+    When the streamed answer didn't contain a ``minallo-diagram`` fence
+    (typically because gpt-4o's RLHF refused with "I can't draw images")
+    we re-ask the same model with response_format=json_schema. Structured
+    outputs constrain the response shape so the refusal path is closed
+    off — the model has no choice but to produce the diagram JSON.
+
+    Returns the fenced markdown to append (with leading newlines), or
+    None if the fallback itself errored.
+    """
+    try:
+        ctx_lines: list[str] = []
+        if open_ctx:
+            ctx_lines.append("CURRENTLY VISIBLE PDF TEXT:\n" + open_ctx[:1500])
+        for i, c in enumerate(used_chunks[:4], start=1):
+            text = getattr(c, "text", "") or ""
+            ctx_lines.append(f"[Source {i}]\n{text[:600]}")
+        context_blob = "\n\n".join(ctx_lines) if ctx_lines else "(no course context available)"
+
+        sys = (
+            "You are a diagram data generator. The student asked for a diagram. "
+            "Produce a single diagram object matching the schema. Use simple labels "
+            "(<= 40 chars). Match the language of the question. If course context "
+            "is provided, ground the diagram in it; otherwise produce a standard "
+            "conceptual diagram and label the caption as 'Conceptual diagram "
+            "(general knowledge).'"
+        )
+        user = (
+            f"Question: {question}\n\n"
+            f"Context:\n{context_blob}\n\n"
+            "Return the diagram object only."
+        )
+        completion = client.chat.completions.create(
+            model=model,
+            response_format={"type": "json_schema", "json_schema": _DIAGRAM_JSON_SCHEMA},
+            messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": user},
+            ],
+        )
+        raw = (completion.choices[0].message.content or "").strip()
+        if not raw:
+            return None
+        # Validate JSON parseability + non-trivial node count before emitting,
+        # so a degenerate {"nodes": []} doesn't render as an empty diagram.
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict) or not parsed.get("nodes"):
+            return None
+        return "\n\n```minallo-diagram\n" + raw + "\n```\n"
+    except Exception:  # noqa: BLE001
+        log.exception("force_render_diagram fallback failed")
+        return None
+
+
 _PROBLEM_SOLVER_MODES = {"hint", "setup", "check", "solve", "practice"}
 
 
@@ -424,6 +544,23 @@ def stream_answer(
         return
 
     full_answer = "".join(answer_buf)
+
+    # Diagram refusal-recovery. The system-prompt overlay tells the model
+    # to emit a fenced ``minallo-diagram`` block, but gpt-4o's RLHF refusal
+    # reflex on "I can't generate images" reliably overrides even few-shot
+    # examples. When the student asked for a diagram and the streamed answer
+    # has no fence, we make a SECOND, narrowly-scoped call with
+    # response_format=json_schema. Structured outputs can't refuse — the
+    # response shape is constrained — so this is the reliable backstop.
+    if wants_diagram and "```minallo-diagram" not in full_answer:
+        diagram_fence = _force_render_diagram(
+            client, target_model, question, used_chunks,
+            open_ctx if include_open_source else None,
+        )
+        if diagram_fence:
+            yield _sse({"t": diagram_fence})
+            full_answer += diagram_fence
+
     cited = _cited_indices(full_answer, len(used_chunks))
     filtered_sources = [_source_payload(c) for i, c in enumerate(used_chunks, start=1) if i in cited]
 
