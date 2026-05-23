@@ -583,7 +583,15 @@ async function streamAiReply(
     const rag = ragEligibility(state.messages);
     let raw: string;
     if (rag) {
-      raw = await streamFromAskStream(rag.question, rag.courseId, bubble, controller);
+      // History = everything BEFORE the just-added user turn (which is
+      // already in rag.question). Without this the backend retrieves on
+      // the literal text "I don't know" and falls into PARTIAL mode
+      // instead of recognising the message as a reply to its own question.
+      const priorTurns = state.messages
+        .slice(0, -1)
+        .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
+        .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
+      raw = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns);
     } else {
       raw = await callGenericAi(state.messages, bubble, controller);
     }
@@ -658,7 +666,8 @@ async function streamFromAskStream(
   question: string,
   courseId: string,
   bubble: HTMLElement | null,
-  controller: AbortController
+  controller: AbortController,
+  previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = []
 ): Promise<string> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
@@ -671,7 +680,12 @@ async function streamFromAskStream(
     method: 'POST',
     signal: controller.signal,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ courseId, question, tutorMode: getCurrentTutorMode() }),
+    body: JSON.stringify({
+      courseId,
+      question,
+      tutorMode: getCurrentTutorMode(),
+      previousTurns,
+    }),
   });
   if (!resp.ok || !resp.body || !resp.body.getReader) {
     const errText = await resp.text().catch(() => '');
