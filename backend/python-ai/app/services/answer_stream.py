@@ -62,12 +62,14 @@ def _is_deictic_question(q: str) -> bool:
     return bool(_DEICTIC_QUESTION_RE.search(q or ""))
 
 
-# Conversation-continuity tuning. A chat session can grow arbitrarily, but
-# we only need a few recent turns for the model to resolve follow-up
-# references — the rest is irrelevant and just inflates prompt cost.
-_MAX_HISTORY_MESSAGES = 6        # 3 Q/A pairs
-_MAX_HISTORY_CHARS    = 2000     # safety cap on total prior text
-_MAX_TURN_CHARS       = 800      # any one turn is truncated to this
+# Conversation-continuity tuning. Earlier values (6 messages / 2k chars)
+# were too tight — students hit cases where the AI forgot the answer it
+# gave 5–10 turns ago and gave "some bullshit" follow-up instead. Raised
+# to 30 messages / 12k chars to cover ~15 Q/A pairs comfortably. Per-turn
+# cap kept at 1200 so a single rambling AI reply can't eat the budget.
+_MAX_HISTORY_MESSAGES = 30       # ~15 Q/A pairs
+_MAX_HISTORY_CHARS    = 12000    # safety cap on total prior text
+_MAX_TURN_CHARS       = 1200     # any one turn is truncated to this
 
 
 def _trim_previous_turns(
