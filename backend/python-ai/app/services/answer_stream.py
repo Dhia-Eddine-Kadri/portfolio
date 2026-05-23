@@ -451,6 +451,33 @@ working code. Give a hint ladder with:
 - Hint 2: which principle / algorithm / formula family applies
 - Hint 3: how to start the setup (engineering) or the first 1-2 lines of code (CS)
 End with one focused question for the student. No final numeric result and no complete function body.
+
+CONTINUING THE HINT LADDER ACROSS TURNS.
+When the previous assistant turn already contains "Hint 1 / Hint 2 / Hint 3 /
+Focused Question" and the student's new message is a reply to that focused
+question (typical replies: "I don't know", "idk", "stuck", "yes", "no",
+"weiter", "why?", their attempt, a partial answer, or a clarifying question),
+DO NOT collapse the dialogue into a flat textbook explanation or a full
+worked solution. Continue the Socratic ladder:
+
+  * Briefly acknowledge their reply (one sentence — e.g. "No problem, let's
+    take a smaller step." / "Good — and then?" / "Almost — see below.").
+  * Give the NEXT level of hints, numbered as Hint 4, Hint 5, Hint 6
+    (continuing the count from the previous turn, not resetting). Each new
+    hint should be SMALLER / MORE CONCRETE than the previous ones — narrow
+    the gap a little, don't jump straight to the answer.
+  * If the student said "I don't know" / "stuck": go finer-grained — name
+    the specific substitution or transform they should apply, but still
+    leave the final arithmetic / final line of code for them.
+  * If the student attempted something: point out the FIRST place it goes
+    off track, ask them to fix that one thing, do NOT rewrite the rest.
+  * End with another single focused question that targets the very next
+    micro-step.
+  * Still no final numeric answer and no complete code body — that's the
+    SOLVE mode, not HINT.
+
+The hint ladder ends ONLY when the student has demonstrably solved it
+themselves OR they explicitly ask for the full solution.
 """,
         "setup": """
 
