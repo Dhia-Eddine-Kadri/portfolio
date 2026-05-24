@@ -416,20 +416,21 @@ export function renderPdfTabs(): void {
   if (menuOpen) renderMenu();
 }
 
+let pdfTabsObserver: MutationObserver | null = null;
+
 export function initPdfTabs(): void {
   const el = document.getElementById('pdfTabsBar');
-  if (el) {
+  if (el && el !== barEl) {
     mountPdfTabs(el);
     return;
   }
-  const observer = new MutationObserver(() => {
+  if (el) return;
+  if (pdfTabsObserver) return;
+  pdfTabsObserver = new MutationObserver(() => {
     const found = document.getElementById('pdfTabsBar');
-    if (found) {
-      observer.disconnect();
-      mountPdfTabs(found);
-    }
+    if (found && found !== barEl) mountPdfTabs(found);
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  pdfTabsObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 function mountPdfTabs(host: HTMLElement): void {
@@ -515,4 +516,12 @@ function mountPdfTabs(host: HTMLElement): void {
 
   renderTabsStrip();
   scheduleRestore();
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initPdfTabs(), { once: true });
+  } else {
+    queueMicrotask(() => initPdfTabs());
+  }
 }
