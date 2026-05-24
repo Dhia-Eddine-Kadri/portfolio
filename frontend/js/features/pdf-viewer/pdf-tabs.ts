@@ -417,8 +417,23 @@ export function renderPdfTabs(): void {
 }
 
 export function initPdfTabs(): void {
-  barEl = document.getElementById('pdfTabsBar');
-  if (!barEl) return;
+  const el = document.getElementById('pdfTabsBar');
+  if (el) {
+    mountPdfTabs(el);
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    const found = document.getElementById('pdfTabsBar');
+    if (found) {
+      observer.disconnect();
+      mountPdfTabs(found);
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+}
+
+function mountPdfTabs(host: HTMLElement): void {
+  barEl = host;
 
   barEl.replaceChildren();
 
