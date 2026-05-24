@@ -87,6 +87,46 @@ async function extractText(bytes: Uint8Array): Promise<string> {
 }
 
 let activeLoad: Promise<void> | null = null;
+let rightBlobUrl: string | null = null;
+
+function revokeRightBlob(): void {
+  if (rightBlobUrl) {
+    try { URL.revokeObjectURL(rightBlobUrl); } catch { /* ignore */ }
+    rightBlobUrl = null;
+  }
+}
+
+function setSplitMode(on: boolean): void {
+  const bodies = document.getElementById('pdfBodies');
+  if (!bodies) return;
+  bodies.classList.toggle('is-split', on);
+}
+
+function renderRightIframe(bytes: Uint8Array, fileName: string): void {
+  const host = document.getElementById('pdfBodyRight');
+  if (!host) return;
+  revokeRightBlob();
+  const mime = /\.html?$/i.test(fileName) ? 'text/html' : 'application/pdf';
+  const blob = new Blob([bytes as BlobPart], { type: mime });
+  rightBlobUrl = URL.createObjectURL(blob);
+  host.replaceChildren();
+  const iframe = document.createElement('iframe');
+  iframe.src = rightBlobUrl;
+  iframe.title = fileName;
+  host.appendChild(iframe);
+}
+
+function showRightLoading(fileName: string): void {
+  const host = document.getElementById('pdfBodyRight');
+  if (!host) return;
+  revokeRightBlob();
+  host.replaceChildren();
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#475569;font-family:inherit;font-size:13px';
+  wrap.textContent = 'Loading ' + fileName + '…';
+  host.appendChild(wrap);
+}
 
 export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): Promise<void> {
   const right = getPane('right');
@@ -95,6 +135,8 @@ export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): P
   right.activeCourseId = course.id || null;
   right.activeCourseRef = course;
   right.pdfFullText = '';
+  setSplitMode(true);
+  showRightLoading(file.name);
   emit();
 
   const task = (async () => {
@@ -104,6 +146,8 @@ export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): P
         right.pdfFullText = '';
         return;
       }
+      if (getPane('right').activeFileName !== file.name) return;
+      renderRightIframe(bytes, file.name);
       const text = await extractText(bytes);
       if (getPane('right').activeFileName !== file.name) return;
       right.pdfFullText = text;
@@ -121,6 +165,10 @@ export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): P
 
 export function clearCompareDoc(): void {
   clearPane('right');
+  setSplitMode(false);
+  revokeRightBlob();
+  const host = document.getElementById('pdfBodyRight');
+  if (host) host.replaceChildren();
   persist(null, null);
   emit();
 }
@@ -165,10 +213,77 @@ export function scheduleRestoreCompare(): void {
   }, 200);
 }
 
+const SPLIT_RATIO_KEY = 'minallo:pdfSplitRatio:v1';
+
+function initDividerDrag(): void {
+  const divider = document.getElementById('pdfPaneDivider');
+  const bodies = document.getElementById('pdfBodies');
+  if (!divider || !bodies) return;
+  if ((divider as HTMLElement).dataset.dragInit === '1') return;
+  (divider as HTMLElement).dataset.dragInit = '1';
+
+  const saved = (() => {
+    try { return localStorage.getItem(SPLIT_RATIO_KEY); } catch { return null; }
+  })();
+  if (saved) {
+    const n = parseFloat(saved);
+    if (!Number.isNaN(n) && n >= 20 && n <= 80) {
+      (bodies as HTMLElement).style.setProperty('--pdf-split-left', n + '%');
+    }
+  }
+
+  let dragging = false;
+  divider.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    divider.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = (bodies as HTMLElement).getBoundingClientRect();
+    if (rect.width <= 0) return;
+    let pct = ((e.clientX - rect.left) / rect.width) * 100;
+    if (pct < 20) pct = 20;
+    if (pct > 80) pct = 80;
+    (bodies as HTMLElement).style.setProperty('--pdf-split-left', pct.toFixed(2) + '%');
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    const current = (bodies as HTMLElement).style.getPropertyValue('--pdf-split-left');
+    if (current) {
+      try { localStorage.setItem(SPLIT_RATIO_KEY, parseFloat(current).toFixed(2)); } catch { /* ignore */ }
+    }
+  });
+}
+
+function scheduleDividerInit(): void {
+  if (document.getElementById('pdfPaneDivider')) {
+    initDividerDrag();
+    return;
+  }
+  const obs = new MutationObserver(() => {
+    if (document.getElementById('pdfPaneDivider')) {
+      obs.disconnect();
+      initDividerDrag();
+    }
+  });
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+}
+
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => scheduleRestoreCompare(), { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      scheduleRestoreCompare();
+      scheduleDividerInit();
+    }, { once: true });
   } else {
-    queueMicrotask(() => scheduleRestoreCompare());
+    queueMicrotask(() => {
+      scheduleRestoreCompare();
+      scheduleDividerInit();
+    });
   }
 }

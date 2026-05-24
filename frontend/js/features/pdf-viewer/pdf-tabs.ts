@@ -284,10 +284,10 @@ function makeTabNode(tab: PdfTab): HTMLButtonElement {
   compare.className = 'pdf-tab-compare';
   compare.setAttribute('role', 'button');
   compare.setAttribute('tabindex', '0');
-  compare.setAttribute('aria-label', `Compare ${tab.file.name} with AI`);
-  compare.setAttribute('title', 'Have the AI also read this PDF');
+  compare.setAttribute('aria-label', `Open ${tab.file.name} in split view`);
+  compare.setAttribute('title', 'Open in split view (AI reads both)');
   compare.dataset.pdfCompareKey = tab.key;
-  compare.textContent = '⇄';
+  compare.textContent = '⛶';
   btn.appendChild(compare);
 
   const close = document.createElement('span');
@@ -314,7 +314,7 @@ function renderCompareChip(): void {
   compareChipEl.replaceChildren();
   const label = document.createElement('span');
   label.className = 'pdf-compare-chip-label';
-  label.textContent = isCompareLoading() ? 'Loading ' + name + '…' : 'Comparing with ' + name;
+  label.textContent = isCompareLoading() ? 'Loading ' + name + '…' : 'Split: ' + name;
   compareChipEl.appendChild(label);
   if (!isCompareLoading()) {
     const x = document.createElement('button');

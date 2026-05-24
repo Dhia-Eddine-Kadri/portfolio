@@ -1470,6 +1470,52 @@ body.night .sb-acc-chev-btn {
   outline: 1.5px solid var(--purple);
   background: rgba(37, 99, 235, 0.07);
 }
+.pdf-bodies {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  --pdf-split-left: 50%;
+}
+.pdf-bodies > #pdfBody {
+  flex: 1;
+}
+.pdf-bodies > .pdf-pane-divider,
+.pdf-bodies > .pdf-body-right {
+  display: none;
+}
+.pdf-bodies.is-split > #pdfBody {
+  flex: 0 0 var(--pdf-split-left);
+  min-width: 200px;
+}
+.pdf-bodies.is-split > .pdf-pane-divider {
+  display: block;
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: rgba(56, 189, 248, 0.18);
+  border-left: 1px solid rgba(56, 189, 248, 0.3);
+  border-right: 1px solid rgba(56, 189, 248, 0.3);
+  transition: background 0.15s;
+  z-index: 2;
+}
+.pdf-bodies.is-split > .pdf-pane-divider:hover,
+.pdf-bodies.is-split > .pdf-pane-divider.is-dragging {
+  background: rgba(56, 189, 248, 0.45);
+}
+.pdf-bodies.is-split > .pdf-body-right {
+  display: flex;
+  flex: 1;
+  min-width: 200px;
+  padding: 0;
+  background: #fff;
+}
+.pdf-bodies.is-split > .pdf-body-right iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
 .pdf-body {
   flex: 1;
   overflow-y: auto;
