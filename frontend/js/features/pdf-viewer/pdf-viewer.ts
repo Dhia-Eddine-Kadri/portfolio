@@ -2,6 +2,7 @@ import { fetchPdfBytes } from '../../services/pdf-service.js';
 import { panelShow, panelHide, selectTopLevelView } from '../../core/panels.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 import { notePdfTabOpen } from './pdf-tabs.js';
+import { setActivePane, snapshotWindowInto, type PaneId } from './pdf-panes.js';
 import type { LegacyCourse } from '../../../globals.js';
 
 interface FileLite {
@@ -49,9 +50,10 @@ function _restorePageBookmark(
   } catch { return null; }
 }
 
-export function openFile(f: FileLite, course: LegacyCourse): void {
+export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left'): void {
   _savePageBookmark();
   notePdfTabOpen(f, course);
+  setActivePane(pane);
 
   const mySeq = ++(window._pdfOpenSeq as number);
   window.activeFileName = f.name;
@@ -159,6 +161,7 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
           window.pdfPage = 1;
           window.pdfFullText = '';
           if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
+          snapshotWindowInto(pane);
           return;
         }
 
@@ -215,6 +218,7 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
           };
 
           if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
+          snapshotWindowInto(pane);
           return;
         }
 
@@ -249,6 +253,7 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
               if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
+              snapshotWindowInto(pane);
               const savedPage = _restorePageBookmark(
                 (f._course || course).id,
                 f._storageName || f.name
@@ -279,7 +284,9 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
                     );
                   }
                   Promise.all(tp).then((pages) => {
+                    if (window._pdfOpenSeq !== mySeq) return;
                     window.pdfFullText = pages.join('\n');
+                    snapshotWindowInto(pane);
                   });
                 }, 400);
               }
@@ -367,6 +374,7 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
               if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
+              snapshotWindowInto(pane);
               setTimeout(() => {
                 const maxPages = Math.min(pdfDoc.numPages, 30);
                 const textPromises: Promise<string>[] = [];
@@ -378,7 +386,9 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
                   );
                 }
                 Promise.all(textPromises).then((pages) => {
+                  if (window._pdfOpenSeq !== mySeq) return;
                   window.pdfFullText = pages.join('\n\n');
+                  snapshotWindowInto(pane);
                 });
               }, 800);
             });
