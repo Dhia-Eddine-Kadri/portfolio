@@ -435,6 +435,7 @@ function openFromMenu(file: PdfTabFile, course: LegacyCourse): void {
 function handleCompareClick(key: string): void {
   const tab = tabs.find((t) => t.key === key);
   if (!tab) return;
+  if (tab.key === activeKey) return;
   const course = tabCourse(tab);
   if (!course) return;
   if (tabIsBeingCompared(tab)) {
