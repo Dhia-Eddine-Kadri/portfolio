@@ -242,7 +242,7 @@ function updateRightToolbar(): void {
   if (!tb) return;
   tb.hidden = false;
   const info = document.getElementById('pdfRightPageInfo');
-  if (info) info.textContent = state.pdfPage + ' / ' + state.pdfTotal;
+  if (info) info.textContent = 'Page ' + state.pdfPage + ' / ' + state.pdfTotal;
   const zoom = document.getElementById('pdfRightZoomPct');
   if (zoom) zoom.textContent = Math.round(state.pdfScale * 100) + '%';
   const all = document.getElementById('pdfRightAll');

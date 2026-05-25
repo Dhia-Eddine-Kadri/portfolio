@@ -2117,19 +2117,27 @@ body.night .sb-acc-chev-btn {
   font-size: 0;
 }
 
-/* ─── PDF RIGHT-PANE TOOLBAR (lives inside the main toolbar) ─────────── */
+/* ─── PDF RIGHT-PANE TOOLBAR (lives inside the main toolbar) ─────────────
+   This is a parallel set of page/zoom/fit/single controls for the right
+   PDF in split view. Visually a cohesive group, separated from the left
+   controls by a vertical rule. Stays on one row (no internal wrapping);
+   the whole group can wrap to the next toolbar row on narrow screens. */
 .pdf-right-controls-group {
-  display: flex;
+  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-left: 12px;
+  margin-left: 4px;
+  border-left: 1px solid rgba(147, 197, 253, 0.22);
 }
 .pdf-right-controls-group[hidden] { display: none; }
-.pdf-right-divider {
-  display: inline-block;
-  width: 1px;
-  height: 22px;
-  background: rgba(148, 163, 184, 0.35);
-  margin: 0 4px;
+/* Page-info text on the right pill: same font/colour as the left's
+   "Page X / Y" label, slightly more breathing room than a bare span. */
+.pdf-toolbar-v2 .pdf-right-controls-group .pdf-page-info {
+  white-space: nowrap;
+  padding: 0 6px;
 }
 
 /* ─── ANNOTATION POPOVER — compact floating blue-glass toolbar ───────── */
