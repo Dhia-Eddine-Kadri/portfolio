@@ -889,6 +889,22 @@
                       >
                         Single page
                       </button>
+                      <!-- RIGHT-PANE CONTROLS — mirror of the left controls; shown only when split view is active. -->
+                      <div class="pdf-right-controls-group" id="pdfRightToolbar" hidden>
+                        <span class="pdf-right-divider" aria-hidden="true"></span>
+                        <div class="pdf-control-group">
+                          <button class="pdf-toolbar-button pdf-icon-button" id="pdfRightPrev" title="Previous page (right)" aria-label="Previous page (right)">−</button>
+                          <span class="pdf-page-info" id="pdfRightPageInfo">1 / 1</span>
+                          <button class="pdf-toolbar-button pdf-icon-button" id="pdfRightNext" title="Next page (right)" aria-label="Next page (right)">+</button>
+                        </div>
+                        <div class="pdf-control-group">
+                          <button class="pdf-toolbar-button pdf-icon-button" id="pdfRightZoomOut" title="Zoom out (right)" aria-label="Zoom out (right)">−</button>
+                          <button class="pdf-toolbar-button pdf-zoom-pct" id="pdfRightZoomPct" title="Right pane zoom">90%</button>
+                          <button class="pdf-toolbar-button pdf-icon-button" id="pdfRightZoomIn" title="Zoom in (right)" aria-label="Zoom in (right)">+</button>
+                        </div>
+                        <button class="pdf-toolbar-button" id="pdfRightFit">Fit</button>
+                        <button class="pdf-toolbar-button" id="pdfRightAll">Single page</button>
+                      </div>
                       <div class="pdf-controls-right">
                         <button
                           class="pdf-primary-button"
@@ -1056,17 +1072,6 @@
                   <div class="pdf-body" id="pdfBody"></div>
                   <div class="pdf-pane-divider" id="pdfPaneDivider" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
                   <div class="pdf-right-pane">
-                    <div class="pdf-right-toolbar" id="pdfRightToolbar" hidden>
-                      <button type="button" class="pdf-right-btn" id="pdfRightPrev" title="Previous page" aria-label="Previous page">‹</button>
-                      <span class="pdf-right-page-info" id="pdfRightPageInfo">1 / 1</span>
-                      <button type="button" class="pdf-right-btn" id="pdfRightNext" title="Next page" aria-label="Next page">›</button>
-                      <span class="pdf-right-sep"></span>
-                      <button type="button" class="pdf-right-btn" id="pdfRightZoomOut" title="Zoom out" aria-label="Zoom out">−</button>
-                      <span class="pdf-right-zoom" id="pdfRightZoomPct">90%</span>
-                      <button type="button" class="pdf-right-btn" id="pdfRightZoomIn" title="Zoom in" aria-label="Zoom in">+</button>
-                      <span class="pdf-right-sep"></span>
-                      <button type="button" class="pdf-right-btn pdf-right-mode" id="pdfRightAll" title="Toggle all/single page">All pages</button>
-                    </div>
                     <div class="pdf-body pdf-body-right" id="pdfBodyRight"></div>
                   </div>
                 </div>

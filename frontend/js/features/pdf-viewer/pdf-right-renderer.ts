@@ -2,7 +2,7 @@ import { getPane } from './pdf-panes.js';
 
 type PdfPage = {
   getViewport: (opts: { scale: number }) => { width: number; height: number; scale: number };
-  render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> };
+  render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown; transform?: number[] | null }) => { promise: Promise<void> };
   getTextContent: () => Promise<{ items: Array<{ str: string }> }>;
 };
 
@@ -71,9 +71,15 @@ function renderPageIntoWrap(wrap: HTMLElement, num: number): void {
     wrap.style.width = vp.width + 'px';
     wrap.style.height = vp.height + 'px';
 
+    // Render at device pixel ratio for crisp text on high-DPI displays.
+    // In split view the page is rendered at ~half width, so without DPR
+    // scaling the text comes out blurry.
+    const dpr = window.devicePixelRatio || 1;
     const canvas = document.createElement('canvas');
-    canvas.width = vp.width;
-    canvas.height = vp.height;
+    canvas.width = Math.floor(vp.width * dpr);
+    canvas.height = Math.floor(vp.height * dpr);
+    canvas.style.width = vp.width + 'px';
+    canvas.style.height = vp.height + 'px';
     const textDiv = document.createElement('div');
     textDiv.className = 'pdf-text-layer';
     textDiv.style.width = vp.width + 'px';
@@ -81,7 +87,8 @@ function renderPageIntoWrap(wrap: HTMLElement, num: number): void {
     wrap.insertBefore(textDiv, wrap.firstChild);
     wrap.insertBefore(canvas, textDiv);
 
-    page.render({ canvasContext: canvas.getContext('2d')!, viewport: vp }).promise.then(() => {
+    const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+    page.render({ canvasContext: canvas.getContext('2d')!, viewport: vp, transform }).promise.then(() => {
       return page.getTextContent();
     }).then((tc) => {
       textDiv.style.setProperty('--scale-factor', String(vp.scale));
@@ -223,6 +230,13 @@ export function rightToggleShowAll(): void {
   renderRightPages();
 }
 
+export function rightFit(): void {
+  if (!state.pdfDoc) return;
+  state.pdfScale = 0.9;
+  persist();
+  renderRightPages();
+}
+
 function updateRightToolbar(): void {
   const tb = document.getElementById('pdfRightToolbar');
   if (!tb) return;
@@ -255,6 +269,7 @@ function initRightToolbar(): void {
   document.getElementById('pdfRightZoomIn')?.addEventListener('click', rightZoomIn);
   document.getElementById('pdfRightZoomOut')?.addEventListener('click', rightZoomOut);
   document.getElementById('pdfRightAll')?.addEventListener('click', rightToggleShowAll);
+  document.getElementById('pdfRightFit')?.addEventListener('click', rightFit);
 }
 
 function scheduleToolbarInit(): void {

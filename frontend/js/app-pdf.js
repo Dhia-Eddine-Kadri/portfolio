@@ -44,9 +44,14 @@ function _pdfRenderIntoWrap(wrap, num) {
     wrap.style.width = vp.width + 'px';
     wrap.style.height = vp.height + 'px';
 
+    // Render at device pixel ratio so text is crisp on high-DPI displays
+    // and on split view (where each pane is narrower than the full PDF).
+    var dpr = window.devicePixelRatio || 1;
     var canvas = document.createElement('canvas');
-    canvas.width = vp.width;
-    canvas.height = vp.height;
+    canvas.width = Math.floor(vp.width * dpr);
+    canvas.height = Math.floor(vp.height * dpr);
+    canvas.style.width = vp.width + 'px';
+    canvas.style.height = vp.height + 'px';
     var textDiv = document.createElement('div');
     textDiv.className = 'pdf-text-layer';
     textDiv.style.width = vp.width + 'px';
@@ -57,8 +62,9 @@ function _pdfRenderIntoWrap(wrap, num) {
     wrap.insertBefore(textDiv, wrap.firstChild);
     wrap.insertBefore(canvas, textDiv);
 
+    var transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
     page
-      .render({ canvasContext: canvas.getContext('2d'), viewport: vp })
+      .render({ canvasContext: canvas.getContext('2d'), viewport: vp, transform: transform })
       .promise.then(function () {
         return page.getTextContent();
       })

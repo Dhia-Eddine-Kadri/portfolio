@@ -2117,6 +2117,21 @@ body.night .sb-acc-chev-btn {
   font-size: 0;
 }
 
+/* ─── PDF RIGHT-PANE TOOLBAR (lives inside the main toolbar) ─────────── */
+.pdf-right-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pdf-right-controls-group[hidden] { display: none; }
+.pdf-right-divider {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 0 4px;
+}
+
 /* ─── ANNOTATION POPOVER — compact floating blue-glass toolbar ───────── */
 #pdfView { position: relative; }
 .annotate-popover {
