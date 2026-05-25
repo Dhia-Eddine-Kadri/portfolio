@@ -19,7 +19,11 @@
     }
     var s = document.createElement('script');
     s.type = 'module';
-    s.src = 'js/features/chatbot-new/shell.js';
+    // Cache-bust query string. Without this the browser and Cloudflare
+    // edge cache the chatbot shell indefinitely, so prompt updates
+    // (e.g. MINALLO_APP_CONTEXT) never reach existing users. Bump on
+    // every shell-affecting change.
+    s.src = 'js/features/chatbot-new/shell.js?v=3';
     s.onload = function () { resolve(); };
     s.onerror = function () {
       console.error('chatbot-new/shell.js failed to load');
