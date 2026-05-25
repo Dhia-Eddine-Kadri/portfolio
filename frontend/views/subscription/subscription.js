@@ -430,9 +430,14 @@ function _initPayPalButton(attempt) {
         .render('#paypalButtonContainer');
     })
     .catch(function (err) {
+      // Render or plan-config failure: log the real reason and reset the
+      // rendered flag so a later trigger (hashchange, ss-ready) can retry.
+      // Without this reset, a transient failure (PayPal SDK blip, missing
+      // plan id on first load) leaves the container silently empty forever.
       _paypalRendered = false;
-      console.warn('PayPal plan config failed to load:', err);
-      showToast(_subT('sub_payment_unavailable', 'Payment unavailable'), _subT('sub_payment_unavailable_sub', 'Subscription configuration is missing.'));
+      console.error('[paypal-init] failed:', err);
+      var msg = (err && err.message) || _subT('sub_payment_unavailable_sub', 'Subscription configuration is missing.');
+      showToast(_subT('sub_payment_unavailable', 'Payment unavailable'), msg);
     })
     .finally(function () {
       _paypalRenderPending = false;
