@@ -200,12 +200,31 @@ var _sb = {
       // (app.ts) BEFORE auth resolves. If we leave them behind, the NEXT
       // user signing in on the same browser flashes the previous user's
       // name / courses for a moment. Clear both.
+      //
+      // Also wipe onboarding answers — both the unscoped legacy keys
+      // (ss_user_type/ss_major/ss_vertiefung) and the per-uid variants
+      // (ss_user_type_<uid>/ss_german_test_<uid>/ss_german_level_<uid>).
+      // These don't directly leak across users since user-data.ts loads the
+      // signed-in user's profile from Supabase on next login, but they're
+      // stale account data that ought to come off when the user logs out.
       try {
         for (var _pi = localStorage.length - 1; _pi >= 0; _pi--) {
           var _pk = localStorage.key(_pi);
-          if (_pk && _pk.indexOf('profile_cache_') === 0) localStorage.removeItem(_pk);
+          if (!_pk) continue;
+          if (
+            _pk.indexOf('profile_cache_') === 0 ||
+            _pk.indexOf('ss_user_type_') === 0 ||
+            _pk.indexOf('ss_german_test_') === 0 ||
+            _pk.indexOf('ss_german_level_') === 0
+          ) localStorage.removeItem(_pk);
         }
         localStorage.removeItem('ss_last_uid');
+        localStorage.removeItem('ss_user_type');
+        localStorage.removeItem('ss_major');
+        localStorage.removeItem('ss_vertiefung');
+        // Also drop the device-trial marker so a re-login on the same
+        // browser doesn't keep "you already used your trial" stuck on.
+        localStorage.removeItem('minallo_trial_used');
       } catch (e) {}
       try {
         sessionStorage.removeItem('ss_logged_in');

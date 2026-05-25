@@ -212,18 +212,14 @@ async function saveSettings(patch) {
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
-      // Defer to supabase.js — it already clears sb_sess_token/sb_sess_refresh
-      // in BOTH localStorage and sessionStorage, wipes per-course caches, and
-      // revokes the token server-side. The previous hand-rolled cleanup only
-      // touched sessionStorage so the persistent localStorage token survived
-      // and auth-bootstrap.js re-flagged the user as logged in on reload.
+      // Defer to supabase.js — it clears sb_sess_*, profile_cache_<uid>,
+      // ss_last_uid, the onboarding keys (ss_user_type, ss_major,
+      // ss_vertiefung, and the per-uid variants), the trial-device marker,
+      // and revokes the token server-side. Don't re-implement any of that
+      // here; this used to drift out of sync.
       try {
         if (window._sb && window._sb.auth) await window._sb.auth.signOut();
       } catch (e) { /* network failure is fine — local state is already wiped */ }
-      localStorage.removeItem('ss_user_type');
-      // Trial-device markers must clear too, otherwise a re-login on the
-      // same browser still reads _deviceHadTrial=true.
-      localStorage.removeItem('minallo_trial_used');
       window._userType = 'enrolled';
       window._germanTest = '';
       window._germanLevel = '';

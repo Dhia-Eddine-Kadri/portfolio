@@ -22,6 +22,8 @@ const AUTH_BOOTSTRAP = read('frontend/js/auth-bootstrap.js');
 const SUPABASE_JS = read('frontend/js/supabase.js');
 const RESET_HTML = read('frontend/reset-password.html');
 const AUTH_MODAL = read('frontend/js/features/auth/auth-modal.ts');
+const ONBOARDING_TS = read('frontend/js/features/auth/onboarding.ts');
+const SETTINGS_VIEW_JS = read('frontend/views/settings/settings.js');
 
 // ── stay-signed-in across browser restart ───────────────────────────────────
 test('auth-bootstrap treats sb_sess_refresh as "logged in" for boot routing', () => {
@@ -146,5 +148,66 @@ test('logout sweeps all profile_cache_<uid> entries', () => {
     SUPABASE_JS,
     /localStorage\.removeItem\(\s*_?\w+\s*\)/,
     'signOut must remove iterated localStorage keys (profile_cache_* sweep)'
+  );
+});
+
+// ── logout also wipes onboarding answers ───────────────────────────────────
+test('logout removes the global onboarding keys', () => {
+  for (const key of ['ss_user_type', 'ss_major', 'ss_vertiefung']) {
+    const re = new RegExp(`\\.removeItem\\(\\s*['"]${key}['"]`);
+    assert.match(SUPABASE_JS, re, `signOut must remove ${key}`);
+  }
+});
+
+test('logout sweeps per-uid onboarding keys', () => {
+  for (const prefix of ['ss_user_type_', 'ss_german_test_', 'ss_german_level_']) {
+    assert.match(
+      SUPABASE_JS,
+      new RegExp(prefix),
+      `signOut must sweep ${prefix}<uid> entries`
+    );
+  }
+});
+
+// ── _obLogout delegates instead of doing its own broken cleanup ────────────
+test('_obLogout delegates to the central sb.auth.signOut', () => {
+  // The hand-rolled cleanup used to remove sb_sess_refresh from
+  // sessionStorage (wrong: it lives in localStorage), leaving the refresh
+  // token on disk so the next boot silently re-authed the user. Forcing
+  // delegation to the central signOut prevents this regression.
+  assert.match(
+    ONBOARDING_TS,
+    /sb\.auth\.signOut\s*\(/,
+    '_obLogout must call sb.auth.signOut to share the central cleanup'
+  );
+});
+
+test('_obLogout does not pretend sb_sess_refresh lives in sessionStorage', () => {
+  // Old code: sessionStorage.removeItem('sb_sess_refresh') — wrong storage.
+  // The refresh token is in localStorage (so it survives a tab close); a
+  // sessionStorage cleanup is harmless but a sign someone misunderstood
+  // the scheme.
+  const wrongClear = /sessionStorage\.removeItem\(\s*['"]sb_sess_refresh['"]/;
+  // Allowed only inside the central signOut (supabase.js), where both
+  // storages are scrubbed defensively. Disallow in onboarding.
+  assert.equal(
+    wrongClear.test(ONBOARDING_TS), false,
+    '_obLogout must not call sessionStorage.removeItem("sb_sess_refresh") in isolation'
+  );
+});
+
+// ── settings logout no longer maintains its own duplicated cleanup ─────────
+test('settings logout calls sb.auth.signOut and does not re-implement cleanup', () => {
+  assert.match(
+    SETTINGS_VIEW_JS,
+    /sb\.auth\.signOut\s*\(/,
+    'settings logout must delegate to sb.auth.signOut'
+  );
+  // The old code removed ss_user_type / minallo_trial_used inline. Those
+  // are now centralised in supabase.js; settings.js should not duplicate.
+  const inlineUserType = /localStorage\.removeItem\(\s*['"]ss_user_type['"]/;
+  assert.equal(
+    inlineUserType.test(SETTINGS_VIEW_JS), false,
+    'settings.js should not duplicate the ss_user_type cleanup that lives in signOut'
   );
 });

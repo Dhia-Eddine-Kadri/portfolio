@@ -533,13 +533,47 @@ export function initOnboarding(): void {
   setupVertProfileAutocomplete();
 
   window._obLogout = function () {
-    localStorage.removeItem('sb_token');
-    localStorage.removeItem('sb_refresh');
-    sessionStorage.removeItem('sb_sess_refresh');
-    sessionStorage.removeItem('sb_sess_token');
-    sessionStorage.removeItem('ss_last_active');
-    sessionStorage.removeItem('ss_logged_in');
-    window.location.reload();
+    // Delegate to the central signOut so we get a single source of truth for
+    // session cleanup (tokens, profile_cache_<uid>, ss_last_uid, course
+    // caches) plus the Supabase /auth/v1/logout revocation. Doing it inline
+    // here used to scrub the wrong storages — sb_sess_refresh lives in
+    // localStorage, not sessionStorage — leaving the refresh token behind so
+    // the next boot silently re-authed the user.
+    const finishReload = () => window.location.reload();
+    const sb = (window as unknown as {
+      _sb?: { auth?: { signOut?: () => unknown } };
+    })._sb;
+    if (sb?.auth?.signOut) {
+      try {
+        const p = sb.auth.signOut();
+        if (p && typeof (p as Promise<unknown>).then === 'function') {
+          (p as Promise<unknown>).then(finishReload, finishReload);
+          return;
+        }
+      } catch (_e) { /* central signOut threw — fall through to manual */ }
+      finishReload();
+      return;
+    }
+
+    // Fallback: no central signOut available (shouldn't happen in production).
+    // Mirror the cleanup in supabase.js. The refresh token lives ONLY in
+    // localStorage; do NOT touch sessionStorage for sb_sess_refresh — that
+    // was the original bug (false sense of cleanup, real token survived).
+    try {
+      sessionStorage.removeItem('sb_sess_token');
+      localStorage.removeItem('sb_sess_token');
+      localStorage.removeItem('sb_sess_refresh');
+      localStorage.removeItem('sb_token');
+      localStorage.removeItem('sb_refresh');
+      localStorage.removeItem('ss_last_uid');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('profile_cache_') === 0) localStorage.removeItem(k);
+      }
+      sessionStorage.removeItem('ss_last_active');
+      sessionStorage.removeItem('ss_logged_in');
+    } catch (_e) { /* ignore */ }
+    finishReload();
   };
 
   window._obNext = function () {
