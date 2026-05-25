@@ -129,6 +129,7 @@ export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): P
     try {
       const bytes = await fetchBytes(file, course);
       if (!bytes) {
+        console.error('[pdf-compare] fetchBytes returned no bytes for', file.name, file);
         failed = true;
         return;
       }
@@ -140,7 +141,8 @@ export async function loadCompareDoc(file: CompareFile, course: LegacyCourse): P
       right.pdfFullText = text;
       persist(courseKey(course), file);
       emit();
-    } catch {
+    } catch (err) {
+      console.error('[pdf-compare] failed loading', file.name, err);
       failed = true;
     } finally {
       if (failed && getPane('right').activeFileName === file.name) {

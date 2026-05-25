@@ -2135,6 +2135,11 @@ body.night .sb-acc-chev-btn {
   -webkit-backdrop-filter: blur(24px);
   animation: annotPopIn 160ms ease-out;
 }
+/* When the AI side panel is open it overlays #pdfView from the right at
+   `width: var(--ai-w)`. Without this shift the popover hides behind it. */
+body:has(#aiPanel.visible) .annotate-popover {
+  right: calc(var(--ai-w, 340px) + 24px);
+}
 .annotate-popover::before {
   content: "";
   position: absolute;
