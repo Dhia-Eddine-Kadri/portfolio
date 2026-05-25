@@ -619,8 +619,17 @@ def stream_answer(
     else:
         used_chunks = []
 
-    open_ctx = (open_file_context or "").strip()[:12000]
-    open_image_parts = _open_file_image_parts(open_file_images)
+    # For app/product questions, also drop the open-file context and any
+    # page images. Otherwise the model still sees the open PDF as
+    # [Source 0] and tries to reconcile "answer from app map" with
+    # "course context attached" — that contradiction is what produced
+    # the generic-study-app feature lists in earlier reports.
+    if app_question:
+        open_ctx = ""
+        open_image_parts: list[dict[str, Any]] = []
+    else:
+        open_ctx = (open_file_context or "").strip()[:12000]
+        open_image_parts = _open_file_image_parts(open_file_images)
     has_open = bool(open_ctx)
     has_open_image = bool(open_image_parts)
     # Promote to "strong" when the user has a file open with visible text AND
