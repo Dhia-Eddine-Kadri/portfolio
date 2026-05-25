@@ -10,6 +10,21 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* ── Global text-selection colour ─────────────────────────────────────────
+ * Without this, the browser's default selection blue runs over our dark
+ * navy text in modals (Create Room, friend picker, etc.) producing the
+ * "I can't read selected text" report. Defaults below cover dark mode;
+ * light-mode.css overrides for body:not(.night). Scoped per-vendor so
+ * Firefox picks it up too. */
+::selection {
+  background: rgba(96, 165, 250, 0.55);
+  color: #ffffff;
+}
+::-moz-selection {
+  background: rgba(96, 165, 250, 0.55);
+  color: #ffffff;
+}
+
 html,
 body {
   font-family: var(--font-main);

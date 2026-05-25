@@ -92,6 +92,25 @@ body:not(.night) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * 1b. TEXT SELECTION — light-mode override
+ *
+ * Light mode uses dark navy text (`--lm-text`), which is invisible against
+ * the default browser selection blue. The user reported "I can't read the
+ * selected text in the chat page and in every pop up". Override with a
+ * light-blue selection + dark text so the highlighted content stays
+ * legible against the page's white surfaces. ::selection doesn't inherit,
+ * so the rule must be set explicitly for the light-mode body.
+ * ────────────────────────────────────────────────────────────────────────── */
+body:not(.night) ::selection {
+  background: rgba(96, 165, 250, 0.40);
+  color: #0f172a;
+}
+body:not(.night) ::-moz-selection {
+  background: rgba(96, 165, 250, 0.40);
+  color: #0f172a;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * 2.  PAGE BACKGROUND — applied globally to every shell container
  * ────────────────────────────────────────────────────────────────────────── */
 body:not(.night),
