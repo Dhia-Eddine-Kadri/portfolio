@@ -257,7 +257,15 @@ function applySubscription(sub) {
       }
       proStatus.style.display = '';
     }
-    if (upgradeBtn) upgradeBtn.style.display = paypalResubscribe ? '' : 'none';
+    if (upgradeBtn) {
+      upgradeBtn.style.display = paypalResubscribe ? '' : 'none';
+      if (paypalResubscribe) {
+        // Resubscribe copy — the user already used their trial, and a new
+        // subscription created while Pro is still active starts billing
+        // immediately, so don't promise a trial in the label.
+        upgradeBtn.textContent = _subT('sub_resubscribe', 'Resubscribe — €11.99/month');
+      }
+    }
     if (manageBtn) manageBtn.style.display = _stripeCustomerId ? '' : 'none';
     // Hide the standalone Cancel button when a Stripe customer exists OR when
     // cancellation is already scheduled — there's nothing more to cancel.
