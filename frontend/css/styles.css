@@ -2011,14 +2011,25 @@ body.night .sb-acc-chev-btn {
 .pdf-toolbar-v2 .pdf-page-info {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  /* Uniform spacing between all four items (label / input / "/" / total)
+     so the indicator reads symmetrically. Previously raw text nodes plus
+     gap:4px stacked extra whitespace around the input. */
+  gap: 6px;
   color: #e2e8f0;
   font-size: 0.82rem;
   font-weight: 600;
   padding: 0 6px;
 }
+.pdf-toolbar-v2 .pdf-page-info .pdf-page-label,
+.pdf-toolbar-v2 .pdf-page-info .pdf-page-sep,
+.pdf-toolbar-v2 .pdf-page-info .pdf-page-total {
+  display: inline-block;
+  line-height: 1;
+}
 .pdf-toolbar-v2 .pdf-page-input {
-  width: 36px;
+  /* Width matches the visual weight of the "Page" label and the total
+     span so the layout reads as four evenly-spaced columns. */
+  width: 22px;
   background: transparent;
   border: none;
   color: #f8fafc;
