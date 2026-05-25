@@ -239,6 +239,14 @@ function applySubscription(sub) {
   var paypalCont = document.getElementById('paypalButtonContainer');
   if (_userIsPro) {
     var scheduledCancel = !!(sub && sub.cancel_at_period_end);
+    var hasStripeSub = !!(sub && (sub.stripe_subscription_id || _stripeCustomerId));
+    var hasPaypalSub = !!(sub && sub.paypal_subscription_id);
+    // Resubscribe-via-PayPal: the original PayPal sub was /cancel'd at PayPal's
+    // end (one-way) so reactivation isn't possible — but we can let them
+    // create a fresh PayPal sub. Show the upgrade UI in that case only.
+    var paypalResubscribe = scheduledCancel && hasPaypalSub && !hasStripeSub;
+    var reactivateBtn = document.getElementById('subReactivateBtn');
+    var legalBlock = document.getElementById('subLegalBlock');
     if (proStatus) {
       if (scheduledCancel && expiresAt) {
         var endStr = new Date(expiresAt).toLocaleDateString();
@@ -249,16 +257,23 @@ function applySubscription(sub) {
       }
       proStatus.style.display = '';
     }
-    if (upgradeBtn) upgradeBtn.style.display = 'none';
+    if (upgradeBtn) upgradeBtn.style.display = paypalResubscribe ? '' : 'none';
     if (manageBtn) manageBtn.style.display = _stripeCustomerId ? '' : 'none';
     // Hide the standalone Cancel button when a Stripe customer exists OR when
     // cancellation is already scheduled — there's nothing more to cancel.
     if (cancelBtn) cancelBtn.style.display = (_stripeCustomerId || scheduledCancel) ? 'none' : '';
+    // Reactivate: only meaningful for Stripe (one-call un-cancel). PayPal goes
+    // through the resubscribe flow with the existing PayPal button instead.
+    if (reactivateBtn) reactivateBtn.style.display = (scheduledCancel && hasStripeSub) ? '' : 'none';
     // No vacation pause when a cancellation is already pending.
     if (pausePanel) pausePanel.style.display = scheduledCancel ? 'none' : '';
     if (resumePanel) resumePanel.style.display = 'none';
-    if (payMethods) payMethods.style.display = 'none';
-    if (paypalCont) paypalCont.style.display = 'none';
+    // Hide the upgrade-only chrome when Pro is uninterrupted. For PayPal
+    // scheduled-cancel we expose it so the user can resubscribe before the
+    // current period ends.
+    if (legalBlock) legalBlock.style.display = paypalResubscribe ? '' : 'none';
+    if (payMethods) payMethods.style.display = paypalResubscribe ? '' : 'none';
+    if (paypalCont) paypalCont.style.display = paypalResubscribe ? '' : 'none';
   } else if (_userIsPaused) {
     if (proStatus) {
       proStatus.style.display = '';
@@ -829,6 +844,39 @@ function _bindSubscriptionControls() {
         showToast(_subT('sub_error', 'Error'), e.message || _subT('sub_cancel_failed', 'Could not cancel subscription.'));
       }
       this.textContent = _subT('sub_cancel_btn', 'Cancel subscription');
+      this.disabled = false;
+    });
+  }
+
+  var reactivateBtn = document.getElementById('subReactivateBtn');
+  if (reactivateBtn && !reactivateBtn.dataset.bound) {
+    reactivateBtn.dataset.bound = '1';
+    reactivateBtn.addEventListener('click', async function () {
+      if (!_currentUser) return;
+      this.textContent = _subT('sub_reactivating', 'Reactivating...');
+      this.disabled = true;
+      try {
+        var data = await window._subService.reactivateSubscription();
+        applySubscription({
+          plan: 'pro',
+          status: 'active',
+          expires_at: data && data.expires_at ? data.expires_at : null,
+          cancel_at_period_end: false,
+          stripe_customer_id: _stripeCustomerId,
+          paypal_subscription_id: _paypalSubscriptionId,
+          had_trial: _hadTrial
+        });
+        showToast(
+          _subT('sub_reactivated_title', 'Subscription reactivated'),
+          _subT('sub_reactivated_body', 'Your Pro access continues with no interruption.')
+        );
+      } catch (e) {
+        showToast(
+          _subT('sub_error', 'Error'),
+          (e && e.message) || _subT('sub_reactivate_failed', 'Could not reactivate subscription.')
+        );
+      }
+      this.textContent = _subT('sub_reactivate_btn', 'Reactivate subscription');
       this.disabled = false;
     });
   }

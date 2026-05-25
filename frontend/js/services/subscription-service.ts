@@ -101,6 +101,25 @@ export async function cancelSubscription(): Promise<Record<string, unknown>> {
   return payload;
 }
 
+export async function reactivateSubscription(): Promise<Record<string, unknown>> {
+  const res = await fetch('/api/reactivate-subscription', {
+    method: 'POST',
+    headers: _authHeaders(),
+    body: JSON.stringify({}),
+  });
+  const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
+  if (!res.ok) {
+    const message =
+      typeof payload.error === 'object' && payload.error?.message
+        ? payload.error.message
+        : typeof payload.error === 'string'
+          ? payload.error
+          : 'Could not reactivate subscription';
+    throw new Error(message);
+  }
+  return payload;
+}
+
 export async function applyRetentionDiscount(): Promise<Record<string, unknown>> {
   const res = await fetch('/api/apply-retention-discount', {
     method: 'POST',

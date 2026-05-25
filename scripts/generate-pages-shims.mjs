@@ -28,6 +28,7 @@ const ROUTES = [
   ['pause-subscription',              'pause-subscription'],
   ['resume-subscription',             'resume-subscription'],
   ['cancel-subscription',             'cancel-subscription'],
+  ['reactivate-subscription',         'reactivate-subscription'],
   ['apply-retention-discount',        'apply-retention-discount'],
   ['activate-paypal-subscription',    'activate-paypal-subscription'],
   ['join-room-by-code',               'join-room-by-code'],
