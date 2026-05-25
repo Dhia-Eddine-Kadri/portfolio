@@ -2121,7 +2121,7 @@ body.night .sb-acc-chev-btn {
 #pdfView { position: relative; }
 .annotate-popover {
   position: absolute;
-  top: 132px;
+  top: 172px;
   right: 32px;
   z-index: 150;
   width: fit-content;
