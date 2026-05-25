@@ -1944,8 +1944,16 @@
     document.addEventListener('click', async function (e) {
       var btn = e.target.closest('[data-act="delete"]');
       if (!btn) return;
-      if (!confirm('Delete this message?')) return;
+      // This listener is scoped to chat-room MESSAGE delete buttons, which
+      // carry the row id in `data-mid`. The chatbot sidebar also emits
+      // `data-act="delete"` (to delete a CHAT, not a message), and that
+      // button has no `data-mid` — without this guard, the chatbot's
+      // delete click would fall through here and DELETE
+      // /rest/v1/messages?id=eq.undefined, surfacing as
+      // "Could not delete — Permission denied or server error" (400 22P02).
       var msgId = btn.dataset.mid;
+      if (!msgId) return;
+      if (!confirm('Delete this message?')) return;
       try {
         var res = await fetch(SUPA_URL + '/rest/v1/messages?id=eq.' + encodeURIComponent(msgId), {
           method: 'DELETE',
