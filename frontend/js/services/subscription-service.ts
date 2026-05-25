@@ -146,7 +146,14 @@ export async function activatePayPalSubscription(
   });
   const payload = (await res.json().catch(() => ({}))) as BillingErrorBody & Record<string, unknown>;
   if (!res.ok) {
-    const message = typeof payload.error === 'string' ? payload.error : 'Activation failed';
+    // Backend uses fail() → { error: { message } }. The old string fallback
+    // never matched, so every failure surfaced as the generic "Activation
+    // failed" instead of the actual reason (e.g. consent missing, custom_id
+    // mismatch).
+    const errObj = payload.error as { message?: string } | string | undefined;
+    const message =
+      (typeof errObj === 'object' && errObj && typeof errObj.message === 'string' && errObj.message) ||
+      (typeof errObj === 'string' ? errObj : 'Activation failed');
     throw new Error(message);
   }
   return payload;

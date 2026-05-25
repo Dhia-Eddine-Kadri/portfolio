@@ -410,7 +410,11 @@ function _initPayPalButton(attempt) {
               });
               return;
             } catch (e) {
-              showToast(_subT('sub_activation_error', 'Activation error'), _subT('sub_activation_error_sub', 'Contact support.'));
+              console.error('[paypal-activate] failed:', e);
+              showToast(
+                _subT('sub_activation_error', 'Activation error'),
+                (e && e.message) || _subT('sub_activation_error_sub', 'Contact support.')
+              );
             }
           },
           onError: function (err) {
