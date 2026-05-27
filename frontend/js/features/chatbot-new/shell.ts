@@ -284,17 +284,23 @@ function bindSearch(sidebar: HTMLElement): void {
 //
 // Three pills above the composer: Solve with me / Explain / Quiz me.
 // The selected mode is forwarded to /ask-stream as `tutorMode`. Default is
-// 'solve' so the experience signals "tutor" from turn 1. Persisted in
+// 'explain' so ordinary questions receive direct grounded answers. Persisted in
 // localStorage so the choice survives reloads but never spans logins.
 
 type TutorMode = 'explain' | 'solve' | 'quiz';
 const TUTOR_MODE_STORAGE_KEY = 'ncb_tutor_mode';
-const TUTOR_MODE_DEFAULT: TutorMode = 'solve';
+const TUTOR_MODE_MIGRATION_KEY = 'ncb_tutor_mode_direct_default_v1';
+const TUTOR_MODE_DEFAULT: TutorMode = 'explain';
 let currentTutorMode: TutorMode = TUTOR_MODE_DEFAULT;
 
 function _readStoredTutorMode(): TutorMode {
   try {
     const v = localStorage.getItem(TUTOR_MODE_STORAGE_KEY);
+    if (v === 'solve' && localStorage.getItem(TUTOR_MODE_MIGRATION_KEY) !== '1') {
+      localStorage.setItem(TUTOR_MODE_STORAGE_KEY, TUTOR_MODE_DEFAULT);
+      localStorage.setItem(TUTOR_MODE_MIGRATION_KEY, '1');
+      return TUTOR_MODE_DEFAULT;
+    }
     if (v === 'explain' || v === 'solve' || v === 'quiz') return v;
   } catch { /* ignore */ }
   return TUTOR_MODE_DEFAULT;
@@ -716,7 +722,7 @@ async function streamFromAskStream(
         if (typeof evt.t === 'string') {
           answerBuf += evt.t;
           if (bubble) {
-            bubble.textContent = answerBuf;
+            bubble.textContent = stripSourceMarkers(answerBuf);
             bubble.parentElement?.scrollIntoView({ block: 'end', behavior: 'auto' });
           }
         }
@@ -728,13 +734,16 @@ async function streamFromAskStream(
     }
   }
 
-  // Re-render with full markdown now that we have the complete text.
-  if (bubble) bubble.innerHTML = renderInlineMarkdown(answerBuf || tStr('cb_no_response', 'No response.'));
+  // Re-render with full markdown now that we have the complete text. Inline
+  // [Source N] markers are internal grounding anchors; the user sees sources
+  // only in the collapsible footer appended below.
+  const displayAnswer = stripSourceMarkers(answerBuf || tStr('cb_no_response', 'No response.'));
+  if (bubble) bubble.innerHTML = renderInlineMarkdown(displayAnswer);
 
   // Append sources + verification chip if the server included them.
   if (doneMeta && bubble) appendAskStreamMeta(bubble, doneMeta);
 
-  return answerBuf || tStr('cb_no_response', 'No response.');
+  return displayAnswer;
 }
 
 
@@ -745,6 +754,7 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
   const verification = (meta.verification as { status?: string; reasons?: string[] } | undefined) || undefined;
 
   let footerHtml = '';
+  let sourceHtml = '';
   if (sources.length) {
     const items = sources
       .map((s) => {
@@ -756,7 +766,7 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
         return line;
       })
       .join('');
-    footerHtml += '<details class="ncb-ask-sources"><summary>' + escapeHtml(tStr('cb_sources_summary', 'Sources')) + '</summary><ul>' + items + '</ul></details>';
+    sourceHtml = '<details class="ncb-ask-sources"><summary>' + escapeHtml(tStr('cb_sources_summary', 'Sources')) + '</summary><ul>' + items + '</ul></details>';
   }
   if (verification && verification.status) {
     const label =
@@ -791,12 +801,21 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
       head.appendChild(chip);
     }
   }
+  footerHtml += sourceHtml;
   if (footerHtml) {
     const footer = document.createElement('div');
     footer.className = 'ncb-ask-footer';
     footer.innerHTML = footerHtml;
     bubble.appendChild(footer);
   }
+}
+
+function stripSourceMarkers(text: string): string {
+  return (text || "")
+    .replace(/\s*\[Source\s+\d+\]/gi, "")
+    .replace(/\s+\./g, ".")
+    .replace(/\s+,/g, ",")
+    .trim();
 }
 
 

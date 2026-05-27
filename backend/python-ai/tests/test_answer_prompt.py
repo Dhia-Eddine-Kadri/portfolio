@@ -41,7 +41,10 @@ from app.services.answer import (  # noqa: E402
     _sources_for_answer,
     pick_system_prompt,
 )
-from app.services.answer_stream import _problem_solver_overlay  # noqa: E402
+from app.services.answer_stream import (  # noqa: E402
+    _effective_strength_with_open_context,
+    _problem_solver_overlay,
+)
 
 
 # ── weak retrieval always wins, even for math questions ────────────────────
@@ -70,6 +73,8 @@ def test_none_retrieval_uses_weak_prompt() -> None:
     prompt, mode = pick_system_prompt("Aufgabe 1.2", "none")
     assert prompt.startswith(_SYSTEM_PROMPT_WEAK)
     assert mode == "weak"
+    assert "General explanation (not from your course files)" in prompt
+    assert "reply 'general'" not in prompt
 
 
 # ── strong retrieval routes by question type ───────────────────────────────
@@ -170,6 +175,17 @@ def test_problem_solver_full_solution_requires_final_arithmetic() -> None:
     assert "exact missing quantities" in body
     assert "mach weiter" in body
     assert "rechnerisch" in body
+
+
+def test_open_context_only_promotes_when_request_targets_visible_page() -> None:
+    """Visible PDF text should not make every broad question look strong.
+
+    The caller now decides whether the open context is actually relevant
+    (deictic question or Problem Solver). This keeps random visible text from
+    masking weak retrieval for broad course questions.
+    """
+    assert _effective_strength_with_open_context("weak", should_promote=False) == "weak"
+    assert _effective_strength_with_open_context("weak", should_promote=True) == "strong"
 
 
 def test_prompt_contains_minallo_navigation_context() -> None:
@@ -276,6 +292,36 @@ def test_completeness_combines_across_chunks() -> None:
     ]
     r = assess_retrieval_completeness(chunks)
     assert r.is_complete_for_math
+
+
+def test_complete_exact_match_context_counts_as_strong() -> None:
+    """Synthetic exact-match chunks should not be forced into PARTIAL mode
+    when they already contain enough material to answer."""
+    from types import SimpleNamespace
+    from app.services.answer import _context_strength
+
+    chunks = [
+        SimpleNamespace(
+            text="Aufgabe 9.1: Bestimmen Sie die Nachgiebigkeit.",
+            chunk_type="exercise",
+            similarity=1.0,
+            is_synthetic=True,
+        ),
+        SimpleNamespace(
+            text="Formel: delta = l / (A * E).",
+            chunk_type="formula",
+            similarity=1.0,
+            is_synthetic=True,
+        ),
+        SimpleNamespace(
+            text="Gegeben: l = 0,5 m, A = 100 mm^2, E = 210000 N/mm^2.",
+            chunk_type="exercise",
+            similarity=1.0,
+            is_synthetic=True,
+        ),
+    ]
+
+    assert _context_strength(chunks) == "strong"
 
 
 def test_completeness_to_api_shape() -> None:

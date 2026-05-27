@@ -193,9 +193,11 @@ async def retrieve_context_endpoint(payload: RetrieveContextRequest) -> Retrieve
             _require_uuid(did, "documentId")
     if payload.activeDocumentId:
         _require_uuid(payload.activeDocumentId, "activeDocumentId")
-    _verify_user_owns_documents(payload.userId, payload.courseId, payload.documentIds)
+    doc_name_map = _verify_user_owns_documents(payload.userId, payload.courseId, payload.documentIds)
     if payload.activeDocumentId:
-        _verify_user_owns_documents(payload.userId, payload.courseId, [payload.activeDocumentId])
+        doc_name_map.update(_verify_user_owns_documents(
+            payload.userId, payload.courseId, [payload.activeDocumentId]
+        ))
 
     chunks = retrieve_chunks(
         user_id=payload.userId,
@@ -213,6 +215,7 @@ async def retrieve_context_endpoint(payload: RetrieveContextRequest) -> Retrieve
         retrieval_strategy="vector+bm25",
         retrieval_mode=None, candidate_doc_count=None, exercise_hit=None,
         chunks=chunks,
+        doc_names=doc_name_map,
     ))
     return RetrieveContextResponse(chunks=[RetrievedChunkPayload(**c.to_api()) for c in chunks])
 
@@ -231,7 +234,7 @@ class AskRequest(BaseModel):
     bypassCache: bool = False
     tutorMode: str | None = Field(
         default=None,
-        description="Tutor-mode overlay: explain | solve | quiz. Defaults to 'solve'.",
+        description="Tutor-mode overlay: explain | solve | quiz. Defaults to 'explain'.",
     )
 
 
@@ -330,8 +333,9 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
                 retrieval_mode=cached.get("retrievalMode", "strong"),
                 candidate_doc_count=None, exercise_hit=None, chunks=[],
                 model=cached.get("model"), cache_hit=True,
-                prompt_tokens=cached.get("promptTokens"),
-                completion_tokens=cached.get("completionTokens"),
+        prompt_tokens=cached.get("promptTokens"),
+        completion_tokens=cached.get("completionTokens"),
+        doc_names=doc_name_map,
             ))
             cached_verification = cached.get("verification")
             return AskResponse(
@@ -476,10 +480,31 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
                 "pageEnd": exercise_hit.page_end,
             } if exercise_hit else None
         ),
+        exact_hits={
+            "exercise": (
+                {
+                    "documentId": exercise_hit.document_id,
+                    "exerciseNumber": exercise_hit.exercise_number,
+                    "subpart": exercise_hit.subpart,
+                    "pageStart": exercise_hit.page_start,
+                    "pageEnd": exercise_hit.page_end,
+                } if exercise_hit else None
+            ),
+            "formulas": [
+                {
+                    "documentId": h.document_id,
+                    "formulaName": h.formula_name,
+                    "symbols": h.symbols,
+                    "pageNumber": h.page_number,
+                }
+                for h in (formula_hits or [])
+            ],
+        },
         chunks=chunks,
         model=answer.get("model"), cache_hit=False,
         prompt_tokens=answer.get("promptTokens"),
         completion_tokens=answer.get("completionTokens"),
+        doc_names=doc_name_map,
     ))
 
     answer_verification = answer.get("verification")

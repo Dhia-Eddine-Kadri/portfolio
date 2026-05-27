@@ -65,14 +65,14 @@ def _is_deictic_question(q: str) -> bool:
     return bool(_DEICTIC_QUESTION_RE.search(q or ""))
 
 
-def _effective_strength_with_open_context(strength: str, has_open_context: bool) -> str:
+def _effective_strength_with_open_context(strength: str, should_promote: bool) -> str:
     """Promote a request with visible PDF text to answerable context.
 
     RAG can miss an exercise even when the user has it open in the PDF. If the
     frontend sends a focused visible-page excerpt, treat that excerpt as
     grounding and use retrieved chunks as supporting material.
     """
-    return "strong" if has_open_context else strength
+    return "strong" if should_promote else strength
 
 
 def _open_file_image_parts(open_file_images: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -630,19 +630,25 @@ def stream_answer(
     else:
         open_ctx = (open_file_context or "").strip()[:20000]
         open_image_parts = _open_file_image_parts(open_file_images)
-    has_open = bool(open_ctx)
-    has_open_image = bool(open_image_parts)
-    # Promote to "strong" when the user has a file open with visible text AND
-    # the question is deictic ("explain this", "what does this section mean?").
-    # For broad questions ("Solve Aufgabe 4", "Find the formula for X") a
-    # 3.5k-char visible slice is NOT enough grounding — those still need
-    # actual retrieval, otherwise the model would treat whatever happens to
-    # be on the visible page as the answer.
-    deictic = _is_deictic_question(question)
-    effective_strength = _effective_strength_with_open_context(strength, has_open or has_open_image)
     tutor_mode_norm = normalise_tutor_mode(tutor_mode)
     problem_mode = _normalise_problem_solver_mode(
         problem_solver.get("mode") if problem_solver else None
+    )
+    if problem_mode:
+        # Problem Solver modes carry their own behavior contract. In
+        # particular, FULL SOLUTION must not inherit the base Socratic
+        # "do not reveal the answer" overlay from tutorMode="solve".
+        tutor_mode_norm = "explain"
+    has_open = bool(open_ctx)
+    has_open_image = bool(open_image_parts)
+    # Promote to "strong" only when visible PDF content is actually the
+    # user's target: deictic questions ("explain this") or Problem Solver
+    # requests whose structured problem text is the task. Broad questions
+    # still need retrieval strength to earn a confident answer.
+    deictic = _is_deictic_question(question)
+    effective_strength = _effective_strength_with_open_context(
+        strength,
+        (has_open or has_open_image) and (deictic or problem_mode is not None),
     )
     if app_question:
         # App-only path: skip the tutor base prompt entirely so the model
@@ -682,7 +688,7 @@ def stream_answer(
     # Source 0 is only included when the question is deictic OR retrieval
     # was already strong on its own. Otherwise a 3.5k slice of whatever the
     # student happens to have on screen would over-anchor a broad question.
-    include_open_source = has_open
+    include_open_source = has_open and (deictic or problem_mode is not None or strength == "strong")
     parts: list[str] = []
     if include_open_source:
         open_name = active_file_name or "open file"

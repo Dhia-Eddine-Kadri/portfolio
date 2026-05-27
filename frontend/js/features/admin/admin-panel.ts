@@ -161,7 +161,7 @@ function _renderLogDetail(r: RetrievalLogFull): HTMLElement {
     ex.style.cssText =
       'margin-top:12px;padding:10px 12px;background:rgba(34,197,94,.08);' +
       'border:1px solid rgba(34,197,94,.3);border-radius:10px;font-size:.72rem;overflow:auto';
-    ex.textContent = 'exercise_hit: ' + JSON.stringify(r.exercise_hit, null, 2);
+    ex.textContent = 'exact hits: ' + JSON.stringify(r.exercise_hit, null, 2);
     wrap.appendChild(ex);
   }
   if (r.error) {
@@ -193,6 +193,7 @@ function _renderLogDetail(r: RetrievalLogFull): HTMLElement {
         (c.fileName ? '<span>' + escapeHtml(c.fileName) + '</span>' : '') +
         '<span>p.' + escapeHtml(pages) + '</span>' +
         (c.chunkType ? '<span>type: ' + escapeHtml(c.chunkType) + '</span>' : '') +
+        (c.synthetic ? '<span style="color:#60a5fa">exact</span>' : '') +
         (c.sectionTitle ? '<span>§ ' + escapeHtml(c.sectionTitle) + '</span>' : '') +
         (c.score != null ? '<span>score: ' + c.score.toFixed(3) + '</span>' : '') +
         (c.similarity != null ? '<span>sim: ' + c.similarity.toFixed(3) + '</span>' : '') +

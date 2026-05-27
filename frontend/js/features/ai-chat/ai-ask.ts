@@ -73,6 +73,43 @@ function _getTime(): string {
   );
 }
 
+function stripSourceMarkers(text: string): string {
+  return (text || '')
+    .replace(/\s*\[Source\s+\d+\]/gi, '')
+    .replace(/\s+\./g, '.')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
+
+function _sourceLine(s: { file_name?: string; pages?: string | null; section?: string | null }): string {
+  let line = s.file_name || 'Unknown';
+  if (s.pages) {
+    const pages = String(s.pages);
+    line += /^\d/.test(pages) ? ', p.' + pages : ', ' + pages;
+  }
+  if (s.section) line += ' · ' + s.section;
+  return line;
+}
+
+function appendSourcesDropdown(
+  bubble: HTMLElement | null,
+  sources?: Array<{ file_name?: string; pages?: string | null; section?: string | null }>
+): void {
+  if (!bubble || !sources || !sources.length || bubble.querySelector('.ai-rag-sources')) return;
+  const details = document.createElement('details');
+  details.className = 'ai-rag-sources';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Sources';
+  const list = document.createElement('ul');
+  sources.forEach((s) => {
+    const item = document.createElement('li');
+    item.textContent = _sourceLine(s);
+    list.appendChild(item);
+  });
+  details.append(summary, list);
+  bubble.appendChild(details);
+}
+
 // ── Auto-scroll controller ──────────────────────────────────────────────────
 let _userScrolledUp = false;
 let _scrollListenerAttached = false;
@@ -696,21 +733,21 @@ export function initAskAI(
 
               const completedCount = blocks.length - 1;
               while (_renderedBlockCount < completedCount) {
-                const blockText = blocks[_renderedBlockCount] || '';
+                const blockText = stripSourceMarkers(blocks[_renderedBlockCount] || '');
                 const div = renderBlock(blockText);
                 bubble.insertBefore(div, typingSpan);
                 applyKatexToBlock(div, blockText);
                 _renderedBlockCount++;
               }
 
-              const typingText = (blocks[blocks.length - 1] || '').replace(/<!--META-->[\s\S]*$/, '');
+              const typingText = stripSourceMarkers((blocks[blocks.length - 1] || '').replace(/<!--META-->[\s\S]*$/, ''));
               typingSpan.textContent = typingText;
               _autoScroll(aiMsgs);
             }
 
             function fullRender(text: string): void {
               if (!bubble) return;
-              const display = text.replace(metaPattern, '').trim();
+              const display = stripSourceMarkers(text.replace(metaPattern, '').trim());
               if (!display) return;
               const _doFullRender = (): void => {
                 if (!bubble) return;
@@ -823,11 +860,10 @@ export function initAskAI(
                 // Recent chat history so the model can resolve anaphoric
                 // references ("the formula above", "explain that again").
                 previousTurns: _previousTurns.length ? _previousTurns : undefined,
-                // Only the explicit "solve" problem-solver mode wants the
-                // base "solve" tutor mode; hint/setup/check/practice all want
-                // the softer "explain" base so the overlay can shape behavior
-                // without the base prompt fighting it.
-                tutorMode: opts?.problemSolver?.mode === 'solve' ? 'solve' : 'explain',
+                // Problem Solver modes carry their own behavior contract.
+                // Keep the base mode direct so "Solve" can produce the full
+                // answer instead of inheriting the Socratic tutor overlay.
+                tutorMode: 'explain',
                 problemSolver: opts?.problemSolver || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
@@ -904,21 +940,9 @@ export function initAskAI(
               )
                 .then((data: RagAskResponse) => {
                   if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
-                  let answer = data.answer || 'No answer found.';
+                  let answer = stripSourceMarkers(data.answer || 'No answer found.');
                   const confEmoji =
                     data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';
-                  if (data.sources && data.sources.length) {
-                    answer += '\n\n**Sources:**\n' +
-                      data.sources.map((s) => {
-                        let l = '- ' + (s.file_name || '');
-                        if (s.pages) {
-                          const pages = String(s.pages);
-                          l += /^\d/.test(pages) ? ', p.' + pages : ', ' + pages;
-                        }
-                        if (s.section) l += ' · *' + s.section + '*';
-                        return l;
-                      }).join('\n');
-                  }
                   answer += '\n\n' + confEmoji + ' Confidence: ' + (data.confidence || 'medium');
                   resolve({ content: [{ text: answer }], _ragData: data as unknown as AiResponse['_ragData'] });
                 })
@@ -937,7 +961,7 @@ export function initAskAI(
               const confidence = (meta && meta.confidence) || 'medium';
               const unsupported = !!(meta && meta.unsupported);
 
-              const cleanText = rawText.replace(metaPattern, '').trim();
+              const cleanText = stripSourceMarkers(rawText.replace(metaPattern, '').trim());
               if (!cleanText) {
                 if (ansWrap) { ansWrap.remove(); ansWrap = null; }
                 fallbackToRag();
@@ -953,18 +977,6 @@ export function initAskAI(
                 fullAnswer =
                   '⚠️ *No matching course materials found — answering from general knowledge.*\n\n' +
                   fullAnswer;
-              }
-              if (sources.length) {
-                fullAnswer += '\n\n**Sources:**\n' +
-                  sources.map((s) => {
-                    let line = '- ' + (s.file_name || '');
-                    if (s.pages) {
-                      const pages = String(s.pages);
-                      line += /^\d/.test(pages) ? ', p.' + pages : ', ' + pages;
-                    }
-                    if (s.section) line += ' · *' + s.section + '*';
-                    return line;
-                  }).join('\n');
               }
               fullAnswer += '\n\n' + footer;
 
@@ -983,6 +995,7 @@ export function initAskAI(
               }
 
               fullRender(fullAnswer);
+              appendSourcesDropdown(bubble, sources);
 
               if (ansWrap && !ansWrap.querySelector('.rag-feedback-bar')) {
                 const _mb = ansWrap.querySelector<HTMLElement>('.msg-body');
@@ -1073,12 +1086,13 @@ export function initAskAI(
           : d.content
             ? d.content.map((b) => b.text || '').join('')
             : 'No response';
+        const displayTextLocal = d._ragData ? stripSourceMarkers(rawTextLocal) : rawTextLocal;
 
         // Persist non-RAG answers too. The RAG/stream path saves history inside
         // finalize(); without this the non-RAG branch silently dropped chat
         // history on reload for users with no indexed course docs.
-        if (!d.error && rawTextLocal && rawTextLocal !== 'No response') {
-          _appendCourseHistory(window.activeCourseId || window.currentCourseId || '', question, rawTextLocal);
+        if (!d.error && displayTextLocal && displayTextLocal !== 'No response') {
+          _appendCourseHistory(window.activeCourseId || window.currentCourseId || '', question, displayTextLocal);
         }
 
         const ansWrap = document.createElement('div');
@@ -1103,7 +1117,7 @@ export function initAskAI(
           const bubble = ansWrap.querySelector<HTMLElement>('.ai-bubble.bot');
           const meta = ansWrap.querySelector<HTMLElement>('.msg-meta');
           if (!bubble || !meta) return;
-          const tokens = rawTextLocal.match(/\S+\s*/g) || [];
+          const tokens = displayTextLocal.match(/\S+\s*/g) || [];
           let idx = 0;
           let displayed = '';
           const _fbCfg = window.AI_TYPING || ({} as Partial<NonNullable<Window['AI_TYPING']>>);
@@ -1125,13 +1139,14 @@ export function initAskAI(
               return;
             }
             if (idx >= tokens.length) {
-              bubble!.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : escapeHtml(rawTextLocal);
+              bubble!.innerHTML = window.renderMarkdown ? window.renderMarkdown(displayTextLocal) : escapeHtml(displayTextLocal);
+              appendSourcesDropdown(bubble, (d._ragData as RagAskResponse | undefined)?.sources);
               if (window._renderMath) window._renderMath(bubble);
               if (window._renderCode) window._renderCode(bubble);
               meta!.style.display = 'flex';
               if (!ansWrap.querySelector('.ai-action-bar') && window._aiResponseActions) {
                 const mb = ansWrap.querySelector<HTMLElement>('.msg-body');
-                const actions = window._aiResponseActions(rawTextLocal, 'panel') as Node | null;
+                const actions = window._aiResponseActions(displayTextLocal, 'panel') as Node | null;
                 if (mb && actions) mb.appendChild(actions);
               }
               if (_ragMeta && !ansWrap.querySelector('.rag-feedback-bar')) {

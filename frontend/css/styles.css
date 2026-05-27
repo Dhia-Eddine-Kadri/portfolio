@@ -4706,6 +4706,58 @@ body.night .ai-bubble.user {
   border-top: 1px solid rgba(37, 99, 235, 0.2);
   margin: 12px 0;
 }
+
+.ai-rag-sources {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+  font-size: 0.78rem;
+  color: rgba(71, 85, 105, 0.9);
+}
+
+.ai-rag-sources > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #334155;
+  list-style: none;
+}
+
+.ai-rag-sources > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ai-rag-sources > summary::before {
+  content: ">";
+  display: inline-block;
+  font-size: 0.68rem;
+  transition: transform 0.15s ease;
+}
+
+.ai-rag-sources[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.ai-rag-sources ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.ai-rag-sources li {
+  margin: 4px 0;
+}
+
+body.night .ai-rag-sources {
+  border-top-color: rgba(148, 163, 184, 0.22);
+  color: rgba(226, 232, 240, 0.78);
+}
+
+body.night .ai-rag-sources > summary {
+  color: #e2e8f0;
+}
+
 .ai-bubble .md-code-block {
   background: var(--dp-solid);
   border: 1px solid rgba(37, 99, 235, 0.18);

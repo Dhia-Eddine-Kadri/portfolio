@@ -68,6 +68,19 @@ def test_chunk_to_meta_accepts_dict_input() -> None:
     assert meta["excerpt"] == "hello"
 
 
+def test_chunk_to_meta_includes_filename_and_synthetic_flag() -> None:
+    c = _FakeChunk(
+        chunk_id="c4", document_id="d4", page_start=7, page_end=7,
+        text="formula text", score=99.0, similarity=1.0, chunk_type="formula",
+    )
+    c.is_synthetic = True  # type: ignore[attr-defined]
+
+    meta = chunk_to_meta(c, {"d4": "Formelzettel.pdf"})
+
+    assert meta["fileName"] == "Formelzettel.pdf"
+    assert meta["synthetic"] is True
+
+
 def test_record_retrieval_debug_inserts_expected_shape() -> None:
     captured: dict = {}
 
@@ -97,6 +110,7 @@ def test_record_retrieval_debug_inserts_expected_shape() -> None:
             cache_hit=False,
             prompt_tokens=100,
             completion_tokens=200,
+            doc_names={"d1": "Lecture.pdf"},
         ))
 
     assert captured["endpoint"] == "ask"
@@ -106,6 +120,35 @@ def test_record_retrieval_debug_inserts_expected_shape() -> None:
     assert captured["cache_hit"] is False
     assert len(captured["chunk_metadata"]) == 1
     assert captured["chunk_metadata"][0]["chunkId"] == "c1"
+    assert captured["chunk_metadata"][0]["fileName"] == "Lecture.pdf"
+
+
+def test_record_retrieval_debug_stores_exact_hits_when_provided() -> None:
+    captured: dict = {}
+
+    def fake_get_supabase():
+        client = MagicMock()
+        def insert(row):
+            captured.update(row)
+            return MagicMock(execute=lambda: None)
+        client.table.return_value.insert.side_effect = insert
+        return client
+
+    exact_hits = {
+        "exercise": None,
+        "formulas": [{"documentId": "d1", "formulaName": "Hooke", "pageNumber": 3}],
+    }
+
+    with patch("app.services.retrieval_debug.get_supabase", fake_get_supabase):
+        record_retrieval_debug(DebugPayload(
+            user_id="u1", course_id="c1", endpoint="ask",
+            question="formula?", active_document_id=None,
+            selected_document_ids=None, retrieval_strategy="formula-exact+vector+bm25",
+            retrieval_mode="strong", candidate_doc_count=1,
+            exercise_hit=None, exact_hits=exact_hits, chunks=[],
+        ))
+
+    assert captured["exercise_hit"] == exact_hits
 
 
 def test_record_retrieval_debug_swallows_db_errors() -> None:

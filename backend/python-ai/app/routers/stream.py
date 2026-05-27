@@ -105,7 +105,7 @@ class AskStreamRequest(BaseModel):
     activeFileName: str | None = None
     openFileContext: str | None = None
     openFileImages: list[OpenFileImagePayload] | None = None
-    # Tutor-mode overlay: explain | solve | quiz. Defaults to 'solve'.
+    # Tutor-mode overlay: explain | solve | quiz. Defaults to 'explain'.
     tutorMode: str | None = None
     # Short transcript of the most recent turns in this chat session,
     # newest last. Capped on the server (we trim to ~3 turns / ~2000 chars
@@ -329,6 +329,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             model=cached.get("model"), cache_hit=True,
             prompt_tokens=cached.get("promptTokens"),
             completion_tokens=cached.get("completionTokens"),
+            doc_names=doc_name_map,
         ))
         return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
@@ -399,6 +400,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     from ..services.answer import is_app_question  # noqa: WPS433
     if is_app_question(question):
         chunks = []
+        exercise_hit = None
+        formula_hits = []
     else:
         exercise_hit = retrieve_exercise_block(
             user_id=user_id, course_id=payload.courseId, query=retrieval_query,
@@ -554,10 +557,31 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                     "pageEnd": exercise_hit.page_end,
                 } if exercise_hit else None
             ),
+            exact_hits={
+                "exercise": (
+                    {
+                        "documentId": exercise_hit.document_id,
+                        "exerciseNumber": exercise_hit.exercise_number,
+                        "subpart": exercise_hit.subpart,
+                        "pageStart": exercise_hit.page_start,
+                        "pageEnd": exercise_hit.page_end,
+                    } if exercise_hit else None
+                ),
+                "formulas": [
+                    {
+                        "documentId": h.document_id,
+                        "formulaName": h.formula_name,
+                        "symbols": h.symbols,
+                        "pageNumber": h.page_number,
+                    }
+                    for h in (formula_hits or [])
+                ],
+            },
             chunks=chunks,
             model=captured_meta.get("model"), cache_hit=False,
             prompt_tokens=captured_meta.get("promptTokens"),
             completion_tokens=captured_meta.get("completionTokens"),
+            doc_names=doc_name_map,
         ))
 
     return StreamingResponse(gen(), media_type="text/event-stream")

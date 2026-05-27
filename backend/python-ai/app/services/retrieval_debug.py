@@ -47,7 +47,7 @@ def _excerpt(text: str | None) -> str:
     return t if len(t) <= _EXCERPT_MAX else t[: _EXCERPT_MAX - 1] + "…"
 
 
-def chunk_to_meta(chunk: Any) -> dict[str, Any]:
+def chunk_to_meta(chunk: Any, doc_names: dict[str, str] | None = None) -> dict[str, Any]:
     """Reduce a RetrievedChunk (or already-dict payload) to a JSON-safe
     metadata record suitable for the debug log."""
     if isinstance(chunk, dict):
@@ -55,15 +55,18 @@ def chunk_to_meta(chunk: Any) -> dict[str, Any]:
     else:
         get = lambda k, d=None: getattr(chunk, k, d)  # noqa: E731
 
+    document_id = get("document_id") or get("documentId")
     return {
         "chunkId":      get("chunk_id") or get("chunkId"),
-        "documentId":   get("document_id") or get("documentId"),
+        "documentId":   document_id,
+        "fileName":     (doc_names or {}).get(document_id) if document_id else None,
         "pageStart":    get("page_start") if get("page_start") is not None else get("pageStart"),
         "pageEnd":      get("page_end") if get("page_end") is not None else get("pageEnd"),
         "score":        get("score"),
         "similarity":   get("similarity"),
         "chunkType":    get("chunk_type") or get("chunkType"),
         "sectionTitle": get("section_title") or get("sectionTitle"),
+        "synthetic":    bool(get("is_synthetic") or get("isSynthetic")),
         "excerpt":      _excerpt(get("text")),
     }
 
@@ -81,12 +84,14 @@ class DebugPayload:
     candidate_doc_count: int | None
     exercise_hit: dict[str, Any] | None
     chunks: Iterable[Any]
+    exact_hits: dict[str, Any] | None = None
     model: str | None = None
     cache_hit: bool = False
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     duration_ms: int | None = None
     error: str | None = None
+    doc_names: dict[str, str] | None = None
 
 
 def record_retrieval_debug(p: DebugPayload) -> None:
@@ -110,8 +115,8 @@ def record_retrieval_debug(p: DebugPayload) -> None:
             "retrieval_strategy":    p.retrieval_strategy,
             "retrieval_mode":        p.retrieval_mode,
             "candidate_doc_count":   p.candidate_doc_count,
-            "exercise_hit":          p.exercise_hit,
-            "chunk_metadata":        [chunk_to_meta(c) for c in (p.chunks or [])],
+            "exercise_hit":          p.exact_hits if p.exact_hits is not None else p.exercise_hit,
+            "chunk_metadata":        [chunk_to_meta(c, p.doc_names) for c in (p.chunks or [])],
             "model":                 p.model,
             "cache_hit":             p.cache_hit,
             "prompt_tokens":         p.prompt_tokens,

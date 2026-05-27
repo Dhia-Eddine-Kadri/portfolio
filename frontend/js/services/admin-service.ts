@@ -82,6 +82,7 @@ export interface RetrievalChunkMeta {
   similarity?: number;
   chunkType?: string;
   sectionTitle?: string | null;
+  synthetic?: boolean;
   excerpt?: string;
 }
 
