@@ -1183,10 +1183,16 @@
         }
       }
 
-      // Make URLs clickable in content
+      // Make URLs clickable in content.
+      // The regex must exclude characters that could break out of the href
+      // attribute after HTML entities are decoded by the browser. Because
+      // _chatMd() already ran _chatEsc(), raw `"` is now the literal string
+      // `&quot;` — which would decode back to `"` inside the attribute and
+      // enable attribute injection (e.g. https://x&quot;onmouseover=...).
+      // Stopping the URL match at `&`, `"`, `'`, `<`, `>` blocks that path.
       var contentHTML = m.content
         ? _chatMd(m.content).replace(
-            /(https?:\/\/[^\s<]+)/g,
+            /(https?:\/\/[^\s<>&"']+)/g,
             '<a href="$1" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:underline;word-break:break-all">$1</a>'
           )
         : '';
