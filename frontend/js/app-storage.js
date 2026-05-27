@@ -163,7 +163,14 @@ async function _ufListFolder(uid, course, folder) {
       Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prefix: prefix, limit: 200, offset: 0 })
+    // sortBy is required by current Supabase Storage validation — older
+    // versions accepted just { prefix, limit, offset }, newer ones 400.
+    body: JSON.stringify({
+      prefix: prefix,
+      limit: 200,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' }
+    })
   });
   if (!r.ok) return [];
   var items = await r.json();
@@ -218,7 +225,14 @@ async function _ufList(uid, course) {
       Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ prefix: prefix, limit: 200, offset: 0 })
+    // sortBy is required by current Supabase Storage validation — older
+    // versions accepted just { prefix, limit, offset }, newer ones 400.
+    body: JSON.stringify({
+      prefix: prefix,
+      limit: 200,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' }
+    })
   });
   if (!r.ok) return [];
   var items = await r.json();
