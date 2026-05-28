@@ -930,6 +930,9 @@ _FORMULA_INTENT_KEYWORDS = (
     "integral", "taylor", "fourier", "matrix", "vektor", "betrag",
     "nachgiebigkeit", "steifigkeit", "schraube", "schrauben", "flansch",
     "vorspann", "vorspannkraft", "federkonstante",
+    "kinematik", "kinematics", "geschwindigkeit", "velocity",
+    "beschleunigung", "acceleration", "verzögerung", "verzoegerung",
+    "deceleration", "freier", "free", "fall", "fallzeit",
 )
 
 

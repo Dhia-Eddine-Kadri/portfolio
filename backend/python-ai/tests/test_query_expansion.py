@@ -36,6 +36,7 @@ def _import_qe():
     "Übung 3 (a) bitte",
     "Give me the formula for shear force",
     "What is sigma when F = 100 N and A = 0.01 m²?",
+    "An object is dropped in a vacuum fall shaft with l = 200 m and a = -50g",
     "Berechne das Moment",
     "Solve for x when x = 2y + 3",
 ])

@@ -271,6 +271,7 @@ interface LandingTranslation {
           document.head.appendChild(gsi);
         })();
         if (SS) SS.markReady('landing', { file: 'pages/new_landing.html' });
+        window.dispatchEvent(new Event('ss-ready'));
         console.log('✓ New landing page loaded');
 
         // Re-run fade-in observer — scripts inside landing.html don't execute via innerHTML
@@ -339,6 +340,7 @@ interface LandingTranslation {
           'background:linear-gradient(90deg,#b87bff,#ef79c4);' +
           'border:none;border-radius:999px;color:#fff;font-weight:800;cursor:pointer">' +
           'Sign in with Google</button></div>';
+        window.dispatchEvent(new Event('ss-ready'));
       });
 
     return; // ← do NOT load app sections below

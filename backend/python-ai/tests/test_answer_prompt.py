@@ -161,6 +161,33 @@ def test_math_prompt_forbids_invention() -> None:
     assert "do not invent" in body
 
 
+def test_math_prompt_requires_kinematics_phase_check() -> None:
+    body = _SYSTEM_PROMPT_MATH.lower()
+    assert "identify the phases" in body
+    assert "braking phase" in body
+    assert "total constraint" in body
+    assert "entire shaft/track length as free fall" in body
+
+
+def test_deictic_visible_math_problem_can_use_math_prompt() -> None:
+    from app.services.answer import pick_system_prompt
+
+    chunks = [
+        _mk_chunk(
+            "Problem 1: An object is dropped in a vacuum fall shaft. "
+            "Given: l = 200 m, a = -50g, v = 0 m/s. "
+            "Determine the maximum possible test time t1 and distance x1.",
+            chunk_type="exercise",
+            similarity=0.99,
+        )
+    ]
+
+    prompt, mode = pick_system_prompt("answer the first problem in this pdf", "strong", chunks)
+
+    assert mode == "math"
+    assert prompt.startswith(_SYSTEM_PROMPT_MATH)
+
+
 def test_problem_solver_full_solution_requires_final_arithmetic() -> None:
     """The full-solution overlay must not let the model stop at method steps.
 

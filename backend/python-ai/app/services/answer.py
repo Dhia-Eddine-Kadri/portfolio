@@ -84,6 +84,11 @@ Rules:
 4. Write math using KaTeX: $...$ inline, $$...$$ display.
 4a. Code: wrap any code in triple-backtick fences with a language tag (```python, ```java, ```c, ```sql, ...). Inline identifiers, function names, file paths, CLI commands use `single backticks`. NEVER wrap code in math `$...$` delimiters. Preserve indentation exactly.
 4b. If the question is a CODING problem (asking to implement, debug, trace, or analyse code) rather than a math problem, IGNORE the Given/Required/Formula structure below. Use instead: ### Problem (restate it) → ### Approach (1-3 sentences of strategy) → ### Code (one or more fenced code blocks) → ### Trace (walk through an example input/output) → ### Complexity (time and space, or "not applicable"). Still cite course material with `[Source N]` where it grounds the answer.
+4c. Physics / engineering model check: before calculating, identify the phases and constraints in the problem statement. If an object is first released/falls/moves and later must end with a specified final velocity under braking/deceleration, model those as separate motion phases. Do NOT use the full available distance as the test/free-motion distance unless the stopping/braking distance is zero. For vacuum/free fall followed by constant deceleration, explicitly write:
+   - free/test phase: $x_1 = \frac{1}{2}gt_1^2$, $v_1 = gt_1$
+   - braking phase: $0 = v_1^2 + 2a_2x_2$
+   - total constraint: $l = x_1 + x_2$
+   Then solve the coupled equations. This prevents the common mistake of treating the entire shaft/track length as free fall when a final stop condition is given.
 5. Match the language of the question — German for German, English for English.
 
 Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry an `[Source N]` reference next to it. `[Source N]` is the ONLY format the verifier accepts. You MAY also append `(filename, p.N)` after the `[Source N]` for the reader, but a filename-only reference without `[Source N]` does NOT count as a citation. Do NOT list sources up front; only cite the ones you actually use, where you use them.
@@ -519,6 +524,29 @@ _GIVEN_VALUE_RE = re.compile(
     r"[A-Za-zα-ωΑ-Ω]\w{0,15}\s*=\s*[-+]?\d+(?:[\.,]\d+)?",
 )
 
+_MATH_PROBLEM_CONTEXT_RE = re.compile(
+    r"\b("
+    r"aufgabe|übungsaufgabe|uebungsaufgabe|exercise|problem|task|"
+    r"berechne|berechnen|calculate|compute|determine|find|"
+    r"velocity|geschwindigkeit|acceleration|beschleunigung|"
+    r"deceleration|verzögerung|verzoegerung|free\s*fall|freier\s*fall|"
+    r"kinematics|kinematik|vacuum|fall\s*shaft"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _chunks_look_like_math_problem(chunks: list[RetrievedChunk] | None) -> bool:
+    """Detect deictic PDF questions whose *visible/retrieved text* is the
+    actual math problem, even if the user's wording is just "solve this".
+    """
+    if not chunks:
+        return False
+    joined = "\n".join((getattr(c, "text", "") or "") for c in chunks[:4])
+    if not joined:
+        return False
+    return bool(_MATH_PROBLEM_CONTEXT_RE.search(joined) and _CHUNK_FORMULA_RE.search(joined))
+
 
 @dataclass
 class RetrievalCompleteness:
@@ -768,7 +796,8 @@ def pick_system_prompt(
         # Local import: query_expansion may transitively import retrieval.
         from .query_expansion import is_math_question  # noqa: WPS433
         use_math = False
-        if tutor_mode != "quiz" and is_math_question(question):
+        mathish = is_math_question(question) or _chunks_look_like_math_problem(chunks)
+        if tutor_mode != "quiz" and mathish:
             # Review fix #7 — gate the rigid math template on a fuller
             # readiness check. Old criteria:
             #   (a) at least one exercise/solution chunk above _STRONG_SIMILARITY

@@ -40,6 +40,9 @@ _EXERCISE_KEYWORDS = (
 _FORMULA_KEYWORDS = (
     "formula", "formel", "formelsammlung", "gleichung", "equation",
     "theorem", "satz", "ungleichung", "inequality",
+    "kinematics", "kinematik", "velocity", "geschwindigkeit",
+    "acceleration", "beschleunigung", "deceleration", "verzögerung",
+    "verzoegerung", "free fall", "freier fall",
 )
 # A few common physics/engineering units. Hitting one of these is a
 # strong signal that the question is numerical.

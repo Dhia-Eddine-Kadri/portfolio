@@ -657,8 +657,11 @@ def stream_answer(
         system_prompt = _APP_ONLY_SYSTEM_PROMPT + MINALLO_APP_CONTEXT
         answer_mode = "app"
     else:
+        routing_question = question
+        if open_ctx and (deictic or problem_mode is not None):
+            routing_question = (question.strip() + "\n\n" + open_ctx[:2000]).strip()
         system_prompt, answer_mode = pick_system_prompt(
-            question, effective_strength, used_chunks, tutor_mode=tutor_mode_norm,
+            routing_question, effective_strength, used_chunks, tutor_mode=tutor_mode_norm,
             weak_topics=weak_topics,
         )
         if problem_mode:
