@@ -169,6 +169,13 @@ def test_math_prompt_requires_kinematics_phase_check() -> None:
     assert "entire shaft/track length as free fall" in body
 
 
+def test_strong_prompt_warns_against_single_phase_braking_error() -> None:
+    body = _SYSTEM_PROMPT_STRONG.lower()
+    assert "separate motion phases" in body
+    assert "full shaft/track length" in body
+    assert "l=x_1+x_2" in body
+
+
 def test_deictic_visible_math_problem_can_use_math_prompt() -> None:
     from app.services.answer import pick_system_prompt
 

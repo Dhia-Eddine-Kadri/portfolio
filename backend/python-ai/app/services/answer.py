@@ -62,6 +62,7 @@ Rules:
    - Formula question → state the formula, define every variable, explain when it applies.
    - "What does this say / summarise this" → faithful summary of the cited chunks, not a derivation.
    Do not impose an engineering-exercise template on questions that aren't exercises.
+8. Physics / engineering model check: if the problem statement says an object is released/falls/moves and later must end with a specified final velocity under braking/deceleration, treat this as separate motion phases. Do NOT set the full shaft/track length equal to the free/test distance. Reserve distance for stopping, write the total constraint (for example $l=x_1+x_2$), and solve the coupled equations.
 
 Open with a line like "Based on your uploaded files..." so the student knows the answer is grounded."""
 
@@ -796,7 +797,8 @@ def pick_system_prompt(
         # Local import: query_expansion may transitively import retrieval.
         from .query_expansion import is_math_question  # noqa: WPS433
         use_math = False
-        mathish = is_math_question(question) or _chunks_look_like_math_problem(chunks)
+        context_math_problem = _chunks_look_like_math_problem(chunks)
+        mathish = is_math_question(question) or context_math_problem
         if tutor_mode != "quiz" and mathish:
             # Review fix #7 — gate the rigid math template on a fuller
             # readiness check. Old criteria:
@@ -819,7 +821,7 @@ def pick_system_prompt(
                     for c in chunks
                 )
                 completeness = assess_retrieval_completeness(chunks)
-                if has_exercise_anchor and completeness.is_complete_for_math:
+                if completeness.is_complete_for_math and (has_exercise_anchor or context_math_problem):
                     use_math = True
         if use_math:
             base, label = _SYSTEM_PROMPT_MATH, "math"
