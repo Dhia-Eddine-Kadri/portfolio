@@ -177,6 +177,10 @@ export function applyProfile(p: ProfileRow | null | undefined): void {
     window._userVertiefung = p.vertiefung;
     localStorage.setItem('ss_vertiefung', p.vertiefung);
   }
+  if (p.university) {
+    window._userUniversity = p.university;
+    localStorage.setItem('ss_university', p.university);
+  }
   if (p.programme) {
     const MAJOR_LIST = window.MAJOR_LIST || [];
     const rawMajor = p.programme.split(',')[0]?.trim() || '';
@@ -223,9 +227,10 @@ export function applyUserTypeUI(): void {
   if (sub) {
     const tFn = window._t;
     const germanTestLabel = tFn ? tFn('profile_german_test') : 'German Test';
+    const uni = window._userUniversity || localStorage.getItem('ss_university') || '';
     sub.textContent = isLearner
       ? (germanTest || germanTestLabel) + (germanLevel ? ' · ' + germanLevel : '')
-      : 'TU Braunschweig';
+      : uni;
   }
   const coursesNav = document.getElementById('pcStudip');
   const germanNav = document.getElementById('psbGerman');

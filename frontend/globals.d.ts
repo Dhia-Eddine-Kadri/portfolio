@@ -222,6 +222,7 @@ declare global {
     _dwLoadAndRender?: () => void;
     _userVertiefung?: string;
     _userMajor?: string;
+    _userUniversity?: string;
     _chatUsername?: string;
     _userType?: string;
     _germanTest?: string;

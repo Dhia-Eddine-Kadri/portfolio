@@ -1,6 +1,35 @@
 // Minallo auth/bootstrap shell.
 // Runs before supabase.js and loader.js so they can read the boot route.
 
+// Escape hatch for state-restore hangs: visit /?reset=1 to wipe the
+// localStorage keys that drive boot-time course/file restore, then
+// reload to a clean slate. Also wired to the splash-watchdog below.
+(function () {
+  try {
+    var qp = new URLSearchParams(window.location.search);
+    if (qp.get('reset') === '1') {
+      try { localStorage.removeItem('ss_state'); } catch (e) {}
+      try { localStorage.removeItem('ss_last_section'); } catch (e) {}
+      try { sessionStorage.removeItem('ss_portal_tab'); } catch (e) {}
+      history.replaceState(null, '', window.location.pathname);
+    }
+  } catch (e) {}
+})();
+
+// Splash watchdog: if ss-ready hasn't fired 15s after boot, the app is
+// hung — most often on a state-restore (e.g. #course=... pointing at a
+// course whose data fails to load). Redirect to ?reset=1 to break the
+// cycle instead of leaving the user stuck on the splash forever.
+(function () {
+  var ready = false;
+  window.addEventListener('ss-ready', function () { ready = true; }, { once: true });
+  setTimeout(function () {
+    if (ready) return;
+    if (window.location.search.indexOf('reset=1') !== -1) return;
+    window.location.replace(window.location.pathname + '?reset=1');
+  }, 15000);
+})();
+
 (function () {
   var loggedIn = false;
 

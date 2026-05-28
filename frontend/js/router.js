@@ -377,6 +377,13 @@ _bindIf('psbProfile', 'click', function () {
   _finalizeNav('profile');
 });
 
+_bindIf('authAvatar', 'click', function () {
+  showPortal();
+  setNavActive('psbProfile');
+  showPortalSection('profile');
+  _finalizeNav('profile');
+});
+
 _bindIf('psbSettings', 'click', function () {
   showPortal();
   setNavActive('psbSettings');
