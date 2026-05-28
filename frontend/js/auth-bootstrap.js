@@ -3,7 +3,10 @@
 
 // Escape hatch for state-restore hangs: visit /?reset=1 to wipe the
 // localStorage keys that drive boot-time course/file restore, then
-// reload to a clean slate. Also wired to the splash-watchdog below.
+// reload to a clean slate. Strips the query AND the hash (the hash is
+// restored from ss_state, but if we don't drop it now the router still
+// reads it as a deep-link target). Sets ss_reset_done so the watchdog
+// doesn't immediately re-fire and re-redirect into an infinite loop.
 (function () {
   try {
     var qp = new URLSearchParams(window.location.search);
@@ -11,6 +14,7 @@
       try { localStorage.removeItem('ss_state'); } catch (e) {}
       try { localStorage.removeItem('ss_last_section'); } catch (e) {}
       try { sessionStorage.removeItem('ss_portal_tab'); } catch (e) {}
+      try { sessionStorage.setItem('ss_reset_done', '1'); } catch (e) {}
       history.replaceState(null, '', window.location.pathname);
     }
   } catch (e) {}
@@ -20,11 +24,23 @@
 // hung — most often on a state-restore (e.g. #course=... pointing at a
 // course whose data fails to load). Redirect to ?reset=1 to break the
 // cycle instead of leaving the user stuck on the splash forever.
+// One-shot per tab via sessionStorage so we never loop: if a reset has
+// already happened this tab and we're STILL hung, escalate to a hard
+// landing-page bounce instead of redirecting in circles.
 (function () {
   var ready = false;
   window.addEventListener('ss-ready', function () { ready = true; }, { once: true });
   setTimeout(function () {
     if (ready) return;
+    var alreadyReset = false;
+    try { alreadyReset = sessionStorage.getItem('ss_reset_done') === '1'; } catch (e) {}
+    if (alreadyReset) {
+      // Reset already tried this tab and we're still hung — give up on
+      // auto-recovery. Leave the user on the splash so they can manually
+      // sign out / try a different browser rather than thrash in a loop.
+      console.error('[watchdog] ss-ready never fired after reset — giving up.');
+      return;
+    }
     if (window.location.search.indexOf('reset=1') !== -1) return;
     window.location.replace(window.location.pathname + '?reset=1');
   }, 15000);
