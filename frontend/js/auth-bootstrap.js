@@ -1,6 +1,51 @@
 // Minallo auth/bootstrap shell.
 // Runs before supabase.js and loader.js so they can read the boot route.
 
+// Install console-log filter IMMEDIATELY so the noisy boot-time logs from
+// supabase.js (Supabase REST client ready, [Auth] path traces) are
+// silenced in production. Real users don't need to see implementation
+// details — and our console was noisier than YouTube/Cloudflare's
+// because we shipped dev logs to prod. Set localStorage.MINALLO_DEBUG=1
+// to re-enable everything when you're actually debugging.
+(function () {
+  try {
+    if (localStorage.getItem('MINALLO_DEBUG') === '1') return;
+  } catch (e) { return; }
+  var origLog = console.log.bind(console);
+  var origWarn = console.warn.bind(console);
+  var devPrefixes = [
+    'Supabase REST client',
+    'Supabase reachable',
+    'app.js + modules loaded',
+    'js/ai.js loaded',
+    '✓ js/ai.js loaded',
+    '✓ New landing page',
+    '[Auth]',
+    '[router]',
+    '[loadUserData]',
+    '[loader]',
+    '[storage]',
+    '[restore]',
+    '[watchdog]',
+  ];
+  function isDev(args) {
+    var first = args && args[0];
+    if (typeof first !== 'string') return false;
+    for (var i = 0; i < devPrefixes.length; i++) {
+      if (first.indexOf(devPrefixes[i]) === 0) return true;
+    }
+    return false;
+  }
+  console.log = function () {
+    if (isDev(arguments)) return;
+    origLog.apply(console, arguments);
+  };
+  console.warn = function () {
+    if (isDev(arguments)) return;
+    origWarn.apply(console, arguments);
+  };
+})();
+
 function _ssForceSplashOff(reason) {
   try { document.body.setAttribute('data-ss-ready', '1'); } catch (e) {}
   try {
