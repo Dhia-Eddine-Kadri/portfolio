@@ -39,22 +39,23 @@ const runDelayed = (fn: () => void, ms = 20000): void => {
   setTimeout(fn, ms);
 };
 
-function lazyImport(path: string): Promise<Record<string, unknown>> {
+function lazyImportEncoded(encodedPath: string): Promise<Record<string, unknown>> {
   // Keep the URL non-literal at parse time. Some browsers/CDN transforms can
   // discover literal import('...') targets immediately, defeating the delay.
+  const path = atob(encodedPath);
   return import(/* @vite-ignore */ path);
 }
 
-runIdle(() => lazyImport('./core/' + 'pull-to-refresh.js').then((m) => (m.initPullToRefresh as () => void)()));
-runIdle(() => lazyImport('./core/' + 'console-filter.js').then((m) => (m.initConsoleFilter as () => void)()));
-runDelayed(() => lazyImport('./features/admin/' + 'admin-panel.js').then((m) => (m.initAdminPanel as () => void)()));
-runDelayed(() => lazyImport('./features/auth/' + 'onboarding.js').then((m) => (m.initOnboarding as () => void)()));
+runIdle(() => lazyImportEncoded('Li9jb3JlL3B1bGwtdG8tcmVmcmVzaC5qcw==').then((m) => (m.initPullToRefresh as () => void)()));
+runIdle(() => lazyImportEncoded('Li9jb3JlL2NvbnNvbGUtZmlsdGVyLmpz').then((m) => (m.initConsoleFilter as () => void)()));
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9hZG1pbi9hZG1pbi1wYW5lbC5qcw==').then((m) => (m.initAdminPanel as () => void)()));
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9hdXRoL29uYm9hcmRpbmcuanM=').then((m) => (m.initOnboarding as () => void)()));
 // AI Fair-Use banner — checks usage on portal load and renders the banner
 // once the user crosses 80% of the monthly cap. Cheap: one GET request,
 // no further work unless the response triggers the banner.
-runDelayed(() => lazyImport('./services/' + 'ai-usage.js').then((m) => (m.initAiUsage as () => void)()), 12000);
-runDelayed(() => lazyImport('./features/study-lounge/' + 'lounge.js').then((m) => (m.initStudyLounge as () => void)()));
-runDelayed(() => lazyImport('./features/music/' + 'music-services.js').then((m) => (m.initMusicServices as (opts: unknown) => void)({
+runDelayed(() => lazyImportEncoded('Li9zZXJ2aWNlcy9haS11c2FnZS5qcw==').then((m) => (m.initAiUsage as () => void)()), 12000);
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9zdHVkeS1sb3VuZ2UvbG91bmdlLmpz').then((m) => (m.initStudyLounge as () => void)()));
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9tdXNpYy9tdXNpYy1zZXJ2aWNlcy5qcw==').then((m) => (m.initMusicServices as (opts: unknown) => void)({
   sb: window._sb as never,
   getCurrentUser: () => window._currentUser ?? null,
   applyUserTypeUI: () => {
@@ -66,8 +67,8 @@ runDelayed(() => lazyImport('./features/music/' + 'music-services.js').then((m) 
     if (typeof window.showToast === 'function') window.showToast(title, sub);
   },
 })));
-runDelayed(() => lazyImport('./features/study-timer/' + 'study-timer.js').then((m) => (m.initStudyTimer as () => void)()));
-runDelayed(() => lazyImport('./features/writing-coach/' + 'writing-coach.js').then((m) => (m.initWritingCoach as () => void)()));
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9zdHVkeS10aW1lci9zdHVkeS10aW1lci5qcw==').then((m) => (m.initStudyTimer as () => void)()));
+runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy93cml0aW5nLWNvYWNoL3dyaXRpbmctY29hY2guanM=').then((m) => (m.initWritingCoach as () => void)()));
 
 // Notifications shell: the portal section #psec-notifications is scaffolded
 // UI without a backend feed yet. Wire #notifMarkAll so the button gives
