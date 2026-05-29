@@ -365,7 +365,23 @@ function _loadUserCourses(data) {
       });
       if (_prcFresh) _prcCourse = _prcFresh;
     }
-    _ufMerge(_prcCourse)
+    // 10s timeout: mirrors the manual openCourse fallback at
+    // course-view.ts:491. Without it, a hung storage list on refresh leaves
+    // the restore promise pending forever AND its in-flight requests saturate
+    // the browser connection pool, blocking subsequent script loads (ai.js).
+    // On timeout we still show the section so the user sees the course UI;
+    // files render from cache, and the on-open _ufMerge retry will refresh
+    // them when storage is reachable again.
+    var _restoreTimeout = new Promise(function (_resolve, reject) {
+      setTimeout(function () { reject(new Error('ufMerge restore timeout')); }, 10000);
+    });
+    Promise.race([_ufMerge(_prcCourse), _restoreTimeout])
+      .catch(function (err) {
+        if (err && err.message === 'ufMerge restore timeout') {
+          console.warn('[restore] _ufMerge timed out — showing course from cache');
+        }
+        // fall through to the .then below so the UI still renders
+      })
       .then(function () {
         _ssRestoring = true;
         showCourseSection(_prcCourse, _prc.sec);
