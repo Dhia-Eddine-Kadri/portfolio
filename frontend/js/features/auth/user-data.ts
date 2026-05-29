@@ -62,9 +62,23 @@ export async function loadUserData(uid: string): Promise<void> {
 
     const sb = window._sb;
     if (!sb) return;
-    const profile = (await sb.from('profiles').select('*').eq('id', uid).single()) as
-      | ProfileRow
-      | null;
+    // 5s timeout per query: any hang here blocks the dashboard from rendering
+    // and the user is left staring at a half-loaded shell forever. Resolving
+    // null on timeout lets downstream code fall back to cached/default state.
+    const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T | null> =>
+      Promise.race<T | null>([
+        p,
+        new Promise<null>((resolve) =>
+          setTimeout(() => {
+            console.warn('[loadUserData] ' + label + ' timed out');
+            resolve(null);
+          }, 5000)
+        ),
+      ]);
+    const profile = (await withTimeout(
+      sb.from('profiles').select('*').eq('id', uid).single() as Promise<ProfileRow | null>,
+      'profiles'
+    )) as ProfileRow | null;
     if (profile && profile.full_name) {
       try {
         localStorage.setItem('profile_cache_' + uid, JSON.stringify(profile));
@@ -90,14 +104,16 @@ export async function loadUserData(uid: string): Promise<void> {
 
     startPresenceHeartbeat(uid);
 
-    const settings = (await sb.from('settings').select('*').eq('id', uid).single()) as
-      | SettingsRow
-      | null;
+    const settings = (await withTimeout(
+      sb.from('settings').select('*').eq('id', uid).single() as Promise<SettingsRow | null>,
+      'settings'
+    )) as SettingsRow | null;
     if (settings && window.applySettings) window.applySettings(settings);
 
-    let sub = (await sb.from('subscriptions').select('*').eq('user_id', uid).single()) as
-      | SubscriptionRow
-      | null;
+    let sub = (await withTimeout(
+      sb.from('subscriptions').select('*').eq('user_id', uid).single() as Promise<SubscriptionRow | null>,
+      'subscriptions'
+    )) as SubscriptionRow | null;
     if (sub && sub.status !== 'paused' && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
       sub = { ...sub, status: 'expired' };
     }
