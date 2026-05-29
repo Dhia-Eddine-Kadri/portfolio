@@ -562,7 +562,32 @@
               </button>
             </div>
 
-            <div id="sdCourseList" class="sd-course-grid"></div>
+            <div id="sdCourseList" class="sd-course-grid">
+              <!-- Skeleton cards shown on first paint while real courses load.
+                   renderCourses() replaces this innerHTML, so they vanish
+                   automatically. The shimmer runs on the compositor thread
+                   (CSS animation), so users see motion even if JS is busy. -->
+              <div class="sd-course-skeleton">
+                <div class="sd-skel-bar w-60"></div>
+                <div class="sd-skel-bar w-40"></div>
+                <div class="sd-skel-bar w-80"></div>
+              </div>
+              <div class="sd-course-skeleton">
+                <div class="sd-skel-bar w-60"></div>
+                <div class="sd-skel-bar w-40"></div>
+                <div class="sd-skel-bar w-80"></div>
+              </div>
+              <div class="sd-course-skeleton">
+                <div class="sd-skel-bar w-60"></div>
+                <div class="sd-skel-bar w-40"></div>
+                <div class="sd-skel-bar w-80"></div>
+              </div>
+              <div class="sd-course-skeleton">
+                <div class="sd-skel-bar w-60"></div>
+                <div class="sd-skel-bar w-40"></div>
+                <div class="sd-skel-bar w-80"></div>
+              </div>
+            </div>
             <div id="sdNextSteps"></div>
           </div>
         </div>

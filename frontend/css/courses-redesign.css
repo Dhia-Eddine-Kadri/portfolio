@@ -384,6 +384,74 @@ textarea {
   border-color: rgba(96, 165, 250, 0.5);
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
 }
+
+/* Skeleton course cards — shown on first paint while real courses load.
+   Removed automatically when renderCourses() replaces #sdCourseList.innerHTML.
+   Compositor-thread shimmer animation keeps running even when the JS thread
+   is busy, so users always see motion (perceived speed). */
+#psec-studip .sd-course-skeleton {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 24px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.4);
+  min-height: 168px;
+  overflow: hidden;
+}
+#psec-studip .sd-course-skeleton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.45), rgba(96, 165, 250, 0.15));
+  border-radius: 22px 22px 0 0;
+}
+#psec-studip .sd-course-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: sd-skeleton-shimmer 1.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes sd-skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+#psec-studip .sd-skel-bar {
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(148, 163, 184, 0.14);
+}
+#psec-studip .sd-skel-bar.w-60 { width: 60%; }
+#psec-studip .sd-skel-bar.w-40 { width: 40%; }
+#psec-studip .sd-skel-bar.w-80 { width: 80%; }
+body:not(.night) #psec-studip .sd-course-skeleton {
+  background: rgba(248, 250, 252, 0.7);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+body:not(.night) #psec-studip .sd-course-skeleton::after {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(15, 23, 42, 0.06) 50%,
+    transparent 70%
+  );
+}
+body:not(.night) #psec-studip .sd-skel-bar {
+  background: rgba(15, 23, 42, 0.08);
+}
+
 #psec-studip .sd-course-bar {
   position: absolute;
   top: 0;
