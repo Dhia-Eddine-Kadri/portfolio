@@ -305,7 +305,18 @@ function _loadUserCourses(data) {
   // Fire-and-forget: pre-fetch every course's files now so cards show real
   // counts and opening a course is instant. Fire on next microtask so the
   // initial render commits first, but with no extra setTimeout delay.
-  Promise.resolve().then(function () { try { _prewarmCourses(); } catch (e) {} });
+  // Wait for ss-ready (loader chain complete + splash hidden) before kicking
+  // off the prewarm fan-out. On networks with broken HTTP/2 multiplexing
+  // (e.g. stale AV filter drivers), the 6 concurrent storage-list calls can
+  // consume the connection pool and queue ai.js behind them — blocking the
+  // entire boot. Running prewarm post-boot lets the user see the dashboard
+  // even if the background warm-up hangs.
+  function _kickPrewarm() { try { _prewarmCourses(); } catch (e) {} }
+  if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
+    Promise.resolve().then(_kickPrewarm);
+  } else {
+    window.addEventListener('ss-ready', _kickPrewarm, { once: true });
+  }
   restoreState();
   // If a course was restored before auth completed, refresh its files from network now.
   // Skip if _currentUser isn't set yet — the post-auth _loadUserCourses call will handle it.
