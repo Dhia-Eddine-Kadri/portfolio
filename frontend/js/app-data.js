@@ -155,6 +155,20 @@ function _prewarmCourses(opts) {
   if (!uid) return; // need an authed user
   if (_coursePrewarmRan && !(opts && opts.force)) return;
 
+  // Defer until ss-ready: the 6 concurrent storage-list calls below will
+  // saturate the connection pool on networks with broken HTTP/2 multiplexing
+  // (and even on healthy connections add measurable latency to ai.js, which
+  // gates ss-ready). Running prewarm pre-boot turns a 1-second hang into a
+  // forever hang. Re-enter once ss-ready fires.
+  var ssReady = document.body && document.body.getAttribute('data-ss-ready') === '1';
+  if (!ssReady && !(opts && opts.force)) {
+    window.addEventListener('ss-ready', function () {
+      _coursePrewarmRan = false; // allow the deferred call to actually run
+      try { _prewarmCourses(); } catch (e) {}
+    }, { once: true });
+    return;
+  }
+
   var allCourses = [];
   Object.keys(SEMS).forEach(function (sid) {
     (SEMS[sid].courses || []).forEach(function (c) { allCourses.push(c); });
