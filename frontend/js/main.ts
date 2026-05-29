@@ -39,16 +39,22 @@ const runDelayed = (fn: () => void, ms = 20000): void => {
   setTimeout(fn, ms);
 };
 
-runIdle(() => import('./core/pull-to-refresh.js').then((m) => m.initPullToRefresh()));
-runIdle(() => import('./core/console-filter.js').then((m) => m.initConsoleFilter()));
-runDelayed(() => import('./features/admin/admin-panel.js').then((m) => m.initAdminPanel()));
-runDelayed(() => import('./features/auth/onboarding.js').then((m) => m.initOnboarding()));
+function lazyImport(path: string): Promise<Record<string, unknown>> {
+  // Keep the URL non-literal at parse time. Some browsers/CDN transforms can
+  // discover literal import('...') targets immediately, defeating the delay.
+  return import(/* @vite-ignore */ path);
+}
+
+runIdle(() => lazyImport('./core/' + 'pull-to-refresh.js').then((m) => (m.initPullToRefresh as () => void)()));
+runIdle(() => lazyImport('./core/' + 'console-filter.js').then((m) => (m.initConsoleFilter as () => void)()));
+runDelayed(() => lazyImport('./features/admin/' + 'admin-panel.js').then((m) => (m.initAdminPanel as () => void)()));
+runDelayed(() => lazyImport('./features/auth/' + 'onboarding.js').then((m) => (m.initOnboarding as () => void)()));
 // AI Fair-Use banner — checks usage on portal load and renders the banner
 // once the user crosses 80% of the monthly cap. Cheap: one GET request,
 // no further work unless the response triggers the banner.
-runDelayed(() => import('./services/ai-usage.js').then((m) => m.initAiUsage()), 12000);
-runDelayed(() => import('./features/study-lounge/lounge.js').then((m) => m.initStudyLounge()));
-runDelayed(() => import('./features/music/music-services.js').then((m) => m.initMusicServices({
+runDelayed(() => lazyImport('./services/' + 'ai-usage.js').then((m) => (m.initAiUsage as () => void)()), 12000);
+runDelayed(() => lazyImport('./features/study-lounge/' + 'lounge.js').then((m) => (m.initStudyLounge as () => void)()));
+runDelayed(() => lazyImport('./features/music/' + 'music-services.js').then((m) => (m.initMusicServices as (opts: unknown) => void)({
   sb: window._sb as never,
   getCurrentUser: () => window._currentUser ?? null,
   applyUserTypeUI: () => {
@@ -60,8 +66,8 @@ runDelayed(() => import('./features/music/music-services.js').then((m) => m.init
     if (typeof window.showToast === 'function') window.showToast(title, sub);
   },
 })));
-runDelayed(() => import('./features/study-timer/study-timer.js').then((m) => m.initStudyTimer()));
-runDelayed(() => import('./features/writing-coach/writing-coach.js').then((m) => m.initWritingCoach()));
+runDelayed(() => lazyImport('./features/study-timer/' + 'study-timer.js').then((m) => (m.initStudyTimer as () => void)()));
+runDelayed(() => lazyImport('./features/writing-coach/' + 'writing-coach.js').then((m) => (m.initWritingCoach as () => void)()));
 
 // Notifications shell: the portal section #psec-notifications is scaffolded
 // UI without a backend feed yet. Wire #notifMarkAll so the button gives
