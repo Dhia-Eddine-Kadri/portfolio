@@ -239,8 +239,15 @@ interface LandingTranslation {
       ensureStylesheet('css/auth.css?v=4');
     })();
 
-    fetch('pages/new_landing.html')
+    // 10s timeout: if the landing fragment fetch stalls (broken network,
+    // CDN hiccup) the whole boot hangs because ss-ready only fires inside
+    // this .then chain. Abort fast and surface a minimal fallback so the
+    // user can still sign in.
+    const landingAbort = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const landingTimer = landingAbort ? setTimeout(() => landingAbort.abort(), 10000) : null;
+    fetch('pages/new_landing.html', { signal: landingAbort ? landingAbort.signal : undefined })
       .then((r) => {
+        if (landingTimer) clearTimeout(landingTimer);
         if (!r.ok) throw new Error('HTTP ' + r.status + ' loading new_landing.html');
         return r.text();
       })
