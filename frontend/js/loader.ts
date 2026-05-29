@@ -513,8 +513,8 @@ interface LandingTranslation {
           'views/settings/settings.js',
           'views/notes/notes-panel.js',
         ];
-        const featurePromises = featureSrcs.map((src) => {
-          return new Promise<void>((res) => {
+        function loadDeferredFeatures(): void {
+          featureSrcs.forEach((src) => {
             const s = document.createElement('script');
             s.src = versioned(src);
             let settled = false;
@@ -523,14 +523,13 @@ interface LandingTranslation {
               settled = true;
               clearTimeout(timer);
               if (reason !== 'load') console.error('[loader] feature ' + reason + ':', src);
-              res();
             };
             const timer = setTimeout(() => settle('timeout'), SCRIPT_TIMEOUT_MS);
             s.onload = () => settle('load');
             s.onerror = () => settle('error');
             document.body.appendChild(s);
           });
-        });
+        }
 
         // Games hub: ~150KB across 13 scripts (8 solitaire variants, tetris,
         // bird, chess, hub dispatcher). Most users never open the games page
@@ -643,7 +642,7 @@ interface LandingTranslation {
           };
         })();
 
-        void Promise.all(featurePromises).then(() => {
+        {
           const aiScript = document.createElement('script');
           aiScript.src = versioned('js/ai.js');
           let aiSettled = false;
@@ -662,12 +661,13 @@ interface LandingTranslation {
               if (SS) SS.markReady('app', { ai: false });
             }
             window.dispatchEvent(new Event('ss-ready'));
+            setTimeout(loadDeferredFeatures, 5000);
           };
           const aiTimer = setTimeout(() => fireReady(false), SCRIPT_TIMEOUT_MS);
           aiScript.onload = () => fireReady(true);
           aiScript.onerror = () => fireReady(false);
           document.body.appendChild(aiScript);
-        });
+        }
       })
       .catch((err: unknown) => {
         console.error('Failed to load app scripts:', err);

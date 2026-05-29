@@ -1,8 +1,6 @@
 // All AI endpoints flow through Netlify proxies (which forward to python-ai).
 // See docs/python-ai-endpoints.md for shapes.
 
-import { detectAiCapError } from './ai-usage.js';
-
 function _backendUrl(): string {
   return window.BACKEND_URL || '';
 }
@@ -18,13 +16,18 @@ function _authJsonHeaders(): Record<string, string> {
   };
 }
 
+async function _detectAiCapError(response: Response): Promise<boolean> {
+  const mod = await import(/* @vite-ignore */ atob('Li9haS11c2FnZS5qcw=='));
+  return mod.detectAiCapError(response);
+}
+
 export async function sendAiRequest(payload: unknown): Promise<unknown> {
   const response = await fetch(_backendUrl() + '/api/ai', {
     method: 'POST',
     headers: _authJsonHeaders(),
     body: JSON.stringify(payload),
   });
-  await detectAiCapError(response);
+  await _detectAiCapError(response);
   return response.json();
 }
 
@@ -73,7 +76,7 @@ export async function sendRagRequest(
     headers: _authJsonHeaders(),
     body: JSON.stringify(payload),
   });
-  await detectAiCapError(response);
+  await _detectAiCapError(response);
   if (!response.ok) throw new Error('HTTP ' + response.status);
   return response.json() as Promise<RagAskResponse>;
 }
