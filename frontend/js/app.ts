@@ -10,7 +10,6 @@ import { initSettingsBridge, t as _t } from './features/settings/settings-bridge
 import { initLandingAuthBridge } from './features/auth/landing-auth-bridge.js';
 import { initAiRenderBridge } from './features/ai-chat/ai-render-bridge.js';
 import { initAiExportBridge } from './features/ai-chat/ai-export-bridge.js';
-import { initAiAskBridge } from './features/ai-chat/ai-ask-bridge.js';
 import { initAiChipsBridge } from './features/ai-chat/ai-chips-bridge.js';
 import { initAiConfettiBridge, spawnConfetti } from './features/ai-chat/ai-confetti-bridge.js';
 import { initAiPanelEffects } from './features/ai-chat/ai-panel-effects.js';
@@ -600,8 +599,84 @@ const _aiState = {
   set activeThinkTimer(v: ReturnType<typeof setInterval> | null) { activeThinkTimer = v; },
 };
 
-const _aiAskBridge = initAiAskBridge(_aiState as unknown as Parameters<typeof initAiAskBridge>[0]);
-askAI = _aiAskBridge.askAI as typeof askAI;
+let _aiAskBridgeReady = false;
+let _aiAskBridgePromise: Promise<{ askAI: typeof askAI; stopGeneration: () => void }> | null = null;
+function _ensureAiAskBridge(): Promise<{ askAI: typeof askAI; stopGeneration: () => void }> {
+  if (_aiAskBridgePromise) return _aiAskBridgePromise;
+  _aiAskBridgePromise = import(
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWFzay1icmlkZ2UuanM=')
+  ).then((mod) => {
+    const bridge = mod.initAiAskBridge(_aiState);
+    askAI = bridge.askAI as typeof askAI;
+    _aiAskBridgeReady = true;
+    return bridge as { askAI: typeof askAI; stopGeneration: () => void };
+  });
+  return _aiAskBridgePromise;
+}
+
+askAI = ((q: string, skipUserBubble?: boolean, opts?: Parameters<typeof askAI>[2]) => {
+  return _ensureAiAskBridge().then((bridge) => bridge.askAI(q, skipUserBubble, opts));
+}) as typeof askAI;
+window.askAI = askAI;
+window.stopGeneration = (): void => {
+  void _ensureAiAskBridge().then((bridge) => bridge.stopGeneration());
+};
+window.restoreCourseHistory = (courseId?: string | null): void => {
+  void _ensureAiAskBridge().then(() => {
+    if (typeof window.restoreCourseHistory === 'function') window.restoreCourseHistory(courseId);
+  });
+};
+window.clearCourseHistory = (courseId: string): void => {
+  void _ensureAiAskBridge().then(() => {
+    if (typeof window.clearCourseHistory === 'function') window.clearCourseHistory(courseId);
+  });
+};
+
+function _sendAiFromDomAfterBridge(): void {
+  const input = document.getElementById('aiInput') as HTMLTextAreaElement | null;
+  const q = (input?.value || '').trim();
+  const hasImages = !!(window._attachedImages && window._attachedImages.length > 0);
+  if (!q && !hasImages) return;
+  if (input) {
+    input.value = '';
+    input.style.height = 'auto';
+  }
+  const count = document.getElementById('aiCharCount');
+  if (count) count.textContent = '0 / 2000';
+  void _ensureAiAskBridge().then((bridge) => {
+    if (hasImages && typeof window._legacyAskAI === 'function') {
+      window._legacyAskAI(q || 'What do you see in this image?');
+      return;
+    }
+    bridge.askAI(q || 'What do you see in this image?');
+  });
+}
+
+function _primeAiAskBridge(): void {
+  void _ensureAiAskBridge().catch((err) => {
+    console.error('[ai] failed to load ask bridge:', err);
+  });
+}
+
+const _aiSendBtn = document.getElementById('aiSend') as HTMLButtonElement | null;
+const _aiInput = document.getElementById('aiInput') as HTMLTextAreaElement | null;
+_aiSendBtn?.addEventListener('click', (e) => {
+  if (_aiAskBridgeReady) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (_aiSendBtn.classList.contains('is-stop')) {
+    window.stopGeneration?.();
+    return;
+  }
+  if (_aiSendBtn.disabled) return;
+  _sendAiFromDomAfterBridge();
+}, true);
+_aiInput?.addEventListener('focus', _primeAiAskBridge, { once: true });
+_aiInput?.addEventListener('keydown', (e) => {
+  if (_aiAskBridgeReady || e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  _sendAiFromDomAfterBridge();
+}, true);
 
 initAiChipsBridge();
 initAiConfettiBridge();

@@ -54,11 +54,16 @@ function _finalizeNav(section) {
 
 function _ssAfterFeature(section, cb) {
   var loader = window._ssLoadPortalFeature;
+  var sectionLoader = window._ssLoadFeatureSection;
+  var sectionP =
+    typeof sectionLoader === 'function'
+      ? sectionLoader(section)
+      : Promise.resolve();
   var p =
     typeof loader === 'function'
       ? loader(section)
       : Promise.resolve();
-  return p
+  return Promise.all([sectionP, p])
     .catch(function (err) {
       console.error('[router] lazy feature failed:', section, err);
     })
@@ -452,6 +457,7 @@ _bindIf('psbProfile', 'click', function () {
   setNavActive('psbProfile');
   showPortalSection('profile');
   _finalizeNav('profile');
+  _ssAfterFeature('profile');
 });
 
 _bindIf('authAvatar', 'click', function () {
@@ -459,6 +465,7 @@ _bindIf('authAvatar', 'click', function () {
   setNavActive('psbProfile');
   showPortalSection('profile');
   _finalizeNav('profile');
+  _ssAfterFeature('profile');
 });
 
 _bindIf('psbSettings', 'click', function () {
@@ -466,6 +473,7 @@ _bindIf('psbSettings', 'click', function () {
   setNavActive('psbSettings');
   showPortalSection('settings');
   _finalizeNav('settings');
+  _ssAfterFeature('settings');
 });
 
 _bindIf('psbSubscription', 'click', function () {
@@ -473,6 +481,7 @@ _bindIf('psbSubscription', 'click', function () {
   setNavActive('psbSubscription');
   showPortalSection('subscription');
   _finalizeNav('subscription');
+  _ssAfterFeature('subscription');
 });
 
 _bindIf('goPortal', 'click', function () {

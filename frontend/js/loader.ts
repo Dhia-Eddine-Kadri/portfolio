@@ -676,29 +676,42 @@ interface LandingTranslation {
       });
   }
 
-  function loadFeatureSections(): Promise<unknown> {
-    return Promise.all(
-      FEATURE_SECTIONS.map((section) => {
-        return _fetchTimeout(section.file, 10000)
-          .then((r) => {
-            if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + section.file);
-            return r.text();
-          })
-          .then((html) => {
-            const target = document.getElementById(section.id);
-            if (!target) {
-              console.warn('Missing feature section #' + section.id);
-              return;
-            }
-            target.innerHTML = html;
-            if (SS) SS.emit('feature:html-loaded', { id: section.id, file: section.file });
-          })
-          .catch((err: unknown) => {
-            console.error('Error loading ' + section.file + ':', err);
-          });
+  const loadedFeatureSections: Record<string, Promise<void>> = {};
+  function loadFeatureSection(section: FeatureSection): Promise<void> {
+    const cached = loadedFeatureSections[section.id];
+    if (cached) return cached;
+    const promise = _fetchTimeout(section.file, 10000)
+      .then((r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + section.file);
+        return r.text();
       })
-    );
+      .then((html) => {
+        const target = document.getElementById(section.id);
+        if (!target) {
+          console.warn('Missing feature section #' + section.id);
+          return;
+        }
+        target.innerHTML = html;
+        if (SS) SS.emit('feature:html-loaded', { id: section.id, file: section.file });
+      })
+      .catch((err: unknown) => {
+        console.error('Error loading ' + section.file + ':', err);
+      });
+    loadedFeatureSections[section.id] = promise;
+    return promise;
   }
+
+  function loadFeatureSections(): Promise<unknown> {
+    return Promise.all(FEATURE_SECTIONS.map(loadFeatureSection));
+  }
+
+  (window as unknown as {
+    _ssLoadFeatureSection?: (name: string) => Promise<void>;
+  })._ssLoadFeatureSection = function (name: string): Promise<void> {
+    const id = name.startsWith('psec-') ? name : 'psec-' + name;
+    const section = FEATURE_SECTIONS.find((item) => item.id === id);
+    return section ? loadFeatureSection(section) : Promise.resolve();
+  };
 
   // Fetch all sections in parallel, inject in order
   void Promise.all(
@@ -723,10 +736,14 @@ interface LandingTranslation {
       while (wrapper.firstChild) root.appendChild(wrapper.firstChild);
     });
     if (SS) SS.markReady('sections', { count: htmls.length });
-    void loadFeatureSections().then(() => {
-      if (SS) SS.markReady('feature-sections', { count: FEATURE_SECTIONS.length });
-      loadAppScript();
-    });
+    loadAppScript();
+    window.addEventListener('ss-ready', () => {
+      setTimeout(() => {
+        void loadFeatureSections().then(() => {
+          if (SS) SS.markReady('feature-sections', { count: FEATURE_SECTIONS.length });
+        });
+      }, 2500);
+    }, { once: true });
   });
 })();
 
