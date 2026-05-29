@@ -5,19 +5,10 @@
 
 import { initSidebarIcons } from './core/app-shell.js';
 import { initPdfWorker } from './core/pdf-worker.js';
-import { initPullToRefresh } from './core/pull-to-refresh.js';
-import { initConsoleFilter } from './core/console-filter.js';
-import { initAdminPanel } from './features/admin/admin-panel.js';
-import { initOnboarding } from './features/auth/onboarding.js';
-import { initStudyLounge } from './features/study-lounge/lounge.js';
-import { initMusicServices } from './features/music/music-services.js';
-import { initStudyTimer } from './features/study-timer/study-timer.js';
 import { initDocumentRail } from './features/document-rail/document-rail.js';
 // chatbot-new shell (~103 KB) is lazy-loaded by views/chatbot/chatbot.js on
 // first navigation to the chatbot page. Keeping the static import here would
 // pull it into the main.js module graph and download it on every login.
-import { initWritingCoach } from './features/writing-coach/writing-coach.js';
-import { initAiUsage } from './services/ai-usage.js';
 
 window.addEventListener('error', (event: ErrorEvent) => {
   console.error('[Minallo] Unhandled error:', event.error || event.message);
@@ -38,22 +29,26 @@ initDocumentRail();
 const runIdle = (fn: () => void): void => {
   const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
   if (typeof ric === 'function') {
-    ric(fn, { timeout: 2000 });
+    ric(fn, { timeout: 8000 });
   } else {
-    setTimeout(fn, 0);
+    setTimeout(fn, 4000);
   }
 };
 
-runIdle(() => initPullToRefresh());
-runIdle(() => initConsoleFilter());
-runIdle(() => initAdminPanel());
-runIdle(() => initOnboarding());
+const runDelayed = (fn: () => void, ms = 20000): void => {
+  setTimeout(fn, ms);
+};
+
+runIdle(() => import('./core/pull-to-refresh.js').then((m) => m.initPullToRefresh()));
+runIdle(() => import('./core/console-filter.js').then((m) => m.initConsoleFilter()));
+runDelayed(() => import('./features/admin/admin-panel.js').then((m) => m.initAdminPanel()));
+runDelayed(() => import('./features/auth/onboarding.js').then((m) => m.initOnboarding()));
 // AI Fair-Use banner — checks usage on portal load and renders the banner
 // once the user crosses 80% of the monthly cap. Cheap: one GET request,
 // no further work unless the response triggers the banner.
-runIdle(() => initAiUsage());
-runIdle(() => initStudyLounge());
-runIdle(() => initMusicServices({
+runDelayed(() => import('./services/ai-usage.js').then((m) => m.initAiUsage()), 12000);
+runDelayed(() => import('./features/study-lounge/lounge.js').then((m) => m.initStudyLounge()));
+runDelayed(() => import('./features/music/music-services.js').then((m) => m.initMusicServices({
   sb: window._sb as never,
   getCurrentUser: () => window._currentUser ?? null,
   applyUserTypeUI: () => {
@@ -64,9 +59,9 @@ runIdle(() => initMusicServices({
   showToast: (title: string, sub?: string) => {
     if (typeof window.showToast === 'function') window.showToast(title, sub);
   },
-}));
-runIdle(() => initStudyTimer());
-runIdle(() => initWritingCoach());
+})));
+runDelayed(() => import('./features/study-timer/study-timer.js').then((m) => m.initStudyTimer()));
+runDelayed(() => import('./features/writing-coach/writing-coach.js').then((m) => m.initWritingCoach()));
 
 // Notifications shell: the portal section #psec-notifications is scaffolded
 // UI without a backend feed yet. Wire #notifMarkAll so the button gives
