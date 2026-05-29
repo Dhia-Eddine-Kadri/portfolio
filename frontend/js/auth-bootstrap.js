@@ -43,10 +43,15 @@
     var alreadyReset = false;
     try { alreadyReset = sessionStorage.getItem('ss_reset_done') === '1'; } catch (e) {}
     if (alreadyReset) {
-      // Reset already tried this tab and we're still hung — give up on
-      // auto-recovery. Leave the user on the splash so they can manually
-      // sign out / try a different browser rather than thrash in a loop.
-      console.error('[watchdog] ss-ready never fired after reset — giving up.');
+      // Reset already tried this tab and we're still hung. Do not trap the
+      // user behind the splash; reveal the page and let auth/router fall back.
+      console.error('[watchdog] ss-ready never fired after reset — forcing splash off.');
+      try { document.body.setAttribute('data-ss-ready', '1'); } catch (e) {}
+      try {
+        var splash = document.getElementById('ss-splash');
+        if (splash) splash.style.display = 'none';
+      } catch (e) {}
+      try { window.dispatchEvent(new Event('ss-ready')); } catch (e) {}
       return;
     }
     if (window.location.search.indexOf('reset=1') !== -1) return;

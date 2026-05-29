@@ -120,24 +120,9 @@
       white-space: nowrap !important;
       border: 0 !important;
     }
-    /* Make the splash visible by default — loader.js hides it when the
-       app is mounted. Means users see the branded "M Minallo …" instead
-       of a blank flash while the landing JS bootstraps. */
-    #ss-splash { display: flex !important; }
-    body.ncb-fullbleed #ss-splash,
-    body[data-ss-ready="1"] #ss-splash { display: none !important; }
   </style>
   </head>
   <body class="night">
-    <!-- Splash screen shown while the app loads after sign-in -->
-    <div id="ss-splash" style="display: none">
-      <div class="ss-splash-inner">
-        <div class="ss-splash-icon">M</div>
-        <div class="ss-splash-name">Minallo</div>
-        <div class="ss-splash-dots"><span></span><span></span><span></span></div>
-      </div>
-    </div>
-
     <!-- SECTIONS ARE INJECTED HERE BY loader.js.
          The static SEO hero below ships in the raw HTML so Googlebot
          (and crawlers that don't execute JS) can read the H1, the
@@ -180,7 +165,7 @@
          the critical-request chain so it loads in parallel without
          sequencing against loader.js. -->
     <script type="module" async src="js/features/ai-chat/ai-typing-config.js?v=1"></script>
-    <script src="js/auth-bootstrap.js?v=4" defer></script>
+    <script src="js/auth-bootstrap.js?v=5" defer></script>
     <script src="js/supabase.js?v=6" defer></script>
     <script type="module" src="js/loader.js?v=7"></script>
   </body>
