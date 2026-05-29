@@ -768,6 +768,11 @@ function initCourseStudyTools(co: HTMLElement, course: LegacyCourse): void {
 
 function setCourseStudyMode(co: HTMLElement, course: LegacyCourse, mode: string): void {
   const nextMode = ['files', 'quiz', 'flashcards'].includes(mode) ? mode : 'files';
+  const featureLoader = (window as unknown as {
+    _ssLoadPortalFeature?: (name: string) => Promise<void>;
+  })._ssLoadPortalFeature;
+  if (nextMode === 'quiz' && typeof featureLoader === 'function') void featureLoader('quiz');
+  if (nextMode === 'flashcards' && typeof featureLoader === 'function') void featureLoader('flashcards');
   co.querySelectorAll<HTMLElement>('[data-course-tab]').forEach((tab) => {
     const isActive = tab.getAttribute('data-course-tab') === nextMode;
     tab.classList.toggle('active', isActive);

@@ -440,6 +440,7 @@ _bindIf('psbDashboard', 'click', function () {
   setNavActive('psbDashboard');
   showPortalSection('dashboard');
   _finalizeNav('dashboard');
+  _ssAfterFeature('dashboard');
 });
 
 _bindIf('psbGerman', 'click', function () {

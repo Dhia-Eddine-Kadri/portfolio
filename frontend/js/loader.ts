@@ -405,17 +405,9 @@ interface LandingTranslation {
       'css/layout.css?v=7',
       'css/document-rail.css?v=15',
       'css/auth.css?v=4',
-      'css/onboarding.css?v=1',
       'views/toast/toast.css',
       'views/chatbot/ai-bubble.css',
-      'views/dashboard/dashboard.css',
-      'views/flashcards/flashcards.css',
-      'views/quiz/quiz.css',
-      'views/profile/profile.css',
-      'views/settings/settings.css',
-      'views/subscription/subscription.css',
       'views/games/games.css',
-      'views/notes/notes-panel.css',
       // Light-mode polish loads LAST so it wins source-order ties
       // against feature CSS that still hard-codes greys.
       'css/light-mode.css?v=45',
@@ -504,14 +496,7 @@ interface LandingTranslation {
         const featureSrcs = [
           'views/toast/toast.js',
           'views/chatbot/ai-bubble.js?v=4',
-          'views/dashboard/dashboard-widget.js',
-          'views/dashboard/dashboard-calendar.js',
           'js/utils/db-helpers.js',
-          'views/flashcards/flashcards.js',
-          'views/quiz/quiz.js',
-          'views/profile/profile.js',
-          'views/settings/settings.js',
-          'views/notes/notes-panel.js',
         ];
         function loadDeferredFeatures(): void {
           featureSrcs.forEach((src) => {
@@ -585,10 +570,19 @@ interface LandingTranslation {
 
         (function setupPortalFeatureLazyLoad(): void {
           const lazyMap: Record<string, string[]> = {
+            dashboard: [
+              'views/dashboard/dashboard-widget.js',
+              'views/dashboard/dashboard-calendar.js',
+            ],
             chat: ['views/chat/chat.js'],
             aipage: ['views/chatbot/chatbot.js?v=4'],
             german: ['views/practice/practice.js'],
             notes: ['views/lecturenotes/lecturenotes.js'],
+            profile: ['views/profile/profile.js'],
+            settings: ['views/settings/settings.js'],
+            flashcards: ['views/flashcards/flashcards.js'],
+            quiz: ['views/quiz/quiz.js'],
+            notesPanel: ['views/notes/notes-panel.js'],
             // writer/merger register listeners for ss-editor-ready, so load
             // them before editor.js fetches markup and dispatches the event.
             editor: [
@@ -598,10 +592,17 @@ interface LandingTranslation {
             ],
           };
           const lazyCssMap: Record<string, string[]> = {
+            dashboard: ['views/dashboard/dashboard.css'],
             chat: ['views/chat/chat.css'],
             aipage: ['views/chatbot/chatbot.css'],
             german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
             notes: ['views/lecturenotes/lecturenotes.css'],
+            profile: ['views/profile/profile.css'],
+            settings: ['views/settings/settings.css'],
+            subscription: ['views/subscription/subscription.css'],
+            flashcards: ['views/flashcards/flashcards.css'],
+            quiz: ['views/quiz/quiz.css'],
+            notesPanel: ['views/notes/notes-panel.css'],
             editor: ['views/editor/editor.css'],
           };
           const lazyPromises: Record<string, Promise<void>> = {};
@@ -661,7 +662,13 @@ interface LandingTranslation {
               if (SS) SS.markReady('app', { ai: false });
             }
             window.dispatchEvent(new Event('ss-ready'));
-            setTimeout(loadDeferredFeatures, 5000);
+            setTimeout(() => {
+              loadDeferredFeatures();
+              const loadPortalFeature = (window as unknown as {
+                _ssLoadPortalFeature?: (name: string) => Promise<void>;
+              })._ssLoadPortalFeature;
+              if (typeof loadPortalFeature === 'function') void loadPortalFeature('dashboard');
+            }, 1200);
           };
           const aiTimer = setTimeout(() => fireReady(false), SCRIPT_TIMEOUT_MS);
           aiScript.onload = () => fireReady(true);

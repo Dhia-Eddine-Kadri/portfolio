@@ -42,6 +42,7 @@ interface DocRailWindow extends Window {
     }
   ) => unknown;
   _notesPanel?: NotesPanelApi;
+  _ssLoadPortalFeature?: (name: string) => Promise<void>;
 }
 
 const WIDTH_KEY = 'ss_dr_width';
@@ -469,6 +470,10 @@ function ensureNotesPanel(): HTMLElement | null {
   } else if (w._notesPanel && typeof w._notesPanel.open === 'function') {
     // Fallback for older notes-panel.js without ensure().
     try { w._notesPanel.open(); } catch (_e) { /* ignore */ }
+  } else if (typeof w._ssLoadPortalFeature === 'function') {
+    void w._ssLoadPortalFeature('notesPanel').then(() => {
+      if (_openMode === 'notes' || _openMode === 'summary') mountNotesPanel(_openMode);
+    });
   }
   panel = document.getElementById('pdfNotesPanel') as HTMLElement | null;
   return panel;
