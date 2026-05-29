@@ -148,6 +148,10 @@ function _saveUserCourses() {
 // users see "0 files" on cards and empty toolbars on the first open.
 
 var _coursePrewarmRan = false;
+// One-shot guard: ensures the ss-ready deferral path registers exactly
+// one listener even if _prewarmCourses is called many times (e.g. by the
+// 500ms _prewarmWhenReady poll) before ss-ready fires.
+var _prewarmDeferredSetup = false;
 
 function _prewarmCourses(opts) {
   if (typeof window._ufMerge !== 'function') return; // app-storage not loaded yet
@@ -161,11 +165,19 @@ function _prewarmCourses(opts) {
   // gates ss-ready). Running prewarm pre-boot turns a 1-second hang into a
   // forever hang. Re-enter once ss-ready fires.
   var ssReady = document.body && document.body.getAttribute('data-ss-ready') === '1';
-  if (!ssReady && !(opts && opts.force)) {
-    window.addEventListener('ss-ready', function () {
-      _coursePrewarmRan = false; // allow the deferred call to actually run
-      try { _prewarmCourses(); } catch (e) {}
-    }, { once: true });
+  if (!ssReady) {
+    // Mark as "ran" so the 500ms _prewarmWhenReady poll stops and any
+    // re-entrant calls (from the poll, from _loadUserCourses, from an
+    // explicit user action) bail at the early _coursePrewarmRan check
+    // above. The real run happens via the single listener below.
+    _coursePrewarmRan = true;
+    if (!_prewarmDeferredSetup) {
+      _prewarmDeferredSetup = true;
+      window.addEventListener('ss-ready', function () {
+        _coursePrewarmRan = false;
+        try { _prewarmCourses(); } catch (e) {}
+      }, { once: true });
+    }
     return;
   }
 
