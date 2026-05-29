@@ -704,7 +704,13 @@ function _verifyAndEnter(tok) {
         else _giveUp();
       });
     }
-    _sb.auth.getUser()
+    // 5s timeout: _sb.auth.getUser hits /auth/v1/user and has no built-in
+    // timeout. Without this race, any auth endpoint slowness leaves the
+    // boot waiting on this promise forever and the splash never hides.
+    var timeoutPromise = new Promise(function (_resolve, reject) {
+      setTimeout(function () { reject(new Error('getUser timeout')); }, 5000);
+    });
+    Promise.race([_sb.auth.getUser(), timeoutPromise])
       .then(function (user) {
         if (user && user.id) {
           _ssEmit('auth:verify:success', { userId: user.id, refreshed: refreshedAlready });
@@ -713,7 +719,12 @@ function _verifyAndEnter(tok) {
           _onFail();
         }
       })
-      .catch(_onFail);
+      .catch(function (err) {
+        if (err && err.message === 'getUser timeout') {
+          console.warn('[Auth] getUser timed out — falling back to sign-in modal');
+        }
+        _onFail();
+      });
   }
 
   if (_jwtAliveEnough(tok)) {
