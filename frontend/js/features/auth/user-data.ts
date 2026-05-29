@@ -62,9 +62,10 @@ export async function loadUserData(uid: string): Promise<void> {
 
     const sb = window._sb;
     if (!sb) return;
-    // 5s timeout per query: any hang here blocks the dashboard from rendering
-    // and the user is left staring at a half-loaded shell forever. Resolving
-    // null on timeout lets downstream code fall back to cached/default state.
+    // 2s timeout per query (was 5s): on a healthy network these typically
+    // return in <300ms, so 2s is plenty of slack but cuts the worst-case
+    // fallback wait by 60%. Resolving null on timeout lets downstream code
+    // use cached/default state instead of blocking the UI.
     const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T | null> =>
       Promise.race<T | null>([
         p,
@@ -72,13 +73,28 @@ export async function loadUserData(uid: string): Promise<void> {
           setTimeout(() => {
             console.warn('[loadUserData] ' + label + ' timed out');
             resolve(null);
-          }, 5000)
+          }, 2000)
         ),
       ]);
-    const profile = (await withTimeout(
-      sb.from('profiles').select('*').eq('id', uid).single() as Promise<ProfileRow | null>,
-      'profiles'
-    )) as ProfileRow | null;
+    // Fire all three queries in parallel. Was sequential awaits — that
+    // meant a slow profiles query blocked settings AND subscriptions from
+    // even starting. Parallel cuts boot data-fetch time to whichever single
+    // query is slowest, instead of the sum.
+    const [profile, settings, sub0] = await Promise.all([
+      withTimeout(
+        sb.from('profiles').select('*').eq('id', uid).single() as Promise<ProfileRow | null>,
+        'profiles'
+      ) as Promise<ProfileRow | null>,
+      withTimeout(
+        sb.from('settings').select('*').eq('id', uid).single() as Promise<SettingsRow | null>,
+        'settings'
+      ) as Promise<SettingsRow | null>,
+      withTimeout(
+        sb.from('subscriptions').select('*').eq('user_id', uid).single() as Promise<SubscriptionRow | null>,
+        'subscriptions'
+      ) as Promise<SubscriptionRow | null>,
+    ]);
+
     if (profile && profile.full_name) {
       try {
         localStorage.setItem('profile_cache_' + uid, JSON.stringify(profile));
@@ -104,16 +120,9 @@ export async function loadUserData(uid: string): Promise<void> {
 
     startPresenceHeartbeat(uid);
 
-    const settings = (await withTimeout(
-      sb.from('settings').select('*').eq('id', uid).single() as Promise<SettingsRow | null>,
-      'settings'
-    )) as SettingsRow | null;
     if (settings && window.applySettings) window.applySettings(settings);
 
-    let sub = (await withTimeout(
-      sb.from('subscriptions').select('*').eq('user_id', uid).single() as Promise<SubscriptionRow | null>,
-      'subscriptions'
-    )) as SubscriptionRow | null;
+    let sub = sub0;
     if (sub && sub.status !== 'paused' && sub.expires_at && Date.parse(sub.expires_at) <= Date.now()) {
       sub = { ...sub, status: 'expired' };
     }

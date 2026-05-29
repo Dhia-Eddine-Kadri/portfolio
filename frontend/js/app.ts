@@ -606,35 +606,36 @@ askAI = _aiAskBridge.askAI as typeof askAI;
 initAiChipsBridge();
 initAiConfettiBridge();
 
-// Apply cached profile & courses — DEFERRED until ss-ready.
+// Two-phase cache application for instant perceived speed:
 //
-// Was: ran sync during main.js execution. _loadUserCourses triggers
-// restoreState which fires _ufMerge (storage list). That single fetch
-// consumed an HTTP/2 connection slot before ai.js loaded; on networks
-// with broken multiplexing (some AV filter drivers, edge cases) ai.js
-// would queue behind it for up to 10s, delaying ss-ready.
+// Phase 1 (SYNC, now): apply cached PROFILE only — just DOM updates
+// (name, avatar, university). Pure local work, no network. Gives the
+// user a fully-styled shell on first paint instead of an empty header.
 //
-// Now: same code runs after the loader fires ss-ready, so the boot
-// chain (router → features → ai.js) is unblocked. Cached state shows
-// up ~milliseconds later than before — imperceptible — but never
-// blocks the splash from going away.
-function _applyCachedProfileNow(): void {
-  try {
-    const lastUid = localStorage.getItem('ss_last_uid');
-    if (!lastUid) return;
-    const cp = JSON.parse(localStorage.getItem('profile_cache_' + lastUid) || 'null');
-    if (cp) {
-      if (cp.full_name && typeof applyProfile === 'function') applyProfile(cp);
-      if (cp.courses && typeof _loadUserCourses === 'function') _loadUserCourses(cp.courses);
+// Phase 2 (DEFERRED until ss-ready): apply cached COURSES via
+// _loadUserCourses. That call triggers restoreState → _ufMerge → storage
+// list, which can saturate the connection pool before ai.js loads. Keep
+// it after ss-ready so the boot chain isn't blocked by a storage fetch.
+let _cpCached: Record<string, unknown> | null = null;
+try {
+  const lastUid = localStorage.getItem('ss_last_uid');
+  if (lastUid) {
+    _cpCached = JSON.parse(localStorage.getItem('profile_cache_' + lastUid) || 'null');
+    if (_cpCached && _cpCached.full_name && typeof applyProfile === 'function') {
+      applyProfile(_cpCached);
     }
-  } catch { /* corrupted cache */ }
+  }
+} catch { /* corrupted cache — ignore */ }
+
+function _applyCachedCoursesNow(): void {
+  if (_cpCached && _cpCached.courses && typeof _loadUserCourses === 'function') {
+    _loadUserCourses(_cpCached.courses);
+  }
 }
 if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
-  // Already ready (rare race) — apply on next microtask so we don't block
-  // the rest of main.js execution.
-  Promise.resolve().then(_applyCachedProfileNow);
+  Promise.resolve().then(_applyCachedCoursesNow);
 } else {
-  window.addEventListener('ss-ready', _applyCachedProfileNow, { once: true });
+  window.addEventListener('ss-ready', _applyCachedCoursesNow, { once: true });
 }
 renderCourses();
 renderTT();
