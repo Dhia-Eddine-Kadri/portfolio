@@ -159,7 +159,7 @@ function _prewarmCourses(opts) {
   if (!uid) return; // need an authed user
   if (_coursePrewarmRan && !(opts && opts.force)) return;
 
-  // Defer until ss-ready: the 6 concurrent storage-list calls below will
+  // Defer until ss-ready: the storage-list calls below can still saturate
   // saturate the connection pool on networks with broken HTTP/2 multiplexing
   // (and even on healthy connections add measurable latency to ai.js, which
   // gates ss-ready). Running prewarm pre-boot turns a 1-second hang into a
@@ -175,7 +175,9 @@ function _prewarmCourses(opts) {
       _prewarmDeferredSetup = true;
       window.addEventListener('ss-ready', function () {
         _coursePrewarmRan = false;
-        try { _prewarmCourses(); } catch (e) {}
+        setTimeout(function () {
+          try { _prewarmCourses(); } catch (e) {}
+        }, 5000);
       }, { once: true });
     }
     return;
@@ -212,11 +214,10 @@ function _prewarmCourses(opts) {
     }
   } catch (e) { /* hash parse failed — fall back to natural order */ }
 
-  // 6 is a measured-ish bump from 4 — Supabase storage list calls are cheap and
-  // the dominant per-course cost is _ufMergeImpl's folder listing (now parallel
-  // within a course). Higher than 6 risks contending with the user's in-focus
-  // open call; 4 left too many courses cold on first paint.
-  var CONCURRENCY = 6;
+  // Keep this deliberately low. Prewarm runs in the background after boot, but
+  // each _ufMerge can fan out into several Supabase folder-list requests. A
+  // high lane count makes the app feel frozen on slower browsers/networks.
+  var CONCURRENCY = 2;
   var cursor = 0;
 
   function _persistCourseCache(c) {
@@ -339,9 +340,11 @@ function _loadUserCourses(data) {
   // even if the background warm-up hangs.
   function _kickPrewarm() { try { _prewarmCourses(); } catch (e) {} }
   if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
-    Promise.resolve().then(_kickPrewarm);
+    setTimeout(_kickPrewarm, 5000);
   } else {
-    window.addEventListener('ss-ready', _kickPrewarm, { once: true });
+    window.addEventListener('ss-ready', function () {
+      setTimeout(_kickPrewarm, 5000);
+    }, { once: true });
   }
   restoreState();
   // If a course was restored before auth completed, refresh its files from network now.

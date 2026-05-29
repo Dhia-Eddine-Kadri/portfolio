@@ -61,7 +61,6 @@ function _ssForceSplashOff(reason) {
       // Reset already tried this tab and we're still hung. Do not trap the
       // user behind the splash; reveal the page and let auth/router fall back.
       _ssForceSplashOff('ss-ready never fired after reset — forcing splash off.');
-      try { window.dispatchEvent(new Event('ss-ready')); } catch (e) {}
       return;
     }
     if (window.location.search.indexOf('reset=1') !== -1) return;

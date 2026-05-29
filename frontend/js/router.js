@@ -52,6 +52,21 @@ function _finalizeNav(section) {
   } catch (e) {}
 }
 
+function _ssAfterFeature(section, cb) {
+  var loader = window._ssLoadPortalFeature;
+  var p =
+    typeof loader === 'function'
+      ? loader(section)
+      : Promise.resolve();
+  return p
+    .catch(function (err) {
+      console.error('[router] lazy feature failed:', section, err);
+    })
+    .then(function () {
+      if (typeof cb === 'function') cb();
+    });
+}
+
 function _ssFindCourseById(courseId) {
   if (!courseId) return null;
   for (var semId in SEMS) {
@@ -134,6 +149,15 @@ function _ssApplyHistoryState(state) {
     if (state.section) {
       setNavActive(_ssPortalNavId(state.section));
       showPortalSection(state.section);
+      _ssAfterFeature(state.section, function () {
+        if (state.section === 'chat' && typeof window._chatInit === 'function') window._chatInit();
+        if (state.section === 'aipage' && typeof window._aipRefreshSidebar === 'function') window._aipRefreshSidebar();
+        if (state.section === 'german' && typeof window._glBackToHome === 'function') window._glBackToHome();
+        if (state.section === 'editor') {
+          if (typeof window._writerInit === 'function') window._writerInit();
+          else if (typeof window._editorInit === 'function') window._editorInit();
+        }
+      });
     } else {
       setNavActive('psbDashboard');
     }
@@ -268,12 +292,14 @@ window.showPortalSection = function (sec) {
     _pendingPortalRestore = null;
     setNavActive(_ssPortalNavId(target));
     if (target === 'courses' || target === 'studip') setTimeout(sdRenderCourses, 0);
-    if (target === 'chat') setTimeout(_chatInit, 0);
+    if (target === 'chat') _ssAfterFeature('chat', function () {
+      if (typeof window._chatInit === 'function') window._chatInit();
+    });
     if (target === 'editor')
-      setTimeout(function () {
+      _ssAfterFeature('editor', function () {
         if (typeof window._writerInit === 'function') window._writerInit();
         else if (typeof window._editorInit === 'function') window._editorInit();
-      }, 0);
+      });
   }
 
   activePortalSection = target;
@@ -388,7 +414,9 @@ _bindIf('psbGerman', 'click', function () {
   setNavActive('psbGerman');
   showPortalSection('german');
   _finalizeNav('german');
-  window._glBackToHome();
+  _ssAfterFeature('german', function () {
+    if (typeof window._glBackToHome === 'function') window._glBackToHome();
+  });
 });
 
 _bindIf('psbProfile', 'click', function () {
@@ -469,22 +497,29 @@ _bindIf('goPortal', 'click', function () {
     if (item.id === 'psbNotes') {
       _navTo('psbNotes', 'notes');
       _finalizeNav('notes');
+      _ssAfterFeature('notes');
     }
     if (item.id === 'psbEditor') {
       _navTo('psbEditor', 'editor');
       _finalizeNav('editor');
-      if (typeof window._writerInit === 'function') window._writerInit();
-      else if (typeof window._editorInit === 'function') window._editorInit();
+      _ssAfterFeature('editor', function () {
+        if (typeof window._writerInit === 'function') window._writerInit();
+        else if (typeof window._editorInit === 'function') window._editorInit();
+      });
     }
     if (item.id === 'psbAIPage') {
       _navTo('psbAIPage', 'aipage');
       _finalizeNav('aipage');
-      if (typeof window._aipRefreshSidebar === 'function') window._aipRefreshSidebar();
+      _ssAfterFeature('aipage', function () {
+        if (typeof window._aipRefreshSidebar === 'function') window._aipRefreshSidebar();
+      });
     }
     if (item.id === 'psbChat') {
       _navTo('psbChat', 'chat');
       _finalizeNav('chat');
-      _chatInit();
+      _ssAfterFeature('chat', function () {
+        if (typeof window._chatInit === 'function') window._chatInit();
+      });
     }
     if (item.id === 'psbNotifications') {
       _navTo('psbNotifications', 'notifications');

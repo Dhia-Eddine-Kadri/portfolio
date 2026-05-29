@@ -407,19 +407,13 @@ interface LandingTranslation {
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',
       'views/toast/toast.css',
-      'views/chatbot/chatbot.css',
       'views/chatbot/ai-bubble.css',
-      'views/chat/chat.css',
       'views/dashboard/dashboard.css',
-      'views/practice/practice.css',
-      'views/writing-coach/writing-coach.css',
       'views/flashcards/flashcards.css',
       'views/quiz/quiz.css',
-      'views/lecturenotes/lecturenotes.css',
       'views/profile/profile.css',
       'views/settings/settings.css',
       'views/subscription/subscription.css',
-      'views/editor/editor.css',
       'views/games/games.css',
       'views/notes/notes-panel.css',
       // Light-mode polish loads LAST so it wins source-order ties
@@ -509,21 +503,14 @@ interface LandingTranslation {
         // Track all loads so ss-ready only fires after every feature script is done.
         const featureSrcs = [
           'views/toast/toast.js',
-          'views/chatbot/chatbot.js?v=4',
           'views/chatbot/ai-bubble.js?v=4',
-          'views/chat/chat.js',
           'views/dashboard/dashboard-widget.js',
           'views/dashboard/dashboard-calendar.js',
           'js/utils/db-helpers.js',
-          'views/practice/practice.js',
           'views/flashcards/flashcards.js',
           'views/quiz/quiz.js',
-          'views/lecturenotes/lecturenotes.js',
           'views/profile/profile.js',
           'views/settings/settings.js',
-          'views/editor/editor.js',
-          'views/editor/merger.js',
-          'views/editor/writer.js',
           'views/notes/notes-panel.js',
         ];
         const featurePromises = featureSrcs.map((src) => {
@@ -595,6 +582,65 @@ interface LandingTranslation {
             });
             obs.observe(document.body, { childList: true, subtree: true });
           }
+        })();
+
+        (function setupPortalFeatureLazyLoad(): void {
+          const lazyMap: Record<string, string[]> = {
+            chat: ['views/chat/chat.js'],
+            aipage: ['views/chatbot/chatbot.js?v=4'],
+            german: ['views/practice/practice.js'],
+            notes: ['views/lecturenotes/lecturenotes.js'],
+            // writer/merger register listeners for ss-editor-ready, so load
+            // them before editor.js fetches markup and dispatches the event.
+            editor: [
+              'views/editor/writer.js',
+              'views/editor/merger.js',
+              'views/editor/editor.js',
+            ],
+          };
+          const lazyCssMap: Record<string, string[]> = {
+            chat: ['views/chat/chat.css'],
+            aipage: ['views/chatbot/chatbot.css'],
+            german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
+            notes: ['views/lecturenotes/lecturenotes.css'],
+            editor: ['views/editor/editor.css'],
+          };
+          const lazyPromises: Record<string, Promise<void>> = {};
+          function ensureStylesheet(href: string): void {
+            const hrefWithVersion = versioned(href);
+            const path = href.split('?')[0] || href;
+            const exists = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some((link) => {
+              const current = link.getAttribute('href') || '';
+              const currentPath = current.split('?')[0] || current;
+              return current === hrefWithVersion || currentPath.endsWith(path);
+            });
+            if (exists) return;
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = hrefWithVersion;
+            document.head.appendChild(link);
+          }
+          function keepLightModeLast(): void {
+            const light = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find((link) => {
+              return (link.getAttribute('href') || '').indexOf('css/light-mode.css') !== -1;
+            });
+            if (light) document.head.appendChild(light);
+          }
+          (window as unknown as {
+            _ssLoadPortalFeature?: (name: string) => Promise<void>;
+          })._ssLoadPortalFeature = function (name: string): Promise<void> {
+            const srcs = lazyMap[name] || [];
+            const css = lazyCssMap[name] || [];
+            if (!srcs.length && !css.length) return Promise.resolve();
+            if (lazyPromises[name]) return lazyPromises[name];
+            css.forEach(ensureStylesheet);
+            keepLightModeLast();
+            lazyPromises[name] = srcs.reduce<Promise<void>>(
+              (p, src) => p.then(() => loadScript(src, 'lazy-' + name)),
+              Promise.resolve()
+            );
+            return lazyPromises[name];
+          };
         })();
 
         void Promise.all(featurePromises).then(() => {

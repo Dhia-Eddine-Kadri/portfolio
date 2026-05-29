@@ -618,16 +618,24 @@ async function _ufMergeImpl(course) {
   });
   if (allFolders.length !== savedFolders.length) _ufSaveFolders(uid, course, allFolders);
 
-  // Fan out folder listings in parallel — N folders previously cost N round-trips
-  // serialized, which dominated open latency on courses with many folders.
-  var folderResults = await Promise.all(
-    allFolders.map(function (folderName) {
-      return _ufListFolder(uid, course, folderName).then(
-        function (folderItems) { return { name: folderName, items: folderItems }; },
-        function () { return { name: folderName, items: [] }; }
-      );
-    })
-  );
+  // Limit folder-list fanout. Fully parallel folder listing made refreshes feel
+  // frozen on accounts with many folders because each course merge could start
+  // a burst of Supabase requests while the UI was still settling.
+  var folderResults = [];
+  var folderCursor = 0;
+  function _nextFolder() {
+    if (folderCursor >= allFolders.length) return Promise.resolve();
+    var folderName = allFolders[folderCursor++];
+    return _ufListFolder(uid, course, folderName)
+      .then(
+        function (folderItems) { folderResults.push({ name: folderName, items: folderItems }); },
+        function () { folderResults.push({ name: folderName, items: [] }); }
+      )
+      .then(_nextFolder);
+  }
+  var folderLanes = [];
+  for (var fi = 0; fi < Math.min(2, allFolders.length); fi++) folderLanes.push(_nextFolder());
+  await Promise.all(folderLanes);
   course.userFolders = folderResults.map(function (fr) {
     var folderFiles = [];
     fr.items.forEach(function (item) {
