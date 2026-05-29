@@ -1,6 +1,15 @@
 // Minallo auth/bootstrap shell.
 // Runs before supabase.js and loader.js so they can read the boot route.
 
+function _ssForceSplashOff(reason) {
+  try { document.body.setAttribute('data-ss-ready', '1'); } catch (e) {}
+  try {
+    var splash = document.getElementById('ss-splash');
+    if (splash) splash.style.display = 'none';
+  } catch (e) {}
+  if (reason) console.error('[watchdog] ' + reason);
+}
+
 // Escape hatch for state-restore hangs: visit /?reset=1 to wipe the
 // localStorage keys that drive boot-time course/file restore, then
 // reload to a clean slate. Strips the query AND the hash (the hash is
@@ -37,7 +46,13 @@
 // landing-page bounce instead of redirecting in circles.
 (function () {
   var ready = false;
-  window.addEventListener('ss-ready', function () { ready = true; }, { once: true });
+  window.addEventListener('ss-ready', function () {
+    ready = true;
+    // A successful boot proves the one-shot reset is no longer needed.
+    // Leaving this flag sticky makes the next refresh take the "already
+    // reset" branch, which was the repeat-refresh splash trap.
+    try { sessionStorage.removeItem('ss_reset_done'); } catch (e) {}
+  }, { once: true });
   setTimeout(function () {
     if (ready) return;
     var alreadyReset = false;
@@ -45,18 +60,21 @@
     if (alreadyReset) {
       // Reset already tried this tab and we're still hung. Do not trap the
       // user behind the splash; reveal the page and let auth/router fall back.
-      console.error('[watchdog] ss-ready never fired after reset — forcing splash off.');
-      try { document.body.setAttribute('data-ss-ready', '1'); } catch (e) {}
-      try {
-        var splash = document.getElementById('ss-splash');
-        if (splash) splash.style.display = 'none';
-      } catch (e) {}
+      _ssForceSplashOff('ss-ready never fired after reset — forcing splash off.');
       try { window.dispatchEvent(new Event('ss-ready')); } catch (e) {}
       return;
     }
     if (window.location.search.indexOf('reset=1') !== -1) return;
     window.location.replace(window.location.pathname + '?reset=1');
   }, 15000);
+
+  // Last local guard. loader.js also has a 35s hard fallback, but this file
+  // loads earlier and is classic JS, so it still protects users if module
+  // loading itself gets stuck or cached HTML still contains the splash.
+  setTimeout(function () {
+    if (ready) return;
+    _ssForceSplashOff('emergency splash fallback — 25s elapsed without ss-ready.');
+  }, 25000);
 })();
 
 (function () {

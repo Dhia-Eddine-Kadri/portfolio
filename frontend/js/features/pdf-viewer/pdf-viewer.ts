@@ -51,6 +51,20 @@ function _restorePageBookmark(
   } catch { return null; }
 }
 
+function _withFileOpenTimeout<T>(promise: Promise<T>, timeoutMs = 45000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error('file open timeout');
+      err.name = 'AbortError';
+      reject(err);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left'): void {
   _savePageBookmark();
   notePdfTabOpen(f, course);
@@ -133,8 +147,16 @@ export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left
     const isHtml = /\.html?$/i.test(f.name);
     const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(f.name);
 
-    window
-      ._ufFetchBytes?.(uid, f._course || course, f._storageName || f.name, f._folder || null)
+    const fetchBytesPromise = window._ufFetchBytes?.(
+      uid,
+      f._course || course,
+      f._storageName || f.name,
+      f._folder || null
+    );
+    const fileBytesPromise = fetchBytesPromise
+      ? _withFileOpenTimeout(fetchBytesPromise)
+      : Promise.reject(new Error('Storage fetch helper is not available'));
+    fileBytesPromise
       .then((bytes: Uint8Array) => {
         if (mySeq !== window._pdfOpenSeq) return;
         try {
