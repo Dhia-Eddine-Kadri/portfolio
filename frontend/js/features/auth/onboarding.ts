@@ -112,7 +112,11 @@ function _obSetText(id: string, key: string): void {
 function _obSetPlaceholder(el: HTMLInputElement | null, key: string): void {
   if (!el) return;
   el.setAttribute('data-i18n-ph', key);
-  el.placeholder = _obT(key);
+  // _obT (→ window._t) falls back to returning the key itself when the
+  // translation is empty/missing. An intentionally-blank placeholder must
+  // stay blank rather than leaking the raw key name into the field.
+  const v = _obT(key);
+  el.placeholder = v === key ? '' : v;
 }
 
 function _obSetHeader(titleKey: string, subKey: string, emojiText: string): void {

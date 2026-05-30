@@ -615,11 +615,28 @@ async function streamAiReply(
     }
   } catch (err) {
     if (bubble) {
-      const isAbort = (err as Error)?.name === 'AbortError';
-      bubble.innerHTML = isAbort
-        ? '<em class="ncb-bubble-aborted">' + escapeHtml(tStr('cb_response_stopped', 'Response stopped.')) + '</em>'
-        : renderInlineMarkdown('❌ ' + ((err as Error)?.message || tStr('cb_request_failed', 'Request failed.')));
-      if (!isAbort) attachErrorRetry(aiRow, bubble);
+      if ((err as Error)?.name === 'AbortError') {
+        bubble.innerHTML =
+          '<em class="ncb-bubble-aborted">' +
+          escapeHtml(tStr('cb_response_stopped', 'Response stopped.')) +
+          '</em>';
+      } else if (isSubscriptionError(err)) {
+        // New users without a plan hit the 402 gate — show a calm upgrade
+        // prompt instead of a raw "Server 402: {…}" dump, and swap the
+        // pointless Retry for a link to the plans.
+        bubble.innerHTML = renderInlineMarkdown(
+          tStr(
+            'cb_need_subscription',
+            'You need an active subscription to use the AI tutor. Open **Subscription** in the menu to unlock it.'
+          )
+        );
+        attachSubscribeCta(aiRow, bubble);
+      } else {
+        bubble.innerHTML = renderInlineMarkdown(
+          '❌ ' + ((err as Error)?.message || tStr('cb_request_failed', 'Request failed.'))
+        );
+        attachErrorRetry(aiRow, bubble);
+      }
     }
   } finally {
     state.controller = null;
@@ -2910,6 +2927,30 @@ function initTextareaAutoSize(root: HTMLElement): void {
 }
 
 // ---- Error retry ----
+
+/** True when a failed AI request is the subscription gate (HTTP 402 or a
+ * "subscription required" body) rather than a real outage. We branch on this
+ * so new users see a calm upgrade prompt, not a raw server error. */
+function isSubscriptionError(err: unknown): boolean {
+  const msg = (err as Error)?.message || String(err || '');
+  return /\b402\b/.test(msg) || /subscription/i.test(msg);
+}
+
+/** Subscription-gate affordance: jumps to the Subscription page. Replaces the
+ * Retry button, since retrying a 402 would just fail again. Reuses the retry
+ * button styling so no extra CSS is needed. */
+function attachSubscribeCta(aiRow: HTMLElement, bubble: HTMLElement | null): void {
+  if (!bubble) return;
+  if (aiRow.querySelector('.ncb-retry-btn')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ncb-retry-btn';
+  btn.innerHTML = '<span>' + escapeHtml(tStr('cb_view_plans', 'View plans')) + '</span>';
+  btn.addEventListener('click', () => {
+    document.getElementById('psbSubscription')?.click();
+  });
+  bubble.appendChild(btn);
+}
 
 function attachErrorRetry(aiRow: HTMLElement, bubble: HTMLElement | null): void {
   if (!bubble) return;

@@ -12,6 +12,18 @@ import { getCompareFileName } from '../pdf-viewer/pdf-compare.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 
+/** The subscription gate (HTTP 402 / "subscription required") should read as a
+ * calm upgrade prompt, not a raw server error. */
+function _isSubscriptionError(msg: string): boolean {
+  return /\b402\b/.test(msg) || /subscription/i.test(msg);
+}
+function _subscriptionMsg(): string {
+  const v = typeof window._t === 'function' ? window._t('cb_need_subscription') : '';
+  return v && v !== 'cb_need_subscription'
+    ? v
+    : 'You need an active subscription to use the AI tutor. Open **Subscription** in the menu to unlock it.';
+}
+
 interface AskAiState {
   generationStopped: boolean;
   currentGenId: number;
@@ -1082,7 +1094,9 @@ export function initAskAI(
           : null;
 
         const rawTextLocal = d.error
-          ? '❌ Error: ' + (d.error.message || JSON.stringify(d.error))
+          ? _isSubscriptionError(d.error.message || '')
+            ? _subscriptionMsg()
+            : '❌ Error: ' + (d.error.message || JSON.stringify(d.error))
           : d.content
             ? d.content.map((b) => b.text || '').join('')
             : 'No response';
@@ -1183,7 +1197,8 @@ export function initAskAI(
       .catch((e: unknown) => {
         thinkWrap.remove();
         const msg = e instanceof Error ? e.message : String(e);
-        if (window.addBotMsg) window.addBotMsg('❌ Error: ' + msg);
+        if (window.addBotMsg)
+          window.addBotMsg(_isSubscriptionError(msg) ? _subscriptionMsg() : '❌ Error: ' + msg);
         const _sb2 = document.getElementById('aiSend') as HTMLButtonElement | null;
         if (_sb2) _sb2.disabled = false;
         const _st2 = document.getElementById('stopBtn');

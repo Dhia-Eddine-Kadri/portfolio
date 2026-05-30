@@ -1181,7 +1181,7 @@ body:not(.night) .sb-user-name {
 body:not(.night) .sb-user-uni {
   color: var(--lm-muted) !important;
 }
-body:not(.night) #portal .sidebar:hover .sb-user {
+body:not(.night) #portal .sidebar.expanded .sb-user {
   background: rgba(37, 99, 235, 0.06) !important;
   border-color: rgba(37, 99, 235, 0.14) !important;
 }
@@ -1201,7 +1201,7 @@ body:not(.night) #portal .sidebar .sb-item {
   width: 64px !important;
   border-radius: 18px !important;
 }
-body:not(.night) #portal .sidebar:hover .sb-item {
+body:not(.night) #portal .sidebar.expanded .sb-item {
   height: 64px !important;
   width: 100% !important;
 }
