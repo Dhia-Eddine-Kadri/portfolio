@@ -37,12 +37,14 @@ from app.services.answer import (  # noqa: E402
     _SYSTEM_PROMPT_PARTIAL,
     _SYSTEM_PROMPT_STRONG,
     _SYSTEM_PROMPT_WEAK,
+    USER_INTENT_OVERLAY,
     is_app_question,
     _sources_for_answer,
     pick_system_prompt,
 )
 from app.services.answer_stream import (  # noqa: E402
     _effective_strength_with_open_context,
+    _intent_resolution_runtime_overlay,
     _is_deictic_question,
     _problem_solver_overlay,
 )
@@ -162,6 +164,13 @@ def test_math_prompt_forbids_invention() -> None:
     assert "do not invent" in body
 
 
+def test_all_prompts_include_exact_intent_overlay() -> None:
+    prompt, _mode = pick_system_prompt("solve it", "none")
+    assert USER_INTENT_OVERLAY in prompt
+    assert "Do not replace it with a nearby task" in prompt
+    assert "ask ONE concrete" in prompt
+
+
 def test_math_prompt_requires_kinematics_phase_check() -> None:
     body = _SYSTEM_PROMPT_MATH.lower()
     assert "identify the phases" in body
@@ -233,6 +242,31 @@ def test_visible_problem_context_routes_to_math_prompt(q: str) -> None:
 
     assert mode == "math"
     assert prompt.startswith(_SYSTEM_PROMPT_MATH)
+
+
+def test_deictic_without_context_must_clarify_not_guess() -> None:
+    overlay = _intent_resolution_runtime_overlay(
+        "solve it",
+        has_visible_context=False,
+        has_history=False,
+        active_file_name=None,
+    )
+
+    assert "Do not guess" in overlay
+    assert "Which file/page or exercise number" in overlay
+
+
+def test_deictic_with_visible_context_binds_to_source_zero() -> None:
+    overlay = _intent_resolution_runtime_overlay(
+        "answer the first problem",
+        has_visible_context=True,
+        has_history=False,
+        active_file_name="Seminar.pdf",
+    )
+
+    assert "Resolve it to [Source 0]" in overlay
+    assert "Seminar.pdf" in overlay
+    assert "must not replace the visible problem" in overlay
 
 
 def test_problem_solver_full_solution_requires_final_arithmetic() -> None:

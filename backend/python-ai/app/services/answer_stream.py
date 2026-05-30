@@ -69,6 +69,50 @@ def _is_deictic_question(q: str) -> bool:
     return bool(_DEICTIC_QUESTION_RE.search(q or ""))
 
 
+def _intent_resolution_runtime_overlay(
+    question: str,
+    *,
+    has_visible_context: bool,
+    has_history: bool,
+    active_file_name: str | None,
+) -> str:
+    """Dynamic guardrail for context-dependent requests.
+
+    Static prompt rules say "do not guess"; this runtime note tells the
+    model whether "this/it/first problem" can actually be resolved in the
+    current request.
+    """
+    if not _is_deictic_question(question):
+        return (
+            "\n\nIntent-resolution note: answer the student's exact request. "
+            "Do not substitute a different exercise, file, or topic just "
+            "because retrieved chunks mention it."
+        )
+    visible_name = active_file_name or "the currently visible PDF"
+    if has_visible_context:
+        return (
+            "\n\nIntent-resolution note: the student's wording is context-dependent "
+            "('this', 'it', 'first problem', or similar). Resolve it to [Source 0], "
+            f"the visible content from {visible_name}. If the student asks for the "
+            "first/second/next problem, use the order in [Source 0] / the current "
+            "page. Retrieved chunks are only supporting material; they must not "
+            "replace the visible problem."
+        )
+    if has_history:
+        return (
+            "\n\nIntent-resolution note: the student's wording is context-dependent "
+            "and no visible PDF source was attached. Resolve 'it/this/that' from "
+            "the recent chat history first. If history is still insufficient, ask "
+            "one concrete clarification instead of guessing."
+        )
+    return (
+        "\n\nIntent-resolution note: the student's wording is context-dependent, "
+        "but no visible PDF context or usable chat history was attached. Do not "
+        "guess which file/problem they mean. Ask one concrete clarification such "
+        "as: 'Which file/page or exercise number should I solve?'"
+    )
+
+
 def _effective_strength_with_open_context(strength: str, should_promote: bool) -> str:
     """Promote a request with visible PDF text to answerable context.
 
@@ -747,6 +791,13 @@ def stream_answer(
             " message. Read printed text, handwritten text, formulas, diagrams,"
             " tables, labels, and numeric values from the image when extracted"
             " text is incomplete. Treat the image as part of [Source 0]."
+        )
+    if not app_question:
+        system_prompt += _intent_resolution_runtime_overlay(
+            question,
+            has_visible_context=include_open_source or has_open_image,
+            has_history=bool(previous_turns),
+            active_file_name=active_file_name,
         )
 
     user_message = "QUESTION:\n" + question.strip()

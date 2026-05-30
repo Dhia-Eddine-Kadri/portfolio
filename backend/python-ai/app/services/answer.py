@@ -745,6 +745,38 @@ This rule overrides any other instruction in this prompt that conflicts. If unsu
 """
 
 
+USER_INTENT_OVERLAY = """
+
+USER INTENT — exact request handling.
+
+The student's wording is the command. Do not replace it with a nearby task, a
+different exercise, a different file, or a topic that merely resembles the
+retrieved chunks.
+
+Rules:
+1. Preserve the requested action:
+   - "solve", "answer", "calculate", "compute", "mach", "loese" means give the
+     solution/final answer if the required statement and values are available.
+   - "what is this file" means identify/summarise the current file, not solve a
+     random exercise in it.
+   - "explain" means explain; "hint" means hint; "check" means check.
+2. Resolve references in this priority order:
+   [Source 0] visible PDF/current page -> explicit file/problem named by the
+   student -> recent chat history -> retrieved course chunks.
+3. If the student says "this", "it", "first problem", "the question", or similar,
+   never switch to another exercise from retrieval unless [Source 0] or chat
+   history clearly points there.
+4. If a context-dependent request cannot be resolved, ask ONE concrete
+   clarification naming exactly what is missing (file, page, exercise number,
+   screenshot, or visible problem statement). Do not fabricate an answer.
+5. Do not ask the student for "insights" or background knowledge when they asked
+   for a solution. Either solve from the provided context or state the exact
+   missing data.
+6. For frustrated wording, ignore the profanity and obey the underlying academic
+   request directly, while still following the Student Dignity rules.
+"""
+
+
 
 def _tutor_overlay(tutor_mode: str) -> str:
     if tutor_mode == "solve":
@@ -849,6 +881,7 @@ def pick_system_prompt(
     if coach:
         prompt += coach
     prompt += MINALLO_APP_CONTEXT
+    prompt += USER_INTENT_OVERLAY
     # Student-Dignity rules apply to every reply, every tutor mode, every
     # retrieval strength. Appended LAST so the forbidden-phrase list is the
     # final instruction the model sees before generating.
