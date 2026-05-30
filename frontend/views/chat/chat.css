@@ -1020,9 +1020,6 @@
     border-left: none !important;
     border-top: 1px solid rgba(37, 99, 235, 0.25);
   }
-  #aiResizeHandle {
-    display: none !important;
-  }
   #aiTab {
     right: 16px !important;
     top: auto !important;

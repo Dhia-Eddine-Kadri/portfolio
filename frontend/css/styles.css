@@ -5853,64 +5853,8 @@ body.night .chip-sub-h {
   pointer-events: none;
   overflow: hidden;
 }
-/* AI panel resize handles — desktop only.
-   Three handles allow resizing on all four sides:
-   - #aiResizeHandle:       left edge      → col-resize (width)
-   - #aiResizeHandleTop:    top edge       → row-resize (height)
-   - #aiResizeHandleCorner: top-left 14×14 → nw-resize  (both axes)
-   The corner handle sits on top with higher z-index; the two edge
-   handles step away from the corner so they don't overlap visually. */
-#aiResizeHandle {
-  position: absolute;
-  left: -4px;
-  top: 14px;
-  bottom: 0;
-  width: 8px;
-  cursor: col-resize;
-  z-index: 60;
-  border-radius: 4px;
-  transition: background 0.18s;
-  pointer-events: auto;
-}
-#aiResizeHandleTop {
-  position: absolute;
-  top: -4px;
-  left: 14px;
-  right: 0;
-  height: 8px;
-  cursor: row-resize;
-  z-index: 60;
-  border-radius: 4px;
-  transition: background 0.18s;
-  pointer-events: auto;
-}
-#aiResizeHandleCorner {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  width: 16px;
-  height: 16px;
-  cursor: nw-resize;
-  z-index: 70;
-  border-radius: 50%;
-  transition: background 0.18s;
-  pointer-events: auto;
-}
-#aiResizeHandle:hover,
-#aiResizeHandle.dragging,
-#aiResizeHandleTop:hover,
-#aiResizeHandleTop.dragging,
-#aiResizeHandleCorner:hover,
-#aiResizeHandleCorner.dragging {
-  background: rgba(37, 99, 235, 0.28);
-}
-@media (hover: none), (pointer: coarse) {
-  #aiResizeHandle,
-  #aiResizeHandleTop,
-  #aiResizeHandleCorner {
-    display: none;
-  }
-}
+/* (Removed: AI panel drag-resize handles — the free-floating #aiPanel is
+   retired; the docked rail panel resizes via #drResize in document-rail.css.) */
 /* STUDIP DASHBOARD */
 .sd-section-label {
   font-family: var(--font-main);
@@ -7288,28 +7232,10 @@ body:not(.night) #portal {
    Overrides the light-theme defaults so the panel matches the portal UI.
    ═══════════════════════════════════════════════════════════════════════ */
 
-#portal #aiPanel {
-  /* Detached from DOM flow by ai-bubble.js — position:fixed is set inline */
-  background: rgba(10, 14, 30, 0.96);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 20px;
-  /* Kill the old width-slide transition — width is now set inline */
-  transition: opacity 0.22s ease, transform 0.22s ease !important;
-  /* Soft defaults that ai-bubble.js / the resize handles override inline.
-     Previously these were `!important` to kill the old absolute-positioned
-     sizing — but `!important` also broke the resize handles, since inline
-     styles can't beat `!important`. The inline `width`/`height` from
-     ai-bubble.js and the resize logic in ai.js win without it. */
-  width: auto;
-  height: auto;
-  min-width: 280px;
-  min-height: 240px;
-}
-#portal #aiPanel.visible {
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);
-}
+/* Note: the legacy free-floating #portal #aiPanel presentation (position:fixed,
+   rounded box, drag-resize) is retired. #aiPanel is now only shown docked in the
+   document-rail drawer, which sets its geometry inline (see document-rail.ts
+   mountAiPanel). The dark portal theming for the panel chrome lives below. */
 
 /* Header */
 #portal .ai-hdr {
@@ -7572,15 +7498,6 @@ body:not(.night) #portal {
 #portal .ai-img-remove {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
-}
-
-/* Resize handle */
-#portal #aiResizeHandle {
-  background: rgba(99, 102, 241, 0.15);
-  border-right: 1px solid rgba(99, 102, 241, 0.2);
-}
-#portal #aiResizeHandle:hover {
-  background: rgba(99, 102, 241, 0.28);
 }
 
 /* ── AI Fair-Use banner ─────────────────────────────────────────────────────

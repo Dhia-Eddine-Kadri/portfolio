@@ -407,7 +407,6 @@ interface LandingTranslation {
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',
       'views/toast/toast.css',
-      'views/chatbot/ai-bubble.css',
       'views/games/games.css',
       // Light-mode polish loads LAST so it wins source-order ties
       // against feature CSS that still hard-codes greys.

@@ -41,8 +41,6 @@ declare global {
     sdRenderCourses?: () => void;
     showPortalSection?: (section: string) => void;
     forceCloseAI?: () => void;
-    _aiBubbleClose?: () => void;
-    _aiBubbleSendMessage?: (text: string) => void;
     _statsStopFile?: () => void;
     _stRunning?: boolean;
     _glOpenSkill?: (skill: string) => void;

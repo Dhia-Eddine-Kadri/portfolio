@@ -13,14 +13,6 @@
   --dr-drawer-right: calc(var(--dr-rail-w) + var(--dr-rail-right) + 8px);
 }
 
-/* Globally hide the legacy floating AI bubble — Task-01 requirement.
-   The element is still injected by ai-bubble.js (guarded with HIDE_BUBBLE),
-   but if any code path slips through we keep it invisible via CSS as a
-   belt-and-braces safety net. */
-#aiBubble {
-  display: none !important;
-}
-
 /* Root container hides everything by default. */
 .dr-root {
   display: none;
@@ -324,12 +316,6 @@
    it are still in the DOM (we click #aiClearBtn programmatically from
    #drTrash) so hide via visibility, not detachment. */
 #aiPanel.dr-host-ai .ai-hdr {
-  display: none !important;
-}
-/* The floating panel's resize handles are useless inside the drawer. */
-#aiPanel.dr-host-ai #aiResizeHandle,
-#aiPanel.dr-host-ai #aiResizeHandleTop,
-#aiPanel.dr-host-ai #aiResizeHandleCorner {
   display: none !important;
 }
 

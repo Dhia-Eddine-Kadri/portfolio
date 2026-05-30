@@ -72,14 +72,9 @@ export function showPortalSection(sec: string): void {
     _activePortalSection = target;
 
     const aiPanel = document.getElementById('aiPanel');
-    const aiBubble = document.getElementById('aiBubble');
     if (sec !== 'studip') {
       if (typeof window.forceCloseAI === 'function') window.forceCloseAI();
       else if (aiPanel) aiPanel.classList.remove('visible');
-      if (aiBubble) aiBubble.style.display = 'none';
-      if (typeof window._aiBubbleClose === 'function') window._aiBubbleClose();
-    } else {
-      if (aiBubble) aiBubble.style.display = '';
     }
 
     // Document rail: visible on the courses dashboard (psec-studip) only here;
@@ -254,9 +249,6 @@ export function showStudipResume(): boolean {
   // Resuming a PDF lands us back on the Courses route, so reflect that in the
   // sidebar — otherwise whichever section the user just left stays highlighted.
   setNavActive('pcStudip');
-
-  const aiBubble = document.getElementById('aiBubble');
-  if (aiBubble) aiBubble.style.display = '';
 
   window.openFile(hit.file, hit.course);
   return true;

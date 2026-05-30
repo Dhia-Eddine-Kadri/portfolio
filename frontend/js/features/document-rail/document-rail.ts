@@ -380,7 +380,7 @@ function mountAiPanel(): void {
     return;
   }
   if (!_aiHomeParent) _aiHomeParent = panel.parentElement;
-  // The ai-bubble.js `detachPanel` may have set fixed positioning. Override.
+  // Reset any stray positioning so the panel sits flush inside the drawer.
   panel.classList.add('dr-host-ai');
   panel.style.position = 'static';
   panel.style.left = '';
@@ -447,9 +447,9 @@ function restoreAiPanel(): void {
   panel.style.border = '';
   panel.style.background = '';
   panel.style.display = '';
-  // Park it back on document.body (where ai-bubble.js's detachPanel left it),
-  // hidden until next open. We don't try to put it back inside #pdfViewerWrap
-  // because that container may have been swapped out by route navigation.
+  // Park it back on document.body, collapsed (CSS width:0) until the next open.
+  // We don't try to put it back inside #pdfViewerWrap because that container
+  // may have been swapped out by route navigation.
   if (panel.parentElement !== document.body) {
     document.body.appendChild(panel);
   }
