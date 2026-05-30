@@ -496,8 +496,6 @@ interface LandingTranslation {
         // Track all loads so ss-ready only fires after every feature script is done.
         const featureSrcs = [
           'views/toast/toast.js',
-          'views/chatbot/ai-bubble.js?v=4',
-          'js/utils/db-helpers.js',
         ];
         function loadDeferredFeatures(): void {
           featureSrcs.forEach((src) => {
@@ -573,8 +571,8 @@ interface LandingTranslation {
           const lazyMap: Record<string, string[]> = {
             dashboard: [
               'views/dashboard/dashboard-widget.js',
-              'views/dashboard/dashboard-calendar.js',
             ],
+            dashboardCalendar: ['views/dashboard/dashboard-calendar.js'],
             chat: ['views/chat/chat.js'],
             aipage: ['views/chatbot/chatbot.js?v=4'],
             german: ['views/practice/practice.js'],
