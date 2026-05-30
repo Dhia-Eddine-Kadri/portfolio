@@ -402,7 +402,7 @@ interface LandingTranslation {
       'css/styles.css?v=19',
       'css/courses-redesign.css?v=34',
       'css/app-design-system.css?v=5',
-      'css/layout.css?v=7',
+      'css/layout.css?v=8',
       'css/document-rail.css?v=15',
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',
@@ -411,7 +411,7 @@ interface LandingTranslation {
       'views/games/games.css',
       // Light-mode polish loads LAST so it wins source-order ties
       // against feature CSS that still hard-codes greys.
-      'css/light-mode.css?v=45',
+      'css/light-mode.css?v=46',
     ].forEach((href) => {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -668,10 +668,6 @@ interface LandingTranslation {
               : (cb: () => void) => window.setTimeout(cb, 2500);
             scheduleDashboard(() => {
               loadDeferredFeatures();
-              const loadPortalFeature = (window as unknown as {
-                _ssLoadPortalFeature?: (name: string) => Promise<void>;
-              })._ssLoadPortalFeature;
-              if (typeof loadPortalFeature === 'function') void loadPortalFeature('dashboard');
             });
           };
           const aiTimer = setTimeout(() => fireReady(false), SCRIPT_TIMEOUT_MS);
