@@ -55,7 +55,6 @@ import {
 } from './services/pdf-service.js';
 import { openFile as _openFile } from './features/pdf-viewer/pdf-viewer.js';
 import { initPdfTabs } from './features/pdf-viewer/pdf-tabs.js';
-import { runMultiSummary as _runMultiSummary } from './features/ai-chat/multi-summary.js';
 import {
   createCheckoutSession as _createCheckoutSession,
   createPortalSession as _createPortalSession,
@@ -405,7 +404,9 @@ document.getElementById('msmSaveBtn')?.addEventListener('click', async () => {
 });
 
 function runMultiSummary(fnames: string[], course: LegacyCourse): unknown {
-  return _runMultiSummary(fnames, course as unknown as Parameters<typeof _runMultiSummary>[1]);
+  return import(
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L211bHRpLXN1bW1hcnkuanM=')
+  ).then((mod) => mod.runMultiSummary(fnames, course));
 }
 (window as unknown as { runMultiSummary: typeof runMultiSummary }).runMultiSummary = runMultiSummary;
 

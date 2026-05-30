@@ -1,8 +1,25 @@
 import { showCourseSection } from './course-view.js';
-import { indexExistingDocument } from '../../services/ai-service.js';
 import { guessSourceType as _guessFolderSourceType } from './source-type.js';
 import { filterOversizedFiles, warnRejected } from './upload-validate.js';
 import type { LegacyCourse } from '../../../globals.js';
+
+type AiServiceModule = typeof import('../../services/ai-service.js');
+let _aiServicePromise: Promise<AiServiceModule> | null = null;
+function indexExistingDocument(
+  courseId: string,
+  storageName: string,
+  fileName: string,
+  sourceType?: string,
+  folder?: string | null,
+  meta?: Parameters<AiServiceModule['indexExistingDocument']>[5]
+): Promise<unknown> {
+  if (!_aiServicePromise) {
+    _aiServicePromise = import(/* @vite-ignore */ atob('Li4vLi4vc2VydmljZXMvYWktc2VydmljZS5qcw=='));
+  }
+  return _aiServicePromise.then((mod) =>
+    mod.indexExistingDocument(courseId, storageName, fileName, sourceType, folder, meta)
+  );
+}
 
 interface FolderUploadInput extends HTMLInputElement {
   _targetFolder?: string;

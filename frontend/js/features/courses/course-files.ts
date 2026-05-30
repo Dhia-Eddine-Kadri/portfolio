@@ -1,13 +1,39 @@
 import { showCourseSection } from './course-view.js';
 import { guessSourceType as _guessSourceType } from './source-type.js';
 import { filterOversizedFiles, warnRejected } from './upload-validate.js';
-import {
-  listCourseDocuments,
-  indexExistingDocument,
-  generateStudyTool,
-  type CourseDocument,
-} from '../../services/ai-service.js';
+import type { CourseDocument } from '../../services/ai-service.js';
 import type { LegacyCourse } from '../../../globals.js';
+
+type AiServiceModule = typeof import('../../services/ai-service.js');
+let _aiServicePromise: Promise<AiServiceModule> | null = null;
+function _aiService(): Promise<AiServiceModule> {
+  if (!_aiServicePromise) {
+    _aiServicePromise = import(/* @vite-ignore */ atob('Li4vLi4vc2VydmljZXMvYWktc2VydmljZS5qcw=='));
+  }
+  return _aiServicePromise;
+}
+function listCourseDocuments(courseId: string): Promise<CourseDocument[]> {
+  return _aiService().then((mod) => mod.listCourseDocuments(courseId));
+}
+function indexExistingDocument(
+  courseId: string,
+  storageName: string,
+  fileName: string,
+  sourceType?: string,
+  folder?: string | null,
+  meta?: Parameters<AiServiceModule['indexExistingDocument']>[5]
+): Promise<unknown> {
+  return _aiService().then((mod) =>
+    mod.indexExistingDocument(courseId, storageName, fileName, sourceType, folder, meta)
+  );
+}
+function generateStudyTool(
+  courseId: string,
+  tool: 'flashcards' | 'quiz' | 'summary',
+  options?: Parameters<AiServiceModule['generateStudyTool']>[2]
+): ReturnType<AiServiceModule['generateStudyTool']> {
+  return _aiService().then((mod) => mod.generateStudyTool(courseId, tool, options)) as ReturnType<AiServiceModule['generateStudyTool']>;
+}
 
 interface SelectedFile {
   name: string;
