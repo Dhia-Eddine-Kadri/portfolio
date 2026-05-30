@@ -8,8 +8,6 @@ import { initStatePersistence } from './core/state-persistence.js';
 import { bindIf as _bindIf } from './core/portal-ui.js';
 import { initSettingsBridge, t as _t } from './features/settings/settings-bridge.js';
 import { initLandingAuthBridge } from './features/auth/landing-auth-bridge.js';
-import { initAiRenderBridge } from './features/ai-chat/ai-render-bridge.js';
-import { initAiExportBridge } from './features/ai-chat/ai-export-bridge.js';
 import { initAiChipsBridge } from './features/ai-chat/ai-chips-bridge.js';
 import { initAiConfettiBridge, spawnConfetti } from './features/ai-chat/ai-confetti-bridge.js';
 import { initAiPanelEffects } from './features/ai-chat/ai-panel-effects.js';
@@ -553,7 +551,28 @@ document.getElementById('pdfStudyBtn')?.addEventListener('click', () => {
 const aiPanel = document.getElementById('aiPanel');
 const aiMsgs = document.getElementById('aiMsgs');
 
-initAiRenderBridge();
+if (typeof window.renderMarkdown !== 'function') {
+  window.renderMarkdown = (text: string): string => escapeHtml(text);
+}
+
+let _aiRenderBridgePromise: Promise<unknown> | null = null;
+function _ensureAiRenderBridge(): Promise<unknown> {
+  if (_aiRenderBridgePromise) return _aiRenderBridgePromise;
+  _aiRenderBridgePromise = import(
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLXJlbmRlci1icmlkZ2UuanM=')
+  ).then((mod) => mod.initAiRenderBridge());
+  return _aiRenderBridgePromise;
+}
+
+let _aiExportBridgePromise: Promise<unknown> | null = null;
+function _ensureAiExportBridge(): Promise<unknown> {
+  if (_aiExportBridgePromise) return _aiExportBridgePromise;
+  _aiExportBridgePromise = import(
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWV4cG9ydC1icmlkZ2UuanM=')
+  ).then((mod) => mod.initAiExportBridge());
+  return _aiExportBridgePromise;
+}
+
 initAiPanelEffects({ aiMsgs, aiPanel });
 const _aiPanelBridge = initAiPanelBridge({
   aiPanel, aiClose: document.getElementById('aiClose'), aiMsgs,
@@ -564,11 +583,19 @@ const _aiPanelBridge = initAiPanelBridge({
   getAiOpen: () => aiOpen,
   setAiOpen: (v: boolean) => { aiOpen = v; },
 });
-openAI = _aiPanelBridge.openAI;
+openAI = (): void => {
+  void _ensureAiRenderBridge();
+  void _ensureAiExportBridge();
+  _aiPanelBridge.openAI();
+};
 closeAI = _aiPanelBridge.closeAI;
 forceCloseAI = _aiPanelBridge.forceCloseAI;
 pinAI = _aiPanelBridge.pinAI;
-showSelectionBanner = _aiPanelBridge.showSelectionBanner;
+showSelectionBanner = (txt: string): void => {
+  void _ensureAiRenderBridge();
+  void _ensureAiExportBridge();
+  _aiPanelBridge.showSelectionBanner(txt);
+};
 
 (window as unknown as { _aiPanelBridge: typeof _aiPanelBridge })._aiPanelBridge = _aiPanelBridge;
 (window as unknown as { _aiMsgs: HTMLElement | null })._aiMsgs = aiMsgs;
@@ -577,8 +604,6 @@ window.openAI = openAI;
 window.forceCloseAI = forceCloseAI;
 window.pinAI = pinAI;
 window.showSelectionBanner = showSelectionBanner;
-
-initAiExportBridge();
 
 // Welcome message
 setTimeout(() => {
@@ -616,7 +641,9 @@ function _ensureAiAskBridge(): Promise<{ askAI: typeof askAI; stopGeneration: ()
 }
 
 askAI = ((q: string, skipUserBubble?: boolean, opts?: Parameters<typeof askAI>[2]) => {
-  return _ensureAiAskBridge().then((bridge) => bridge.askAI(q, skipUserBubble, opts));
+  return Promise.all([_ensureAiRenderBridge(), _ensureAiExportBridge()])
+    .then(() => _ensureAiAskBridge())
+    .then((bridge) => bridge.askAI(q, skipUserBubble, opts));
 }) as typeof askAI;
 window.askAI = askAI;
 window.stopGeneration = (): void => {
@@ -790,6 +817,46 @@ _bindIf('nightBtn', 'click', function (this: HTMLElement) {
     const target = e.target as Element | null;
     if (window.innerWidth <= 768 && target && target.closest('.sb-item')) closeMobSb();
   });
+})();
+
+// ── Sidebar expand / collapse toggle ──────────────────────────────────────
+// Click-to-expand (hover-expand was removed). State is sticky across reloads
+// and restored without animating so the rail never grows on its own.
+(function (): void {
+  const sb = document.querySelector<HTMLElement>('#portal .sidebar');
+  const btn = document.getElementById('sbToggle');
+  if (!sb || !btn) return;
+  const KEY = 'ss_sb_expanded';
+
+  // Collapsed rail shows icons only, so give each nav item a native tooltip
+  // (hover-to-expand is gone — this keeps the icons discoverable).
+  sb.querySelectorAll<HTMLElement>('.sb-item').forEach((item) => {
+    if (item.title) return;
+    const label = item.querySelector('span:not(.sb-item-badge)')?.textContent?.trim();
+    if (label) item.title = label;
+  });
+
+  function setExpanded(on: boolean, animate = true): void {
+    // Skip transitions when restoring saved state on load, so the rail never
+    // auto-grows on its own — only a deliberate click animates.
+    if (!animate) sb!.classList.add('sb-no-anim');
+    sb!.classList.toggle('expanded', on);
+    btn!.setAttribute('aria-expanded', on ? 'true' : 'false');
+    btn!.setAttribute('aria-label', on ? 'Collapse sidebar' : 'Expand sidebar');
+    btn!.setAttribute('title', on ? 'Collapse menu' : 'Expand menu');
+    if (!animate) {
+      void sb!.offsetWidth; // force reflow so the class change applies instantly
+      sb!.classList.remove('sb-no-anim');
+    }
+    try {
+      localStorage.setItem(KEY, on ? '1' : '0');
+    } catch {
+      /* storage may be blocked — toggle still works for the session */
+    }
+  }
+
+  setExpanded(localStorage.getItem(KEY) === '1', false);
+  btn.addEventListener('click', () => setExpanded(!sb!.classList.contains('expanded')));
 })();
 
 // Dashboard cards

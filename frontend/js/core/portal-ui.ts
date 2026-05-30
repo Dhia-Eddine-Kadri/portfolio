@@ -84,47 +84,6 @@ export function initPortalUi(options: PortalUiOptions): { applyTheme: (toNight: 
     applyTheme(!options.getNightOn(), this);
   });
 
-  (function initSidebarToggle(): void {
-    const sb = document.querySelector<HTMLElement>('#portal .sidebar');
-    const btn = document.getElementById('sbToggle');
-    if (!sb || !btn) return;
-    const KEY = 'ss_sb_expanded';
-
-    // Collapsed rail shows icons only, so give each nav item a native tooltip
-    // (hover-to-expand is gone — this keeps the icons discoverable).
-    sb.querySelectorAll<HTMLElement>('.sb-item').forEach((item) => {
-      if (item.title) return;
-      const label = item.querySelector('span:not(.sb-item-badge)')?.textContent?.trim();
-      if (label) item.title = label;
-    });
-
-    function setExpanded(on: boolean, animate = true): void {
-      // Skip the width/label transitions when restoring saved state on load,
-      // so the rail never auto-grows on its own — only a deliberate click animates.
-      if (!animate) sb!.classList.add('sb-no-anim');
-      sb!.classList.toggle('expanded', on);
-      btn!.setAttribute('aria-expanded', on ? 'true' : 'false');
-      btn!.setAttribute('aria-label', on ? 'Collapse sidebar' : 'Expand sidebar');
-      btn!.setAttribute('title', on ? 'Collapse menu' : 'Expand menu');
-      if (!animate) {
-        void sb!.offsetWidth; // force reflow so the class change applies instantly
-        sb!.classList.remove('sb-no-anim');
-      }
-      try {
-        localStorage.setItem(KEY, on ? '1' : '0');
-      } catch (e) {
-        /* storage may be blocked — toggle still works for the session */
-      }
-    }
-
-    // Restore the user's last choice (sticky across reloads) — without animating.
-    setExpanded(localStorage.getItem(KEY) === '1', false);
-
-    btn.addEventListener('click', () => {
-      setExpanded(!sb!.classList.contains('expanded'));
-    });
-  })();
-
   (function initMobileSidebar(): void {
     const ham = document.getElementById('portalHamburger');
     const scrim = document.getElementById('mobScrim');

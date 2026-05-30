@@ -5,10 +5,17 @@
 
 import { initSidebarIcons } from './core/app-shell.js';
 import { initPdfWorker } from './core/pdf-worker.js';
-import { initDocumentRail } from './features/document-rail/document-rail.js';
 // chatbot-new shell (~103 KB) is lazy-loaded by views/chatbot/chatbot.js on
 // first navigation to the chatbot page. Keeping the static import here would
 // pull it into the main.js module graph and download it on every login.
+
+type DocRailRoute = 'pdf' | 'courses' | 'other';
+type DocRailMode = 'ai' | 'problem' | 'notes' | 'summary';
+type DocRailApi = {
+  setRouteVisibility: (route: DocRailRoute) => void;
+  open: (mode: DocRailMode) => void;
+  close: () => void;
+};
 
 window.addEventListener('error', (event: ErrorEvent) => {
   console.error('[Minallo] Unhandled error:', event.error || event.message);
@@ -21,7 +28,35 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
 // Eager: affects first paint or core infrastructure.
 initSidebarIcons();
 initPdfWorker();
-initDocumentRail();
+
+let docRailPromise: Promise<DocRailApi | null> | null = null;
+function ensureDocumentRail(): Promise<DocRailApi | null> {
+  if (docRailPromise) return docRailPromise;
+  docRailPromise = lazyImportEncoded('Li9mZWF0dXJlcy9kb2N1bWVudC1yYWlsL2RvY3VtZW50LXJhaWwuanM=')
+    .then((m) => {
+      (m.initDocumentRail as () => void)();
+      return ((window as unknown as { __minalloDocRail?: DocRailApi }).__minalloDocRail || null);
+    })
+    .catch((err: unknown) => {
+      console.warn('[Minallo] document rail failed to load:', err);
+      return null;
+    });
+  return docRailPromise;
+}
+
+(window as unknown as { __minalloDocRail?: DocRailApi }).__minalloDocRail = {
+  setRouteVisibility(route: DocRailRoute): void {
+    if (route === 'other' && !docRailPromise) return;
+    ensureDocumentRail().then((api) => api?.setRouteVisibility(route));
+  },
+  open(mode: DocRailMode): void {
+    ensureDocumentRail().then((api) => api?.open(mode));
+  },
+  close(): void {
+    if (!docRailPromise) return;
+    ensureDocumentRail().then((api) => api?.close());
+  }
+};
 
 // Deferred: not needed before the first navigation. Run in idle time so they
 // don't block the main thread during boot. Falls back to setTimeout(0) when
@@ -104,4 +139,4 @@ runIdle(() => {
 });
 
 // @ts-ignore — dynamic import with cache-busting query string
-import('./app.js?v=7');
+import('./app.js?v=8');
