@@ -662,13 +662,16 @@ interface LandingTranslation {
               if (SS) SS.markReady('app', { ai: false });
             }
             window.dispatchEvent(new Event('ss-ready'));
-            setTimeout(() => {
+            const scheduleDashboard = window.requestIdleCallback
+              ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 3500 })
+              : (cb: () => void) => window.setTimeout(cb, 2500);
+            scheduleDashboard(() => {
               loadDeferredFeatures();
               const loadPortalFeature = (window as unknown as {
                 _ssLoadPortalFeature?: (name: string) => Promise<void>;
               })._ssLoadPortalFeature;
               if (typeof loadPortalFeature === 'function') void loadPortalFeature('dashboard');
-            }, 1200);
+            });
           };
           const aiTimer = setTimeout(() => fireReady(false), SCRIPT_TIMEOUT_MS);
           aiScript.onload = () => fireReady(true);
@@ -708,10 +711,6 @@ interface LandingTranslation {
     return promise;
   }
 
-  function loadFeatureSections(): Promise<unknown> {
-    return Promise.all(FEATURE_SECTIONS.map(loadFeatureSection));
-  }
-
   (window as unknown as {
     _ssLoadFeatureSection?: (name: string) => Promise<void>;
   })._ssLoadFeatureSection = function (name: string): Promise<void> {
@@ -744,13 +743,6 @@ interface LandingTranslation {
     });
     if (SS) SS.markReady('sections', { count: htmls.length });
     loadAppScript();
-    window.addEventListener('ss-ready', () => {
-      setTimeout(() => {
-        void loadFeatureSections().then(() => {
-          if (SS) SS.markReady('feature-sections', { count: FEATURE_SECTIONS.length });
-        });
-      }, 2500);
-    }, { once: true });
   });
 })();
 

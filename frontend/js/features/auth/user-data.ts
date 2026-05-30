@@ -30,6 +30,16 @@ interface SubscriptionRow {
 }
 
 let _presenceTimer: ReturnType<typeof setInterval> | null = null;
+let _courseLoadTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleUserCoursesLoad(courses: unknown, delay = 1200): void {
+  if (!courses || !window._loadUserCourses) return;
+  if (_courseLoadTimer) clearTimeout(_courseLoadTimer);
+  _courseLoadTimer = setTimeout(() => {
+    _courseLoadTimer = null;
+    if (window._loadUserCourses) window._loadUserCourses(courses);
+  }, delay);
+}
 
 export function startPresenceHeartbeat(uid: string): void {
   if (_presenceTimer) clearInterval(_presenceTimer);
@@ -54,7 +64,7 @@ export async function loadUserData(uid: string): Promise<void> {
       if (cached) {
         const cp = JSON.parse(cached) as ProfileRow;
         if (cp && cp.full_name && window.applyProfile) window.applyProfile(cp);
-        if (cp && cp.courses && window._loadUserCourses) window._loadUserCourses(cp.courses);
+        if (cp && cp.courses) scheduleUserCoursesLoad(cp.courses, 1500);
       }
     } catch {
       /* malformed cache — ignore */
@@ -104,7 +114,7 @@ export async function loadUserData(uid: string): Promise<void> {
       if (window.applyProfile) window.applyProfile(profile);
     }
     if (profile && profile.courses) {
-      if (window._loadUserCourses) window._loadUserCourses(profile.courses);
+      scheduleUserCoursesLoad(profile.courses, 300);
     } else if (window.restoreState) {
       window.restoreState();
     }
