@@ -519,10 +519,44 @@ document.getElementById('pdfFit')?.addEventListener('click', () => {
   renderPages();
   setTimeout(() => _pdfScrollToPage(pg), 120);
 });
+// Maximize / focus reading mode. Fills the window over the sidebar + header but
+// keeps the document rail on top (CSS: #pdfViewerWrap.is-maximized) so the
+// AI / Problem / Notes / Summary rail stays usable. Re-renders so canvas pages
+// re-rasterise crisply at the new width; Esc exits.
+function setPdfMaximized(on: boolean): void {
+  const wrap = document.getElementById('pdfViewerWrap');
+  if (!wrap) return;
+  const pg = _pdfVisiblePage();
+  wrap.classList.toggle('is-maximized', on);
+  document.body.classList.toggle('pdf-maximized', on);
+  const mbtn = document.getElementById('pdfMaximize');
+  if (mbtn) {
+    mbtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    mbtn.setAttribute('title', on ? 'Exit maximize (Esc)' : 'Maximize');
+    mbtn.setAttribute('aria-label', on ? 'Exit maximize' : 'Maximize');
+  }
+  renderPages();
+  setTimeout(() => _pdfScrollToPage(pg), 120);
+}
+document.getElementById('pdfMaximize')?.addEventListener('click', () => {
+  const wrap = document.getElementById('pdfViewerWrap');
+  setPdfMaximized(!wrap?.classList.contains('is-maximized'));
+});
+document.addEventListener('keydown', (e) => {
+  if (
+    e.key === 'Escape' &&
+    document.getElementById('pdfViewerWrap')?.classList.contains('is-maximized')
+  ) {
+    setPdfMaximized(false);
+  }
+});
 document.getElementById('pdfDownload')?.addEventListener('click', () => {
   if (activeFileName) downloadFile(activeFileName);
 });
 document.getElementById('pdfBack')?.addEventListener('click', () => {
+  // Leaving the reader: drop maximize so the next view isn't stuck fixed.
+  document.body.classList.remove('pdf-maximized');
+  document.getElementById('pdfViewerWrap')?.classList.remove('is-maximized');
   const w = window as unknown as {
     activeCourseRef?: { id?: string } & Record<string, unknown>;
     showCourseSection?: (course: unknown, section: string) => void;
