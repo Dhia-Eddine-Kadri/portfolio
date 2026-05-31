@@ -493,6 +493,11 @@ If [Source 0] contains a Problem Solver problem statement, that statement is
 the primary source of truth. Cite it for the givens/required quantities and do
 not replace it with a different retrieved exercise, even if the retrieved
 exercise looks similar.
+Equation-copying is strict: preserve every symbol, subscript, denominator,
+constant, final condition, and domain exactly from [Source 0]. Do not turn
+`\\pi` / `π` into a new variable `p`; do not change `r(\\phi)=R\\phi/\\pi`
+into `R\\theta/p`; do not introduce a symbol and then claim it is missing
+unless it actually appears in the problem statement or cited course source.
 You MUST still use uploaded course sources when they are present in COURSE
 CONTEXT. Cite at least one uploaded course source (`[Source 1]` or higher) for
 the formula, method, or matching course convention. If no uploaded course source
@@ -598,6 +603,10 @@ substitution → intermediate result → final answer with units → short
 plausibility check. For code: complete working implementation in a fenced
 block, a Trace through one example, and a Complexity line.
 FULL SOLUTION means finish the computation, not merely describe the method.
+Never end a Full Solution with "this provides the basis", "solve v(t)", "can
+be determined", or other method-only placeholders. If the statement gives a
+complete symbolic problem, finish symbolically even when no decimal numbers are
+given.
 For engineering/math tasks:
 - If all required numeric inputs are present in the PROBLEM SOLVER INPUT or
   COURSE CONTEXT, you MUST carry out the arithmetic and end with a visibly

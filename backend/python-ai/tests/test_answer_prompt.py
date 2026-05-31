@@ -298,6 +298,10 @@ def test_problem_solver_input_is_primary_source() -> None:
     assert "different retrieved exercise" in body
     assert "uploaded course source" in body
     assert "[source 1]" in body
+    assert "equation-copying is strict" in body
+    assert "do not turn" in body
+    assert "new variable `p`" in body
+    assert "method-only placeholders" in body
 
 
 def test_open_context_only_promotes_when_request_targets_visible_page() -> None:
