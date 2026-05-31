@@ -1400,6 +1400,27 @@ body.night .sb-acc-chev-btn {
   min-width: 0;
   background: var(--dp-solid);
 }
+
+/* ── PDF maximize / focus reading mode ────────────────────────────────────
+   The viewer fills the window over the left sidebar and the top header, but
+   stops short of the document rail on the right (--dr-drawer-right) and sits
+   below it in the stack (rail strip = 9500, drawer = 9499) so AI / Problem /
+   Notes / Summary stay visible and usable while reading. Toggle via the
+   #pdfMaximize button or Esc (see pdf-controls.ts). */
+#pdfViewerWrap.is-maximized {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: var(--dr-drawer-right);
+  z-index: 9000;
+  border-radius: 0;
+}
+/* Maximize button shows the "expand" glyph by default and the "compress"
+   glyph while maximized. */
+#pdfMaximize .pdf-min-icon { display: none; }
+body.pdf-maximized #pdfMaximize .pdf-max-icon { display: none; }
+body.pdf-maximized #pdfMaximize .pdf-min-icon { display: inline-flex; }
 .pdf-toolbar {
   display: flex;
   align-items: center;
