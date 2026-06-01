@@ -1468,6 +1468,84 @@ body.pdf-maximized #pdfMaximize {
   min-width: 36px;
   margin-left: 4px;
 }
+
+/* ── Notifications list items + sidebar unread badge ──────────────────── */
+#psec-notifications .notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.notif-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.15s, border-color 0.15s;
+}
+.notif-item:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+.notif-item.unread {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.32);
+}
+.notif-item.unread::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.notif-item-icon {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+.notif-item-main {
+  min-width: 0;
+  flex: 1;
+}
+.notif-item-title {
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.notif-item-text {
+  color: rgba(203, 213, 225, 0.85);
+  font-size: 0.82rem;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.notif-item-time {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.sb-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+}
 .pdf-toolbar {
   display: flex;
   align-items: center;
@@ -2267,7 +2345,13 @@ body:has(#aiPanel.visible) .annotate-popover {
   right: calc(var(--ai-w, 340px) + 24px);
 }
 body.pdf-maximized .annotate-popover {
-  top: 96px;
+  position: fixed;
+  top: 86px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  z-index: 9002;
+  max-width: min(calc(100vw - 2 * (var(--dr-rail-w) + 28px)), 980px);
 }
 .annotate-popover::before {
   content: "";
@@ -2282,8 +2366,8 @@ body.pdf-maximized .annotate-popover {
   background: rgba(18, 26, 49, 0.94);
 }
 @keyframes annotPopIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .annotate-toolbar-row {

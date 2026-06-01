@@ -5,6 +5,7 @@
 
 import { initSidebarIcons } from './core/app-shell.js';
 import { initPdfWorker } from './core/pdf-worker.js';
+import { initNotifications } from './features/notifications/notifications.js';
 // chatbot-new shell (~103 KB) is lazy-loaded by views/chatbot/chatbot.js on
 // first navigation to the chatbot page. Keeping the static import here would
 // pull it into the main.js module graph and download it on every login.
@@ -28,6 +29,7 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
 // Eager: affects first paint or core infrastructure.
 initSidebarIcons();
 initPdfWorker();
+initNotifications();
 
 let docRailPromise: Promise<DocRailApi | null> | null = null;
 function ensureDocumentRail(): Promise<DocRailApi | null> {

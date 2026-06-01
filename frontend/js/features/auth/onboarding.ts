@@ -225,6 +225,31 @@ async function _obSaveAndClose(
   if (typeof window.updateAuthIndicator === 'function' && _currentUser)
     window.updateAuthIndicator(_currentUser);
   localStorage.setItem('ob_done_' + (_currentUser ? _currentUser.id : 'u'), '1');
+  // Welcome notification for brand-new users. dedupeKey keeps it to once even
+  // if onboarding is re-run, and addNotification is a no-op if the module/uid
+  // isn't ready yet.
+  try {
+    const _w = window as unknown as {
+      addNotification?: (n: {
+        title: string;
+        body?: string;
+        icon?: string;
+        dedupeKey?: string;
+      }) => void;
+      _lang?: string;
+    };
+    const _de = _w._lang === 'de';
+    _w.addNotification?.({
+      icon: '🎉',
+      title: _de ? 'Willkommen bei Minallo! 👋' : 'Welcome to Minallo! 👋',
+      body: _de
+        ? 'Schön, dass du da bist! Lade ein PDF hoch, stelle Fragen an die KI und erstelle Quizze, um loszulegen.'
+        : "Glad you're here! Upload a PDF, ask the AI questions, and generate quizzes to get started.",
+      dedupeKey: 'welcome',
+    });
+  } catch {
+    /* notifications optional — never block onboarding */
+  }
   const modal = document.getElementById('onboardModal');
   if (modal) modal.style.display = 'none';
 }
