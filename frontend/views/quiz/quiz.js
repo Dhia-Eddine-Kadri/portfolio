@@ -715,6 +715,23 @@
       var existing = document.getElementById('qzSourcePickerOverlay');
       if (existing) existing.remove();
 
+      // Only show files the course CURRENTLY has. The documents table can keep
+      // rows for files that were deleted/removed from the course (or carried
+      // over from a migration); those otherwise surface here as "Other files",
+      // including items the user no longer recognises. Cross-reference against
+      // the course's live file list (loose files + folder files) so the picker
+      // matches exactly what the course holds now.
+      var _courseFileNames = {};
+      (course.files || []).forEach(function (f) { if (f && f.name) _courseFileNames[f.name] = true; });
+      (course.userFolders || []).forEach(function (fd) {
+        (fd.files || []).forEach(function (f) { if (f && f.name) _courseFileNames[f.name] = true; });
+      });
+      if (Object.keys(_courseFileNames).length) {
+        docs = (docs || []).filter(function (d) {
+          return !!_courseFileNames[d.file_name || d.fileName || ''];
+        });
+      }
+
       // Group docs by folder using course.userFolders
       var fileToFolder = {};
       (course.userFolders || []).forEach(function (fd) {
