@@ -272,10 +272,40 @@ function _appendCourseHistory(courseId: string | null | undefined, question: str
     pairs.push({ q: question, a: answer, ts: Date.now() });
   }
   _saveCourseHistory(courseId, pairs);
+
+  // Also persist to the chat_history table (RLS-scoped to the user) so history
+  // survives a refresh and syncs across devices. restoreCourseHistory() reads
+  // this table first, then falls back to the localStorage copy above. This
+  // write was missing on the python-ai /ask-stream path, so the rail used to
+  // only save locally. Best-effort — never block or throw on failure.
+  try {
+    const supaUrl = window._SUPA || '';
+    const tok = window._sbToken || '';
+    const uid =
+      (window._currentUser && (window._currentUser.id || window._currentUser.sub)) || '';
+    if (supaUrl && tok && uid && courseId) {
+      void fetch(supaUrl + '/rest/v1/chat_history', {
+        method: 'POST',
+        headers: {
+          apikey: window._SAKEY || '',
+          Authorization: 'Bearer ' + tok,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ user_id: uid, course_id: courseId, question, answer }),
+      }).catch(() => {});
+    }
+  } catch {
+    /* best-effort persistence — localStorage above is the fallback */
+  }
 }
 
 function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): void {
   if (!pairs || !pairs.length) return;
+  // We only reach here when there's no in-progress user conversation (see the
+  // guard in restoreCourseHistory). Clear any lone welcome greeting so the
+  // restored history becomes the panel's content instead of sitting below it.
+  aiMsgs.querySelectorAll('.ai-msg-wrap:not(.typing-wrap)').forEach((el) => el.remove());
   pairs.forEach((pair) => {
     const uWrap = window.addUserMsg ? (window.addUserMsg as (text: string, skipSave?: boolean) => HTMLElement | null)(pair.q, true) : null;
     if (uWrap) uWrap.setAttribute('data-restored', 'true');
@@ -306,7 +336,10 @@ export function restoreCourseHistory(courseId: string | null | undefined): void 
   if (!courseId) return;
   const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
   if (!aiMsgs) return;
-  if (aiMsgs.querySelectorAll('.ai-msg-wrap:not(.typing-wrap)').length > 0) return;
+  // Only skip restore if a real conversation is already present (a user
+  // message). A lone bot greeting must NOT block restore — otherwise the
+  // boot-time welcome message permanently hides saved history.
+  if (aiMsgs.querySelector('.ai-msg-wrap.user')) return;
 
   const supaUrl = window._SUPA || '';
   const tok = window._sbToken || '';
