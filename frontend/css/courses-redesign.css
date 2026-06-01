@@ -2213,21 +2213,32 @@ body.minallo-in-course .welcome-state {
 .co-inner-v2 .co-folder-more-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border-radius: 7px;
   border: none;
   background: transparent;
-  color: rgba(252, 165, 165, 0.92);
+  color: rgba(226, 232, 240, 0.92);
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
+}
+.co-inner-v2 .co-folder-more-item svg {
+  flex-shrink: 0;
 }
 .co-inner-v2 .co-folder-more-item:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.co-inner-v2 .co-folder-more-item.co-folder-del-btn {
+  color: rgba(252, 165, 165, 0.92);
+}
+.co-inner-v2 .co-folder-more-item.co-folder-del-btn:hover {
+  background: rgba(239, 68, 68, 0.16);
   color: #fff;
 }
 

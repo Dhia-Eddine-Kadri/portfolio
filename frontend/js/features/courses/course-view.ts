@@ -233,6 +233,10 @@ function buildFilesContent(course: LegacyCourse): string {
               '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>' +
             '</button>' +
             '<div class="co-folder-more-menu" role="menu">' +
+              '<button class="co-folder-rename-btn co-folder-more-item" data-folder="' + eFdName + '" type="button" title="Rename folder">' +
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>' +
+                '<span>Rename</span>' +
+              '</button>' +
               '<button class="co-folder-del-btn co-folder-more-item" data-folder="' + eFdName + '" type="button" title="Delete folder">' +
                 '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>' +
                 '<span>Delete folder</span>' +

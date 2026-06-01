@@ -93,6 +93,8 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
       if (
         target?.closest('.co-folder-up-btn') ||
         target?.closest('.co-folder-del-btn') ||
+        target?.closest('.co-folder-rename-btn') ||
+        target?.closest('.co-folder-more') ||
         target?.closest('.co-folder-select-all-btn')
       ) {
         return;
@@ -145,6 +147,52 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
           );
         }
       });
+    });
+  });
+
+  // Folder rename — moves the folder's files to the new storage prefix (the
+  // cross-device source of truth) so the new name syncs to other devices.
+  co.querySelectorAll<HTMLButtonElement>('.co-folder-rename-btn').forEach((btn) => {
+    btn.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      const oldName = btn.getAttribute('data-folder');
+      if (!oldName) return;
+      const uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
+      if (!uid) return;
+      const raw = window.prompt('Rename folder:', oldName);
+      if (raw == null) return;
+      const newName = raw.trim();
+      if (!newName || newName === oldName) return;
+      if ((course.userFolders || []).some((f) => f.name === newName)) {
+        if (typeof window.showToast === 'function') {
+          window.showToast('Already exists', 'A folder with that name already exists.');
+        }
+        return;
+      }
+      btn.disabled = true;
+      Promise.resolve(window._ufRenameFolder?.(uid, course, oldName, newName))
+        .then(() => {
+          const fd = (course.userFolders || []).find((f) => f.name === oldName);
+          if (fd) {
+            fd.name = newName;
+            (fd.files || []).forEach((f) => {
+              (f as CourseFileLite)._folder = newName;
+            });
+          }
+          if (window._openFolders && window._openFolders.has(oldName)) {
+            window._openFolders.delete(oldName);
+            window._openFolders.add(newName);
+          }
+          showCourseSection(course, 'files');
+          if (typeof window.showToast === 'function') {
+            window.showToast('Folder renamed', '"' + oldName + '" → "' + newName + '"');
+          }
+        })
+        .catch((err: unknown) => {
+          btn.disabled = false;
+          const msg = err instanceof Error ? err.message : 'Please try again.';
+          if (typeof window.showToast === 'function') window.showToast('Rename failed', msg);
+        });
     });
   });
 

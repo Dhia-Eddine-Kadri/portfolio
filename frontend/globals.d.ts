@@ -340,6 +340,12 @@ declare global {
       toFolder: string | null,
       sname: string | null
     ) => Promise<unknown>;
+    _ufRenameFolder?: (
+      uid: string,
+      course: LegacyCourse,
+      oldName: string,
+      newName: string
+    ) => Promise<unknown>;
     _showFolderPickerPopup?: (
       anchor: HTMLElement,
       folders: string[],

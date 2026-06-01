@@ -788,3 +788,28 @@ async function _ufMoveFile(uid, course, fname, fromFolder, toFolder) {
   if (!r.ok) throw new Error('Copy failed: ' + r.status);
   await _ufDeleteRemote(uid, course, fname, fromFolder || null);
 }
+
+// Rename a folder. The cross-device source of truth for folder names is the
+// Supabase storage path prefix (_ufMerge derives the folder list from it), so
+// we move every file in the folder from the old prefix to the new one. The
+// localStorage folder list is updated too so empty folders (no storage objects
+// yet) also rename. File open/download builds paths from the live folder name,
+// so it keeps working after the rename.
+async function _ufRenameFolder(uid, course, oldName, newName) {
+  oldName = (oldName || '').trim();
+  newName = (newName || '').trim();
+  if (!uid || !oldName || !newName || oldName === newName) return;
+  var fd = (course.userFolders || []).find(function (x) {
+    return x.name === oldName;
+  });
+  var files = fd ? fd.files || [] : [];
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    await _ufMoveFileTo(uid, course, course, f.name, oldName, newName, f._storageName || null);
+  }
+  var list = _ufGetFolders(uid, course).map(function (n) {
+    return n === oldName ? newName : n;
+  });
+  if (list.indexOf(newName) === -1) list.push(newName);
+  _ufSaveFolders(uid, course, list);
+}
