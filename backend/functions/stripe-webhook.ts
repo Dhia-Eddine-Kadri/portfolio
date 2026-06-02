@@ -8,6 +8,7 @@ import { requireEnv } from '../lib/env';
 import { supaRequest } from '../lib/supabase-admin';
 import { stripeGet } from '../lib/stripe';
 import { recordDeviceTrial } from '../lib/trial-device';
+import { recordSubEvent, lookupByStripeCustomer } from '../lib/subscription-events';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 interface StripeEvent<T = unknown> {
@@ -33,6 +34,10 @@ interface SubscriptionObject {
 
 interface InvoiceObject {
   customer?: string;
+  billing_reason?: string;
+  subscription?: string;
+  amount_paid?: number;
+  currency?: string;
 }
 
 const SIGNATURE_TOLERANCE_SECONDS = 300; // matches stripe-node default
@@ -226,6 +231,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
             'stripe'
           );
         }
+
+        // Analytics history (best-effort): a trial start, or an immediate paid
+        // signup when the user skipped the trial.
+        await recordSubEvent(serviceKey, {
+          user_id: userId,
+          provider: 'stripe',
+          event_type: noTrial ? 'paid' : 'trial_started',
+          subscription_id: session.subscription || null,
+          period_end: expiresAt
+        });
       }
     }
 
@@ -233,6 +248,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       const sub = evt.data.object as SubscriptionObject;
       const cusId = sub.customer;
       if (cusId) {
+        const { userId: cancelUid } = await lookupByStripeCustomer(serviceKey, cusId);
         // Stamp expires_at to now() so app code keying off it correctly
         // treats the user as expired even before the next sync.
         await supaWriteOrThrow('PATCH',
@@ -243,6 +259,10 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
             updated_at: new Date().toISOString()
           },
           serviceKey, prefer);
+        await recordSubEvent(serviceKey, {
+          user_id: cancelUid, provider: 'stripe', event_type: 'cancelled',
+          subscription_id: sub.id || null
+        });
       }
     }
 
@@ -250,6 +270,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       const sub = evt.data.object as SubscriptionObject;
       const cusId = sub.customer;
       if (cusId) {
+        // Read prior status first so we can detect a trial → paid conversion.
+        const prior = await lookupByStripeCustomer(serviceKey, cusId);
         const isActive = sub.status === 'active' || sub.status === 'trialing';
         const isPaused = Boolean(sub.pause_collection);
         const patch: Record<string, unknown> = {
@@ -272,6 +294,31 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         await supaWriteOrThrow('PATCH',
           'subscriptions?stripe_customer_id=eq.' + encodeURIComponent(cusId),
           patch, serviceKey, prefer);
+
+        // Trial → paid conversion: prior row was trialing and Stripe now
+        // reports an active (charged) subscription.
+        if (prior.status === 'trialing' && sub.status === 'active') {
+          await recordSubEvent(serviceKey, {
+            user_id: prior.userId, provider: 'stripe', event_type: 'converted',
+            subscription_id: sub.id || null, period_end: isoOrNull(sub.current_period_end)
+          });
+        }
+      }
+    }
+
+    if (evt.type === 'invoice.payment_succeeded') {
+      // Recurring renewal payments. Stripe sets billing_reason to
+      // 'subscription_cycle' for renewals (vs 'subscription_create' for the
+      // first charge, which is already captured as paid/converted).
+      const inv = evt.data.object as InvoiceObject;
+      if (inv.customer && inv.billing_reason === 'subscription_cycle') {
+        const { userId: renewUid } = await lookupByStripeCustomer(serviceKey, inv.customer);
+        await recordSubEvent(serviceKey, {
+          user_id: renewUid, provider: 'stripe', event_type: 'renewed',
+          subscription_id: inv.subscription || null,
+          amount_cents: typeof inv.amount_paid === 'number' ? inv.amount_paid : null,
+          currency: inv.currency || null
+        });
       }
     }
 

@@ -1,5 +1,7 @@
 interface AdminFetchBody {
-  action: 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself';
+  action:
+    | 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself'
+    | 'signups' | 'subscriptions' | 'retention';
   [k: string]: unknown;
 }
 
@@ -27,6 +29,61 @@ export async function searchUsers(query: string): Promise<unknown> {
 
 export async function setUserPlan(userId: string, plan: 'free' | 'pro'): Promise<void> {
   await _adminFetch({ action: 'setplan', userId, plan });
+}
+
+// ── Admin analytics ─────────────────────────────────────────────────────────
+
+export interface SignupStats {
+  total: number;
+  range: string;
+  bucket: string;
+  series: Array<{ date: string; count: number }>;
+  summary: { today: number; week: number; month: number; year: number; total: number; currentUsers: number };
+}
+
+export async function getSignupStats(range: string, bucket?: string): Promise<SignupStats | null> {
+  const body: AdminFetchBody = { action: 'signups', range };
+  if (bucket) body.bucket = bucket;
+  const res = await _adminFetch(body);
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export interface SubscriptionStats {
+  totalSubs: number;
+  trialsStarted: number;
+  converted: number;
+  conversionRate: number;
+  activePaid: number;
+  trialing: number;
+  cancelled: number;
+  pastDue: number;
+  paused: number;
+}
+
+export async function getSubscriptionStats(): Promise<SubscriptionStats | null> {
+  const res = await _adminFetch({ action: 'subscriptions' });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export interface RetentionMonth {
+  month: string;
+  active: number;
+  newPaid: number;
+  renewed: number;
+  cancelled: number;
+}
+export interface RetentionStats {
+  series: RetentionMonth[];
+  months: number;
+  available: boolean;
+}
+
+export async function getRetentionStats(months = 12): Promise<RetentionStats | null> {
+  const res = await _adminFetch({ action: 'retention', months });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
 }
 
 export interface ReindexCourseResult {

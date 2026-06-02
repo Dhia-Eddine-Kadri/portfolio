@@ -4,7 +4,38 @@ import { supaRequest, supaAuthAdminRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { logSecurityEvent } from '../lib/logger';
 import { isUuid } from '../lib/validation';
+import {
+  bucketSignups, summarizeSubscriptions, computeRetention,
+  isBucket, isRange, RANGE_DAYS, type Bucket, type Range, type SubRow, type SubEvent
+} from '../lib/admin-stats';
 import type { LambdaResponse, NetlifyEvent, SupabaseUser } from '../lib/types';
+
+// Smart default bucket per range so charts stay readable (a year of daily bars
+// is unusable). Used only when the caller didn't specify a valid bucket.
+function defaultBucket(range: Range): Bucket {
+  if (range === '365d' || range === 'all') return 'month';
+  if (range === '90d') return 'week';
+  return 'day';
+}
+
+// Page through the Auth Admin API collecting signup timestamps. This needs no
+// DB migration and is fine for launch-scale user counts; if it ever gets slow,
+// swap in a SECURITY DEFINER RPC over auth.users.
+async function collectSignupTimestamps(serviceKey: string): Promise<string[]> {
+  const out: string[] = [];
+  const PER_PAGE = 1000;
+  let page = 1;
+  for (; page <= 100; page++) {
+    const res = await supaAuthAdminRequest<{ users?: Array<{ created_at?: string }> }>(
+      'GET', 'users?per_page=' + PER_PAGE + '&page=' + page, serviceKey
+    );
+    if (res.status < 200 || res.status >= 300) break;
+    const users = (res.body && res.body.users) || [];
+    for (const u of users) if (u.created_at) out.push(u.created_at);
+    if (users.length < PER_PAGE) break;
+  }
+  return out;
+}
 
 interface AdminRow { user_id: string }
 interface SubscriptionLite { plan?: string; status?: string }
@@ -28,7 +59,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   let action: unknown, query = '', userId: unknown, plan: unknown,
-      reportId: unknown, status: unknown, resolutionNote = '';
+      reportId: unknown, status: unknown, resolutionNote = '',
+      range: unknown, bucket: unknown, months: unknown;
   try {
     const b = JSON.parse(event.body || '{}') as Record<string, unknown>;
     if (!b || typeof b !== 'object' || Array.isArray(b)) return fail(400, 'Invalid body');
@@ -39,6 +71,9 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     reportId = b.reportId;
     status = b.status;
     resolutionNote = typeof b.resolutionNote === 'string' ? b.resolutionNote.trim() : '';
+    range = b.range;
+    bucket = b.bucket;
+    months = b.months;
   } catch { return fail(400, 'Invalid body'); }
 
   const callerToken = extractBearerToken(event.headers);
@@ -53,7 +88,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'subscriptions', 'retention'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -180,6 +215,59 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       report_id: reportId, status, auth_method: adminCheck.method
     });
     return jsonResponse(200, { ok: true });
+  }
+
+  // ── Analytics: signup growth ──────────────────────────────────────────────
+  if (action === 'signups') {
+    const r: Range = isRange(range) ? range : '30d';
+    const b: Bucket = isBucket(bucket) ? bucket : defaultBucket(r);
+    const timestamps = await collectSignupTimestamps(serviceKey);
+    const result = bucketSignups(timestamps, r, b);
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_signups', {
+      range: r, bucket: b, total_users: result.summary.total, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, { ...result, metadata: { generatedAt: new Date().toISOString(), windowDays: RANGE_DAYS[r] } });
+  }
+
+  // ── Analytics: subscription snapshot ──────────────────────────────────────
+  if (action === 'subscriptions') {
+    const subRes = await supaRequest<SubRow[]>(
+      'GET', 'subscriptions?select=plan,status,had_trial', null, serviceKey
+    );
+    const rows = Array.isArray(subRes.body) ? subRes.body : [];
+    const summary = summarizeSubscriptions(rows);
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_subscriptions', {
+      total_subs: summary.totalSubs, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, { ...summary, metadata: { generatedAt: new Date().toISOString() } });
+  }
+
+  // ── Analytics: monthly retention (from subscription_events history) ───────
+  if (action === 'retention') {
+    let m = typeof months === 'number' ? Math.floor(months) : parseInt(String(months || ''), 10);
+    if (!Number.isFinite(m) || m < 1) m = 12;
+    if (m > 36) m = 36;
+    // Only need events from the window under review. Pull a generous slice.
+    const sinceMs = Date.now() - (m + 1) * 31 * 24 * 60 * 60 * 1000;
+    const since = new Date(sinceMs).toISOString();
+    const evRes = await supaRequest<SubEvent[]>(
+      'GET',
+      'subscription_events?created_at=gte.' + encodeURIComponent(since) +
+        '&select=user_id,event_type,created_at&order=created_at.asc&limit=100000',
+      null, serviceKey
+    );
+    // If the table doesn't exist yet (migration not applied) PostgREST returns
+    // a non-array error body — degrade to an empty series rather than 500.
+    const events = Array.isArray(evRes.body) ? evRes.body : [];
+    const series = computeRetention(events, m);
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_retention', {
+      months: m, event_count: events.length, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, {
+      series, months: m,
+      available: Array.isArray(evRes.body),
+      metadata: { generatedAt: new Date().toISOString() }
+    });
   }
 
   return fail(400, 'Unknown action');

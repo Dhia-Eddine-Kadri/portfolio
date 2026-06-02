@@ -307,6 +307,43 @@
             <h1><span data-i18n="admin_title">🛡️ Admin</span></h1>
             <p data-i18n="admin_subtitle">Manage user subscriptions</p>
           </div>
+
+          <!-- ANALYTICS DASHBOARD (populated by admin-panel.ts) -->
+          <div id="adminStats" style="max-width: 960px; margin: 0 auto 34px">
+            <div id="adminStatsLoading" style="color: var(--on-glass-muted); font-size: .85rem">Loading stats…</div>
+            <div id="adminStatsBody" style="display: none">
+              <h2 style="font-size: 1.05rem; margin: 0 0 10px">📈 <span data-i18n="admin_growth_title">User growth</span></h2>
+              <div id="adminGrowthCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px"></div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 16px 0 10px">
+                <label style="font-size: .8rem; color: var(--on-glass-muted)">
+                  <span data-i18n="admin_range">Range</span>
+                  <select id="adminRangeSel" class="chat-friend-search" style="margin-left: 6px; width: auto">
+                    <option value="7d" data-i18n="admin_range_7d">Last 7 days</option>
+                    <option value="30d" selected data-i18n="admin_range_30d">Last 30 days</option>
+                    <option value="90d" data-i18n="admin_range_90d">Last 90 days</option>
+                    <option value="365d" data-i18n="admin_range_365d">Last year</option>
+                    <option value="all" data-i18n="admin_range_all">All time</option>
+                  </select>
+                </label>
+                <label style="font-size: .8rem; color: var(--on-glass-muted)">
+                  <span data-i18n="admin_bucket">Bucket</span>
+                  <select id="adminBucketSel" class="chat-friend-search" style="margin-left: 6px; width: auto">
+                    <option value="day" data-i18n="admin_bucket_day">Daily</option>
+                    <option value="week" data-i18n="admin_bucket_week">Weekly</option>
+                    <option value="month" data-i18n="admin_bucket_month">Monthly</option>
+                  </select>
+                </label>
+              </div>
+              <div id="adminSignupChart" style="margin-bottom: 8px"></div>
+
+              <h2 style="font-size: 1.05rem; margin: 28px 0 10px">💳 <span data-i18n="admin_subs_title">Subscriptions</span></h2>
+              <div id="adminSubCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px"></div>
+
+              <h2 style="font-size: 1.05rem; margin: 28px 0 10px">🔁 <span data-i18n="admin_retention_title">Monthly retention</span></h2>
+              <div id="adminRetention"></div>
+            </div>
+          </div>
+
           <div style="max-width: 640px; margin: 0 auto">
             <div style="display: flex; gap: 10px; margin-bottom: 18px">
               <input

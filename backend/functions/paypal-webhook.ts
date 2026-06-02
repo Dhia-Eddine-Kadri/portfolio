@@ -22,6 +22,7 @@
 
 import { requireEnv, optionalEnv } from '../lib/env';
 import { supaRequest } from '../lib/supabase-admin';
+import { recordSubEvent, lookupByPaypalSub } from '../lib/subscription-events';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 const PAYPAL_API_BASE = optionalEnv('PAYPAL_API_BASE', 'https://api-m.paypal.com');
@@ -218,6 +219,10 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       return { statusCode: 200, body: 'ok' };
     }
 
+    // user_id for analytics: custom_id is set on BILLING.* events; fall back to
+    // a lookup by subscription id (e.g. PAYMENT.SALE.COMPLETED).
+    const analyticsUid = parsed.resource?.custom_id || (await lookupByPaypalSub(serviceKey, subId));
+
     if (
       parsed.event_type === 'BILLING.SUBSCRIPTION.CANCELLED' ||
       parsed.event_type === 'BILLING.SUBSCRIPTION.EXPIRED'
@@ -230,6 +235,11 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
           updated_at: new Date().toISOString()
         },
         serviceKey, prefer);
+      await recordSubEvent(serviceKey, {
+        user_id: analyticsUid, provider: 'paypal',
+        event_type: parsed.event_type === 'BILLING.SUBSCRIPTION.EXPIRED' ? 'expired' : 'cancelled',
+        subscription_id: subId
+      });
     } else if (parsed.event_type === 'BILLING.SUBSCRIPTION.SUSPENDED') {
       await supaWriteOrThrow('PATCH',
         'subscriptions?paypal_subscription_id=eq.' + encodeURIComponent(subId),
@@ -257,6 +267,13 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
           updated_at: new Date().toISOString()
         },
         serviceKey, prefer);
+      // ACTIVATED = first paid activation; SALE.COMPLETED = a recurring payment.
+      await recordSubEvent(serviceKey, {
+        user_id: analyticsUid, provider: 'paypal',
+        event_type: parsed.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED' ? 'paid' : 'renewed',
+        subscription_id: subId,
+        period_end: expires
+      });
     }
 
     await markEvent(parsed.id, 'processed', serviceKey);

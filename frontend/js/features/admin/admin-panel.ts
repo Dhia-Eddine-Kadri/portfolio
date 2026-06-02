@@ -5,9 +5,15 @@ import {
   reindexUserCourse,
   listRetrievalLogs,
   getRetrievalLog,
+  getSignupStats,
+  getSubscriptionStats,
+  getRetentionStats,
   type RetrievalLogLite,
   type RetrievalLogFull,
   type RetrievalChunkMeta,
+  type SignupStats,
+  type SubscriptionStats,
+  type RetentionStats,
 } from '../../services/admin-service.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 
@@ -50,6 +56,179 @@ export function initAdminPanel(): void {
     });
   }
   initRetrievalInspector();
+  initAdminStats();
+}
+
+// ── Analytics dashboard ─────────────────────────────────────────────────────
+
+let _statsLoaded = false;
+
+function _statCard(label: string, value: string | number, accent?: string): HTMLElement {
+  const card = document.createElement('div');
+  card.style.cssText =
+    'background:var(--glass-surface,rgba(255,255,255,.04));border:1px solid var(--glass-border,rgba(255,255,255,.08));' +
+    'border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px';
+  const v = document.createElement('div');
+  v.style.cssText = 'font-size:1.5rem;font-weight:800;color:' + (accent || '#fff');
+  v.textContent = String(value);
+  const l = document.createElement('div');
+  l.style.cssText = 'font-size:.72rem;color:var(--on-glass-muted);font-weight:600';
+  l.textContent = label;
+  card.appendChild(v);
+  card.appendChild(l);
+  return card;
+}
+
+function _defaultBucketFor(range: string): 'day' | 'week' | 'month' {
+  if (range === '365d' || range === 'all') return 'month';
+  if (range === '90d') return 'week';
+  return 'day';
+}
+
+function initAdminStats(): void {
+  const root = document.getElementById('adminStats');
+  if (!root) return;
+  const navBtn = document.getElementById('psbAdmin');
+  // Lazy-load on first time the admin section is opened.
+  if (navBtn) navBtn.addEventListener('click', () => { void loadAdminStats(); });
+
+  const rangeSel = document.getElementById('adminRangeSel') as HTMLSelectElement | null;
+  const bucketSel = document.getElementById('adminBucketSel') as HTMLSelectElement | null;
+  if (rangeSel) {
+    rangeSel.addEventListener('change', () => {
+      if (bucketSel) bucketSel.value = _defaultBucketFor(rangeSel.value);
+      void reloadSignupChart();
+    });
+  }
+  if (bucketSel) bucketSel.addEventListener('change', () => { void reloadSignupChart(); });
+}
+
+async function loadAdminStats(): Promise<void> {
+  if (_statsLoaded) return;
+  _statsLoaded = true;
+  const loading = document.getElementById('adminStatsLoading');
+  const body = document.getElementById('adminStatsBody');
+  try {
+    await Promise.all([reloadSignupChart(), loadSubscriptionCards(), loadRetention()]);
+    if (loading) loading.style.display = 'none';
+    if (body) body.style.display = '';
+  } catch {
+    if (loading) loading.textContent = 'Could not load stats.';
+    _statsLoaded = false; // allow a retry on next open
+  }
+}
+
+async function reloadSignupChart(): Promise<void> {
+  const rangeSel = document.getElementById('adminRangeSel') as HTMLSelectElement | null;
+  const bucketSel = document.getElementById('adminBucketSel') as HTMLSelectElement | null;
+  const range = rangeSel?.value || '30d';
+  const bucket = bucketSel?.value || _defaultBucketFor(range);
+  const data = await getSignupStats(range, bucket);
+  if (data) {
+    _renderGrowthCards(data);
+    _renderSignupChart(data);
+  }
+}
+
+function _renderGrowthCards(data: SignupStats): void {
+  const host = document.getElementById('adminGrowthCards');
+  if (!host) return;
+  host.innerHTML = '';
+  const s = data.summary;
+  host.appendChild(_statCard('Today', s.today, '#7dd3fc'));
+  host.appendChild(_statCard('This week', s.week, '#7dd3fc'));
+  host.appendChild(_statCard('This month', s.month));
+  host.appendChild(_statCard('This year', s.year));
+  host.appendChild(_statCard('Total users', s.total, '#6ee7b7'));
+  host.appendChild(_statCard('Current (>7d)', s.currentUsers));
+}
+
+function _renderSignupChart(data: SignupStats): void {
+  const host = document.getElementById('adminSignupChart');
+  if (!host) return;
+  host.innerHTML = '';
+  const series = data.series || [];
+  if (!series.length) {
+    host.innerHTML = '<div style="color:var(--on-glass-muted);font-size:.8rem">No signups in this range.</div>';
+    return;
+  }
+  const max = series.reduce((m, p) => (p.count > m ? p.count : m), 0) || 1;
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'display:flex;align-items:flex-end;gap:2px;height:160px;padding:10px 4px;' +
+    'background:var(--glass-surface,rgba(255,255,255,.03));border:1px solid var(--glass-border,rgba(255,255,255,.08));border-radius:14px;overflow-x:auto';
+  for (const p of series) {
+    const col = document.createElement('div');
+    col.style.cssText = 'flex:1 0 6px;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%';
+    col.title = p.date + ': ' + p.count;
+    const bar = document.createElement('div');
+    const h = Math.round((p.count / max) * 100);
+    bar.style.cssText =
+      'width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#38bdf8,#0284c7);' +
+      'height:' + (p.count > 0 ? Math.max(h, 3) : 0) + '%;transition:height .2s';
+    col.appendChild(bar);
+    wrap.appendChild(col);
+  }
+  host.appendChild(wrap);
+  const caption = document.createElement('div');
+  caption.style.cssText = 'font-size:.72rem;color:var(--on-glass-muted);margin-top:6px';
+  caption.textContent =
+    data.total + ' signups · ' + series[0]!.date + ' → ' + series[series.length - 1]!.date +
+    ' · peak ' + max + '/' + data.bucket;
+  host.appendChild(caption);
+}
+
+async function loadSubscriptionCards(): Promise<void> {
+  const host = document.getElementById('adminSubCards');
+  if (!host) return;
+  const data: SubscriptionStats | null = await getSubscriptionStats();
+  host.innerHTML = '';
+  if (!data) {
+    host.innerHTML = '<div style="color:var(--on-glass-muted);font-size:.8rem">Subscription stats unavailable.</div>';
+    return;
+  }
+  host.appendChild(_statCard('Trials started', data.trialsStarted, '#fbbf24'));
+  host.appendChild(_statCard('Converted', data.converted, '#6ee7b7'));
+  host.appendChild(_statCard('Conversion', data.conversionRate + '%', '#6ee7b7'));
+  host.appendChild(_statCard('Active paid', data.activePaid, '#7dd3fc'));
+  host.appendChild(_statCard('Trialing now', data.trialing));
+  host.appendChild(_statCard('Cancelled', data.cancelled, '#f87171'));
+}
+
+async function loadRetention(): Promise<void> {
+  const host = document.getElementById('adminRetention');
+  if (!host) return;
+  const data: RetentionStats | null = await getRetentionStats(12);
+  host.innerHTML = '';
+  if (!data || !data.available) {
+    host.innerHTML =
+      '<div style="color:var(--on-glass-muted);font-size:.8rem">' +
+      'No retention history yet. Apply the <code>subscription_events</code> migration; numbers fill in as Stripe/PayPal webhooks fire.' +
+      '</div>';
+    return;
+  }
+  const rows = data.series || [];
+  const table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:.82rem';
+  table.innerHTML =
+    '<thead><tr>' +
+    ['Month', 'Active paid', 'New paid', 'Renewed', 'Cancelled']
+      .map((h) => '<th style="text-align:left;padding:7px 10px;color:var(--on-glass-muted);font-weight:700;border-bottom:1px solid var(--glass-border,rgba(255,255,255,.1))">' + h + '</th>')
+      .join('') +
+    '</tr></thead>';
+  const tbody = document.createElement('tbody');
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    const cells = [r.month, String(r.active), String(r.newPaid), String(r.renewed), String(r.cancelled)];
+    tr.innerHTML = cells
+      .map((c, i) =>
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--glass-border,rgba(255,255,255,.06));' +
+        (i === 0 ? 'font-weight:700' : 'color:var(--on-glass-muted)') + '">' + escapeHtml(c) + '</td>')
+      .join('');
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  host.appendChild(table);
 }
 
 // ── Retrieval inspector ────────────────────────────────────────────────────
