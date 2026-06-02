@@ -288,7 +288,11 @@
           var d = state.decks.find(function (x) { return x.id === id; });
           if (!d) return;
           var name = window.prompt('Rename deck', d.name);
-          if (name && name.trim()) { d.name = name.trim(); renderAll(); }
+          if (name && name.trim()) {
+            d.name = name.trim();
+            _dbUpdateDeck(d._dbId, { name: d.name, updated_at: new Date().toISOString() });
+            renderAll();
+          }
         });
       });
       els.grid.querySelectorAll('[data-deck-menu]').forEach(function (b) {

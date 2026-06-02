@@ -814,16 +814,30 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
     co.querySelectorAll<HTMLElement>('[data-course-panel]').forEach((panel) => {
       panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
     });
-    if (targetTab === 'quiz') {
-      const qp = co.querySelector<HTMLElement>('#coQuizPanel');
-      if (qp && typeof window.mountQuiz === 'function') {
-        window.mountQuiz(qp, course, { generate: window._generateStudyTool });
-      }
-    } else if (targetTab === 'flashcards') {
-      const fp = co.querySelector<HTMLElement>('#coFlashPanel');
-      if (fp && typeof window.mountFlashcards === 'function') {
-        window.mountFlashcards(fp, course, { generate: window._generateStudyTool });
-      }
+    if (targetTab === 'quiz' || targetTab === 'flashcards') {
+      // The quiz/flashcards scripts are lazy-loaded on demand. On the FIRST
+      // visit the module isn't on `window` yet, so a one-shot mount check
+      // silently no-ops and the panel stays empty until a second click. Kick
+      // off the lazy load and poll for the mount fn so the first click works.
+      const panel = co.querySelector<HTMLElement>(
+        targetTab === 'quiz' ? '#coQuizPanel' : '#coFlashPanel'
+      );
+      const loadFeature = (window as unknown as {
+        _ssLoadPortalFeature?: (name: string) => Promise<void>;
+      })._ssLoadPortalFeature;
+      if (typeof loadFeature === 'function') void loadFeature(targetTab);
+      const mountWhenReady = (tries: number): void => {
+        const mountFn = targetTab === 'quiz' ? window.mountQuiz : window.mountFlashcards;
+        if (typeof mountFn === 'function') {
+          // Guard against a later tab switch having replaced/detached the panel.
+          if (panel && panel.isConnected) {
+            mountFn(panel, course, { generate: window._generateStudyTool });
+          }
+        } else if (tries > 0) {
+          setTimeout(() => mountWhenReady(tries - 1), 80);
+        }
+      };
+      mountWhenReady(80);
     }
   }
 }

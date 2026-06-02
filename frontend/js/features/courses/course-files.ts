@@ -792,7 +792,7 @@ function initCourseStudyTools(co: HTMLElement, course: LegacyCourse): void {
   });
 }
 
-function setCourseStudyMode(co: HTMLElement, course: LegacyCourse, mode: string): void {
+function setCourseStudyMode(co: HTMLElement, _course: LegacyCourse, mode: string): void {
   const nextMode = ['files', 'quiz', 'flashcards'].includes(mode) ? mode : 'files';
   const featureLoader = (window as unknown as {
     _ssLoadPortalFeature?: (name: string) => Promise<void>;
@@ -811,41 +811,11 @@ function setCourseStudyMode(co: HTMLElement, course: LegacyCourse, mode: string)
   const inner = co.closest<HTMLElement>('.co-inner');
   if (inner) inner.classList.toggle('co-inner-wide', nextMode === 'quiz' || nextMode === 'flashcards');
 
-  if (nextMode === 'quiz') {
-    const quizPanel = co.querySelector<HTMLElement>('#coQuizPanel');
-    if (quizPanel) {
-      (function tryMountQuiz(): void {
-        if (typeof window.mountQuiz === 'function') {
-          if (!quizPanel.dataset.qzMounted) {
-            quizPanel.dataset.qzMounted = '1';
-            window.mountQuiz(quizPanel, course, { generate: generateStudyTool });
-          } else if (typeof window.resetQuizToGrid === 'function') {
-            window.resetQuizToGrid(quizPanel);
-          }
-        } else {
-          setTimeout(tryMountQuiz, 80);
-        }
-      })();
-    }
-    return;
-  }
-  if (nextMode === 'flashcards') {
-    const flashPanel = co.querySelector<HTMLElement>('#coFlashPanel');
-    if (flashPanel) {
-      (function tryMountFlashcards(): void {
-        if (typeof window.mountFlashcards === 'function') {
-          if (!flashPanel.dataset.fcMounted) {
-            flashPanel.dataset.fcMounted = '1';
-            window.mountFlashcards(flashPanel, course, { generate: generateStudyTool });
-          } else if (typeof window.resetFlashcardsToGrid === 'function') {
-            window.resetFlashcardsToGrid(flashPanel);
-          }
-        } else {
-          setTimeout(tryMountFlashcards, 80);
-        }
-      })();
-    }
-  }
+  // Mounting the quiz/flashcards panel is owned by showCourseSection(), which
+  // re-renders the whole course overview right after this runs (the tab click
+  // calls both). Mounting here too would target a node that's about to be
+  // detached — wasted work and a duplicate DB fetch — so we only kick off the
+  // lazy-load above and let showCourseSection do the actual mount.
 }
 
 interface DocMeta {

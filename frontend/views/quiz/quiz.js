@@ -336,7 +336,11 @@
           var q = state.quizzes.find(function (x) { return x.id === id; });
           if (!q) return;
           var name = window.prompt('Rename quiz', q.name);
-          if (name && name.trim()) { q.name = name.trim(); renderAll(); }
+          if (name && name.trim()) {
+            q.name = name.trim();
+            _dbUpdateQuiz(q._dbId, { name: q.name, updated_at: new Date().toISOString() });
+            renderAll();
+          }
         });
       });
       els.grid.querySelectorAll('[data-quiz-delete]').forEach(function (btn) {
