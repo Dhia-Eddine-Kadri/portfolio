@@ -2107,11 +2107,6 @@ body.pdf-maximized #pdfMaximize {
   font-size: 1rem;
   font-weight: 700;
 }
-.pdf-toolbar-v2 .pdf-more-button {
-  width: 40px;
-  padding: 0;
-}
-
 .pdf-toolbar-v2 .pdf-primary-button {
   height: 40px;
   display: inline-flex;

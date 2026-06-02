@@ -399,7 +399,7 @@ interface LandingTranslation {
     [
       'css/base.css?v=5',
       'css/theme.css?v=5',
-      'css/styles.css?v=24',
+      'css/styles.css?v=25',
       'css/courses-redesign.css?v=36',
       'css/app-design-system.css?v=5',
       'css/layout.css?v=10',
