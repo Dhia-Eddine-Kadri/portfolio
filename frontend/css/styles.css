@@ -2027,6 +2027,9 @@ body.pdf-maximized #pdfMaximize {
   color: #7dd3fc;
   background: rgba(56, 189, 248, 0.22);
 }
+.pdf-compare-chip[hidden] {
+  display: none;
+}
 .pdf-compare-chip {
   display: inline-flex;
   align-items: center;

@@ -371,15 +371,6 @@ function renderTabsStrip(): void {
   while (stripEl.children.length > tabs.length) {
     stripEl.removeChild(stripEl.lastChild!);
   }
-
-  // Keep the tabs bar invisible until there is actually something to switch
-  // between. With a single open document the lone "+" add-tab button reads as
-  // an empty placeholder pill, so only reveal the bar once ≥2 tabs exist (or a
-  // split compare is active, whose chip also lives in this bar).
-  if (barEl) {
-    const show = tabs.length >= 2 || !!getCompareFileName();
-    barEl.style.display = show ? 'flex' : 'none';
-  }
 }
 
 // ── actions ───────────────────────────────────────────────────────────────
