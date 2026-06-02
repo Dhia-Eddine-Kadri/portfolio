@@ -72,14 +72,14 @@
       features: {
         eyebrow: 'Features',
         title: 'Everything a serious student needs, without the clutter.',
-        lead: 'The design is built around one idea: the student should always know what to study next, where the answer came from, and how to stay focused.',
+        lead: 'Minallo keeps the study routine clear: what to study next, where each answer comes from, and how to stay focused while working.',
         cards: [
           { title: 'AI tutor trained around your course', text: 'Minallo answers from your uploaded lectures, exercises, and formula sheets instead of giving generic internet-style explanations.' },
           { title: 'Cited PDF answers', text: 'Every important claim can point back to the exact document and page, so students can verify the answer instantly.' },
           { title: 'Focus tools built in', text: 'Pomodoro sessions, study streaks, and progress signals keep the student working instead of just collecting files.' },
-          { title: 'Honest when context is missing', text: 'When the uploaded material is not enough, Minallo should say what is missing instead of hallucinating a confident answer.' },
+          { title: 'Honest when context is missing', text: 'When the course material does not contain enough information, Minallo explains what is missing and asks for the right file, page, or exercise number.' },
           { title: 'Multi-source synthesis', text: 'It can combine an exercise, a lecture explanation, and a formula sheet into one clean step-by-step answer.' },
-          { title: 'Fast repeated answers', text: 'Common repeated questions can be cached, reducing token cost and making the experience feel instant.' },
+          { title: 'Quick answers to common questions', text: 'Repeated course questions load faster when Minallo already has a verified answer for the same material.' },
           { title: 'German learner mode', text: 'A separate path for vocabulary, grammar, examples, and playful German revision.' },
           { title: 'Playlists while studying', text: 'Students can keep their favorite playlists close, making focus sessions feel more personal and enjoyable.' },
           { title: 'Games for motivation', text: 'Quick games and challenges give students relaxing breaks while keeping the learning mood alive.' }
@@ -88,7 +88,7 @@
       paths: {
         eyebrow: 'Choose your space',
         title: 'One platform, two clear journeys.',
-        lead: 'Minallo should not feel confusing. New users choose whether they are here to manage studies or learn German, then the dashboard adapts to the tools they actually need.',
+        lead: 'New users choose their main path: manage courses or learn German. The dashboard then shows the tools that match that goal.',
         studentCard: {
           eyebrow: 'Courses',
           title: "I'm a student",
@@ -123,12 +123,12 @@
       tutor: {
         eyebrow: 'AI Tutor',
         title: 'Not just chat. A study engine.',
-        lead: "A generic chatbot can explain topics. Minallo should explain your topic the way your professor's material presents it, with citations and controlled confidence.",
+        lead: 'Generic chatbots answer from general knowledge. Minallo answers from your uploaded lectures, exercises, and formula sheets, then cites the pages it used.',
         items: [
           'Search across lectures, exercises, and formula sheets',
           'Answer with page-level citations',
-          'Use active document as a ranking hint, not a hard limit',
-          'Cache repeated questions to reduce API cost'
+          'Start with the open PDF, then search the course when needed',
+          'Reuse verified answers for repeated course questions'
         ]
       },
       pipeline: {
@@ -143,8 +143,8 @@
       },
       workflow: {
         eyebrow: 'Workflow',
-        title: 'A landing page that sells the whole experience.',
-        lead: 'The page should immediately show that Minallo is more than a pretty chatbot. It is a student dashboard, German learner space, course tutor, PDF workspace, focus system, playlist companion, and study-game hub.',
+        title: 'One workspace for the whole study routine.',
+        lead: 'Minallo brings courses, PDFs, AI tutoring, German practice, focus sessions, playlists, and study games into one calm student workspace.',
         cards: [
           { title: 'Ask', text: 'Students ask questions in natural language.' },
           { title: 'Solve', text: 'Exercises become guided step-by-step explanations.' },
@@ -153,8 +153,8 @@
         ]
       },
       quote: {
-        title: '"Minallo should feel like a private tutor who has actually read the student\'s lecture files."',
-        text: 'That message is the core of the landing page: accurate, calm, beautiful, and focused on real student outcomes.'
+        title: '"Minallo feels like a private tutor who has actually read your lecture files."',
+        text: 'Answers stay grounded in real course material, with clear sources and honest limits when context is missing.'
       },
       pricing: {
         eyebrow: 'Pricing',
@@ -233,14 +233,14 @@
       features: {
         eyebrow: 'Funktionen',
         title: 'Alles, was ernsthafte Studierende brauchen — ohne Ballast.',
-        lead: 'Das Design folgt einer Idee: Du sollst immer wissen, was als Nächstes zu lernen ist, woher die Antwort kommt und wie du fokussiert bleibst.',
+        lead: 'Minallo macht den Lernalltag klar: was als Nächstes dran ist, woher eine Antwort kommt und wie du beim Arbeiten fokussiert bleibst.',
         cards: [
           { title: 'KI-Tutor, trainiert auf deinen Kurs', text: 'Minallo antwortet auf Basis deiner hochgeladenen Vorlesungen, Übungen und Formelsammlungen — statt mit generischen Internet-Erklärungen.' },
           { title: 'PDF-Antworten mit Quellenangabe', text: 'Jede wichtige Aussage verweist zurück auf das genaue Dokument und die Seite — so kannst du die Antwort sofort überprüfen.' },
           { title: 'Fokus-Werkzeuge eingebaut', text: 'Pomodoro-Sitzungen, Lernserien und Fortschrittssignale halten dich am Arbeiten — statt nur Dateien zu sammeln.' },
           { title: 'Ehrlich, wenn Kontext fehlt', text: 'Wenn das Material nicht ausreicht, sagt Minallo, was fehlt — statt eine selbstsichere Antwort zu halluzinieren.' },
           { title: 'Synthese aus mehreren Quellen', text: 'Übung, Vorlesungserklärung und Formelsammlung werden zu einer sauberen Schritt-für-Schritt-Antwort kombiniert.' },
-          { title: 'Schnelle wiederholte Antworten', text: 'Häufige Fragen werden zwischengespeichert — das senkt Token-Kosten und fühlt sich sofort an.' },
+          { title: 'Schnelle Antworten auf häufige Fragen', text: 'Wiederholte Kursfragen laden schneller, wenn Minallo bereits eine geprüfte Antwort zum gleichen Material hat.' },
           { title: 'Deutsch-Lernmodus', text: 'Ein eigener Bereich für Vokabeln, Grammatik, Beispiele und spielerische Wiederholung.' },
           { title: 'Playlists beim Lernen', text: 'Behalte deine Lieblings-Playlists in Reichweite — so fühlen sich Fokus-Sessions persönlicher und angenehmer an.' },
           { title: 'Spiele für Motivation', text: 'Schnelle Spiele und Mini-Challenges geben dir entspannte Pausen — und halten die Lernlaune am Leben.' }
@@ -249,7 +249,7 @@
       paths: {
         eyebrow: 'Wähle deinen Bereich',
         title: 'Eine Plattform, zwei klare Wege.',
-        lead: 'Minallo soll nicht verwirrend wirken. Neue Nutzer:innen entscheiden, ob sie hier ihr Studium organisieren oder Deutsch lernen wollen — das Dashboard passt sich dann an die wirklich nötigen Werkzeuge an.',
+        lead: 'Neue Nutzer:innen wählen ihren Hauptweg: Kurse organisieren oder Deutsch lernen. Das Dashboard zeigt danach die passenden Werkzeuge.',
         studentCard: {
           eyebrow: 'Kurse',
           title: 'Ich studiere',
@@ -284,12 +284,12 @@
       tutor: {
         eyebrow: 'KI-Tutor',
         title: 'Kein bloßer Chat. Ein Lern-Motor.',
-        lead: 'Ein generischer Chatbot kann Themen erklären. Minallo erklärt dein Thema so, wie es im Material deiner Professorin oder deines Professors steht — mit Quellenangaben und kontrollierter Sicherheit.',
+        lead: 'Generische Chatbots antworten aus allgemeinem Wissen. Minallo antwortet aus deinen hochgeladenen Vorlesungen, Übungen und Formelsammlungen und nennt die genutzten Seiten.',
         items: [
           'Suche über Vorlesungen, Übungen und Formelsammlungen',
           'Antworten mit Quellenangabe auf Seitenebene',
-          'Das aktive Dokument als Ranking-Hinweis nutzen — nicht als harte Grenze',
-          'Wiederholte Fragen zwischenspeichern, um API-Kosten zu sparen'
+          'Mit dem geöffneten PDF beginnen und bei Bedarf den ganzen Kurs durchsuchen',
+          'Geprüfte Antworten für wiederholte Kursfragen erneut nutzen'
         ]
       },
       pipeline: {
@@ -304,8 +304,8 @@
       },
       workflow: {
         eyebrow: 'Ablauf',
-        title: 'Eine Landingpage, die das ganze Erlebnis verkauft.',
-        lead: 'Die Seite soll sofort zeigen: Minallo ist mehr als ein hübscher Chatbot. Es ist Studi-Dashboard, Deutsch-Lernbereich, Kurs-Tutor, PDF-Arbeitsplatz, Fokus-System, Playlist-Begleiter und Lernspiel-Hub.',
+        title: 'Ein Arbeitsbereich für den ganzen Lernalltag.',
+        lead: 'Minallo verbindet Kurse, PDFs, KI-Tutor, Deutschübungen, Fokus-Sessions, Playlists und Lernspiele in einem ruhigen Studierenden-Workspace.',
         cards: [
           { title: 'Fragen', text: 'Stelle Fragen in natürlicher Sprache.' },
           { title: 'Lösen', text: 'Übungen werden zu geführten Schritt-für-Schritt-Erklärungen.' },
@@ -314,8 +314,8 @@
         ]
       },
       quote: {
-        title: '„Minallo soll sich anfühlen wie ein privater Tutor, der die Vorlesungsdateien wirklich gelesen hat."',
-        text: 'Genau das ist der Kern der Landingpage: präzise, ruhig, schön — und auf echten Lernerfolg ausgerichtet.'
+        title: '„Minallo fühlt sich an wie ein privater Tutor, der deine Vorlesungsdateien wirklich gelesen hat."',
+        text: 'Antworten bleiben im echten Kursmaterial verankert, mit klaren Quellen und ehrlichen Grenzen, wenn Kontext fehlt.'
       },
       pricing: {
         eyebrow: 'Preise',

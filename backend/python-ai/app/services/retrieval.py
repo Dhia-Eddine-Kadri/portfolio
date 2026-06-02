@@ -101,6 +101,8 @@ _NO_QUERY_TERM_PENALTY = 0.30     # chunk doesn't contain any meaningful query t
 _LECTURE_REFERENCE_BOOST = 0.18   # exercise/math questions should include professor lecture context
 _LECTURE_CONCEPT_BOOST = 0.32     # explanation/method questions should prefer professor lecture notes
 _SOLUTION_CONCEPT_PENALTY = 0.18  # worked solutions are secondary for conceptual explanations
+_NAMED_DOC_BOOST = 0.75           # explicit "in X.pdf / lecture 4" should anchor retrieval hard
+_OTHER_EXERCISE_CONTEXT_PENALTY = 0.45  # after the anchor, prefer lecture/formula over random worksheets
 
 # Phase 8 helpers — token filtering for "meaningful query term" checks.
 _STOPWORDS = frozenset({
@@ -189,6 +191,54 @@ def _meaningful_tokens(text: str) -> set[str]:
     }
 
 
+def _normalise_doc_match_text(text: str) -> str:
+    lower = (text or "").lower()
+    lower = (
+        lower.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+        .replace("vorlesung", "vorlesung lecture")
+        .replace("lecture", "lecture vorlesung")
+        .replace("loesung", "loesung solution")
+        .replace("solution", "solution loesung")
+    )
+    return re.sub(r"[^a-z0-9]+", " ", lower).strip()
+
+
+def _doc_name_matches_query(file_name: str, query: str) -> bool:
+    """True when the prompt appears to name a specific uploaded document.
+
+    This intentionally stays conservative: one shared word like "seminar" is
+    not enough. We require either the compact filename/stem phrase, or at
+    least two meaningful filename tokens present in the user's prompt.
+    """
+    if not file_name or not query:
+        return False
+    q_norm = _normalise_doc_match_text(query)
+    name = re.sub(r"\.[a-z0-9]{1,5}$", "", file_name.lower())
+    name_norm = _normalise_doc_match_text(name)
+    if not q_norm or not name_norm:
+        return False
+    compact_q = q_norm.replace(" ", "")
+    compact_name = name_norm.replace(" ", "")
+    if len(compact_name) >= 8 and compact_name in compact_q:
+        return True
+
+    q_parts = q_norm.split()
+    q_token_set = set(q_parts)
+    name_parts = name_norm.split()
+    name_numbers = {str(int(t)) for t in name_parts if t.isdigit()}
+    query_numbers = {str(int(t)) for t in q_parts if t.isdigit()}
+    name_tokens = [
+        t for t in name_norm.split()
+        if len(t) >= 3 and t not in _STOPWORDS and not t.isdigit()
+    ]
+    alpha_hits = sum(1 for t in set(name_tokens) if t in q_token_set)
+    if alpha_hits >= 1 and name_numbers and (name_numbers & query_numbers):
+        return True
+    if len(name_tokens) < 2:
+        return False
+    return alpha_hits >= min(3, len(set(name_tokens)))
+
+
 def infer_question_intent(question: str) -> str | None:
     """Map a question to the document_type most likely to contain the
     answer. Returns None when the signal is weak — better to leave the
@@ -260,6 +310,7 @@ def _study_score(
     *,
     active_document_id: str | None = None,
     preferred_document_ids: set[str] | None = None,
+    named_document_ids: set[str] | None = None,
     quality_by_doc_page: dict[tuple[str, int], str] | None = None,
     # Phase 8 context — all optional so legacy callers still work.
     question_intent: str | None = None,
@@ -291,6 +342,8 @@ def _study_score(
         score += _ACTIVE_DOC_BOOST
     if preferred_document_ids and doc_id in preferred_document_ids:
         score += _PREFERRED_DOC_BOOST
+    if named_document_ids and doc_id in named_document_ids:
+        score += _NAMED_DOC_BOOST
 
     # Phase 1: penalise chunks that originated from weak/failed extraction pages.
     if quality_by_doc_page and doc_id:
@@ -339,6 +392,14 @@ def _study_score(
         doc_type = doc_meta_row.get("document_type") if doc_meta_row else None
         if source == "lecture" or doc_type == "lecture":
             score += _LECTURE_REFERENCE_BOOST
+
+        anchor_ids = set(preferred_document_ids or set()) | set(named_document_ids or set())
+        if active_document_id:
+            anchor_ids.add(active_document_id)
+        if anchor_ids and doc_id not in anchor_ids and (
+            source in {"exercise", "solution"} or doc_type in {"exercise_sheet", "solution_sheet"}
+        ):
+            score -= _OTHER_EXERCISE_CONTEXT_PENALTY
 
     # Explanation/method questions should surface the professor's lecture
     # wording before a worked solution that happens to contain the same
@@ -460,6 +521,7 @@ def retrieve_chunks(
     document_ids: list[str] | None = None,
     preferred_document_ids: list[str] | None = None,
     active_document_id: str | None = None,
+    document_name_query: str | None = None,
     top_k: int = 12,
     min_similarity: float = _MIN_SIMILARITY,
 ) -> list[RetrievedChunk]:
@@ -496,13 +558,41 @@ def retrieve_chunks(
     if document_ids:
         payload["p_document_ids"] = list(document_ids)
 
+    named_document_ids = set()
+    if not document_ids:
+        named_document_ids = _resolve_mentioned_document_ids(
+            sb,
+            user_id=user_id,
+            course_id=course_id,
+            query=document_name_query or query,
+        )
+
     try:
-        resp = sb.rpc("match_chunks_hybrid", payload).execute()
+        if named_document_ids:
+            named_payload = dict(payload)
+            named_payload["p_document_ids"] = list(named_document_ids)
+            resp = sb.rpc("match_chunks_hybrid", named_payload).execute()
+        else:
+            resp = sb.rpc("match_chunks_hybrid", payload).execute()
     except Exception:
         log.exception("match_chunks_hybrid failed")
         return []
 
     rows: list[dict[str, Any]] = resp.data or []
+
+    # When the prompt explicitly names a document, search that document first
+    # but still append course-wide candidates so the model can fall back to
+    # lecture/formula material if the named/open PDF only contains the task.
+    if named_document_ids:
+        try:
+            broad_resp = sb.rpc("match_chunks_hybrid", payload).execute()
+            seen = {r.get("id") for r in rows if r.get("id")}
+            for r in broad_resp.data or []:
+                if r.get("id") not in seen:
+                    rows.append(r)
+                    seen.add(r.get("id"))
+        except Exception:
+            log.exception("match_chunks_hybrid named-doc broad fallback failed")
 
     # If the document filter returned nothing, try once more without it as a
     # safety net — same behaviour the JS pipeline already had.
@@ -530,7 +620,8 @@ def retrieve_chunks(
     # ranker can apply doc-type-match and filename-match boosts.
     doc_meta = _load_doc_metadata(sb, [r.get("document_id") for r in rows if r.get("document_id")])
 
-    preferred = set(preferred_document_ids or document_ids or []) or None
+    preferred = set(preferred_document_ids or document_ids or []) | named_document_ids
+    preferred = preferred or None
     question_intent = infer_question_intent(query)
     conceptual_explanation = is_conceptual_explanation_query(query)
     query_tokens = _meaningful_tokens(query)
@@ -550,6 +641,7 @@ def retrieve_chunks(
                 row,
                 active_document_id=active_document_id,
                 preferred_document_ids=preferred,
+                named_document_ids=named_document_ids or None,
                 quality_by_doc_page=quality_map,
                 question_intent=question_intent,
                 query_tokens=query_tokens,
@@ -632,6 +724,34 @@ def _load_doc_metadata(sb, doc_ids: list[str]) -> dict[str, dict[str, str | None
             "document_type": r.get("document_type"),
             "file_name":     r.get("file_name"),
         }
+    return out
+
+
+def _resolve_mentioned_document_ids(
+    sb,
+    *,
+    user_id: str,
+    course_id: str,
+    query: str,
+) -> set[str]:
+    """Find uploaded docs whose filename is explicitly mentioned in query."""
+    if not query or len(query.strip()) < 4:
+        return set()
+    try:
+        resp = (
+            sb.table("documents")
+            .select("id, file_name")
+            .eq("user_id", user_id)
+            .eq("course_id", course_id)
+            .execute()
+        )
+    except Exception:
+        log.exception("document filename lookup failed")
+        return set()
+    out: set[str] = set()
+    for row in resp.data or []:
+        if _doc_name_matches_query(row.get("file_name") or "", query):
+            out.add(row["id"])
     return out
 
 

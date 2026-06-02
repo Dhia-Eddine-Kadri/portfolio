@@ -27,6 +27,7 @@ from ..services.access_control import (
 from ..services.answer import DEFAULT_TUTOR_MODE, normalise_tutor_mode
 from ..services.answer_stream import stream_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
+from ..services.embeddings import EmbeddingServiceUnavailable
 from ..services.retrieval import retrieve_chunks, retrieve_exercise_block, retrieve_formula_block
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
 from ..supabase_client import get_supabase
@@ -404,26 +405,34 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         exercise_hit = None
         formula_hits = []
     else:
-        exercise_hit = retrieve_exercise_block(
-            user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-            document_ids=payload.documentIds,
-            active_document_id=payload.activeDocumentId,
-        )
-        chunks = retrieve_chunks(
-            user_id=user_id, course_id=payload.courseId,
-            query=retrieval_query, document_ids=None,
-            preferred_document_ids=payload.documentIds,
-            active_document_id=payload.activeDocumentId, top_k=18,
-        )
+        try:
+            exercise_hit = retrieve_exercise_block(
+                user_id=user_id, course_id=payload.courseId, query=retrieval_query,
+                document_ids=payload.documentIds,
+                active_document_id=payload.activeDocumentId,
+            )
+            chunks = retrieve_chunks(
+                user_id=user_id, course_id=payload.courseId,
+                query=retrieval_query, document_ids=None,
+                preferred_document_ids=payload.documentIds,
+                active_document_id=payload.activeDocumentId,
+                document_name_query=question,
+                top_k=18,
+            )
+        except EmbeddingServiceUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         if exercise_hit:
             from .ask import _prepend_exercise_chunks  # reuse the same helper
             chunks = _prepend_exercise_chunks(exercise_hit, chunks)
 
-        formula_hits = retrieve_formula_block(
-            user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-            document_ids=payload.documentIds,
-            active_document_id=payload.activeDocumentId,
-        )
+        try:
+            formula_hits = retrieve_formula_block(
+                user_id=user_id, course_id=payload.courseId, query=retrieval_query,
+                document_ids=payload.documentIds,
+                active_document_id=payload.activeDocumentId,
+            )
+        except EmbeddingServiceUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         if formula_hits:
             from .ask import _prepend_formula_chunks  # reuse the same helper
             chunks = _prepend_formula_chunks(formula_hits, chunks)

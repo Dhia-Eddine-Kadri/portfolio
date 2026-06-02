@@ -14,6 +14,7 @@ def _import_retrieval():
     fake_sb.get_supabase = lambda: None
     sys.modules.setdefault("app.supabase_client", fake_sb)
     fake_emb = types.ModuleType("app.services.embeddings")
+    fake_emb.EmbeddingServiceUnavailable = RuntimeError
     fake_emb.embed_texts = lambda texts: [[0.0] * 1536 for _ in texts]
     sys.modules.setdefault("app.services.embeddings", fake_emb)
     if "app.services.retrieval" in sys.modules:
@@ -78,6 +79,25 @@ def test_doc_type_match_boost():
     assert with_meta > base
 
 
+def test_named_document_gets_strong_anchor_boost():
+    r = _import_retrieval()
+    meta = {
+        "DOC1": {"document_type": "lecture", "file_name": "Vorlesung 04.pdf"},
+        "DOC2": {"document_type": "lecture", "file_name": "Vorlesung 05.pdf"},
+    }
+    named = r._study_score(
+        _chunk(document_id="DOC1"),
+        named_document_ids={"DOC1"},
+        doc_meta=meta,
+    )
+    other = r._study_score(
+        _chunk(document_id="DOC2"),
+        named_document_ids={"DOC1"},
+        doc_meta=meta,
+    )
+    assert named - other == pytest.approx(r._NAMED_DOC_BOOST)
+
+
 def test_doc_type_mismatch_no_boost():
     r = _import_retrieval()
     meta = {"DOC1": {"document_type": "lecture", "file_name": "anon.pdf"}}
@@ -107,6 +127,30 @@ def test_exercise_math_boosts_lecture_reference_chunks():
         doc_meta=meta,
     )
     assert boosted > base
+
+
+def test_anchored_exercise_question_penalises_other_exercise_sheets():
+    r = _import_retrieval()
+    meta = {
+        "ACTIVE": {"document_type": "exercise_sheet", "file_name": "AG_9.pdf"},
+        "OTHER": {"document_type": "exercise_sheet", "file_name": "AG_8.pdf"},
+        "LEC": {"document_type": "lecture", "file_name": "Vorlesung Schrauben.pdf"},
+    }
+    other_exercise = r._study_score(
+        _chunk(document_id="OTHER", source_type="exercise"),
+        active_document_id="ACTIVE",
+        question_intent="exercise_sheet",
+        query_is_math=True,
+        doc_meta=meta,
+    )
+    lecture = r._study_score(
+        _chunk(document_id="LEC", source_type="lecture"),
+        active_document_id="ACTIVE",
+        question_intent="exercise_sheet",
+        query_is_math=True,
+        doc_meta=meta,
+    )
+    assert lecture > other_exercise
 
 
 def test_conceptual_explanation_prefers_lecture_over_solution():
@@ -173,6 +217,22 @@ def test_filename_match_boost():
     base = r._study_score(_chunk(), query_tokens={"bending"})
     boosted = r._study_score(_chunk(), query_tokens={"bending"}, doc_meta=meta)
     assert boosted > base
+
+
+def test_doc_name_match_requires_specific_filename_signal():
+    r = _import_retrieval()
+    assert r._doc_name_matches_query(
+        "EM2_Seminar_04_Solutions.pdf",
+        "Use EM2 Seminar 04 Solutions to solve this.",
+    )
+    assert r._doc_name_matches_query(
+        "Vorlesung_04.pdf",
+        "Please use lecture 4 for the method.",
+    )
+    assert not r._doc_name_matches_query(
+        "EM2_Seminar_04_Solutions.pdf",
+        "Can you solve this seminar exercise?",
+    )
 
 
 def test_generic_chunk_penalty():

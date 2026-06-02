@@ -932,8 +932,21 @@ export function initAskAI(
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
             })
-              .then((res) => {
-                if (!res.ok || !res.body || !res.body.getReader) { fallbackToRag(); return; }
+              .then(async (res) => {
+                if (!res.ok) {
+                  if (res.status === 503 || res.status === 429) {
+                    let detail = 'AI retrieval is temporarily unavailable. Please try again later.';
+                    try {
+                      const data = await res.json() as { detail?: string };
+                      detail = data.detail || detail;
+                    } catch { /* keep fallback detail */ }
+                    resolve({ content: [{ text: '❌ ' + detail }] });
+                    return;
+                  }
+                  fallbackToRag();
+                  return;
+                }
+                if (!res.body || !res.body.getReader) { fallbackToRag(); return; }
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
                 let sseBuffer = '';

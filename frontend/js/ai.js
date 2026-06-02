@@ -740,10 +740,117 @@ function _captureSnipRegion(x1, y1, x2, y2) {
 (function () {
   var input = document.getElementById('aiFileInput');
   if (!input) return;
+
+  function isImageFile(file) {
+    return /^image\//i.test(file.type || '') || /\.(png|jpe?g)$/i.test(file.name || '');
+  }
+
+  function getActiveCourseForUpload() {
+    return window.activeCourseRef || null;
+  }
+
+  function getActiveUserId() {
+    return window._currentUser && (window._currentUser.id || window._currentUser.sub);
+  }
+
+  function guessSourceType(fileName) {
+    var n = (fileName || '').toLowerCase();
+    if (/\b(seminar|exercise|aufgabe|solution|sol|uebung|übung)\b/.test(n)) return 'exercise';
+    if (/\b(formula|formel|cheat|sheet|zusammenfassung|summary)\b/.test(n)) return 'formula_sheet';
+    return 'lecture';
+  }
+
+  function findMergedUpload(course, fileName) {
+    var files = Array.isArray(course.files) ? course.files : [];
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (f && f.name === fileName && f._uploaded && f._storageName) return f;
+    }
+    var folders = Array.isArray(course.userFolders) ? course.userFolders : [];
+    for (var j = 0; j < folders.length; j++) {
+      var list = Array.isArray(folders[j].files) ? folders[j].files : [];
+      for (var k = 0; k < list.length; k++) {
+        var ff = list[k];
+        if (ff && ff.name === fileName && ff._uploaded && ff._storageName) return ff;
+      }
+    }
+    return null;
+  }
+
+  async function indexCourseDocument(course, file) {
+    if (!course || !course.id) return;
+    var name = file && file.name;
+    if (!name || !/\.(pdf|txt|docx)$/i.test(name)) return;
+    var merged = findMergedUpload(course, name);
+    if (!merged || !merged._storageName) return;
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function () {
+      controller.abort();
+    }, 12000);
+    try {
+      var res = await fetch((window.BACKEND_URL || '') + '/api/documents/index-existing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + (window._sbToken || '')
+        },
+        body: JSON.stringify({
+          courseId: course.id,
+          storageName: merged._storageName,
+          fileName: merged.name || name,
+          sourceType: guessSourceType(merged.name || name),
+          folder: merged._folder || null
+        }),
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error('Index failed (' + res.status + ')');
+    } catch (e) {
+      console.warn('[ai-panel] document indexing failed', e);
+      if (typeof showToast === 'function')
+        showToast('Uploaded, indexing delayed', 'The file is saved. Try again shortly if AI cannot see it yet.');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async function uploadCourseDocument(file) {
+    var course = getActiveCourseForUpload();
+    var uid = getActiveUserId();
+    if (!course || !course.id) {
+      if (typeof showToast === 'function')
+        showToast('Open a course first', 'Documents from the AI panel are added to the active course.');
+      return;
+    }
+    if (!uid) {
+      if (typeof showToast === 'function') showToast('Not signed in', 'Sign in to upload files.');
+      return;
+    }
+    if (typeof window._ufUpload !== 'function') {
+      if (typeof showToast === 'function') showToast('Upload unavailable', 'Please try from the Files tab.');
+      return;
+    }
+
+    try {
+      if (typeof showToast === 'function') showToast('Uploading document', file.name);
+      await window._ufUpload(uid, course, file, null, null);
+      if (typeof window._ufMerge === 'function') await window._ufMerge(course);
+      await indexCourseDocument(course, file);
+      if (typeof showToast === 'function')
+        showToast('Document uploaded', file.name + ' was added to this course.');
+    } catch (e) {
+      if (typeof showToast === 'function')
+        showToast('Upload failed', file.name + ': ' + (e && e.message ? e.message : e));
+    }
+  }
+
   input.addEventListener('change', function () {
     var files = Array.prototype.slice.call(this.files);
     this.value = ''; // reset so same file can be re-selected
     files.forEach(function (file) {
+      if (!isImageFile(file)) {
+        uploadCourseDocument(file);
+        return;
+      }
       try {
         if (window._ssValidateImageFile)
           window._ssValidateImageFile(file, window._SS_UPLOAD_AI_IMAGE_MAX_BYTES || 1024 * 1024);

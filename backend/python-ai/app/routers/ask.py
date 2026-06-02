@@ -27,6 +27,7 @@ from ..services.retrieval import (
     retrieve_exercise_block,
     retrieve_formula_block,
 )
+from ..services.embeddings import EmbeddingServiceUnavailable
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
 from ..supabase_client import get_supabase
 
@@ -205,6 +206,7 @@ async def retrieve_context_endpoint(payload: RetrieveContextRequest) -> Retrieve
         query=payload.query,
         document_ids=payload.documentIds,
         active_document_id=payload.activeDocumentId,
+        document_name_query=payload.query,
         top_k=max(1, min(payload.topK, 40)),
     )
     record_retrieval_debug(DebugPayload(
@@ -364,23 +366,27 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         has_problem_solver=False,
     )
 
-    exercise_hit = retrieve_exercise_block(
-        user_id=payload.userId,
-        course_id=payload.courseId,
-        query=retrieval_query,
-        document_ids=payload.documentIds,
-        active_document_id=payload.activeDocumentId,
-    )
+    try:
+        exercise_hit = retrieve_exercise_block(
+            user_id=payload.userId,
+            course_id=payload.courseId,
+            query=retrieval_query,
+            document_ids=payload.documentIds,
+            active_document_id=payload.activeDocumentId,
+        )
 
-    chunks = retrieve_chunks(
-        user_id=payload.userId,
-        course_id=payload.courseId,
-        query=retrieval_query,
-        document_ids=None,
-        preferred_document_ids=payload.documentIds,
-        active_document_id=payload.activeDocumentId,
-        top_k=18,
-    )
+        chunks = retrieve_chunks(
+            user_id=payload.userId,
+            course_id=payload.courseId,
+            query=retrieval_query,
+            document_ids=None,
+            preferred_document_ids=payload.documentIds,
+            active_document_id=payload.activeDocumentId,
+            document_name_query=question,
+            top_k=18,
+        )
+    except EmbeddingServiceUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
     if exercise_hit:
         chunks = _prepend_exercise_chunks(exercise_hit, chunks)
@@ -388,13 +394,16 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
     # Formula exact-match: cheap heuristic over document_formulas. Surfaces
     # the canonical formula when the question names it (or its symbol)
     # before the vector ranker gets to pick a general explanation chunk.
-    formula_hits = retrieve_formula_block(
-        user_id=payload.userId,
-        course_id=payload.courseId,
-        query=retrieval_query,
-        document_ids=payload.documentIds,
-        active_document_id=payload.activeDocumentId,
-    )
+    try:
+        formula_hits = retrieve_formula_block(
+            user_id=payload.userId,
+            course_id=payload.courseId,
+            query=retrieval_query,
+            document_ids=payload.documentIds,
+            active_document_id=payload.activeDocumentId,
+        )
+    except EmbeddingServiceUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     if formula_hits:
         chunks = _prepend_formula_chunks(formula_hits, chunks)
 

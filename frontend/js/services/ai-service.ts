@@ -77,7 +77,16 @@ export async function sendRagRequest(
     body: JSON.stringify(payload),
   });
   await _detectAiCapError(response);
-  if (!response.ok) throw new Error('HTTP ' + response.status);
+  if (!response.ok) {
+    let detail = 'HTTP ' + response.status;
+    try {
+      const data = (await response.json()) as { detail?: string; error?: { message?: string } };
+      detail = data.detail || data.error?.message || detail;
+    } catch {
+      /* keep status fallback */
+    }
+    throw new Error(detail);
+  }
   return response.json() as Promise<RagAskResponse>;
 }
 
