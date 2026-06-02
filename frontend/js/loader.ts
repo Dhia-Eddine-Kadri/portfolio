@@ -255,7 +255,12 @@ interface LandingTranslation {
         const exists = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some((link) => {
           const current = link.getAttribute('href') || '';
           const currentPath = current.split('?')[0] || current;
-          return current === href || currentPath.endsWith(path);
+          if (current === href) return true;
+          if (currentPath.endsWith(path)) {
+            link.setAttribute('href', href);
+            return true;
+          }
+          return false;
         });
         if (exists) return;
         const link = document.createElement('link');
@@ -263,7 +268,7 @@ interface LandingTranslation {
         link.href = href;
         document.head.appendChild(link);
       }
-      ensureStylesheet('css/new-landing.css?v=2');
+      ensureStylesheet('css/new-landing.css?v=3');
       ensureStylesheet('css/auth.css?v=4');
     })();
 
@@ -279,7 +284,7 @@ interface LandingTranslation {
         // can find its #/data-* hooks on first query.
         (function () {
           const script = document.createElement('script');
-          script.src = 'js/pages/new-landing.js?v=2';
+          script.src = 'js/pages/new-landing.js?v=3';
           script.defer = true;
           document.body.appendChild(script);
         })();
