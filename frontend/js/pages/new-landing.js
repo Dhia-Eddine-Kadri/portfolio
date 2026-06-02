@@ -1395,34 +1395,40 @@
       ];
       var nav = pages.map(function (p) {
         var on = p[0] === active ? ' is-active' : '';
-        return '<div class="nl-mini-nav__item' + on + '"><span>' + iconUse(p[1], 13) + '</span><b>' + p[0] + '</b></div>';
+        return '<div class="nl-mini-nav__item' + on + '" title="' + p[0] + '"><span>' + iconUse(p[1], 16) + '</span><b>' + p[0] + '</b></div>';
       }).join('');
       return '<div class="nl-mini-shell ' + (extraClass || '') + '">' +
-        '<aside class="nl-mini-nav"><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div>' + nav + '</aside>' +
-        '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div>' + mainHtml + '</section>' +
+        '<aside class="nl-mini-nav"><button class="nl-mini-toggle" aria-hidden="true">☰</button><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div>' + nav + '<div class="nl-mini-night">☀</div></aside>' +
+        '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div><div class="nl-mini-scroll">' + mainHtml + '</div></section>' +
         '</div>';
     }
     function buildPagesOverview(scene) {
       var cards = [
-        ['Dashboard', 'Today plan, streak, active courses'],
-        ['Courses', 'Organize subjects and files'],
-        ['PDF Workspace', 'Read, annotate, ask AI'],
-        ['AI Tutor', 'Course-grounded help'],
+        ['Dashboard', 'Today plan, progress, active courses'],
+        ['Courses', 'Real semester course workspace'],
+        ['PDF Workspace', 'Viewer, annotations, document rail'],
+        ['AI Tutor', 'Course-grounded answer panel'],
         ['Chatbot', 'Full study conversations'],
-        ['Chat', 'Study rooms and classmates']
+        ['Chat', 'Rooms and classmates'],
+        ['Games', 'Revision and streaks'],
+        ['Study Lounge', 'Activity and motivation'],
+        ['Profile', 'Student setup'],
+        ['Settings', 'Preferences'],
+        ['Subscription', 'Plan and free trial']
       ].map(function (c) { return '<div class="nl-mini-card"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('');
-      var main = '<div class="nl-mini-hero"><span>Core pages</span><h4>Everything useful in one study workspace.</h4></div><div class="nl-mini-grid">' + cards + '</div>';
+      var main = '<div class="nl-mini-dashboard-hero"><span>Workspace overview</span><h4>Start from the real Minallo shell.</h4><p>The preview begins with the collapsed rail students actually use.</p></div><div class="nl-mini-grid nl-mini-grid--dense">' + cards + '</div>';
       return tourFrame(scene, miniShell('Dashboard', main));
     }
     function buildCoursesSetup(scene) {
-      var main = '<div class="nl-mini-course-head"><div><span>Summer semester 2026</span><h4>Courses dashboard</h4></div><button>+ Add course</button></div>' +
-        '<div class="nl-mini-course-layout">' +
-        '<article class="nl-mini-course-card is-hot"><b>Engineering Mechanics 2</b><span>Created course · 3 folders · 6 files</span><em>Open course</em></article>' +
-        '<div class="nl-mini-modal"><span>Create course</span><b>Engineering Mechanics 2</b><small>TU Braunschweig · SS 2026</small></div>' +
+      var main = '<section class="nl-mini-sd-hero"><div><span>AI-ready course workspace</span><h4>📚 My Courses</h4><p>Organize your semester, upload lecture files, and open AI, notes, or summaries directly from each subject.</p><div class="nl-mini-sd-stats"><b>SS 2026</b><b>1 course</b><b>6 files</b><b>42% avg progress</b></div></div><aside><button class="nl-mini-sem">● SS 2026 ▾</button><button class="nl-mini-add">+ Add Subject</button></aside></section>' +
+        '<div class="nl-mini-sd-controls"><div>⌕ Search subjects...</div><button>Manage layout</button></div>' +
+        '<div class="nl-mini-course-layout nl-mini-course-layout--real">' +
+        '<article class="nl-mini-course-card is-hot"><div class="nl-mini-course-icon">📘</div><b>Engineering Mechanics 2</b><span>Created subject · SS 2026</span><div class="nl-mini-progress"><i style="width:42%"></i></div><div class="nl-mini-statrow"><em>Read 4</em><em>Notes 2</em><em>Practice 10</em><em>AI 8</em></div><strong>Open course</strong></article>' +
+        '<div class="nl-mini-modal"><span>Create subject</span><b>Engineering Mechanics 2</b><small>Semester: SS 2026 · Accent: blue</small></div>' +
         '<div class="nl-mini-folder-grid">' +
-        '<div><b>Lectures</b><span>Mechanics_lecture_03.pdf</span></div>' +
-        '<div><b>Exercises</b><span>Exercise_sheet_06.pdf</span></div>' +
-        '<div><b>Formula Sheets</b><span>Formula_collection.pdf</span></div>' +
+        '<div><b>Lectures</b><span>Mechanics_lecture_03.pdf uploaded</span></div>' +
+        '<div><b>Exercises</b><span>Exercise_sheet_06.pdf uploaded</span></div>' +
+        '<div><b>Formula Sheets</b><span>Formula_collection.pdf uploaded</span></div>' +
         '</div></div>';
       return tourFrame(scene, miniShell('Courses', main, 'nl-mini-shell--courses'));
     }

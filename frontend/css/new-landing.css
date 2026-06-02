@@ -2449,8 +2449,9 @@ body.nl-pv-open {
 }
 .nl-mini-shell {
   height: 100%;
-  display: grid;
-  grid-template-columns: 142px minmax(0, 1fr);
+  display: flex;
+  align-items: stretch;
+  gap: 0.65rem;
   background:
     radial-gradient(circle at 72% 8%, rgba(59, 130, 246, 0.16), transparent 28%),
     linear-gradient(135deg, #071226, #0e1b31);
@@ -2458,85 +2459,126 @@ body.nl-pv-open {
   font-size: 0.72rem;
 }
 .nl-mini-nav {
-  padding: 0.75rem 0.55rem;
-  border-right: 1px solid rgba(148, 163, 184, 0.15);
-  background: linear-gradient(180deg, rgba(8, 15, 31, 0.98), rgba(15, 23, 42, 0.96));
+  width: 4.25rem;
+  margin: 0.7rem 0 0.7rem 0.7rem;
+  padding: 0.55rem 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.45rem;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.93), rgba(8, 15, 31, 0.96));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
+  flex: 0 0 auto;
+}
+.nl-mini-toggle {
+  width: 2.15rem;
+  height: 2.15rem;
+  margin: 0 auto 0.25rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd5e1;
+  font-weight: 900;
 }
 .nl-mini-brand {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.45rem;
-  font-size: 0.78rem;
+  margin-bottom: 0.35rem;
 }
 .nl-mini-brand span {
   width: 1.7rem;
   height: 1.7rem;
-  border-radius: 0.65rem;
+  border-radius: 0.7rem;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #38bdf8, #2563eb);
+  background: linear-gradient(145deg, rgba(59, 130, 246, 0.95), rgba(96, 165, 250, 0.78));
+  border: 1px solid rgba(147, 197, 253, 0.30);
   color: #fff;
   font-weight: 900;
 }
+.nl-mini-brand strong {
+  display: none;
+}
 .nl-mini-nav__item {
-  min-height: 1.75rem;
+  width: 100%;
+  min-height: 2.05rem;
   display: flex;
   align-items: center;
-  gap: 0.42rem;
-  padding: 0.35rem 0.45rem;
-  border-radius: 0.55rem;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0.85rem;
   color: rgba(203, 213, 225, 0.74);
+  border: 1px solid transparent;
 }
 .nl-mini-nav__item svg {
-  width: 0.82rem;
-  height: 0.82rem;
+  width: 1rem;
+  height: 1rem;
 }
 .nl-mini-nav__item b {
-  font-size: 0.62rem;
-  white-space: nowrap;
+  display: none;
 }
 .nl-mini-nav__item.is-active,
 .nl-mini-nav__item:nth-child(3),
 .nl-mini-nav__item:nth-child(4),
 .nl-mini-nav__item:nth-child(6) {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(147, 197, 253, 0.28);
   color: #f8fafc;
+}
+.nl-mini-night {
+  margin-top: auto;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  background: rgba(255, 255, 255, 0.06);
 }
 .nl-mini-main {
   min-width: 0;
-  padding: 0.8rem;
+  flex: 1 1 auto;
+  padding: 0.7rem 0.7rem 0.7rem 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 .nl-mini-top {
-  min-height: 2.3rem;
+  min-height: 2.55rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.8rem;
-  background: rgba(15, 23, 42, 0.88);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.95rem;
+  background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.nl-mini-scroll {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 .nl-mini-top span {
   color: rgba(186, 230, 253, 0.78);
   font-weight: 800;
 }
-.nl-mini-hero {
+.nl-mini-hero,
+.nl-mini-dashboard-hero {
   padding: 1rem;
   border-radius: 1rem;
   background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(15, 23, 42, 0.88));
   border: 1px solid rgba(125, 211, 252, 0.22);
 }
 .nl-mini-hero span,
+.nl-mini-dashboard-hero span,
 .nl-mini-course-head span,
 .nl-mini-practice span,
-.nl-mini-chat-top span {
+.nl-mini-chat-top span,
+.nl-mini-sd-hero span {
   color: #7dd3fc;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -2544,18 +2586,29 @@ body.nl-pv-open {
   font-weight: 900;
 }
 .nl-mini-hero h4,
+.nl-mini-dashboard-hero h4,
 .nl-mini-course-head h4,
 .nl-mini-practice h4,
+.nl-mini-sd-hero h4,
 .nl-mini-pdf__page h4 {
   margin: 0.3rem 0 0;
   color: #fff;
   font-size: 1rem;
+}
+.nl-mini-dashboard-hero p,
+.nl-mini-sd-hero p {
+  margin: 0.35rem 0 0;
+  color: rgba(226, 232, 240, 0.72);
 }
 .nl-mini-grid,
 .nl-mini-folder-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
+}
+.nl-mini-grid--dense {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
 }
 .nl-mini-card,
 .nl-mini-folder-grid div,
@@ -2594,6 +2647,69 @@ body.nl-pv-open {
   gap: 0.75rem;
   align-items: center;
 }
+.nl-mini-sd-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background:
+    radial-gradient(circle at 86% 18%, rgba(14, 165, 233, 0.20), transparent 32%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(8, 47, 73, 0.55));
+}
+.nl-mini-sd-hero h4 {
+  font-size: 1.35rem;
+}
+.nl-mini-sd-hero aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.nl-mini-sem,
+.nl-mini-add,
+.nl-mini-sd-controls button {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  font-weight: 900;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.66rem;
+}
+.nl-mini-add {
+  background: #fff;
+  color: #0f172a;
+}
+.nl-mini-sd-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.nl-mini-sd-stats b {
+  padding: 0.32rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.58rem;
+}
+.nl-mini-sd-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+}
+.nl-mini-sd-controls div {
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+  padding: 0.6rem 0.75rem;
+  color: rgba(226, 232, 240, 0.62);
+  font-weight: 800;
+}
 .nl-mini-course-head button,
 .nl-mini-practice button {
   border: 0;
@@ -2610,9 +2726,63 @@ body.nl-pv-open {
   grid-template-rows: auto 1fr;
   gap: 0.65rem;
 }
+.nl-mini-course-layout--real {
+  grid-template-columns: 1.15fr 0.85fr;
+}
 .nl-mini-course-card {
   min-height: 7.6rem;
-  background: linear-gradient(145deg, rgba(14, 165, 233, 0.18), rgba(15, 23, 42, 0.9));
+  background:
+    radial-gradient(circle at 90% 10%, rgba(59, 130, 246, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(8, 47, 73, 0.65));
+}
+.nl-mini-course-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  margin-bottom: 0.45rem;
+}
+.nl-mini-progress {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+.nl-mini-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #93c5fd);
+}
+.nl-mini-statrow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  margin-top: 0.55rem;
+}
+.nl-mini-statrow em {
+  margin: 0;
+  padding: 0.24rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 0.5rem;
+  font-style: normal;
+  text-align: center;
+}
+.nl-mini-course-card strong {
+  display: block;
+  margin-top: 0.6rem;
+  padding: 0.45rem;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #0f172a;
+  text-align: center;
+  font-size: 0.64rem;
 }
 .nl-mini-course-card em {
   display: inline-flex;
@@ -2939,14 +3109,25 @@ body.nl-pv-open {
     aspect-ratio: 4 / 3;
   }
   .nl-mini-shell {
-    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 0.45rem;
     font-size: 0.62rem;
   }
-  .nl-mini-nav__item {
-    padding: 0.3rem;
+  .nl-mini-nav {
+    width: 3.5rem;
+    margin: 0.45rem 0 0.45rem 0.45rem;
+    padding: 0.4rem 0.28rem;
+    border-radius: 1.2rem;
   }
-  .nl-mini-nav__item b {
-    font-size: 0.52rem;
+  .nl-mini-nav__item {
+    min-height: 1.78rem;
+  }
+  .nl-mini-main {
+    padding: 0.45rem 0.45rem 0.45rem 0;
+  }
+  .nl-mini-sd-hero,
+  .nl-mini-sd-controls,
+  .nl-mini-course-layout--real {
+    grid-template-columns: 1fr;
   }
   .nl-mini-grid,
   .nl-mini-folder-grid,
