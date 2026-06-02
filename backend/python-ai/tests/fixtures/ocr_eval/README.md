@@ -1,65 +1,75 @@
-# OCR transcription eval fixture
+# OCR Evaluation Fixture
 
-Grades vision-OCR output against hand-typed ground truth. Complements
-[../math_eval_cases.json](../math_eval_cases.json) (which grades retrieval/answer
-quality, not OCR transcription).
+This fixture grades vision/OCR output against hand-typed Markdown ground truth. It complements the math/RAG fixture, which evaluates retrieval and answer behavior rather than transcription quality.
 
 ## Layout
 
-```
+```text
 ocr_eval/
-├── cases.json              ← index of all cases
-├── <id>.pdf                ← source PDF (any page count)
-└── <id>.expected.md        ← hand-typed ground truth for ONE page
+  cases.json              Case index
+  <id>.pdf                Source PDF, local only and gitignored
+  <id>.expected.md        Hand-typed ground truth for one page
 ```
 
-## Adding a case
+## Adding A Case
 
-1. Pick a real page from a PDF in the product that exercises a hard OCR
-   pattern — formula sheet, dense table, diagram with labels, scanned
-   page, etc. Aim for 5–10 cases total, covering different failure modes.
-2. Drop the PDF into this directory as `<id>.pdf` (keep ids kebab-case
-   and short: `ag91_formelzettel`, `lin_alg_ch2_table`, etc). **PDFs are
-   gitignored** — they stay local. Only the `<id>.expected.md` ground
-   truth is checked in. Tests skip cleanly if the local PDF is missing.
-3. Open the page in any PDF viewer and *manually type* the correct
-   Markdown into `<id>.expected.md`. Follow the conventions the vision
-   prompt enforces (see [vision_ocr.py](../../../app/services/vision_ocr.py)):
-   - `$$ ... $$` for display math, proper LaTeX (`\frac`, `\delta`, `_`, `^`)
-   - Two-column formula-label tables: formula then label on next line
-   - `[unclear]` for genuinely unreadable regions
-4. Add an entry to `cases.json` with `id`, `pdf`, `page_index` (0-based),
-   and a one-line `description` of what failure mode the case covers.
-5. Run the eval (below) and record the baseline score in the PR.
+1. Pick a real PDF page that stresses OCR quality:
+   - formula sheet
+   - dense table
+   - diagram with labels
+   - scanned page
+   - mixed text/math layout
+2. Copy the PDF into this directory as `<id>.pdf`.
+3. Keep IDs short and kebab-case, for example `em2-formula-p3`.
+4. Manually type the expected Markdown into `<id>.expected.md`.
+5. Add the case to `cases.json` with:
+   - `id`
+   - `pdf`
+   - `page_index` as a 0-based page number
+   - `description`
+6. Run the eval and record the baseline in the related PR/commit notes.
+
+PDF files are gitignored. Tests skip cleanly when a local PDF is missing.
+
+## Ground Truth Conventions
+
+Follow the conventions used by the OCR prompt:
+
+- Use `$$ ... $$` for display math.
+- Use proper LaTeX commands such as `\frac`, `\delta`, `_`, and `^`.
+- Preserve important formula labels and table structure.
+- Use `[unclear]` only for genuinely unreadable regions.
+- Do not "improve" the professor's notation unless OCR should normalize it.
 
 ## Running
 
-The eval makes real OpenAI calls (~$0.005 per page on gpt-4o), so it is
-**gated behind an env var** and is not part of the default `pytest` run.
+This eval makes real OpenAI calls, so it is gated behind an environment variable and is not part of default `pytest`.
 
 ```powershell
 $env:MINALLO_RUN_OCR_EVAL = "1"
-$env:OPENAI_API_KEY       = "sk-..."
+$env:OPENAI_API_KEY = "sk-..."
 pytest backend/python-ai/tests/test_vision_ocr_eval.py -v -s
 ```
 
-Output per case:
+Example output:
 
+```text
+em2-formula-p3  char_sim=0.91  formula_recall=1.00 (8/8)
 ```
-ag91_formelzettel_p3  char_sim=0.91  formula_recall=1.00 (8/8)
-```
 
-- `char_sim` — difflib SequenceMatcher ratio on normalized text. Loose;
-  catches large layout regressions.
-- `formula_recall` — fraction of LaTeX `$$ ... $$` blocks from the
-  expected file that appear (token-for-token) in the actual output.
-  This is the real quality signal — formulas are what students rely on.
+## Metrics
 
-## Tuning loop
+| Metric | Meaning |
+|---|---|
+| `char_sim` | Normalized text similarity. Useful for broad layout/text regressions. |
+| `formula_recall` | Fraction of expected display-math blocks recovered exactly. This is the most important signal for engineering students. |
 
-1. Establish baseline on current `MINALLO_VISION_OCR_*` settings.
-2. Change ONE knob (prompt edit, DPI, model).
-3. Re-run, compare per-case scores.
-4. Commit the change *with* the score delta in the message.
+## Tuning Loop
 
-That's it — no more "I think it looks better."
+1. Establish a baseline on current OCR settings.
+2. Change one thing: prompt, DPI, model, page preprocessing, or parser behavior.
+3. Re-run the eval.
+4. Compare per-case scores.
+5. Keep the change only if it improves the target failure mode without hurting other cases.
+
+Avoid subjective OCR changes without a score delta.
