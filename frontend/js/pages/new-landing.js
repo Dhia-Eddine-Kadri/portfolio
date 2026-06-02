@@ -188,6 +188,65 @@
         privacy: 'Privacy',
         terms: 'Terms',
         withdrawal: 'Withdrawal'
+      },
+      preview: {
+        title: 'Minallo · Product preview',
+        closingLine: 'Minallo reads your course files, finds the right source pages, and explains the answer the way your material teaches it.',
+        controls: {
+          next: 'Next', back: 'Back', replay: 'Replay',
+          start: 'Start studying with Minallo',
+          switchTrack: 'Switch track', close: 'Close preview'
+        },
+        chooser: {
+          title: 'What do you want to see?',
+          sub: 'Pick a track — the preview plays a short, interactive walkthrough.',
+          course: 'Studying a course',
+          courseSub: 'Lectures, exercises, AI answers with sources, and focus tools.',
+          german: 'Learning German',
+          germanSub: 'Vocabulary, grammar, everyday sentences, and practice games.'
+        },
+        labels: {
+          synced: 'Synced', sources: 'Sources', verified: 'Verified',
+          given: 'Given', required: 'Required', formula: 'Formula',
+          steps: 'Steps', finalAnswer: 'Final answer',
+          annotate: 'Annotate', annotateSub: 'Highlight & sign PDFs',
+          flashcards: 'Flashcards', flashcardsSub: 'Auto-built from your files',
+          quiz: 'Quiz', quizSub: 'Practice with scoring',
+          summary: 'Summary', summarySub: 'Key points from lectures',
+          focus: 'Focus', streak: 'Streak', dayStreak: '7-day streak',
+          askPlaceholder: 'Ask about your course…', tapToFlip: 'Tap to flip'
+        },
+        mock: {
+          src1: 'Lecture 03 · p.12', src2: 'Exercise Sheet 06 · p.2', src3: 'Formula Sheet · p.1',
+          ansGiven: 'Beam in equilibrium, load F = 120 N',
+          ansRequired: 'Support reaction Aᵧ',
+          ansSteps: 'Moment balance about A, then solve',
+          ansFinal: 'Aᵧ = 72 N',
+          trustMsg: 'That isn’t in your uploaded files yet. Upload Exercise Sheet 07 and I’ll solve it with your lecture method.',
+          vocabFront: 'die Übung', vocabBack: 'the exercise / practice',
+          grammarTip: 'Separable verbs split: “Ich rufe dich an.”',
+          sentence1: 'Können Sie mir bitte helfen?', sentence1Gloss: 'Could you help me, please?',
+          sentence2: 'Ich hätte gern einen Kaffee.', sentence2Gloss: 'I would like a coffee.',
+          gameQ: 'der / die / das  Apfel?', gameA: 'der'
+        },
+        course: {
+          upload: { chapter: 'Upload', eyebrow: 'Step 1 · Set up', headline: 'Start with your real material.', body: 'Drop in lecture PDFs, exercise sheets, and formula collections. Minallo organizes them into one course workspace.' },
+          ask: { chapter: 'Ask', eyebrow: 'Step 2 · Ask', headline: 'Ask in your own words.', body: 'No prompt engineering. Ask the way you would ask a tutor sitting next to you.' },
+          sources: { chapter: 'Sources', eyebrow: 'Step 3 · Retrieve', headline: 'It finds the exact pages.', body: 'Minallo searches your files and pulls the passages that actually answer the question.' },
+          answer: { chapter: 'Answer', eyebrow: 'Step 4 · Explain', headline: 'A structured answer you can trust.', body: 'Worked the way your course teaches it — with page citations you can open and verify.' },
+          trust: { chapter: 'Trust', eyebrow: 'Step 5 · Honesty', headline: 'Honest when something is missing.', body: 'If the answer is not in your files, Minallo says so and asks for the right file or page instead of guessing.' },
+          tools: { chapter: 'Tools', eyebrow: 'Step 6 · Revise', headline: 'Turn material into practice.', body: 'Annotate PDFs, generate flashcards and quizzes, and get lecture summaries — all from the same files.' },
+          focus: { chapter: 'Focus', eyebrow: 'Step 7 · Momentum', headline: 'Then keep your momentum.', body: 'Run a Pomodoro, play a focus playlist, and watch your study streak grow.' }
+        },
+        german: {
+          intro: { chapter: 'Start', eyebrow: 'Step 1 · German', headline: 'A space just for German.', body: 'Build vocabulary, grammar, and everyday phrases with simple explanations and playful revision.' },
+          vocab: { chapter: 'Vocab', eyebrow: 'Step 2 · Vocabulary', headline: 'Learn words that stick.', body: 'Flip cards with translations and example sentences for real situations.' },
+          grammar: { chapter: 'Grammar', eyebrow: 'Step 3 · Grammar', headline: 'Grammar explained simply.', body: 'Clear rules written for understanding, not memorizing — with examples you can reuse.' },
+          sentences: { chapter: 'Sentences', eyebrow: 'Step 4 · Everyday', headline: 'Speak everyday German.', body: 'Practice useful sentences for daily situations, from shopping to small talk.' },
+          games: { chapter: 'Games', eyebrow: 'Step 5 · Practice', headline: 'Review with quick games.', body: 'Short challenges turn revision into something you actually want to repeat.' },
+          streak: { chapter: 'Progress', eyebrow: 'Step 6 · Momentum', headline: 'See your progress build.', body: 'Daily streaks and progress signals keep your practice going.' },
+          cta: { chapter: 'Start', eyebrow: 'Ready', headline: 'Start learning German.', body: 'Your daily German practice space is one click away.' }
+        }
       }
     },
     de: {
@@ -349,6 +408,65 @@
         privacy: 'Datenschutz',
         terms: 'AGB',
         withdrawal: 'Widerruf'
+      },
+      preview: {
+        title: 'Minallo · Produktvorschau',
+        closingLine: 'Minallo liest deine Kursdateien, findet die richtigen Quellenseiten und erklärt die Antwort so, wie dein Material es lehrt.',
+        controls: {
+          next: 'Weiter', back: 'Zurück', replay: 'Erneut abspielen',
+          start: 'Mit Minallo lernen',
+          switchTrack: 'Bereich wechseln', close: 'Vorschau schließen'
+        },
+        chooser: {
+          title: 'Was möchtest du sehen?',
+          sub: 'Wähle einen Bereich — die Vorschau spielt eine kurze, interaktive Tour.',
+          course: 'Kurs lernen',
+          courseSub: 'Vorlesungen, Übungen, KI-Antworten mit Quellen und Fokuswerkzeuge.',
+          german: 'Deutsch lernen',
+          germanSub: 'Vokabeln, Grammatik, Alltagssätze und Übungsspiele.'
+        },
+        labels: {
+          synced: 'Synchronisiert', sources: 'Quellen', verified: 'Geprüft',
+          given: 'Gegeben', required: 'Gesucht', formula: 'Formel',
+          steps: 'Schritte', finalAnswer: 'Endergebnis',
+          annotate: 'Markieren', annotateSub: 'PDFs markieren & signieren',
+          flashcards: 'Karteikarten', flashcardsSub: 'Automatisch aus deinen Dateien',
+          quiz: 'Quiz', quizSub: 'Üben mit Bewertung',
+          summary: 'Zusammenfassung', summarySub: 'Kernpunkte aus Vorlesungen',
+          focus: 'Fokus', streak: 'Serie', dayStreak: '7-Tage-Serie',
+          askPlaceholder: 'Frag zu deinem Kurs…', tapToFlip: 'Zum Umdrehen tippen'
+        },
+        mock: {
+          src1: 'Vorlesung 03 · S. 12', src2: 'Übungsblatt 06 · S. 2', src3: 'Formelsammlung · S. 1',
+          ansGiven: 'Balken im Gleichgewicht, Last F = 120 N',
+          ansRequired: 'Auflagerreaktion Aᵧ',
+          ansSteps: 'Momentengleichgewicht um A, dann lösen',
+          ansFinal: 'Aᵧ = 72 N',
+          trustMsg: 'Das steht noch nicht in deinen Dateien. Lade Übungsblatt 07 hoch und ich löse es mit deiner Vorlesungsmethode.',
+          vocabFront: 'die Übung', vocabBack: 'das Üben, die Aufgabe',
+          grammarTip: 'Trennbare Verben trennen sich: „Ich rufe dich an.“',
+          sentence1: 'Können Sie mir bitte helfen?', sentence1Gloss: 'Höfliche Bitte um Hilfe',
+          sentence2: 'Ich hätte gern einen Kaffee.', sentence2Gloss: 'Etwas höflich bestellen',
+          gameQ: 'der / die / das  Apfel?', gameA: 'der'
+        },
+        course: {
+          upload: { chapter: 'Hochladen', eyebrow: 'Schritt 1 · Einrichten', headline: 'Beginne mit deinem echten Material.', body: 'Lade Vorlesungs-PDFs, Übungsblätter und Formelsammlungen hoch. Minallo ordnet sie in einem Kurs-Workspace.' },
+          ask: { chapter: 'Fragen', eyebrow: 'Schritt 2 · Fragen', headline: 'Frag in deinen eigenen Worten.', body: 'Kein Prompt-Engineering. Frag so, wie du einen Tutor neben dir fragen würdest.' },
+          sources: { chapter: 'Quellen', eyebrow: 'Schritt 3 · Finden', headline: 'Es findet die genauen Seiten.', body: 'Minallo durchsucht deine Dateien und zieht die Stellen heraus, die die Frage wirklich beantworten.' },
+          answer: { chapter: 'Antwort', eyebrow: 'Schritt 4 · Erklären', headline: 'Eine strukturierte Antwort, der du vertrauen kannst.', body: 'Gelöst, wie es dein Kurs lehrt — mit Seitenquellen, die du öffnen und prüfen kannst.' },
+          trust: { chapter: 'Vertrauen', eyebrow: 'Schritt 5 · Ehrlichkeit', headline: 'Ehrlich, wenn etwas fehlt.', body: 'Wenn die Antwort nicht in deinen Dateien steht, sagt Minallo das und fragt nach der richtigen Datei oder Seite, statt zu raten.' },
+          tools: { chapter: 'Werkzeuge', eyebrow: 'Schritt 6 · Wiederholen', headline: 'Mach aus Material echtes Üben.', body: 'Markiere PDFs, erstelle Karteikarten und Quizze und erhalte Vorlesungs-Zusammenfassungen — alles aus denselben Dateien.' },
+          focus: { chapter: 'Fokus', eyebrow: 'Schritt 7 · Schwung', headline: 'Und halte deinen Schwung.', body: 'Starte eine Pomodoro-Sitzung, spiele eine Fokus-Playlist und sieh deine Lernserie wachsen.' }
+        },
+        german: {
+          intro: { chapter: 'Start', eyebrow: 'Schritt 1 · Deutsch', headline: 'Ein Bereich nur für Deutsch.', body: 'Baue Vokabeln, Grammatik und Alltagsphrasen mit einfachen Erklärungen und spielerischer Wiederholung auf.' },
+          vocab: { chapter: 'Vokabeln', eyebrow: 'Schritt 2 · Vokabeln', headline: 'Lerne Wörter, die hängen bleiben.', body: 'Drehe Karten mit Übersetzungen und Beispielsätzen für echte Situationen.' },
+          grammar: { chapter: 'Grammatik', eyebrow: 'Schritt 3 · Grammatik', headline: 'Grammatik einfach erklärt.', body: 'Klare Regeln zum Verstehen statt Auswendiglernen — mit Beispielen, die du wiederverwenden kannst.' },
+          sentences: { chapter: 'Sätze', eyebrow: 'Schritt 4 · Alltag', headline: 'Sprich alltägliches Deutsch.', body: 'Übe nützliche Sätze für den Alltag, vom Einkaufen bis zum Small Talk.' },
+          games: { chapter: 'Spiele', eyebrow: 'Schritt 5 · Üben', headline: 'Wiederhole mit kurzen Spielen.', body: 'Kurze Challenges machen aus Wiederholung etwas, das du gern wiederholst.' },
+          streak: { chapter: 'Fortschritt', eyebrow: 'Schritt 6 · Schwung', headline: 'Sieh deinen Fortschritt wachsen.', body: 'Tägliche Serien und Fortschrittssignale halten dein Üben am Laufen.' },
+          cta: { chapter: 'Start', eyebrow: 'Bereit', headline: 'Starte mit Deutsch.', body: 'Dein täglicher Deutsch-Übungsbereich ist nur einen Klick entfernt.' }
+        }
       }
     }
   };
@@ -499,6 +617,10 @@
 
     // Re-render path picker detail panel in active language.
     _renderActivePath();
+
+    // Re-render the preview modal if it's open, so a mid-preview language
+    // switch updates every scene string live.
+    if (_pvApi && _pvApi.relang) _pvApi.relang();
   }
 
   // ---- A. Mobile navigation toggle --------------------------------------
@@ -773,9 +895,14 @@
     if (watch) {
       watch.addEventListener('click', function (e) {
         if (e && typeof e.preventDefault === 'function') e.preventDefault();
-        var tgt = document.getElementById('tutor');
-        if (tgt && typeof tgt.scrollIntoView === 'function') {
-          tgt.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+        if (_pvApi && _pvApi.open) {
+          _pvApi.open();
+        } else {
+          // Fallback: if the preview failed to init, scroll to the live mock.
+          var tgt = document.getElementById('tutor');
+          if (tgt && typeof tgt.scrollIntoView === 'function') {
+            tgt.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+          }
         }
       });
     }
@@ -793,6 +920,422 @@
     if (btnM) btnM.addEventListener('click', toggle);
   }
 
+  // ---- I. Product preview modal -----------------------------------------
+  // Scene-based, data-driven walkthrough. Two tracks (course / german),
+  // chapter dots, autoplay with countdown, full keyboard + a11y support.
+  // _pvApi is read by the Watch button handler and applyLang (live relang).
+
+  var _pvApi = null;
+
+  function initPreviewModal() {
+    var modal = document.getElementById('nlPreviewModal');
+    if (!modal) return;
+
+    var els = {
+      dialog:  modal.querySelector('.nl-pv__dialog'),
+      chooser: document.getElementById('nlPvChooser'),
+      player:  document.getElementById('nlPvPlayer'),
+      stage:   document.getElementById('nlPvStage'),
+      visual:  document.getElementById('nlPvVisual'),
+      eyebrow: document.getElementById('nlPvEyebrow'),
+      headline:document.getElementById('nlPvHeadline'),
+      body:    document.getElementById('nlPvBody'),
+      cta:     document.getElementById('nlPvCta'),
+      prev:    document.getElementById('nlPvPrev'),
+      next:    document.getElementById('nlPvNext'),
+      dots:    document.getElementById('nlPvDots'),
+      live:    document.getElementById('nlPvLive'),
+      sw:      document.getElementById('nlPvSwitch'),
+      close:   document.getElementById('nlPvClose')
+    };
+
+    var state = { track: null, index: 0, playing: false, timer: null, lastFocus: null, hover: false };
+
+    // -- i18n resolvers (fall back to EN if a key is missing) --
+    function t(key) {
+      var v = _resolveKey(I18N[_currentLang] || I18N.en, 'preview.' + key);
+      if (v == null) v = _resolveKey(I18N.en, 'preview.' + key);
+      return v == null ? '' : v;
+    }
+    function tFull(key) {
+      var v = _resolveKey(I18N[_currentLang] || I18N.en, key);
+      if (v == null) v = _resolveKey(I18N.en, key);
+      return v == null ? '' : v;
+    }
+    function L(k) { return t('labels.' + k); }
+    function M(k) { return t('mock.' + k); }
+
+    // -- DOM helpers --
+    function el(tag, cls, text) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+    function mock() { return el('div', 'nl-pv__mock'); }
+    function row(icon, name, meta) {
+      var r = el('div', 'nl-pv-row');
+      var i = el('span', 'nl-pv-row__icon'); i.appendChild(buildSvgUse(icon, 16)); r.appendChild(i);
+      r.appendChild(el('span', 'nl-pv-row__name', name));
+      if (meta != null && meta !== '') r.appendChild(el('span', 'nl-pv-row__meta', meta));
+      return r;
+    }
+    function bar(pct) {
+      var b = el('div', 'nl-pv-bar'); var f = el('span', 'nl-pv-bar__fill'); f.style.width = pct + '%'; b.appendChild(f); return b;
+    }
+    function chip(icon, text) {
+      var c = el('span', 'nl-pv-chip'); c.appendChild(buildSvgUse(icon, 12)); c.appendChild(el('span', null, text)); return c;
+    }
+    function badge(icon, text) {
+      var b = el('span', 'nl-pv-badge'); b.appendChild(buildSvgUse(icon, 12)); b.appendChild(el('span', null, text)); return b;
+    }
+    function ansLine(label, val) {
+      var l = el('div', 'nl-pv-ans__line');
+      l.appendChild(el('span', 'nl-pv-ans__label', label));
+      l.appendChild(el('span', 'nl-pv-ans__val', val));
+      return l;
+    }
+    function tile(icon, name, sub) {
+      var ti = el('div', 'nl-pv-tile');
+      var ic = el('span', 'nl-pv-tile__icon'); ic.appendChild(buildSvgUse(icon, 18)); ti.appendChild(ic);
+      ti.appendChild(el('span', 'nl-pv-tile__name', name));
+      ti.appendChild(el('span', 'nl-pv-tile__sub', sub));
+      return ti;
+    }
+
+    // -- scene visual builders (each returns a DOM node) --
+    var builders = {
+      upload: function () {
+        var m = mock();
+        m.appendChild(badge('check-circle-2', L('synced')));
+        m.appendChild(row('file-text', 'Mechanics_lecture_03.pdf', 'PDF'));
+        m.appendChild(row('pen-tool', 'Exercise_sheet_06.pdf', 'PDF'));
+        m.appendChild(row('book-open', 'Formula_collection.pdf', 'PDF'));
+        return m;
+      },
+      ask: function () {
+        var m = mock();
+        m.appendChild(row('search', L('askPlaceholder'), ''));
+        m.appendChild(el('div', 'nl-pv-bubble nl-pv-bubble--user', tFull('tutorPreview.userMsg')));
+        return m;
+      },
+      sources: function () {
+        var m = mock();
+        m.appendChild(row('search', t('course.sources.chapter'), ''));
+        m.appendChild(bar(82)); m.appendChild(bar(96)); m.appendChild(bar(68));
+        var chips = el('div', 'nl-pv-chips');
+        chips.appendChild(chip('file-text', M('src1')));
+        chips.appendChild(chip('pen-tool', M('src2')));
+        chips.appendChild(chip('book-open', M('src3')));
+        m.appendChild(chips);
+        return m;
+      },
+      answer: function () {
+        var m = mock();
+        m.appendChild(ansLine(L('given'), M('ansGiven')));
+        m.appendChild(ansLine(L('required'), M('ansRequired')));
+        m.appendChild(el('div', 'nl-pv-formula', 'ΣF = 0   ·   ΣM = 0'));
+        m.appendChild(ansLine(L('steps'), M('ansSteps')));
+        m.appendChild(ansLine(L('finalAnswer'), M('ansFinal')));
+        var chips = el('div', 'nl-pv-chips');
+        chips.appendChild(chip('file-text', tFull('tutorPreview.cite1')));
+        chips.appendChild(chip('book-open', tFull('tutorPreview.cite2')));
+        m.appendChild(chips);
+        return m;
+      },
+      trust: function () {
+        var m = mock();
+        m.appendChild(el('div', 'nl-pv-bubble nl-pv-bubble--ai', M('trustMsg')));
+        m.appendChild(badge('shield-check', L('verified')));
+        return m;
+      },
+      tools: function () {
+        var m = mock();
+        var t2 = el('div', 'nl-pv-tiles');
+        t2.appendChild(tile('pen-tool', L('annotate'), L('annotateSub')));
+        t2.appendChild(tile('layers-3', L('flashcards'), L('flashcardsSub')));
+        t2.appendChild(tile('check-circle-2', L('quiz'), L('quizSub')));
+        t2.appendChild(tile('file-text', L('summary'), L('summarySub')));
+        m.appendChild(t2);
+        return m;
+      },
+      focus: function () {
+        var m = mock();
+        m.appendChild(el('div', 'nl-pv-ring', '25:00'));
+        var sr = el('div', 'nl-pv-streak');
+        sr.appendChild(buildSvgUse('trophy', 16));
+        sr.appendChild(el('span', null, L('dayStreak')));
+        m.appendChild(sr);
+        m.appendChild(row('music-2', L('focus'), '♪'));
+        return m;
+      },
+      gIntro: function () {
+        var m = mock();
+        var chips = el('div', 'nl-pv-chips');
+        chips.appendChild(chip('languages', 'der · die · das'));
+        chips.appendChild(chip('book-open', 'A1 – B2'));
+        m.appendChild(chips);
+        m.appendChild(row('languages', t('german.intro.chapter'), ''));
+        return m;
+      },
+      gVocab: function () {
+        var m = mock();
+        var card = el('div', 'nl-pv-flip');
+        var inner = el('div');
+        inner.appendChild(el('div', 'nl-pv-flip__front', M('vocabFront')));
+        inner.appendChild(el('div', 'nl-pv-flip__back', M('vocabBack')));
+        card.appendChild(inner);
+        m.appendChild(card);
+        m.appendChild(el('p', 'nl-pv-tile__sub', L('tapToFlip')));
+        return m;
+      },
+      gGrammar: function () {
+        var m = mock();
+        m.appendChild(badge('graduation-cap', t('german.grammar.chapter')));
+        m.appendChild(el('div', 'nl-pv-bubble nl-pv-bubble--ai', M('grammarTip')));
+        return m;
+      },
+      gSentences: function () {
+        var m = mock();
+        m.appendChild(row('quote', M('sentence1'), ''));
+        m.appendChild(el('p', 'nl-pv-tile__sub', M('sentence1Gloss')));
+        m.appendChild(row('quote', M('sentence2'), ''));
+        m.appendChild(el('p', 'nl-pv-tile__sub', M('sentence2Gloss')));
+        return m;
+      },
+      gGames: function () {
+        var m = mock();
+        m.appendChild(el('div', 'nl-pv-flip__front', M('gameQ')));
+        var chips = el('div', 'nl-pv-chips');
+        ['der', 'die', 'das'].forEach(function (opt) {
+          var c = chip('gamepad-2', opt);
+          if (opt === M('gameA')) c.style.borderColor = 'rgba(110,231,183,0.55)';
+          chips.appendChild(c);
+        });
+        m.appendChild(chips);
+        return m;
+      },
+      gStreak: function () {
+        var m = mock();
+        var sr = el('div', 'nl-pv-streak');
+        sr.appendChild(buildSvgUse('trophy', 16));
+        sr.appendChild(el('span', null, L('dayStreak')));
+        m.appendChild(sr);
+        m.appendChild(bar(72));
+        return m;
+      },
+      gCta: function () {
+        var m = mock();
+        var ic = el('div', 'nl-pv-tile__icon'); ic.appendChild(buildSvgUse('sparkles', 26)); m.appendChild(ic);
+        m.appendChild(el('div', 'nl-pv-flip__front', 'Deutsch'));
+        return m;
+      }
+    };
+
+    // -- track definitions (single source of truth) --
+    var TRACKS = {
+      course: [
+        { keyBase: 'course.upload',  build: 'upload',  ms: 4200 },
+        { keyBase: 'course.ask',     build: 'ask',     ms: 4000 },
+        { keyBase: 'course.sources', build: 'sources', ms: 4200 },
+        { keyBase: 'course.answer',  build: 'answer',  ms: 6000 },
+        { keyBase: 'course.trust',   build: 'trust',   ms: 5000 },
+        { keyBase: 'course.tools',   build: 'tools',   ms: 4600 },
+        { keyBase: 'course.focus',   build: 'focus',   ms: 4600 }
+      ],
+      german: [
+        { keyBase: 'german.intro',     build: 'gIntro',     ms: 4200 },
+        { keyBase: 'german.vocab',     build: 'gVocab',     ms: 4200 },
+        { keyBase: 'german.grammar',   build: 'gGrammar',   ms: 4600 },
+        { keyBase: 'german.sentences', build: 'gSentences', ms: 4600 },
+        { keyBase: 'german.games',     build: 'gGames',     ms: 4400 },
+        { keyBase: 'german.streak',    build: 'gStreak',    ms: 4200 },
+        { keyBase: 'german.cta',       build: 'gCta',       ms: 4600 }
+      ]
+    };
+
+    function scenes() { return TRACKS[state.track] || TRACKS.course; }
+    function isLast() { return state.index >= scenes().length - 1; }
+
+    // -- autoplay timer --
+    function clearTimer() { if (state.timer) { clearTimeout(state.timer); state.timer = null; } }
+    function armTimer() {
+      clearTimer();
+      if (!state.playing || prefersReducedMotion || state.hover || isLast()) return;
+      var ms = scenes()[state.index].ms || 4000;
+      state.timer = setTimeout(function () { goto(state.index + 1, true); }, ms);
+    }
+
+    // -- render --
+    function renderDots() {
+      clearChildren(els.dots);
+      var list = scenes();
+      for (var i = 0; i < list.length; i++) {
+        (function (idx) {
+          var sc = list[idx];
+          var label = t(sc.keyBase + '.chapter') || '';
+          var d = el('button', 'nl-pv__dot'); d.type = 'button';
+          d.setAttribute('role', 'tab');
+          d.setAttribute('aria-label', label);
+          d.appendChild(el('span', 'nl-pv__dot-pip'));
+          d.appendChild(el('span', 'nl-pv__dot-label', label));
+          if (idx === state.index) {
+            d.classList.add('is-active');
+            d.setAttribute('aria-current', 'true');
+            if (state.playing && !prefersReducedMotion) d.classList.add('is-playing');
+          } else if (idx < state.index) {
+            d.classList.add('is-done');
+          }
+          d.addEventListener('click', function () { state.playing = false; goto(idx, false); });
+          els.dots.appendChild(d);
+        })(i);
+      }
+    }
+
+    function paint() {
+      var sc = scenes()[state.index];
+      clearChildren(els.visual);
+      if (builders[sc.build]) els.visual.appendChild(builders[sc.build]());
+      els.eyebrow.textContent = t(sc.keyBase + '.eyebrow');
+      els.headline.textContent = t(sc.keyBase + '.headline');
+      els.body.textContent = t(sc.keyBase + '.body');
+      els.dialog.style.setProperty('--nl-pv-dwell', (sc.ms || 4000) + 'ms');
+
+      clearChildren(els.cta);
+      if (isLast()) {
+        els.cta.hidden = false;
+        els.cta.appendChild(el('p', 'nl-pv__closing', t('closingLine')));
+        var start = el('button', 'nl-btn nl-btn--primary', t('controls.start')); start.type = 'button';
+        start.addEventListener('click', function () { try { if (typeof window._googleAuth === 'function') window._googleAuth(); } catch (e) {} });
+        els.cta.appendChild(start);
+        var replay = el('button', 'nl-pv__replay', t('controls.replay')); replay.type = 'button';
+        replay.addEventListener('click', function () { state.playing = !prefersReducedMotion; goto(0, false); });
+        els.cta.appendChild(replay);
+        els.next.hidden = true;
+      } else {
+        els.cta.hidden = true;
+        els.next.hidden = false;
+      }
+      els.prev.disabled = state.index === 0;
+      renderDots();
+      els.live.textContent = t(sc.keyBase + '.headline');
+      armTimer();
+    }
+
+    function goto(i, fromAuto) {
+      var list = scenes();
+      if (i < 0) i = 0;
+      if (i > list.length - 1) i = list.length - 1;
+      if (fromAuto && state.index >= list.length - 1) return;
+      state.index = i;
+      if (state.index >= list.length - 1 && fromAuto) state.playing = false;
+      if (!prefersReducedMotion) {
+        els.stage.classList.add('is-leaving');
+        setTimeout(function () { els.stage.classList.remove('is-leaving'); paint(); }, 140);
+      } else {
+        paint();
+      }
+    }
+
+    // -- chooser --
+    function renderChooser() {
+      clearChildren(els.chooser);
+      els.chooser.appendChild(el('h3', 'nl-pv__chooser-title', t('chooser.title')));
+      els.chooser.appendChild(el('p', 'nl-pv__chooser-sub', t('chooser.sub')));
+      var grid = el('div', 'nl-pv__choices');
+      [['course', 'layout-dashboard'], ['german', 'languages']].forEach(function (pair) {
+        var key = pair[0];
+        var btn = el('button', 'nl-pv__choice'); btn.type = 'button';
+        var b = el('span', 'nl-icon-badge'); b.appendChild(buildSvgUse(pair[1], 22)); btn.appendChild(b);
+        btn.appendChild(el('span', 'nl-pv__choice-title', t('chooser.' + key)));
+        btn.appendChild(el('span', 'nl-pv__choice-sub', t('chooser.' + key + 'Sub')));
+        btn.addEventListener('click', function () { chooseTrack(key); });
+        grid.appendChild(btn);
+      });
+      els.chooser.appendChild(grid);
+    }
+    function showChooser() {
+      clearTimer();
+      els.player.hidden = true;
+      els.sw.hidden = true;
+      els.chooser.hidden = false;
+      renderChooser();
+    }
+    function chooseTrack(track) {
+      state.track = track;
+      state.index = 0;
+      state.playing = !prefersReducedMotion;
+      els.chooser.hidden = true;
+      els.player.hidden = false;
+      els.sw.hidden = false;
+      paint();
+    }
+
+    // -- open / close --
+    function open() {
+      state.lastFocus = document.activeElement;
+      modal.hidden = false;
+      document.documentElement.classList.add('nl-pv-open');
+      document.body.classList.add('nl-pv-open');
+      state.track = null;
+      showChooser();
+      if (els.close && els.close.focus) els.close.focus();
+    }
+    function close() {
+      clearTimer();
+      modal.hidden = true;
+      document.documentElement.classList.remove('nl-pv-open');
+      document.body.classList.remove('nl-pv-open');
+      if (state.lastFocus && state.lastFocus.focus) { try { state.lastFocus.focus(); } catch (e) {} }
+    }
+
+    // -- events --
+    els.close.addEventListener('click', close);
+    els.sw.addEventListener('click', showChooser);
+    var closers = modal.querySelectorAll('[data-nl-pv-close]');
+    for (var ci = 0; ci < closers.length; ci++) closers[ci].addEventListener('click', close);
+
+    els.next.addEventListener('click', function () { if (!isLast()) { state.playing = false; goto(state.index + 1, false); } });
+    els.prev.addEventListener('click', function () { state.playing = false; goto(state.index - 1, false); });
+
+    els.dialog.addEventListener('mouseenter', function () { state.hover = true; clearTimer(); });
+    els.dialog.addEventListener('mouseleave', function () { state.hover = false; armTimer(); });
+    els.dialog.addEventListener('focusin', function () { state.hover = true; clearTimer(); });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) clearTimer();
+      else if (!modal.hidden && !els.player.hidden) armTimer();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') { close(); return; }
+      if (els.player.hidden) return;
+      if (e.key === 'ArrowRight') { state.playing = false; goto(state.index + 1, false); }
+      else if (e.key === 'ArrowLeft') { state.playing = false; goto(state.index - 1, false); }
+      else if (e.key === 'Tab') { trapFocus(e); }
+    });
+
+    function trapFocus(e) {
+      var f = modal.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+      var list = [];
+      for (var i = 0; i < f.length; i++) { if (f[i].offsetParent !== null && !f[i].disabled) list.push(f[i]); }
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    _pvApi = {
+      open: open,
+      relang: function () {
+        if (modal.hidden) return;
+        if (!els.chooser.hidden) renderChooser();
+        else paint();
+      }
+    };
+  }
+
   // ---- bootstrap --------------------------------------------------------
 
   function init() {
@@ -801,6 +1344,7 @@
     try { applyLang(_getInitialLang()); } catch (e) { /* noop */ }
     try { initLangToggle(); } catch (e) { /* noop */ }
     try { initCtaButtons(); } catch (e) { /* noop */ }
+    try { initPreviewModal(); } catch (e) { /* noop */ }
     try { initMobileNav(); } catch (e) { /* noop */ }
     try { initPathPicker(); } catch (e) { /* noop */ }
     try { initTutorPreviewTabs(); } catch (e) { /* noop */ }

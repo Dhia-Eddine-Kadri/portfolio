@@ -742,4 +742,56 @@
       </div>
     </footer>
 
+    <!-- ===================== PRODUCT PREVIEW MODAL =====================
+         Scene-based interactive preview. Chrome is static; the chooser,
+         scenes, chapter dots, and copy are rendered by initPreviewModal()
+         in js/pages/new-landing.js. -->
+    <div class="nl-pv" id="nlPreviewModal" hidden>
+      <div class="nl-pv__backdrop" data-nl-pv-close></div>
+      <div class="nl-pv__dialog nl-glass" role="dialog" aria-modal="true" aria-labelledby="nlPvTitle">
+        <header class="nl-pv__head">
+          <div class="nl-pv__brand">
+            <span class="nl-pv__brand-dot" aria-hidden="true"></span>
+            <span id="nlPvTitle" class="nl-pv__brand-name" data-i18n="preview.title">Minallo · Product preview</span>
+          </div>
+          <div class="nl-pv__head-actions">
+            <button type="button" class="nl-pv__switch" id="nlPvSwitch" hidden>
+              <svg width="14" height="14" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+              <span data-i18n="preview.controls.switchTrack">Switch track</span>
+            </button>
+            <button type="button" class="nl-pv__close" id="nlPvClose" aria-label="Close preview">
+              <svg width="20" height="20" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Branch chooser (rendered by JS) -->
+        <div class="nl-pv__chooser" id="nlPvChooser" hidden></div>
+
+        <!-- Scene player -->
+        <div class="nl-pv__player" id="nlPvPlayer" hidden>
+          <div class="nl-pv__stage" id="nlPvStage">
+            <div class="nl-pv__visual" id="nlPvVisual" aria-hidden="true"></div>
+            <div class="nl-pv__copy">
+              <p class="nl-pv__eyebrow" id="nlPvEyebrow"></p>
+              <h3 class="nl-pv__headline" id="nlPvHeadline"></h3>
+              <p class="nl-pv__body" id="nlPvBody"></p>
+              <div class="nl-pv__cta" id="nlPvCta" hidden></div>
+            </div>
+          </div>
+          <div class="nl-pv__nav">
+            <button type="button" class="nl-pv__navbtn" id="nlPvPrev">
+              <span data-i18n="preview.controls.back">Back</span>
+            </button>
+            <div class="nl-pv__dots" id="nlPvDots" role="tablist" aria-label="Preview chapters"></div>
+            <button type="button" class="nl-pv__navbtn nl-pv__navbtn--primary" id="nlPvNext">
+              <span data-i18n="preview.controls.next">Next</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="nl-pv__sr" id="nlPvLive" aria-live="polite"></p>
+      </div>
+    </div>
+
   </main>
