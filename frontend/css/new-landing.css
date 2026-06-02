@@ -2472,3 +2472,56 @@ body.nl-pv-open {
     animation: none;
   }
 }
+
+/* Performance polish: keep the look, remove the live paint work that made
+   scrolling and the preview feel heavy on real devices. */
+body.nl-body .nl-orb {
+  animation: none;
+  filter: none;
+  opacity: 0.16;
+  transform: none;
+  will-change: auto;
+}
+
+body.nl-body .nl-hero__halo {
+  filter: none;
+  opacity: 0.42;
+  transform: none !important;
+}
+
+body.nl-body .nl-glass,
+body.nl-body .nl-nav,
+body.nl-body .nl-nav__mobile,
+body.nl-body .nl-tutor-preview,
+body.nl-body .nl-paths__detail,
+body.nl-body .nl-price-card,
+body.nl-body .nl-pv__backdrop,
+body.nl-body .nl-pv__dialog,
+body.nl-body .nl-pv__mock {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body.nl-body .nl-pv__backdrop {
+  background: rgba(2, 6, 23, 0.86);
+}
+
+body.nl-body .nl-card__glow,
+body.nl-body .nl-tutor-preview__glow-a,
+body.nl-body .nl-tutor-preview__glow-b {
+  filter: none;
+  opacity: 0.24;
+}
+
+body.nl-body .nl-reveal {
+  transition-duration: 0.28s;
+  will-change: auto;
+}
+
+body.nl-body .nl-pv__stage {
+  transition-duration: 0.12s;
+}
+
+body.nl-body .nl-pv__dot.is-active.is-playing .nl-pv__dot-pip::after {
+  animation: none;
+}
