@@ -110,6 +110,19 @@ body:not(.night) ::-moz-selection {
   color: #0f172a;
 }
 
+/* PDF text layer exception: the dark selection text colour above paints a
+ * doubled copy of the glyphs over the canvas. Keep the overlay text
+ * transparent so only the highlight shows. Higher specificity than the
+ * body:not(.night) rule above, so it wins regardless of source order. */
+body:not(.night) .pdf-text-layer ::selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: transparent;
+}
+body:not(.night) .pdf-text-layer ::-moz-selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: transparent;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * 2.  PAGE BACKGROUND — applied globally to every shell container
  * ────────────────────────────────────────────────────────────────────────── */

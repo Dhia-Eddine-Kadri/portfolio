@@ -2574,8 +2574,19 @@ body.pdf-maximized .annotate-popover {
   top: 0;
   height: 0;
 }
+/* The glyphs are painted on the <canvas>; the text layer is a transparent
+ * overlay that exists only to be selectable. On selection we must keep the
+ * span text transparent — otherwise it paints a second copy of the text over
+ * the canvas and the selection looks doubled/smudged. Cover ::-moz-selection
+ * too so Firefox doesn't fall back to the global rule (which sets a text
+ * colour). The light-mode override lives in light-mode.css, which loads last
+ * and otherwise wins on specificity. */
 .pdf-text-layer ::selection {
-  background: rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.3);
+  color: transparent;
+}
+.pdf-text-layer ::-moz-selection {
+  background: rgba(37, 99, 235, 0.3);
   color: transparent;
 }
 /* ANNOTATION LAYER */
