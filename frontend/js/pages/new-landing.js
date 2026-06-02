@@ -1290,6 +1290,283 @@
     };
   }
 
+  function initProductTourModal() {
+    var modal = document.getElementById('nlPreviewModal');
+    if (!modal) return;
+
+    var els = {
+      dialog:  modal.querySelector('.nl-pv__dialog'),
+      chooser: document.getElementById('nlPvChooser'),
+      player:  document.getElementById('nlPvPlayer'),
+      visual:  document.getElementById('nlPvVisual'),
+      eyebrow: document.getElementById('nlPvEyebrow'),
+      headline:document.getElementById('nlPvHeadline'),
+      body:    document.getElementById('nlPvBody'),
+      cta:     document.getElementById('nlPvCta'),
+      prev:    document.getElementById('nlPvPrev'),
+      next:    document.getElementById('nlPvNext'),
+      dots:    document.getElementById('nlPvDots'),
+      live:    document.getElementById('nlPvLive'),
+      play:    document.getElementById('nlPvSwitch'),
+      close:   document.getElementById('nlPvClose')
+    };
+
+    var state = { index: 0, playing: false, timer: null, lastFocus: null, hover: false };
+    var SCENES = [
+      {
+        key: 'pages', ms: 6800, icon: 'layout-dashboard', cursor: 'tour-cursor-pages',
+        eyebrow: 'Step 1 · Product map',
+        title: 'See the useful Minallo pages first.',
+        body: 'The tour starts with the real app structure: Dashboard, Courses, PDF Workspace, AI Tutor, Chatbot, Chat, Games, Study Lounge, Profile, Settings, and Subscription.',
+        calls: [['Dashboard', 12, 24, 0], ['Courses', 12, 34, 900], ['PDF workspace', 12, 45, 1800], ['AI Tutor', 12, 55, 2700], ['Chatbot and Chat', 12, 66, 3600], ['Account pages', 12, 78, 4700]],
+        build: buildPagesOverview
+      },
+      {
+        key: 'courses', ms: 7600, icon: 'folder-plus', cursor: 'tour-cursor-courses',
+        eyebrow: 'Step 2 · Course setup',
+        title: 'Create a course, organize folders, then upload files.',
+        body: 'Students see exactly how to add a course, create lecture/exercise/formula folders, and drop PDFs into the right place before asking Minallo for help.',
+        calls: [['Add course', 77, 17, 0], ['Create Engineering Mechanics 2', 43, 39, 1200], ['Open the course', 29, 65, 2500], ['Create folders', 58, 55, 3800], ['Upload PDFs', 71, 73, 5200]],
+        build: buildCoursesSetup
+      },
+      {
+        key: 'rail', ms: 7600, icon: 'sparkles', cursor: 'tour-cursor-rail',
+        eyebrow: 'Step 3 · AI side rail',
+        title: 'Open the AI rail without leaving the PDF.',
+        body: 'The preview shows the right rail sections: AI, Problem, Notes, and Summary. The answer preview includes the source pages used from the course files.',
+        calls: [['Open AI', 87, 30, 0], ['Problem Solver', 87, 43, 1400], ['Notes', 87, 56, 2800], ['Summary', 87, 69, 4200], ['Cited answer', 63, 42, 5400]],
+        build: buildAiSideRail
+      },
+      {
+        key: 'practice', ms: 6800, icon: 'layers-3', cursor: 'tour-cursor-practice',
+        eyebrow: 'Step 4 · Practice tools',
+        title: 'Generate quizzes and flashcards from the same material.',
+        body: 'The preview makes it clear that a request for 10 questions creates 10 questions, and that flashcards come from the uploaded lecture and formula files.',
+        calls: [['Choose Quiz', 17, 31, 0], ['Set 10 questions', 40, 33, 1300], ['Generate', 75, 32, 2600], ['Review Flashcards', 29, 72, 4200]],
+        build: buildQuizFlashcards
+      },
+      {
+        key: 'chatbot', ms: 7200, icon: 'message-circle', cursor: 'tour-cursor-chatbot',
+        eyebrow: 'Step 5 · Chatbot page',
+        title: 'Use the full chatbot when you need a wider study conversation.',
+        body: 'The final chapter shows the standalone chatbot page selecting course context, answering a broad study question, and citing course sources when documents are involved.',
+        calls: [['Select course context', 22, 19, 0], ['Ask a study question', 63, 75, 1800], ['Answer with sources', 57, 45, 3400], ['Start free trial', 76, 18, 5200]],
+        build: buildChatbotPage
+      }
+    ];
+
+    function el(tag, cls, text) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+    function clearTimer() {
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+    }
+    function isLast() { return state.index >= SCENES.length - 1; }
+    function iconUse(name, size) {
+      var s = document.createElement('span');
+      s.appendChild(buildSvgUse(name, size || 16));
+      return s.innerHTML;
+    }
+    function callouts(scene) {
+      return scene.calls.map(function (c) {
+        return '<span class="nl-tour-call" style="left:' + c[1] + '%;top:' + c[2] + '%;animation-delay:' + c[3] + 'ms">' + c[0] + '</span>';
+      }).join('');
+    }
+    function tourFrame(scene, screenHtml) {
+      var frame = el('div', 'nl-tour');
+      frame.innerHTML =
+        '<div class="nl-tour__screen">' + screenHtml + '</div>' +
+        '<span class="nl-tour-cursor ' + scene.cursor + '" aria-hidden="true"></span>' +
+        callouts(scene);
+      return frame;
+    }
+    function miniShell(active, mainHtml, extraClass) {
+      var pages = [
+        ['Dashboard', 'layout-dashboard'], ['Courses', 'book-open'], ['PDF Workspace', 'file-text'],
+        ['AI Tutor', 'sparkles'], ['Chatbot', 'brain-circuit'], ['Chat', 'quote'],
+        ['Games', 'gamepad-2'], ['Study Lounge', 'trophy'], ['Profile', 'shield-check'],
+        ['Settings', 'pen-tool'], ['Subscription', 'zap']
+      ];
+      var nav = pages.map(function (p) {
+        var on = p[0] === active ? ' is-active' : '';
+        return '<div class="nl-mini-nav__item' + on + '"><span>' + iconUse(p[1], 13) + '</span><b>' + p[0] + '</b></div>';
+      }).join('');
+      return '<div class="nl-mini-shell ' + (extraClass || '') + '">' +
+        '<aside class="nl-mini-nav"><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div>' + nav + '</aside>' +
+        '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div>' + mainHtml + '</section>' +
+        '</div>';
+    }
+    function buildPagesOverview(scene) {
+      var cards = [
+        ['Dashboard', 'Today plan, streak, active courses'],
+        ['Courses', 'Organize subjects and files'],
+        ['PDF Workspace', 'Read, annotate, ask AI'],
+        ['AI Tutor', 'Course-grounded help'],
+        ['Chatbot', 'Full study conversations'],
+        ['Chat', 'Study rooms and classmates']
+      ].map(function (c) { return '<div class="nl-mini-card"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('');
+      var main = '<div class="nl-mini-hero"><span>Core pages</span><h4>Everything useful in one study workspace.</h4></div><div class="nl-mini-grid">' + cards + '</div>';
+      return tourFrame(scene, miniShell('Dashboard', main));
+    }
+    function buildCoursesSetup(scene) {
+      var main = '<div class="nl-mini-course-head"><div><span>Summer semester 2026</span><h4>Courses dashboard</h4></div><button>+ Add course</button></div>' +
+        '<div class="nl-mini-course-layout">' +
+        '<article class="nl-mini-course-card is-hot"><b>Engineering Mechanics 2</b><span>Created course · 3 folders · 6 files</span><em>Open course</em></article>' +
+        '<div class="nl-mini-modal"><span>Create course</span><b>Engineering Mechanics 2</b><small>TU Braunschweig · SS 2026</small></div>' +
+        '<div class="nl-mini-folder-grid">' +
+        '<div><b>Lectures</b><span>Mechanics_lecture_03.pdf</span></div>' +
+        '<div><b>Exercises</b><span>Exercise_sheet_06.pdf</span></div>' +
+        '<div><b>Formula Sheets</b><span>Formula_collection.pdf</span></div>' +
+        '</div></div>';
+      return tourFrame(scene, miniShell('Courses', main, 'nl-mini-shell--courses'));
+    }
+    function buildAiSideRail(scene) {
+      var main = '<div class="nl-mini-pdf">' +
+        '<div class="nl-mini-pdf__toolbar"><span>EM2_Seminar_04_Solutions.pdf</span><b>Page 2 / 8</b></div>' +
+        '<div class="nl-mini-pdf__page"><h4>Engineering Mechanics 2</h4><p>Archimedes spiral (cat) · circular motion (mouse)</p><div class="nl-mini-formula">v<sub>c</sub>dt = R/π √(1 + φ²)dφ</div></div>' +
+        '<aside class="nl-mini-rail"><button class="is-active">AI</button><button>Problem</button><button>Notes</button><button>Summary</button></aside>' +
+        '<div class="nl-mini-ai-drawer"><span>Minallo AI · course context</span><p>Solve the mouse and cat problem using the professor’s method.</p><div><b>Given</b><br>r(φ)=Rφ/π, mouse speed a</div><div><b>Sources</b><br>EM2_Seminar_04_Solutions.pdf, p.2<br>Formula sheet, p.1</div></div>' +
+        '</div>';
+      return tourFrame(scene, miniShell('PDF Workspace', main, 'nl-mini-shell--pdf'));
+    }
+    function buildQuizFlashcards(scene) {
+      var main = '<div class="nl-mini-practice">' +
+        '<div class="nl-mini-practice__panel"><span>Quiz generator</span><h4>10 questions from Engineering Mechanics 2</h4><div class="nl-mini-step is-active">1. Concept check</div><div class="nl-mini-step">2. Formula substitution</div><div class="nl-mini-step">3. Calculation problem</div><div class="nl-mini-step">... 10 total questions</div><button>Generate quiz</button></div>' +
+        '<div class="nl-mini-flashcards"><span>Flashcards</span><div class="nl-mini-flashcard"><b>Q</b><p>What does the work-energy theorem compare?</p></div><div class="nl-mini-flashcard"><b>A</b><p>Kinetic and potential energy changes using course notation.</p></div><small>Sources: Lecture 03 p.12 · Formula sheet p.2</small></div>' +
+        '</div>';
+      return tourFrame(scene, miniShell('AI Tutor', main, 'nl-mini-shell--practice'));
+    }
+    function buildChatbotPage(scene) {
+      var main = '<div class="nl-mini-chatbot">' +
+        '<aside><b>Course context</b><button class="is-active">Engineering Mechanics 2</button><button>German B1 Practice</button><button>General study help</button></aside>' +
+        '<section><div class="nl-mini-chat-top"><b>Minallo Chatbot</b><span>Course-aware conversation</span></div><div class="nl-mini-msg user">Explain how I should prepare for the dynamics exam using my files.</div><div class="nl-mini-msg bot">Start with Seminar 04 for point-mass kinematics, then use Seminar 07 for rigid-body dynamics. I found the key method in your uploaded pages below.<br><small>Sources: EM2_Seminar_04_Solutions.pdf p.1, p.5 · EngMec2_Seminar_07_Sol.pdf p.1</small></div><div class="nl-mini-composer">Ask about your course...</div></section>' +
+        '</div>';
+      return tourFrame(scene, miniShell('Chatbot', main, 'nl-mini-shell--chatbot'));
+    }
+    function renderDots() {
+      clearChildren(els.dots);
+      SCENES.forEach(function (sc, idx) {
+        var d = el('button', 'nl-pv__dot');
+        d.type = 'button';
+        d.setAttribute('aria-label', sc.title);
+        d.appendChild(el('span', 'nl-pv__dot-pip'));
+        d.appendChild(el('span', 'nl-pv__dot-label', sc.eyebrow.replace('Step ', '')));
+        if (idx === state.index) {
+          d.classList.add('is-active');
+          if (state.playing && !prefersReducedMotion) d.classList.add('is-playing');
+        } else if (idx < state.index) {
+          d.classList.add('is-done');
+        }
+        d.addEventListener('click', function () { state.playing = false; goto(idx); });
+        els.dots.appendChild(d);
+      });
+    }
+    function updatePlayButton() {
+      if (!els.play) return;
+      els.play.hidden = false;
+      els.play.innerHTML = '<span>' + (state.playing ? 'Pause' : 'Play') + '</span>';
+      els.play.setAttribute('aria-label', state.playing ? 'Pause preview' : 'Play preview');
+    }
+    function armTimer() {
+      clearTimer();
+      if (!state.playing || prefersReducedMotion || isLast()) return;
+      state.timer = setTimeout(function () { goto(state.index + 1, true); }, SCENES[state.index].ms);
+    }
+    function paint() {
+      var sc = SCENES[state.index];
+      clearChildren(els.visual);
+      els.visual.appendChild(sc.build(sc));
+      els.eyebrow.textContent = sc.eyebrow;
+      els.headline.textContent = sc.title;
+      els.body.textContent = sc.body;
+      els.dialog.style.setProperty('--nl-pv-dwell', sc.ms + 'ms');
+      clearChildren(els.cta);
+      els.next.hidden = isLast();
+      els.prev.disabled = state.index === 0;
+      if (isLast()) {
+        els.cta.hidden = false;
+        els.cta.appendChild(el('p', 'nl-pv__closing', 'Minallo brings courses, PDFs, AI help, practice tools, and study chat into one workspace.'));
+        var start = el('button', 'nl-btn nl-btn--primary', 'Start free trial');
+        start.type = 'button';
+        start.addEventListener('click', function () { try { if (typeof window._googleAuth === 'function') window._googleAuth(); } catch (e) {} });
+        els.cta.appendChild(start);
+        var replay = el('button', 'nl-pv__replay', 'Replay tour');
+        replay.type = 'button';
+        replay.addEventListener('click', function () { state.playing = !prefersReducedMotion; goto(0); });
+        els.cta.appendChild(replay);
+      } else {
+        els.cta.hidden = true;
+      }
+      renderDots();
+      updatePlayButton();
+      els.live.textContent = sc.title;
+      armTimer();
+    }
+    function goto(i) {
+      if (i < 0) i = 0;
+      if (i > SCENES.length - 1) i = SCENES.length - 1;
+      state.index = i;
+      if (isLast()) state.playing = false;
+      paint();
+    }
+    function open() {
+      state.lastFocus = document.activeElement;
+      modal.hidden = false;
+      document.documentElement.classList.add('nl-pv-open');
+      document.body.classList.add('nl-pv-open');
+      if (els.chooser) els.chooser.hidden = true;
+      els.player.hidden = false;
+      state.index = 0;
+      state.playing = !prefersReducedMotion;
+      paint();
+      if (els.close && els.close.focus) els.close.focus();
+    }
+    function close() {
+      clearTimer();
+      modal.hidden = true;
+      document.documentElement.classList.remove('nl-pv-open');
+      document.body.classList.remove('nl-pv-open');
+      if (state.lastFocus && state.lastFocus.focus) { try { state.lastFocus.focus(); } catch (e) {} }
+    }
+    function trapFocus(e) {
+      var f = modal.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+      var list = [];
+      for (var i = 0; i < f.length; i++) { if (f[i].offsetParent !== null && !f[i].disabled) list.push(f[i]); }
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    els.close.addEventListener('click', close);
+    if (els.play) els.play.addEventListener('click', function () { state.playing = !state.playing; updatePlayButton(); armTimer(); renderDots(); });
+    modal.querySelectorAll('[data-nl-pv-close]').forEach(function (x) { x.addEventListener('click', close); });
+    els.next.addEventListener('click', function () { state.playing = false; goto(state.index + 1); });
+    els.prev.addEventListener('click', function () { state.playing = false; goto(state.index - 1); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) clearTimer();
+      else if (!modal.hidden) armTimer();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key === 'ArrowRight') { state.playing = false; goto(state.index + 1); }
+      else if (e.key === 'ArrowLeft') { state.playing = false; goto(state.index - 1); }
+      else if (e.key === 'Tab') { trapFocus(e); }
+    });
+
+    _pvApi = {
+      open: open,
+      relang: function () { if (!modal.hidden) paint(); }
+    };
+  }
+
   // ---- bootstrap --------------------------------------------------------
 
   function init() {
@@ -1298,7 +1575,7 @@
     try { applyLang(_getInitialLang()); } catch (e) { /* noop */ }
     try { initLangToggle(); } catch (e) { /* noop */ }
     try { initCtaButtons(); } catch (e) { /* noop */ }
-    try { initPreviewModal(); } catch (e) { /* noop */ }
+    try { initProductTourModal(); } catch (e) { /* noop */ }
     try { initMobileNav(); } catch (e) { /* noop */ }
     try { initPathPicker(); } catch (e) { /* noop */ }
     try { initTutorPreviewTabs(); } catch (e) { /* noop */ }

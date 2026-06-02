@@ -2422,6 +2422,476 @@ body.nl-pv-open {
   margin-top: 0.3rem;
 }
 
+/* ---- Product tour replica screens ---- */
+.nl-pv__dialog {
+  width: min(1280px, 100%);
+}
+.nl-pv__stage {
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.62fr);
+}
+.nl-pv__visual {
+  min-height: 520px;
+}
+.nl-tour {
+  position: relative;
+  width: 100%;
+  max-width: 850px;
+  aspect-ratio: 16 / 10;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: #061021;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.38);
+}
+.nl-tour__screen {
+  position: absolute;
+  inset: 0;
+}
+.nl-mini-shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 142px minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 72% 8%, rgba(59, 130, 246, 0.16), transparent 28%),
+    linear-gradient(135deg, #071226, #0e1b31);
+  color: #e5edf8;
+  font-size: 0.72rem;
+}
+.nl-mini-nav {
+  padding: 0.75rem 0.55rem;
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  background: linear-gradient(180deg, rgba(8, 15, 31, 0.98), rgba(15, 23, 42, 0.96));
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.nl-mini-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+}
+.nl-mini-brand span {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.65rem;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #38bdf8, #2563eb);
+  color: #fff;
+  font-weight: 900;
+}
+.nl-mini-nav__item {
+  min-height: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.55rem;
+  color: rgba(203, 213, 225, 0.74);
+}
+.nl-mini-nav__item svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+.nl-mini-nav__item b {
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+.nl-mini-nav__item.is-active,
+.nl-mini-nav__item:nth-child(3),
+.nl-mini-nav__item:nth-child(4),
+.nl-mini-nav__item:nth-child(6) {
+  background: rgba(56, 189, 248, 0.12);
+  color: #f8fafc;
+}
+.nl-mini-main {
+  min-width: 0;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.nl-mini-top {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.8rem;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.nl-mini-top span {
+  color: rgba(186, 230, 253, 0.78);
+  font-weight: 800;
+}
+.nl-mini-hero {
+  padding: 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(15, 23, 42, 0.88));
+  border: 1px solid rgba(125, 211, 252, 0.22);
+}
+.nl-mini-hero span,
+.nl-mini-course-head span,
+.nl-mini-practice span,
+.nl-mini-chat-top span {
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.55rem;
+  font-weight: 900;
+}
+.nl-mini-hero h4,
+.nl-mini-course-head h4,
+.nl-mini-practice h4,
+.nl-mini-pdf__page h4 {
+  margin: 0.3rem 0 0;
+  color: #fff;
+  font-size: 1rem;
+}
+.nl-mini-grid,
+.nl-mini-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.nl-mini-card,
+.nl-mini-folder-grid div,
+.nl-mini-course-card,
+.nl-mini-modal,
+.nl-mini-practice__panel,
+.nl-mini-flashcards,
+.nl-mini-chatbot aside,
+.nl-mini-chatbot section {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.86);
+  border-radius: 0.85rem;
+  padding: 0.7rem;
+}
+.nl-mini-card b,
+.nl-mini-folder-grid b,
+.nl-mini-course-card b,
+.nl-mini-practice b {
+  display: block;
+  color: #fff;
+  font-size: 0.72rem;
+}
+.nl-mini-card span,
+.nl-mini-folder-grid span,
+.nl-mini-course-card span,
+.nl-mini-flashcards small {
+  display: block;
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 0.62rem;
+  line-height: 1.35;
+  margin-top: 0.22rem;
+}
+.nl-mini-course-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+.nl-mini-course-head button,
+.nl-mini-practice button {
+  border: 0;
+  border-radius: 0.75rem;
+  background: #38bdf8;
+  color: #051224;
+  font-weight: 900;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.68rem;
+}
+.nl-mini-course-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0.65rem;
+}
+.nl-mini-course-card {
+  min-height: 7.6rem;
+  background: linear-gradient(145deg, rgba(14, 165, 233, 0.18), rgba(15, 23, 42, 0.9));
+}
+.nl-mini-course-card em {
+  display: inline-flex;
+  margin-top: 1rem;
+  color: #bae6fd;
+  font-style: normal;
+  font-weight: 900;
+}
+.nl-mini-modal {
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.34);
+}
+.nl-mini-modal span {
+  color: #7dd3fc;
+  font-weight: 900;
+}
+.nl-mini-modal b,
+.nl-mini-modal small {
+  display: block;
+  margin-top: 0.35rem;
+}
+.nl-mini-folder-grid {
+  grid-column: 1 / -1;
+}
+.nl-mini-pdf {
+  position: relative;
+  min-height: 390px;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #030712;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+.nl-mini-pdf__toolbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  background: rgba(15, 23, 42, 0.96);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+.nl-mini-pdf__page {
+  position: absolute;
+  left: 1.1rem;
+  top: 3.2rem;
+  bottom: 1.1rem;
+  right: 13.3rem;
+  padding: 1.2rem;
+  background: #f8fafc;
+  color: #111827;
+  border-radius: 0.55rem;
+  text-align: center;
+}
+.nl-mini-pdf__page p {
+  color: #334155;
+}
+.nl-mini-formula {
+  margin-top: 1rem;
+  color: #dc2626;
+  font-size: 1rem;
+  font-family: Georgia, serif;
+}
+.nl-mini-rail {
+  position: absolute;
+  right: 0.65rem;
+  top: 3.2rem;
+  width: 4rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.nl-mini-rail button,
+.nl-mini-chatbot aside button {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.9);
+  color: #cbd5e1;
+  border-radius: 0.65rem;
+  padding: 0.45rem;
+  font-weight: 900;
+  font-size: 0.58rem;
+}
+.nl-mini-rail button.is-active,
+.nl-mini-chatbot aside button.is-active {
+  background: #2563eb;
+  color: #fff;
+}
+.nl-mini-ai-drawer {
+  position: absolute;
+  right: 5.2rem;
+  top: 3.2rem;
+  bottom: 1.1rem;
+  width: 12rem;
+  border-radius: 0.9rem;
+  padding: 0.75rem;
+  background: linear-gradient(180deg, rgba(15, 27, 48, 0.98), rgba(8, 15, 31, 0.98));
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.nl-mini-ai-drawer span {
+  color: #7dd3fc;
+  font-weight: 900;
+}
+.nl-mini-ai-drawer p,
+.nl-mini-ai-drawer div {
+  margin: 0;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.55rem;
+  color: #dbeafe;
+  line-height: 1.35;
+}
+.nl-mini-practice,
+.nl-mini-chatbot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  min-height: 360px;
+}
+.nl-mini-step {
+  margin-top: 0.45rem;
+  padding: 0.45rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.055);
+  color: #cbd5e1;
+}
+.nl-mini-step.is-active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #fff;
+}
+.nl-mini-practice button {
+  margin-top: 0.7rem;
+}
+.nl-mini-flashcard {
+  margin-top: 0.55rem;
+  border-radius: 0.75rem;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  padding: 0.7rem;
+}
+.nl-mini-flashcard p {
+  margin: 0.25rem 0 0;
+  color: #e0f2fe;
+  line-height: 1.35;
+}
+.nl-mini-chatbot aside,
+.nl-mini-chatbot section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.nl-mini-chat-top {
+  display: flex;
+  justify-content: space-between;
+}
+.nl-mini-msg {
+  max-width: 86%;
+  border-radius: 0.85rem;
+  padding: 0.65rem;
+  line-height: 1.35;
+}
+.nl-mini-msg.user {
+  align-self: flex-end;
+  background: #38bdf8;
+  color: #082f49;
+  font-weight: 800;
+}
+.nl-mini-msg.bot {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+.nl-mini-msg small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #93c5fd;
+}
+.nl-mini-composer {
+  margin-top: auto;
+  border-radius: 0.8rem;
+  padding: 0.65rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: #94a3b8;
+}
+.nl-tour-cursor {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+}
+.nl-tour-cursor::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 0.95rem solid #fff;
+  border-top: 0.6rem solid transparent;
+  border-bottom: 0.6rem solid transparent;
+  transform: rotate(-22deg);
+}
+.nl-tour-cursor::after {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 0.56rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);
+  animation: nl-tour-pulse 1.6s ease-out infinite;
+}
+.nl-tour-call {
+  position: absolute;
+  z-index: 7;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(8, 15, 31, 0.94);
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  color: #e0f2fe;
+  font-size: 0.62rem;
+  font-weight: 900;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: nl-tour-call 1.7s ease both;
+}
+.tour-cursor-pages { animation: nl-tour-pages 6.6s ease-in-out infinite; }
+.tour-cursor-courses { animation: nl-tour-courses 7.4s ease-in-out infinite; }
+.tour-cursor-rail { animation: nl-tour-rail 7.4s ease-in-out infinite; }
+.tour-cursor-practice { animation: nl-tour-practice 6.6s ease-in-out infinite; }
+.tour-cursor-chatbot { animation: nl-tour-chatbot 7s ease-in-out infinite; }
+
+@keyframes nl-tour-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }
+  70% { box-shadow: 0 0 0 12px rgba(56, 189, 248, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+@keyframes nl-tour-call {
+  0%, 100% { opacity: 0; transform: translateY(6px); }
+  18%, 82% { opacity: 1; transform: translateY(0); }
+}
+@keyframes nl-tour-pages {
+  0%, 12% { left: 10%; top: 23%; }
+  20%, 28% { left: 10%; top: 32%; }
+  36%, 44% { left: 10%; top: 42%; }
+  52%, 60% { left: 10%; top: 50%; }
+  68%, 76% { left: 10%; top: 58%; }
+  88%, 100% { left: 10%; top: 84%; }
+}
+@keyframes nl-tour-courses {
+  0%, 14% { left: 78%; top: 18%; }
+  24%, 34% { left: 49%; top: 42%; }
+  44%, 54% { left: 30%; top: 63%; }
+  64%, 74% { left: 61%; top: 58%; }
+  86%, 100% { left: 73%; top: 76%; }
+}
+@keyframes nl-tour-rail {
+  0%, 15% { left: 91%; top: 31%; }
+  28%, 38% { left: 91%; top: 43%; }
+  50%, 60% { left: 91%; top: 55%; }
+  70%, 80% { left: 91%; top: 67%; }
+  90%, 100% { left: 67%; top: 43%; }
+}
+@keyframes nl-tour-practice {
+  0%, 18% { left: 17%; top: 31%; }
+  30%, 45% { left: 41%; top: 34%; }
+  56%, 70% { left: 73%; top: 34%; }
+  84%, 100% { left: 31%; top: 71%; }
+}
+@keyframes nl-tour-chatbot {
+  0%, 20% { left: 23%; top: 20%; }
+  34%, 50% { left: 63%; top: 76%; }
+  62%, 80% { left: 58%; top: 48%; }
+  90%, 100% { left: 77%; top: 19%; }
+}
+
 /* Screen-reader-only live region */
 .nl-pv__sr {
   position: absolute;
@@ -2450,13 +2920,51 @@ body.nl-pv-open {
 
 /* Responsive: stack visual over copy */
 @media (max-width: 720px) {
+  .nl-pv {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  .nl-pv__dialog {
+    max-height: none;
+  }
   .nl-pv__stage {
     grid-template-columns: 1fr;
     align-content: start;
     overflow-y: auto;
   }
   .nl-pv__visual {
-    min-height: 200px;
+    min-height: 300px;
+  }
+  .nl-tour {
+    aspect-ratio: 4 / 3;
+  }
+  .nl-mini-shell {
+    grid-template-columns: 86px minmax(0, 1fr);
+    font-size: 0.62rem;
+  }
+  .nl-mini-nav__item {
+    padding: 0.3rem;
+  }
+  .nl-mini-nav__item b {
+    font-size: 0.52rem;
+  }
+  .nl-mini-grid,
+  .nl-mini-folder-grid,
+  .nl-mini-practice,
+  .nl-mini-chatbot {
+    grid-template-columns: 1fr;
+  }
+  .nl-mini-pdf__page {
+    right: 6rem;
+  }
+  .nl-mini-ai-drawer {
+    display: none;
+  }
+  .nl-mini-rail {
+    width: 4.5rem;
+  }
+  .nl-tour-call {
+    display: none;
   }
   .nl-pv__choices {
     grid-template-columns: 1fr;
