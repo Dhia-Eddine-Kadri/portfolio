@@ -2806,6 +2806,41 @@ body.nl-pv-open {
 .nl-mini-folder-grid {
   grid-column: 1 / -1;
 }
+.nl-mini-course-opened {
+  grid-column: 1 / -1;
+  border-radius: 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background:
+    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.16), transparent 34%),
+    rgba(15, 23, 42, 0.88);
+  padding: 0.75rem;
+}
+.nl-mini-course-opened-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+.nl-mini-course-opened-head b {
+  color: #fff;
+}
+.nl-mini-course-opened-head span {
+  color: #7dd3fc;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+.nl-mini-upload-drop {
+  margin-top: 0.6rem;
+  padding: 0.7rem;
+  border-radius: 0.8rem;
+  border: 1px dashed rgba(125, 211, 252, 0.36);
+  background: rgba(56, 189, 248, 0.08);
+  color: #bae6fd;
+  text-align: center;
+  font-weight: 900;
+  font-size: 0.68rem;
+}
 .nl-mini-pdf {
   position: relative;
   min-height: 390px;
@@ -3012,11 +3047,113 @@ body.nl-pv-open {
   transform: translateY(6px);
   animation: nl-tour-call 1.7s ease both;
 }
+.nl-tour-click {
+  position: absolute;
+  z-index: 6;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin: -0.95rem 0 0 -0.95rem;
+  border-radius: 999px;
+  border: 2px solid rgba(56, 189, 248, 0.88);
+  opacity: 0;
+  pointer-events: none;
+  animation: nl-tour-click 0.72s ease-out both;
+}
 .tour-cursor-pages { animation: nl-tour-pages 6.6s ease-in-out infinite; }
 .tour-cursor-courses { animation: nl-tour-courses 7.4s ease-in-out infinite; }
 .tour-cursor-rail { animation: nl-tour-rail 7.4s ease-in-out infinite; }
 .tour-cursor-practice { animation: nl-tour-practice 6.6s ease-in-out infinite; }
 .tour-cursor-chatbot { animation: nl-tour-chatbot 7s ease-in-out infinite; }
+
+.nl-tour--courses .nl-mini-add {
+  animation: nl-tour-target 1.1s ease 0s both;
+}
+.nl-tour--courses .nl-mini-modal {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  animation: nl-course-modal 2.1s ease 0.95s both;
+}
+.nl-tour--courses .nl-mini-course-card {
+  transform-origin: center;
+  animation: nl-course-card-open 1.15s ease 2.45s both;
+}
+.nl-tour--courses .nl-mini-course-opened {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: nl-course-workspace-in 0.75s ease 3.2s both;
+}
+.nl-tour--courses .nl-mini-folder-grid div {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: nl-course-workspace-in 0.55s ease both;
+}
+.nl-tour--courses .nl-mini-folder-grid div:nth-child(1) { animation-delay: 3.85s; }
+.nl-tour--courses .nl-mini-folder-grid div:nth-child(2) { animation-delay: 4.15s; }
+.nl-tour--courses .nl-mini-folder-grid div:nth-child(3) { animation-delay: 4.45s; }
+.nl-tour--courses .nl-mini-upload-drop {
+  opacity: 0;
+  transform: scale(0.96);
+  animation: nl-course-upload-in 0.75s ease 5.15s both;
+}
+.nl-tour--rail .nl-mini-rail button {
+  animation: nl-tour-target 0.85s ease both;
+}
+.nl-tour--rail .nl-mini-rail button:nth-child(1) { animation-delay: 0s; }
+.nl-tour--rail .nl-mini-rail button:nth-child(2) { animation-delay: 1.4s; }
+.nl-tour--rail .nl-mini-rail button:nth-child(3) { animation-delay: 2.8s; }
+.nl-tour--rail .nl-mini-rail button:nth-child(4) { animation-delay: 4.2s; }
+.nl-tour--rail .nl-mini-ai-drawer {
+  opacity: 0;
+  transform: translateX(14px);
+  animation: nl-course-workspace-in 0.75s ease 0.55s both;
+}
+.nl-tour--rail .nl-mini-ai-drawer div:last-child {
+  animation: nl-tour-target 1.4s ease 5.3s both;
+}
+.nl-tour--practice .nl-mini-practice button {
+  animation: nl-tour-target 1.2s ease 2.4s both;
+}
+.nl-tour--practice .nl-mini-step {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: nl-course-workspace-in 0.45s ease both;
+}
+.nl-tour--practice .nl-mini-step:nth-of-type(1) { animation-delay: 2.8s; }
+.nl-tour--practice .nl-mini-step:nth-of-type(2) { animation-delay: 3.05s; }
+.nl-tour--practice .nl-mini-step:nth-of-type(3) { animation-delay: 3.3s; }
+.nl-tour--practice .nl-mini-step:nth-of-type(4) { animation-delay: 3.55s; }
+.nl-mini-quiz-ready {
+  opacity: 0;
+  margin-top: 0.5rem;
+  padding: 0.45rem;
+  border-radius: 0.65rem;
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.28);
+  font-weight: 900;
+  animation: nl-course-workspace-in 0.55s ease 4.15s both;
+}
+.nl-tour--practice .nl-mini-flashcards {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: nl-course-workspace-in 0.65s ease 4.25s both;
+}
+.nl-tour--chatbot .nl-mini-chatbot aside button.is-active {
+  animation: nl-tour-target 1.1s ease 0s both;
+}
+.nl-tour--chatbot .nl-mini-msg.user {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: nl-course-workspace-in 0.55s ease 1.75s both;
+}
+.nl-tour--chatbot .nl-mini-msg.bot {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: nl-course-workspace-in 0.7s ease 3.25s both;
+}
+.nl-tour--chatbot .nl-mini-composer {
+  animation: nl-tour-target 1s ease 1.55s both;
+}
 
 @keyframes nl-tour-pulse {
   0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }
@@ -3026,6 +3163,30 @@ body.nl-pv-open {
 @keyframes nl-tour-call {
   0%, 100% { opacity: 0; transform: translateY(6px); }
   18%, 82% { opacity: 1; transform: translateY(0); }
+}
+@keyframes nl-tour-click {
+  0% { opacity: 0; transform: scale(0.55); }
+  20% { opacity: 1; transform: scale(0.75); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+@keyframes nl-tour-target {
+  0%, 100% { box-shadow: none; transform: none; }
+  45% { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18), 0 0 24px rgba(56, 189, 248, 0.32); transform: translateY(-1px); }
+}
+@keyframes nl-course-modal {
+  0% { opacity: 0; transform: translateY(8px) scale(0.96); }
+  18%, 72% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+@keyframes nl-course-card-open {
+  0%, 100% { transform: none; box-shadow: none; }
+  45% { transform: scale(1.025); box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18), 0 22px 40px rgba(0, 0, 0, 0.36); }
+}
+@keyframes nl-course-workspace-in {
+  to { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
+}
+@keyframes nl-course-upload-in {
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes nl-tour-pages {
   0%, 12% { left: 10%; top: 23%; }

@@ -1375,11 +1375,12 @@
     }
     function callouts(scene) {
       return scene.calls.map(function (c) {
-        return '<span class="nl-tour-call" style="left:' + c[1] + '%;top:' + c[2] + '%;animation-delay:' + c[3] + 'ms">' + c[0] + '</span>';
+        return '<span class="nl-tour-call" style="left:' + c[1] + '%;top:' + c[2] + '%;animation-delay:' + c[3] + 'ms">' + c[0] + '</span>' +
+          '<span class="nl-tour-click" style="left:' + c[1] + '%;top:' + c[2] + '%;animation-delay:' + c[3] + 'ms"></span>';
       }).join('');
     }
     function tourFrame(scene, screenHtml) {
-      var frame = el('div', 'nl-tour');
+      var frame = el('div', 'nl-tour nl-tour--' + scene.key);
       frame.innerHTML =
         '<div class="nl-tour__screen">' + screenHtml + '</div>' +
         '<span class="nl-tour-cursor ' + scene.cursor + '" aria-hidden="true"></span>' +
@@ -1425,11 +1426,11 @@
         '<div class="nl-mini-course-layout nl-mini-course-layout--real">' +
         '<article class="nl-mini-course-card is-hot"><div class="nl-mini-course-icon">📘</div><b>Engineering Mechanics 2</b><span>Created subject · SS 2026</span><div class="nl-mini-progress"><i style="width:42%"></i></div><div class="nl-mini-statrow"><em>Read 4</em><em>Notes 2</em><em>Practice 10</em><em>AI 8</em></div><strong>Open course</strong></article>' +
         '<div class="nl-mini-modal"><span>Create subject</span><b>Engineering Mechanics 2</b><small>Semester: SS 2026 · Accent: blue</small></div>' +
-        '<div class="nl-mini-folder-grid">' +
+        '<div class="nl-mini-course-opened"><div class="nl-mini-course-opened-head"><b>Engineering Mechanics 2</b><span>Course workspace opened</span></div><div class="nl-mini-folder-grid">' +
         '<div><b>Lectures</b><span>Mechanics_lecture_03.pdf uploaded</span></div>' +
         '<div><b>Exercises</b><span>Exercise_sheet_06.pdf uploaded</span></div>' +
         '<div><b>Formula Sheets</b><span>Formula_collection.pdf uploaded</span></div>' +
-        '</div></div>';
+        '</div><div class="nl-mini-upload-drop">Drop PDFs here or choose files</div></div></div>';
       return tourFrame(scene, miniShell('Courses', main, 'nl-mini-shell--courses'));
     }
     function buildAiSideRail(scene) {
@@ -1443,7 +1444,7 @@
     }
     function buildQuizFlashcards(scene) {
       var main = '<div class="nl-mini-practice">' +
-        '<div class="nl-mini-practice__panel"><span>Quiz generator</span><h4>10 questions from Engineering Mechanics 2</h4><div class="nl-mini-step is-active">1. Concept check</div><div class="nl-mini-step">2. Formula substitution</div><div class="nl-mini-step">3. Calculation problem</div><div class="nl-mini-step">... 10 total questions</div><button>Generate quiz</button></div>' +
+        '<div class="nl-mini-practice__panel"><span>Quiz generator</span><h4>10 questions from Engineering Mechanics 2</h4><div class="nl-mini-step is-active">1. Concept check</div><div class="nl-mini-step">2. Formula substitution</div><div class="nl-mini-step">3. Calculation problem</div><div class="nl-mini-step">... 10 total questions</div><button>Generate quiz</button><div class="nl-mini-quiz-ready">10-question quiz ready</div></div>' +
         '<div class="nl-mini-flashcards"><span>Flashcards</span><div class="nl-mini-flashcard"><b>Q</b><p>What does the work-energy theorem compare?</p></div><div class="nl-mini-flashcard"><b>A</b><p>Kinetic and potential energy changes using course notation.</p></div><small>Sources: Lecture 03 p.12 · Formula sheet p.2</small></div>' +
         '</div>';
       return tourFrame(scene, miniShell('AI Tutor', main, 'nl-mini-shell--practice'));
