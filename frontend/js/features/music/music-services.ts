@@ -447,7 +447,12 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     ytRenderSelect();
   };
 
-  window.addEventListener('ss-ready', () => {
+  // initMusicServices runs from main.ts via runDelayed (~20s after boot), which
+  // is long after loader.ts dispatches 'ss-ready'. Registering only on ss-ready
+  // would attach this handler too late and it would never fire — leaving the
+  // YouTube add button and Spotify controls unwired. So run immediately if boot
+  // already finished; otherwise wait for ss-ready (same guard as app.ts).
+  const _musicInitOnReady = (): void => {
     const currentUser = getCurrentUser();
     const earlyUid = (currentUser && currentUser.id) || '';
     if (earlyUid) {
@@ -552,7 +557,12 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
         }
       });
     }
-  });
+  };
+  if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
+    _musicInitOnReady();
+  } else {
+    window.addEventListener('ss-ready', _musicInitOnReady, { once: true });
+  }
 
   window._getMusicPlaylistId = function (): string | null {
     const sel = document.getElementById('stPlaylistSelect') as HTMLSelectElement | null;

@@ -44,15 +44,11 @@ export function adminShowIfEligible(user: { id?: string } | null): void {
 export function initAdminPanel(): void {
   const searchBtn = document.getElementById('adminSearchBtn');
   const searchInput = document.getElementById('adminSearchInput') as HTMLInputElement | null;
-  const navBtn = document.getElementById('psbAdmin');
 
-  if (navBtn) {
-    navBtn.addEventListener('click', () => {
-      if (typeof window.showPortal === 'function') window.showPortal();
-      if (typeof window.setNavActive === 'function') window.setNavActive('psbAdmin');
-      if (typeof window.showPortalSection === 'function') window.showPortalSection('admin');
-    });
-  }
+  // Navigation (show section, set nav-active, push #portal=admin) is wired in
+  // router.js alongside every other sidebar button, so it works on the first
+  // click rather than waiting for this lazily-loaded module. Here we only wire
+  // the admin feature itself: search, retrieval inspector, and stats.
   if (searchBtn) searchBtn.addEventListener('click', adminSearch);
   if (searchInput) {
     searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -95,6 +91,11 @@ function initAdminStats(): void {
   const navBtn = document.getElementById('psbAdmin');
   // Lazy-load on first time the admin section is opened.
   if (navBtn) navBtn.addEventListener('click', () => { void loadAdminStats(); });
+  // If this module finished loading after the user already navigated to the
+  // admin section (the nav handler lives in router.js and fires from boot),
+  // the click above was missed — load now so the dashboard isn't left blank.
+  const sec = document.getElementById('psec-admin');
+  if (sec && sec.style.display !== 'none') void loadAdminStats();
 
   const rangeSel = document.getElementById('adminRangeSel') as HTMLSelectElement | null;
   const bucketSel = document.getElementById('adminBucketSel') as HTMLSelectElement | null;

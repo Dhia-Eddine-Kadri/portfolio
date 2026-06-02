@@ -402,6 +402,18 @@ _bindIf('psbSubscription', 'click', function () {
   _ssAfterFeature('subscription');
 });
 
+// Admin is wired here (not in the lazily-loaded admin-panel.js) so the click
+// handler exists from boot — otherwise the first clicks land before the
+// delayed admin module attaches its listener and do nothing. _finalizeNav is
+// what writes #portal=admin to the URL, matching every other section.
+_bindIf('psbAdmin', 'click', function () {
+  showPortal();
+  setNavActive('psbAdmin');
+  showPortalSection('admin');
+  _finalizeNav('admin');
+  _ssAfterFeature('admin');
+});
+
 _bindIf('goPortal', 'click', function () {
   if (activeFileName && activeCourseRef) {
     if (
