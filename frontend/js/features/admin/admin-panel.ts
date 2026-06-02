@@ -5,9 +5,6 @@ import {
   reindexUserCourse,
   listRetrievalLogs,
   getRetrievalLog,
-  getSignupStats,
-  getSubscriptionStats,
-  getRetentionStats,
   type RetrievalLogLite,
   type RetrievalLogFull,
   type RetrievalChunkMeta,
@@ -15,6 +12,13 @@ import {
   type SubscriptionStats,
   type RetentionStats,
 } from '../../services/admin-service.js';
+// Analytics functions are reached via a namespace import on purpose: this
+// module is lazy-imported when the admin page opens, and a stale browser-cached
+// admin-service.js (missing these newer exports) would otherwise fail to LINK
+// the whole admin module and stop the page from opening at all. With a
+// namespace import a missing export is just `undefined`, so the dashboard
+// degrades to absent while the rest of the admin page still works.
+import * as adminSvc from '../../services/admin-service.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 
 interface AdminUser {
@@ -108,6 +112,13 @@ async function loadAdminStats(): Promise<void> {
   _statsLoaded = true;
   const loading = document.getElementById('adminStatsLoading');
   const body = document.getElementById('adminStatsBody');
+  // Stale cached admin-service.js without the analytics exports → hide the
+  // dashboard entirely rather than show a broken/loading-forever panel.
+  if (typeof adminSvc.getSignupStats !== 'function') {
+    const stats = document.getElementById('adminStats');
+    if (stats) stats.style.display = 'none';
+    return;
+  }
   try {
     await Promise.all([reloadSignupChart(), loadSubscriptionCards(), loadRetention()]);
     if (loading) loading.style.display = 'none';
@@ -123,7 +134,7 @@ async function reloadSignupChart(): Promise<void> {
   const bucketSel = document.getElementById('adminBucketSel') as HTMLSelectElement | null;
   const range = rangeSel?.value || '30d';
   const bucket = bucketSel?.value || _defaultBucketFor(range);
-  const data = await getSignupStats(range, bucket);
+  const data = adminSvc.getSignupStats ? await adminSvc.getSignupStats(range, bucket) : null;
   if (data) {
     _renderGrowthCards(data);
     _renderSignupChart(data);
@@ -181,7 +192,7 @@ function _renderSignupChart(data: SignupStats): void {
 async function loadSubscriptionCards(): Promise<void> {
   const host = document.getElementById('adminSubCards');
   if (!host) return;
-  const data: SubscriptionStats | null = await getSubscriptionStats();
+  const data: SubscriptionStats | null = adminSvc.getSubscriptionStats ? await adminSvc.getSubscriptionStats() : null;
   host.innerHTML = '';
   if (!data) {
     host.innerHTML = '<div style="color:var(--on-glass-muted);font-size:.8rem">Subscription stats unavailable.</div>';
@@ -198,7 +209,7 @@ async function loadSubscriptionCards(): Promise<void> {
 async function loadRetention(): Promise<void> {
   const host = document.getElementById('adminRetention');
   if (!host) return;
-  const data: RetentionStats | null = await getRetentionStats(12);
+  const data: RetentionStats | null = adminSvc.getRetentionStats ? await adminSvc.getRetentionStats(12) : null;
   host.innerHTML = '';
   if (!data || !data.available) {
     host.innerHTML =
