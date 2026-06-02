@@ -639,6 +639,25 @@ interface LandingTranslation {
             );
             return lazyPromises[name];
           };
+
+          function scheduleChatPrewarm(): void {
+            const run = (): void => {
+              const loadFeature = (window as unknown as {
+                _ssLoadPortalFeature?: (name: string) => Promise<void>;
+              })._ssLoadPortalFeature;
+              if (typeof loadFeature !== 'function') return;
+              void Promise.all([loadFeature('aipage'), loadFeature('chat')]).catch((err) => {
+                console.warn('[loader] chat prewarm failed', err);
+              });
+            };
+            const schedule = window.requestIdleCallback
+              ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 4500 })
+              : (cb: () => void) => window.setTimeout(cb, 1800);
+            window.setTimeout(() => schedule(run), 900);
+          }
+
+          if (document.body.getAttribute('data-ss-ready') === '1') scheduleChatPrewarm();
+          else window.addEventListener('ss-ready', scheduleChatPrewarm, { once: true });
         })();
 
         {

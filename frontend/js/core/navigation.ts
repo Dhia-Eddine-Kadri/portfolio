@@ -90,7 +90,8 @@ export function showPortalSection(sec: string): void {
   }
 
   const leaving = _activePortalSection;
-  if (leaving && leaving !== target && leaving.style.display !== 'none') {
+  const instantRoute = sec === 'aipage' || sec === 'chat';
+  if (!instantRoute && leaving && leaving !== target && leaving.style.display !== 'none') {
     leaving.classList.add('psec-leaving');
     setTimeout(revealTarget, 170);
   } else {
