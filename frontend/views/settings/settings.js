@@ -13,6 +13,12 @@
 
   var section = document.getElementById('psec-settings');
   if (section) section.dataset.feature = 'settings';
+
+  // This file runs right after settings.html is injected. The YouTube playlist
+  // UI is owned by music-services.js, which renders into #ytPlaylistList — but
+  // it may have initialised before this HTML existed, so populate the list now.
+  // (Click handling is document-delegated there, so it works regardless.)
+  if (typeof window._ytRenderList === 'function') window._ytRenderList();
 })();
 
 var _autoOpenEnabled = true;

@@ -48,6 +48,7 @@ declare global {
   interface Window {
     _getMusicPlaylistId?: () => string | null;
     _ytRenderSelect?: () => void;
+    _ytRenderList?: () => void;
     _spIsConnected?: () => boolean;
     _spPlayResume?: () => void;
     _stMusicSrc?: string;
@@ -484,79 +485,74 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
 
     ytRenderList();
 
-    const spBtn = document.getElementById('spotifyConnectBtn');
-    if (spBtn) spBtn.addEventListener('click', spConnect);
-    const spDisc = document.getElementById('spotifyDisconnect');
-    if (spDisc) spDisc.addEventListener('click', spDisconnect);
-    const spPrev = document.getElementById('spotifyPrev');
-    if (spPrev) {
-      spPrev.addEventListener('click', () => {
+    // Every control below lives in the lazily-injected settings.html, which is
+    // normally NOT in the DOM when this init runs (~20s after boot, before the
+    // user ever opens Settings). Binding directly with getElementById would
+    // silently no-op and the buttons would stay dead — which is exactly why the
+    // YouTube "Add playlist" button did nothing. Delegate from document so the
+    // handlers fire no matter when the settings view is injected.
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      if (target.closest('#spotifyConnectBtn')) { spConnect(); return; }
+      if (target.closest('#spotifyDisconnect')) { spDisconnect(); return; }
+      if (target.closest('#spotifyPrev')) {
         void spApi('me/player/previous', 'POST');
         setTimeout(spPollPlayback, 500);
-      });
-    }
-    const spNext = document.getElementById('spotifyNext');
-    if (spNext) {
-      spNext.addEventListener('click', () => {
+        return;
+      }
+      if (target.closest('#spotifyNext')) {
         void spApi('me/player/next', 'POST');
         setTimeout(spPollPlayback, 500);
-      });
-    }
-    const spPP = document.getElementById('spotifyPlayPause');
-    if (spPP) {
-      spPP.addEventListener('click', () => {
+        return;
+      }
+      if (target.closest('#spotifyPlayPause')) {
         void spApi('me/player').then((d) => {
           if (d && d['is_playing']) void spApi('me/player/pause', 'PUT');
           else void spApi('me/player/play', 'PUT');
           setTimeout(spPollPlayback, 600);
         });
-      });
-    }
-    const ytAddBtn = document.getElementById('ytSaveBtn');
-    if (ytAddBtn) ytAddBtn.addEventListener('click', ytAdd);
-    const ytList = document.getElementById('ytPlaylistList');
-    if (ytList) {
-      ytList.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement | null;
-        if (!target) return;
+        return;
+      }
+      if (target.closest('#ytSaveBtn')) { ytAdd(); return; }
+
+      // Playlist row actions (rows are rendered into #ytPlaylistList).
+      if (target.closest('#ytPlaylistList')) {
         const editBtn = target.closest('.yt-pl-edit') as HTMLElement | null;
         if (editBtn) {
-          const idxAttr = editBtn.dataset['idx'];
-          if (idxAttr !== undefined) ytStartEdit(parseInt(idxAttr, 10));
+          const idx = editBtn.dataset['idx'];
+          if (idx !== undefined) ytStartEdit(parseInt(idx, 10));
           return;
         }
         const saveBtn = target.closest('.yt-pl-save') as HTMLElement | null;
         if (saveBtn) {
-          const idxAttr = saveBtn.dataset['idx'];
-          if (idxAttr !== undefined) ytSaveEdit(parseInt(idxAttr, 10));
+          const idx = saveBtn.dataset['idx'];
+          if (idx !== undefined) ytSaveEdit(parseInt(idx, 10));
           return;
         }
-        const cancelBtn = target.closest('.yt-pl-cancel') as HTMLElement | null;
-        if (cancelBtn) {
-          ytCancelEdit();
-          return;
-        }
+        if (target.closest('.yt-pl-cancel')) { ytCancelEdit(); return; }
         const removeBtn = target.closest('.yt-pl-remove') as HTMLElement | null;
         if (removeBtn) {
-          const idxAttr = removeBtn.dataset['idx'];
-          if (idxAttr !== undefined) ytRemove(parseInt(idxAttr, 10));
+          const idx = removeBtn.dataset['idx'];
+          if (idx !== undefined) ytRemove(parseInt(idx, 10));
         }
-      });
-      // Enter to save, Escape to cancel while editing
-      ytList.addEventListener('keydown', (e) => {
-        if (_ytEditingIdx === null) return;
-        const target = e.target as HTMLElement | null;
-        if (!target) return;
-        if (!target.matches('.yt-pl-edit-name, .yt-pl-edit-url')) return;
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          ytSaveEdit(_ytEditingIdx);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          ytCancelEdit();
-        }
-      });
-    }
+      }
+    });
+
+    // Enter to save / Escape to cancel while editing a playlist row.
+    document.addEventListener('keydown', (e) => {
+      if (_ytEditingIdx === null) return;
+      const target = e.target as HTMLElement | null;
+      if (!target || !target.matches('.yt-pl-edit-name, .yt-pl-edit-url')) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        ytSaveEdit(_ytEditingIdx);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        ytCancelEdit();
+      }
+    });
   };
   if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
     _musicInitOnReady();
@@ -571,6 +567,10 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     return playlists.length && playlists[0] ? playlists[0].id : null;
   };
   window._ytRenderSelect = ytRenderSelect;
+  // settings.html is injected lazily; this lets settings.js populate the
+  // playlist list the first time the user opens Settings, regardless of whether
+  // this module finished loading before or after that HTML appeared.
+  window._ytRenderList = ytRenderList;
   document.addEventListener('change', (e) => {
     const target = e.target as HTMLElement | null;
     if (

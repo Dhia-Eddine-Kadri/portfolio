@@ -1399,7 +1399,7 @@
         return '<div class="nl-mini-nav__item' + on + '" title="' + p[0] + '"><span>' + iconUse(p[1], 16) + '</span><b>' + p[0] + '</b></div>';
       }).join('');
       return '<div class="nl-mini-shell ' + (extraClass || '') + '">' +
-        '<aside class="nl-mini-nav"><button class="nl-mini-toggle" aria-hidden="true">☰</button><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div>' + nav + '<div class="nl-mini-night">☀</div></aside>' +
+        '<aside class="nl-mini-nav"><button class="nl-mini-toggle" aria-hidden="true">›</button><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div><div class="nl-mini-nav-list">' + nav + '<i class="nl-mini-divider"></i></div><div class="nl-mini-night">☀</div></aside>' +
         '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div><div class="nl-mini-scroll">' + mainHtml + '</div></section>' +
         '</div>';
     }
