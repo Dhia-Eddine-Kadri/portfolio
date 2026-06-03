@@ -196,11 +196,14 @@ function _renderSignupChart(data: SignupStats): void {
     if (p.length === 3) return p[2] + '/' + p[1];
     return d;
   };
+  const xTitle = data.bucket === 'month' ? 'Month' : data.bucket === 'week' ? 'Week' : 'Day';
   renderBarChart(
     host,
     series.map((p) => ({ label: label(p.date), value: p.count })),
     {
       tooltipNoun: 'signup',
+      yTitle: 'New users',
+      xTitle,
       caption: data.total + ' signups · ' + series[0]!.date + ' → ' + series[series.length - 1]!.date +
         ' · peak ' + max + '/' + data.bucket,
     },
@@ -234,6 +237,7 @@ function _renderFinanceSeries(): void {
 
   let points: LinePoint[];
   let fmt: (n: number) => string;
+  let yTitle: string;
   if (_financeMode === 'money') {
     points = data.series.map((p) => ({
       label: mLabel(p.month),
@@ -241,7 +245,12 @@ function _renderFinanceSeries(): void {
       cost: p.costCents / 100,
       profit: p.profitCents / 100,
     }));
-    fmt = (n: number): string => '€' + (Math.abs(n) >= 100 ? Math.round(n) : n.toFixed(0));
+    fmt = (n: number): string => {
+      const a = Math.abs(n);
+      if (a >= 1000) return '€' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+      return '€' + Math.round(n);
+    };
+    yTitle = 'Euros / month';
   } else {
     // "Users" view: paid users and AI-call volume share the profit/revenue lines.
     points = data.series.map((p) => ({
@@ -251,8 +260,9 @@ function _renderFinanceSeries(): void {
       profit: p.activePaid,
     }));
     fmt = (n: number): string => String(Math.round(n));
+    yTitle = 'Count / month';
   }
-  renderLineChart(host, points, fmt);
+  renderLineChart(host, points, fmt, { yTitle, xTitle: 'Month' });
 }
 
 function _initFinanceToggle(): void {
