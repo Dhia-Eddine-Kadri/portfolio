@@ -224,3 +224,21 @@
   scroll-behavior: auto !important;
   will-change: auto !important;
 }
+
+/* ── Chat view ───────────────────────────────────────────────────────────────
+   #psec-chat carries dozens of backdrop-filter blurs (message bubbles, sidebar,
+   header, input bar). Re-rasterising those on every scroll/typing frame makes
+   the conversation feel sluggish and switching chats janky. Drop the live blur
+   (translucent backgrounds keep the glass look) and stop blanket transitions
+   from firing mid-scroll. */
+#psec-chat,
+#psec-chat * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+#psec-chat .chat-msg,
+#psec-chat .chat-msgs,
+#psec-chat .chat-friend-item {
+  animation: none !important;
+  transition-duration: 0.08s !important;
+}
