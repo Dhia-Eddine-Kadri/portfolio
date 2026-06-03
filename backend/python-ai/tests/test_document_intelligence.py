@@ -7,7 +7,9 @@ import pytest
 from app.services.document_intelligence import (
     DOCUMENT_TYPES,
     classify_document,
+    prefer_ocr_text,
     rollup_extraction_quality,
+    score_extraction,
 )
 
 
@@ -267,3 +269,69 @@ def test_legacy_classify_document_returns_just_the_type() -> None:
     )
     assert isinstance(result, str)
     assert result == "formula_sheet"
+
+
+# ── pdfminer-vs-OCR scoring ─────────────────────────────────────────────────
+
+
+def test_score_extraction_empty_is_zero() -> None:
+    assert score_extraction("") == 0.0
+    assert score_extraction("   \n  ") == 0.0
+
+
+def test_score_rewards_formula_blocks_and_headings() -> None:
+    r"""Clean OCR markdown (headings + $$ blocks + \frac) must outscore the
+    same content as flat formula-soup."""
+    clean = (
+        "## Schraubenberechnung\n\n"
+        "$$ \\delta_K = \\frac{l'_K}{E_S \\cdot A_N} $$\n"
+        "Nachgiebigkeit des Schraubenkopfes\n"
+        "$$ \\delta_G = \\frac{0.5 \\cdot d}{E_S \\cdot A_3} $$\n"
+        "Nachgiebigkeit des eingeschraubten Gewindeteils\n"
+    )
+    soup = "delta K lK ES AN delta G d ES A3 Nachgiebigkeit Schraubenkopfes Gewindeteils"
+    assert score_extraction(clean) > score_extraction(soup)
+
+
+def test_score_penalises_unclear_markers() -> None:
+    base = "Eine vollständig lesbare Vorlesungsfolie mit ausreichend Inhalt."
+    with_gaps = base + " [unclear] [unclear] [unclear]"
+    assert score_extraction(with_gaps) < score_extraction(base)
+
+
+def test_prefer_ocr_when_original_empty() -> None:
+    """Scanned page: pdfminer got nothing, OCR got text → always take OCR."""
+    assert prefer_ocr_text("", "## Heading\n\nReadable recovered content.")
+
+
+def test_reject_empty_ocr() -> None:
+    """OCR returned nothing usable → keep the original, never overwrite."""
+    assert not prefer_ocr_text("some original prose with words", "")
+    assert not prefer_ocr_text("some original prose with words", "   ")
+
+
+def test_prefer_ocr_over_garbled_formula_soup() -> None:
+    """The Formelzettel case: garbled pdfminer soup vs clean OCR markdown."""
+    garbled = (
+        "delta K lK ES AN delta i li ES Ai delta G d ES A3 "
+        "Elastische Schraubennachgiebigkeit Nachgiebigkeit Schraubenkopfes"
+    )
+    ocr = (
+        "## Schraubenberechnung\n\n"
+        "$$ \\delta_K = \\frac{l'_K}{E_S \\cdot A_N} $$\n"
+        "$$ \\delta_i = \\frac{l_i}{E_S \\cdot A_i} $$\n"
+        "$$ \\delta_G = \\frac{0.5 d}{E_S \\cdot A_3} $$\n"
+        "Elastische Schraubennachgiebigkeit\n"
+    )
+    assert prefer_ocr_text(garbled, ocr)
+
+
+def test_keep_original_when_ocr_is_mostly_unclear() -> None:
+    """OCR that came back as mostly [unclear] must not clobber a
+    partially-readable original."""
+    original = (
+        "Eine teilweise lesbare Seite mit mehreren verständlichen Wörtern "
+        "und Begriffen aus der Vorlesung über Maschinenelemente."
+    )
+    ocr = "[unclear]\n[unclear]\n[unclear]\n[unclear]\nFragment"
+    assert not prefer_ocr_text(original, ocr)

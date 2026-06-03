@@ -254,6 +254,59 @@ def rollup_extraction_quality(page_qualities: Iterable[str | None]) -> QualityRo
     return QualityRollup("good", good, weak, failed, total, False)
 
 
+# ── pdfminer-vs-OCR scoring ─────────────────────────────────────────────────
+#
+# A page only reaches OCR because the detector judged pdfminer's text bad
+# (empty or structurally garbled). But OCR can fail too — blur, handwriting,
+# a hallucinated table. So instead of blindly overwriting, we score both
+# versions and keep the stronger one.
+
+_HEADING_RE = re.compile(r"(?m)^\s{0,3}#{1,6}\s")
+_MATH_BLOCK_RE = re.compile(r"\$\$.+?\$\$", re.DOTALL)
+_LATEX_STRUCT_RE = re.compile(r"\\frac|\\sqrt|\\sum|\\int|\\begin\{")
+_UNCLEAR_RE = re.compile(r"\[unclear\]", re.IGNORECASE)
+_READABLE_WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüß]{4,}")
+
+
+def score_extraction(text: str) -> float:
+    """Heuristic quality score for one page of extracted text — higher is
+    better. Rewards parseable structure; penalises honest-OCR gaps.
+
+      + readable words   — tokens of >= 4 letters (real words, not formula soup)
+      + display formulas — clean ``$$ ... $$`` blocks
+      + latex structure  — ``\\frac`` / ``\\sqrt`` / ``\\sum`` / ``\\begin{}``
+      + headings         — Markdown ATX headings (structure survived)
+      - [unclear] markers— regions the model could not read
+    """
+    if not text or not text.strip():
+        return 0.0
+    readable_words = len(_READABLE_WORD_RE.findall(text))
+    formula_blocks = len(_MATH_BLOCK_RE.findall(text))
+    latex = len(_LATEX_STRUCT_RE.findall(text))
+    headings = len(_HEADING_RE.findall(text))
+    unclear = len(_UNCLEAR_RE.findall(text))
+    return (
+        readable_words
+        + 4.0 * formula_blocks
+        + 2.0 * latex
+        + 3.0 * headings
+        - 5.0 * unclear
+    )
+
+
+def prefer_ocr_text(original: str, ocr: str) -> bool:
+    """Decide whether the OCR result should replace the pdfminer ``original``.
+
+    The bar is low because the page was already flagged as bad pdfminer
+    output: take the OCR text unless it scores strictly worse than what we
+    had. An empty original always loses; an OCR result that came back mostly
+    ``[unclear]`` can lose to a partially-readable original.
+    """
+    if not ocr or not ocr.strip():
+        return False
+    return score_extraction(ocr) >= score_extraction(original)
+
+
 # ── Phase 11 — OCR measurement ──────────────────────────────────────────────
 
 

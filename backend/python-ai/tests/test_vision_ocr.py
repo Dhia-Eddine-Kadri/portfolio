@@ -26,6 +26,7 @@ class _FakeSettings:
     vision_ocr_model = "gpt-test-vision"
     vision_ocr_max_pages = 20
     vision_ocr_render_dpi = 150
+    vision_ocr_mathpix_dpi = 300
     openai_api_key = "test"
     # Mathpix routing defaults — overridden per-test below.
     mathpix_routing = "off"
@@ -366,3 +367,51 @@ def test_unknown_routing_value_defaults_to_openai() -> None:
         mathpix_app_key = "key"
 
     assert _provider_with(S, "Formelzettel.pdf", ["a = b = c = d = e = f = g = h = i"], [0]) == "openai"
+
+
+# ── per-provider render DPI ─────────────────────────────────────────────────
+
+
+def test_mathpix_renders_at_higher_dpi() -> None:
+    """Mathpix (formula path) renders at vision_ocr_mathpix_dpi, not the
+    cheaper default — small subscripts/fractions need the resolution."""
+    class S(_FakeSettings):
+        vision_ocr_enabled = True
+        mathpix_app_id = "id"
+        mathpix_app_key = "key"
+        vision_ocr_render_dpi = 150
+        vision_ocr_mathpix_dpi = 300
+
+    captured: dict[str, int] = {}
+
+    def fake_render(_pdfium, _pdf_bytes, _idx, dpi):
+        captured["dpi"] = dpi
+        return None  # short-circuit; we only assert on the DPI passed
+
+    with patch("app.services.vision_ocr.get_settings", lambda: S()), \
+         patch("app.services.vision_ocr._try_import_pypdfium2", lambda: object()), \
+         patch("app.services.vision_ocr._render_page_to_png", fake_render):
+        pages_via_vision(b"%PDF-fake", [0], provider="mathpix")
+
+    assert captured["dpi"] == 300
+
+
+def test_openai_renders_at_default_dpi() -> None:
+    class S(_FakeSettings):
+        vision_ocr_enabled = True
+        vision_ocr_render_dpi = 150
+        vision_ocr_mathpix_dpi = 300
+
+    captured: dict[str, int] = {}
+
+    def fake_render(_pdfium, _pdf_bytes, _idx, dpi):
+        captured["dpi"] = dpi
+        return None
+
+    with patch("app.services.vision_ocr.get_settings", lambda: S()), \
+         patch("app.services.vision_ocr._try_import_pypdfium2", lambda: object()), \
+         patch("app.services.vision_ocr._try_import_openai", lambda: (lambda **kw: object())), \
+         patch("app.services.vision_ocr._render_page_to_png", fake_render):
+        pages_via_vision(b"%PDF-fake", [0], provider="openai")
+
+    assert captured["dpi"] == 150

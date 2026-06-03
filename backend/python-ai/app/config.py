@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     vision_ocr_model: str = Field("gpt-4o-mini", alias="MINALLO_VISION_OCR_MODEL")
     vision_ocr_max_pages: int = Field(20, alias="MINALLO_VISION_OCR_MAX_PAGES")
     vision_ocr_render_dpi: int = Field(150, alias="MINALLO_VISION_OCR_DPI")
+    # Formula pages need finer rendering — subscripts, indices and the
+    # numerator/denominator of small fractions blur at 150 DPI. Mathpix
+    # (the formula path) renders at this higher DPI; the OpenAI path keeps
+    # the cheaper default above.
+    vision_ocr_mathpix_dpi: int = Field(300, alias="MINALLO_VISION_OCR_MATHPIX_DPI")
 
     # --- Schreibtrainer: persistence stays off until the migrations land.
     # Flip to true once user_writing_submissions / user_writing_weaknesses

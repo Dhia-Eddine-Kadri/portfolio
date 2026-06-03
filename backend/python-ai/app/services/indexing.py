@@ -28,7 +28,12 @@ from .block_detection import (
     detect_formulas,
 )
 from .chunking import Chunk, chunk_pages
-from .document_intelligence import classify_document, measure_ocr_need, rollup_extraction_quality
+from .document_intelligence import (
+    classify_document,
+    measure_ocr_need,
+    prefer_ocr_text,
+    rollup_extraction_quality,
+)
 from .embeddings import embed_texts
 from .extraction import extract_pages_text
 from .markdown_indexing import PageMarkdown, page_to_markdown
@@ -80,6 +85,10 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
             return _status_payload(doc)
 
         pages = extract_pages_text(pdf_bytes)
+        # Keep the untouched pdfminer text so we can (a) store it as raw_text
+        # for debugging and (b) score it against any OCR result before
+        # deciding to overwrite the page.
+        pdfminer_pages = list(pages)
 
         # Phase 12: vision OCR fallback for image-only / heavily-scanned
         # pages AND structurally garbled pages (multi-column formula sheets
@@ -103,11 +112,15 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
                 )
                 ocr_pages_run = len(bad_idx)
                 ocr_results = pages_via_vision(pdf_bytes, bad_idx, provider=ocr_provider)
+                # Don't blindly trust OCR: only overwrite the page when the
+                # OCR text scores at least as well as the pdfminer original.
+                # A page that scores lower (mostly [unclear], blurred render)
+                # keeps its original text and is NOT counted as recovered.
                 for idx, text in ocr_results.items():
-                    if 0 <= idx < len(pages):
+                    if 0 <= idx < len(pages) and prefer_ocr_text(pages[idx], text):
                         pages[idx] = text
-                ocr_pages_recovered = len(ocr_results)
-                if ocr_results:
+                        ocr_pages_recovered += 1
+                if ocr_pages_recovered:
                     log.info(
                         "vision OCR via %s recovered %d/%d bad pages",
                         ocr_provider, ocr_pages_recovered, ocr_pages_run,
@@ -139,7 +152,10 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
 
         _set_status(sb, document_id, "chunking")
         page_md = [page_to_markdown(text, idx + 1) for idx, text in enumerate(pages)]
-        _replace_pages(sb, document_id, user_id, course_id, pages, page_md)
+        _replace_pages(
+            sb, document_id, user_id, course_id, pages, page_md,
+            raw_pages=pdfminer_pages,
+        )
 
         # Pass the already-built PageMarkdown rather than the raw pdfminer
         # text. Phase 3 Step A — keeps the chunker on the same heading +
@@ -363,6 +379,7 @@ def _replace_pages(
     course_id: str,
     pages: list[str],
     page_md: list[PageMarkdown] | None = None,
+    raw_pages: list[str] | None = None,
 ) -> None:
     sb.table("document_pages").delete().eq("document_id", document_id).execute()
     md_by_page = {p.page_number: p for p in (page_md or [])}
@@ -371,12 +388,19 @@ def _replace_pages(
         if not text or not text.strip():
             continue
         page_number = idx + 1
+        # raw_text = the pdfminer original (so a re-OCR'd page still records
+        # what the text layer held); cleaned_text = the final text actually
+        # indexed. Falls back to the final text when no original was kept or
+        # pdfminer extracted nothing for that page.
+        raw = text
+        if raw_pages is not None and idx < len(raw_pages) and raw_pages[idx] and raw_pages[idx].strip():
+            raw = raw_pages[idx]
         row: dict[str, Any] = {
             "document_id": document_id,
             "user_id": user_id,
             "course_id": course_id,
             "page_number": page_number,
-            "raw_text": text,
+            "raw_text": raw,
             "cleaned_text": text,
         }
         md = md_by_page.get(page_number)

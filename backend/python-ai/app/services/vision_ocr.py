@@ -321,9 +321,18 @@ def pages_via_vision(
         )
         indices = indices[: settings.vision_ocr_max_pages]
 
+    # Formula pages go to Mathpix at a higher DPI so small subscripts and
+    # fraction bars survive rasterisation; the OpenAI path keeps the cheaper
+    # default. ``getattr`` keeps this safe against older Settings stand-ins.
+    render_dpi = (
+        getattr(settings, "vision_ocr_mathpix_dpi", settings.vision_ocr_render_dpi)
+        if provider == "mathpix"
+        else settings.vision_ocr_render_dpi
+    )
+
     out: dict[int, str] = {}
     for idx in indices:
-        png = _render_page_to_png(pdfium, pdf_bytes, idx, settings.vision_ocr_render_dpi)
+        png = _render_page_to_png(pdfium, pdf_bytes, idx, render_dpi)
         if not png:
             continue
         text = extract(png)
