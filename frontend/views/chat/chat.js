@@ -1817,7 +1817,11 @@
       var inp = document.getElementById('chatInput');
       if (!inp) return;
       var content = inp.value.trim();
-      if (!content) return;
+      // Allow sending a bare attachment with no caption. The backend accepts an
+      // empty content as long as attachment_url is present; without this guard a
+      // file added with no text was silently dropped here before it was ever
+      // uploaded — "upload works but sending doesn't".
+      if (!content && !_chatPendingFile) return;
 
       // Edit mode
       if (inp.dataset.editingMsgId) {
@@ -2178,7 +2182,7 @@
       var file = e.target.files[0];
       if (!file) return;
       try {
-        if (window._ssValidateUploadFile) window._ssValidateUploadFile(file);
+        _chatValidateFile(file);
       } catch (err) {
         showToast('File blocked', file.name + ': ' + err.message);
         e.target.value = '';
@@ -2206,8 +2210,28 @@
       if (bar) bar.style.display = 'none';
     });
 
+    // Chat attachments are downloaded by the recipient, not indexed like course
+    // uploads — so we don't use the strict course whitelist (which blocks .zip
+    // and only allows pdf/txt/docx/images). Allow any file friends want to share
+    // (pdf, zip, photos, docs, audio, video…) but still block active/executable
+    // content that could run when opened from the signed storage URL.
+    function _chatValidateFile(file) {
+      if (!file) throw new Error('No file selected');
+      var MAX = 25 * 1024 * 1024;
+      if (file.size > MAX) throw new Error('File is too large. Max 25 MB.');
+      var name = String(file.name || '').toLowerCase();
+      var dot = name.lastIndexOf('.');
+      var ext = dot >= 0 ? name.slice(dot) : '';
+      var blocked = [
+        '.html', '.htm', '.js', '.mjs', '.svg', '.exe', '.bat', '.cmd',
+        '.sh', '.php', '.ps1', '.vbs', '.msi', '.jar', '.com', '.scr'
+      ];
+      if (blocked.indexOf(ext) !== -1) throw new Error("This file type can't be shared in chat.");
+      return true;
+    }
+
     async function _chatUploadFile(file) {
-      if (window._ssValidateUploadFile) window._ssValidateUploadFile(file);
+      _chatValidateFile(file);
       var safeName = _chatSafeStoragePart(file.name) || 'attachment';
       var path =
         _chatSafeStoragePart(_chatStorageRoomId(_chatRoomId)) +
