@@ -46,7 +46,12 @@ export function initPortalUi(options: PortalUiOptions): { applyTheme: (toNight: 
       if (typeof options.saveState === 'function') options.saveState();
     }
 
-    if (typeof document.startViewTransition !== 'function') {
+    // Skip the animated reveal when the API is missing or the user prefers
+    // reduced motion — just swap instantly.
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof document.startViewTransition !== 'function' || reduceMotion) {
       commitTheme();
       return;
     }
@@ -64,8 +69,10 @@ export function initPortalUi(options: PortalUiOptions): { applyTheme: (toNight: 
           ],
         },
         {
-          duration: 500,
-          easing: 'ease-in-out',
+          // Shorter + ease-out (fast start) reads as snappier and leaves fewer
+          // frames to drop than the old 500ms ease-in-out on a heavy page.
+          duration: 340,
+          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
           pseudoElement: '::view-transition-new(root)',
         }
       );

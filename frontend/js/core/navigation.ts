@@ -6,8 +6,6 @@
 import { hideFilesView, selectTopLevelView, showFilesView } from './panels.js';
 import type { LegacyCourse } from '../../globals.js';
 
-let _activePortalSection: HTMLElement | null = null;
-
 export function setNavActive(id: string): void {
   document.querySelectorAll('.psb').forEach((el) => {
     el.classList.remove('on');
@@ -69,7 +67,6 @@ export function showPortalSection(sec: string): void {
       if (key) tt.setAttribute('data-i18n', key);
     }
     if (fab) fab.classList.toggle('visible', sec === 'dashboard');
-    _activePortalSection = target;
 
     const aiPanel = document.getElementById('aiPanel');
     if (sec !== 'studip') {
@@ -89,14 +86,11 @@ export function showPortalSection(sec: string): void {
     }
   }
 
-  const leaving = _activePortalSection;
-  const instantRoute = sec === 'aipage' || sec === 'chat';
-  if (!instantRoute && leaving && leaving !== target && leaving.style.display !== 'none') {
-    leaving.classList.add('psec-leaving');
-    setTimeout(revealTarget, 170);
-  } else {
-    revealTarget();
-  }
+  // performance.css disables the section cross-fade app-wide, so the old 170ms
+  // wait before swapping sections was pure dead time that made every navigation
+  // feel sluggish. Reveal immediately; the entering animation (kept only for the
+  // chat/aipage routes in performance.css) still plays.
+  revealTarget();
 }
 
 export function showPortal(): void {
@@ -294,7 +288,6 @@ export function navTo(navId: string, section: string): void {
     document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
       el.style.display = 'none';
     });
-    _activePortalSection = null;
     showPortal();
   }
   setNavActive(navId);

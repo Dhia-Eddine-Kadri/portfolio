@@ -15,6 +15,7 @@
 #portal .dash-widget,
 #portal .profile-hero,
 #portal .settings-card,
+#portal .settings-block,
 #portal .sub-card,
 #portal .ln-section,
 #portal .editor-card,
@@ -200,6 +201,26 @@
 #portal .main-scroll,
 #portal #app,
 #portal #pdfView {
+  scroll-behavior: auto !important;
+  will-change: auto !important;
+}
+
+/* ── Course / Quiz / Flashcards view ────────────────────────────────────────
+   These render inside #courseOverview, which lives in #app (its own scroll
+   container) — NOT under #portal's main-scroll, so none of the overrides above
+   reached it. Every course card carries a live backdrop-filter blur (18–24px),
+   and re-rasterising those on each scroll tick is what makes the quiz and
+   flashcards pages stutter. Drop the live blur here too — the translucent
+   backgrounds already read as glass without it. (Transitions like the
+   flashcard flip are left intact.) */
+#app #courseOverview,
+#app #courseOverview * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+#app #courseOverview {
   scroll-behavior: auto !important;
   will-change: auto !important;
 }
