@@ -284,7 +284,7 @@ interface LandingTranslation {
         // can find its #/data-* hooks on first query.
         (function () {
           const script = document.createElement('script');
-          script.src = 'js/pages/new-landing.js?v=12';
+          script.src = 'js/pages/new-landing.js?v=13';
           script.defer = true;
           document.body.appendChild(script);
         })();

@@ -1116,7 +1116,7 @@
       input.appendChild(el('span', 'nl-mini-type-value'));
       searchWrap.appendChild(input);
       var drop = el('div', 'sd-search-drop');
-      drop.appendChild(el('div', 'nl-mini-search-option', 'Engineering Mechanics 2'));
+      drop.appendChild(el('div', 'nl-mini-search-option', 'Ingenieurmathematik A'));
       searchWrap.appendChild(drop);
       controls.appendChild(searchWrap);
       var layoutBtn = el('button', 'sd-layout-btn', 'Manage layout');
@@ -1137,7 +1137,7 @@
       card.innerHTML =
         '<div class="sd-course-bar"></div>' +
         '<button type="button" class="sd-del-btn" aria-label="Remove course" title="Remove"></button>' +
-        '<header class="sd-course-head"><div class="sd-course-icon" aria-hidden="true">📘</div><div class="sd-course-head-text"><h3 class="sd-course-name">Engineering Mechanics 2</h3><div class="sd-course-chips"><span class="sd-course-chip sd-course-chip-files">0 files</span><span class="sd-course-chip sd-course-chip-time">just now</span></div></div></header>' +
+        '<header class="sd-course-head"><div class="sd-course-icon" aria-hidden="true">📊</div><div class="sd-course-head-text"><h3 class="sd-course-name">Ingenieurmathematik A</h3><div class="sd-course-chips"><span class="sd-course-chip sd-course-chip-files">0 files</span><span class="sd-course-chip sd-course-chip-time">just now</span></div></div></header>' +
         '<div class="sd-course-empty-msg"><svg class="sd-course-empty-icon" width="20" height="20"><use href="#i-upload-cloud"></use></svg><div><div class="sd-course-empty-msg-title">No files yet</div><div class="sd-course-empty-msg-sub">Upload lectures, exercises, or formula sheets to start.</div></div></div>' +
         '<button type="button" class="sd-course-open-btn" data-course-target="open">Open course</button>';
       list.appendChild(card);
@@ -1166,9 +1166,9 @@
       var courseStat = frame.querySelector('[data-mini-stat="courses"] span:last-child');
       var steps = [
         { target: '[data-tour-page="Courses"]', title: 'Courses', body: 'Click Courses in the real sidebar.', typed: '', phase: 'empty' },
-        { target: '[data-course-target="search"]', title: 'Course name', body: 'Type the subject name into the course search field.', typed: 'Engineering Mechanics 2', phase: 'typing' },
-        { target: '[data-course-target="add"]', title: 'Add Subject', body: 'Click Add Subject to create the course.', typed: 'Engineering Mechanics 2', phase: 'ready' },
-        { target: '[data-course-target="open"]', title: 'Engineering Mechanics 2', body: 'The new course card appears in front of you, ready to open.', typed: 'Engineering Mechanics 2', phase: 'created' }
+        { target: '[data-course-target="search"]', title: 'Course name', body: 'Type the subject name into the course search field.', typed: 'Ingenieurmathematik A', phase: 'typing' },
+        { target: '[data-course-target="add"]', title: 'Add Subject', body: 'Click Add Subject to create the course.', typed: 'Ingenieurmathematik A', phase: 'ready' },
+        { target: '[data-course-target="open"]', title: 'Ingenieurmathematik A', body: 'The new course card appears in front of you, ready to open.', typed: 'Ingenieurmathematik A', phase: 'created' }
       ];
       function applyPhase(step) {
         if (value) value.textContent = step.typed || '';
