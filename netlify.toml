@@ -206,6 +206,18 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Lazily-imported feature ESM modules are the exception to the immutable rule
+# above. They're loaded via dynamic import() and statically import their own
+# leaf modules — and a relative `import './leaf.js'` does NOT inherit the
+# parent's ?v= query, so the ?v cache-busting scheme can't reach every hop.
+# Pinning them `immutable` meant a deploy never reached browsers (e.g. the AI
+# chat render fixes). Revalidate instead: a short TTL then an ETag check, so
+# updates land within minutes. These load on demand, so it's cheap.
+[[headers]]
+  for = "/js/features/**/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=300, must-revalidate"
+
 [[headers]]
   for = "/**/*.css"
   [headers.values]
