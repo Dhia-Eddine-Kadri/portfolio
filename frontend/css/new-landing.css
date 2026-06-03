@@ -2477,6 +2477,7 @@ body.nl-pv-open {
   overflow: visible;
 }
 .nl-mini-toggle {
+  display: none;
   width: 44px;
   height: 44px;
   min-height: 44px;
@@ -2492,7 +2493,7 @@ body.nl-pv-open {
   padding: 0;
 }
 .nl-mini-brand {
-  display: flex;
+  display: none;
   justify-content: center;
   align-items: center;
   height: 56px;
@@ -3288,13 +3289,12 @@ body.nl-pv-open {
   to { opacity: 1; transform: scale(1); }
 }
 @keyframes nl-tour-pages {
-  0%, 11% { left: 6.5%; top: 9%; }
-  14%, 25% { left: 6.5%; top: 18.4%; }
-  28%, 39% { left: 6.5%; top: 30.9%; }
-  42%, 53% { left: 6.5%; top: 43%; }
-  56%, 67% { left: 6.5%; top: 55%; }
-  70%, 81% { left: 6.5%; top: 67.1%; }
-  84%, 100% { left: 6.5%; top: 79.1%; }
+  0%, 13% { left: 6.5%; top: 10.9%; }
+  17%, 30% { left: 6.5%; top: 23%; }
+  34%, 47% { left: 6.5%; top: 35%; }
+  51%, 64% { left: 6.5%; top: 47.1%; }
+  68%, 81% { left: 6.5%; top: 59.1%; }
+  85%, 100% { left: 6.5%; top: 71.2%; }
 }
 @keyframes nl-tour-courses {
   0%, 16% { left: 77%; top: 17%; }

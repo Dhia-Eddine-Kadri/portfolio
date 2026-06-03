@@ -1318,7 +1318,7 @@
         eyebrow: 'Step 1 · Product map',
         title: 'Start from the real Minallo shell.',
         body: 'The preview opens on an empty dashboard so the tour focuses on the actual sidebar and the next useful action.',
-        calls: [['Expand menu', 6.5, 9, 0], ['Profile', 6.5, 18.4, 1200], ['Dashboard', 6.5, 30.9, 2400], ['Courses', 6.5, 43, 3600], ['Lecture Notes', 6.5, 55, 4800], ['Editor', 6.5, 67.1, 6000], ['Chatbot', 6.5, 79.1, 7200]],
+        calls: [['Home', 6.5, 10.9, 0], ['Courses', 6.5, 23, 1200], ['Lecture Notes', 6.5, 35, 2400], ['Editor', 6.5, 47.1, 3600], ['Chatbot', 6.5, 59.1, 4800], ['Chat', 6.5, 71.2, 6000]],
         build: buildPagesOverview
       },
       {
@@ -1389,9 +1389,9 @@
     }
     function miniShell(active, mainHtml, extraClass) {
       var pages = [
-        ['Dashboard', 'layout-dashboard'], ['Courses', 'book-open'], ['Lecture Notes', 'file-text'],
-        ['Editor', 'sparkles'], ['Chatbot', 'brain-circuit'], ['Chat', 'quote'],
-        ['__divider__', ''], ['Notifications', 'bell']
+        ['Home', 'sb-home'], ['Courses', 'sb-courses'], ['Lecture Notes', 'sb-notes'],
+        ['Editor', 'sb-editor'], ['Chatbot', 'sb-chatbot'], ['Chat', 'sb-chat'],
+        ['__divider__', '']
       ];
       var nav = pages.map(function (p) {
         if (p[0] === '__divider__') return '<i class="nl-mini-divider"></i>';
@@ -1399,13 +1399,13 @@
         return '<div class="nl-mini-nav__item' + on + '" title="' + p[0] + '"><span class="nl-mini-nav__icon">' + iconUse(p[1], 24) + '</span><b>' + p[0] + '</b></div>';
       }).join('');
       return '<div class="nl-mini-shell ' + (extraClass || '') + '">' +
-        '<aside class="nl-mini-nav"><button class="nl-mini-toggle" aria-hidden="true">' + iconUse('chevron-right', 18) + '</button><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div><div class="nl-mini-nav-list">' + nav + '</div></aside>' +
+        '<aside class="nl-mini-nav"><div class="nl-mini-nav-list">' + nav + '</div></aside>' +
         '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div><div class="nl-mini-scroll">' + mainHtml + '</div></section>' +
         '</div>';
     }
     function buildPagesOverview(scene) {
       var main = '<div class="nl-mini-empty-dashboard" aria-hidden="true"></div>';
-      return tourFrame(scene, miniShell('Dashboard', main));
+      return tourFrame(scene, miniShell('Chat', main));
     }
     function buildCoursesSetup(scene) {
       var main = '<section class="nl-mini-sd-hero"><div><span>AI-ready course workspace</span><h4>📚 My Courses</h4><p>Organize your semester, upload lecture files, and open AI, notes, or summaries directly from each subject.</p><div class="nl-mini-sd-stats"><b>SS 2026</b><b>1 course</b><b>6 files</b><b>42% avg progress</b></div></div><aside><button class="nl-mini-sem">● SS 2026 ▾</button><button class="nl-mini-add">+ Add Subject</button></aside></section>' +
