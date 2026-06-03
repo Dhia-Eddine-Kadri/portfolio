@@ -268,7 +268,7 @@ interface LandingTranslation {
         link.href = href;
         document.head.appendChild(link);
       }
-      ensureStylesheet('css/new-landing.css?v=16');
+      ensureStylesheet('css/new-landing.css?v=17');
       ensureStylesheet('css/auth.css?v=4');
     })();
 

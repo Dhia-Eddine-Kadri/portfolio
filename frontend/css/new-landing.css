@@ -3605,6 +3605,12 @@ body.nl-pv-open {
 .nl-mini-upload-modal.is-visible {
   opacity: 1;
 }
+.nl-tour--upload-flow .nl-upload-popover {
+  z-index: 14;
+}
+.nl-tour--upload-flow .nl-upload-cursor {
+  z-index: 15;
+}
 .nl-mini-upload-modal .co-upmodal {
   width: min(32rem, 92%);
   border-radius: 1rem;
