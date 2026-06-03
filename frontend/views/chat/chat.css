@@ -196,10 +196,10 @@
   position: relative;
 }
 .chat-msg-actions {
-  /* Always visible (dimmed) so reply/react/edit/delete are discoverable
-     without hovering — hover just brightens them. */
+  /* Hidden until the message is hovered. */
   display: flex;
-  opacity: 0.55;
+  opacity: 0;
+  pointer-events: none;
   position: absolute;
   top: -18px;
   right: 4px;
@@ -213,6 +213,7 @@
 }
 .chat-msg:hover .chat-msg-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 .chat-action-btn {
   background: none;
@@ -3150,17 +3151,18 @@ body.night .music-yt-input {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
   padding: 4px;
-  /* Always visible (dimmed) so reply/react/edit/delete are discoverable
-     without hovering. The previous reveal targeted `.chat-msg-group:hover`,
-     but messages render as `.chat-msg`, so the toolbar never appeared. */
-  opacity: 0.55;
-  pointer-events: auto;
+  /* Hidden until the message is hovered. The previous reveal targeted
+     `.chat-msg-group:hover`, but messages render as `.chat-msg`, so the
+     toolbar never appeared — hence the correct selector below. */
+  opacity: 0;
+  pointer-events: none;
   transition: opacity 0.15s;
   z-index: 10;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
 }
 .chat-msg:hover .chat-msg-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 .chat-act-btn {
   background: none;
