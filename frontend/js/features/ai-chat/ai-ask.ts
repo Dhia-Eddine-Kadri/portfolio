@@ -136,6 +136,29 @@ function appendSourcesDropdown(
   bubble.appendChild(details);
 }
 
+// Per-response confidence badge. The backend derives this from VERIFICATION
+// status — not retrieval strength — and sends it in the SSE done event
+// (`confidence`: high → verified, medium → partially_verified, low → else).
+// See answer_stream.py. To re-word the three states, edit this map only.
+const _CONFIDENCE_LABELS: Record<string, { text: string; cls: string }> = {
+  high: { text: 'Verified', cls: 'conf-high' },
+  medium: { text: 'Partly verified', cls: 'conf-medium' },
+  low: { text: 'Unverified', cls: 'conf-low' },
+};
+
+function appendConfidenceBadge(bubble: HTMLElement | null, confidence?: string): void {
+  if (!bubble) return;
+  const cfg = _CONFIDENCE_LABELS[(confidence || '').toLowerCase()];
+  // Unknown / absent value → render nothing rather than a misleading badge.
+  if (!cfg) return;
+  if (bubble.querySelector('.ai-conf-badge')) return;
+  const badge = document.createElement('span');
+  badge.className = `ai-conf-badge ${cfg.cls}`;
+  badge.textContent = cfg.text;
+  badge.title = 'How well this answer was verified against your uploaded course files.';
+  bubble.appendChild(badge);
+}
+
 // ── Auto-scroll controller ──────────────────────────────────────────────────
 let _userScrolledUp = false;
 let _scrollListenerAttached = false;
@@ -1178,6 +1201,7 @@ export function initAskAI(
               }
 
               fullRender(fullAnswer);
+              appendConfidenceBadge(bubble, meta?.confidence ?? undefined);
               appendSourcesDropdown(bubble, sources);
 
               if (ansWrap && !ansWrap.querySelector('.rag-feedback-bar')) {
