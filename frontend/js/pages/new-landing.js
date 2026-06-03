@@ -232,6 +232,7 @@
         course: {
           shell: { chapter: 'Shell', eyebrow: 'Step 1 · App shell', headline: 'Start from the real Minallo sidebar.', body: 'The preview opens on an empty dashboard and uses the same sidebar order and icons students see in the app.' },
           setup: { chapter: 'Course', eyebrow: 'Step 2 · Course setup', headline: 'Create the course first.', body: 'Open Courses, type the subject name, add it, and Minallo places the new course card in front of you.' },
+          upload: { chapter: 'Upload', eyebrow: 'Step 3 · Upload files', headline: 'Open the course and add a file.', body: 'Inside the Files tab, click Upload files, choose the material you need, and Minallo shows the upload progress modal.' },
           ask: { chapter: 'Ask', eyebrow: 'Step 2 · Ask', headline: 'Ask in your own words.', body: 'No prompt engineering. Ask the way you would ask a tutor sitting next to you.' },
           sources: { chapter: 'Sources', eyebrow: 'Step 3 · Retrieve', headline: 'It finds the exact pages.', body: 'Minallo searches your files and pulls the passages that actually answer the question.' },
           answer: { chapter: 'Answer', eyebrow: 'Step 4 · Explain', headline: 'A structured answer you can trust.', body: 'Worked the way your course teaches it — with page citations you can open and verify.' },
@@ -453,6 +454,7 @@
         course: {
           shell: { chapter: 'Shell', eyebrow: 'Schritt 1 · App-Shell', headline: 'Starte mit der echten Minallo-Seitenleiste.', body: 'Die Vorschau öffnet ein leeres Dashboard und nutzt dieselbe Reihenfolge und dieselben Icons wie die App.' },
           setup: { chapter: 'Kurs', eyebrow: 'Schritt 2 · Kurs einrichten', headline: 'Erstelle zuerst den Kurs.', body: 'Öffne Kurse, tippe den Fachnamen ein, füge ihn hinzu und Minallo zeigt dir direkt die neue Kurskarte.' },
+          upload: { chapter: 'Upload', eyebrow: 'Schritt 3 · Dateien hochladen', headline: 'Öffne den Kurs und füge eine Datei hinzu.', body: 'Im Dateien-Tab klickst du auf Upload files, wählst dein Material aus und Minallo zeigt den Upload-Fortschritt.' },
           ask: { chapter: 'Fragen', eyebrow: 'Schritt 2 · Fragen', headline: 'Frag in deinen eigenen Worten.', body: 'Kein Prompt-Engineering. Frag so, wie du einen Tutor neben dir fragen würdest.' },
           sources: { chapter: 'Quellen', eyebrow: 'Schritt 3 · Finden', headline: 'Es findet die genauen Seiten.', body: 'Minallo durchsucht deine Dateien und zieht die Stellen heraus, die die Frage wirklich beantworten.' },
           answer: { chapter: 'Antwort', eyebrow: 'Schritt 4 · Erklären', headline: 'Eine strukturierte Antwort, der du vertrauen kannst.', body: 'Gelöst, wie es dein Kurs lehrt — mit Seitenquellen, die du öffnen und prüfen kannst.' },
@@ -909,7 +911,7 @@
       close:   document.getElementById('nlPvClose')
     };
 
-    var state = { track: null, index: 0, playing: false, timer: null, shellTimer: null, courseTimer: null, lastFocus: null, hover: false };
+    var state = { track: null, index: 0, playing: false, timer: null, shellTimer: null, courseTimer: null, uploadTimer: null, lastFocus: null, hover: false };
 
     // -- i18n resolvers (fall back to EN if a key is missing) --
     function t(key) {
@@ -1221,6 +1223,168 @@
       }
       requestAnimationFrame(function () { step(0); });
     }
+    function clearUploadCursor() {
+      if (state.uploadTimer) {
+        clearTimeout(state.uploadTimer);
+        state.uploadTimer = null;
+      }
+    }
+    function courseUploadScene() {
+      var frame = appShell('Courses', el('div', 'nl-mini-course-view'));
+      frame.classList.add('nl-tour--upload-flow');
+      var root = frame.querySelector('.nl-mini-course-view');
+      var inner = el('div', 'co-inner co-inner-v2');
+      inner.style.setProperty('--co-hero-accent', '#2563eb');
+      root.appendChild(inner);
+
+      var top = el('div', 'co-topnav');
+      var back = el('button', 'co-back-btn');
+      back.type = 'button';
+      back.appendChild(buildSvgUse('chevron-right', 14));
+      back.appendChild(el('span', null, 'Back'));
+      top.appendChild(back);
+      top.appendChild(el('div', 'co-topnav-title', 'Ingenieurmathematik A'));
+      var study = el('button', 'co-study-btn');
+      study.type = 'button';
+      study.appendChild(el('span', null, 'Study'));
+      top.appendChild(study);
+      inner.appendChild(top);
+
+      var hero = el('section', 'co-hero');
+      hero.appendChild(el('div', 'co-hero-glow'));
+      var grid = el('div', 'co-hero-grid');
+      var left = el('div', 'co-hero-left');
+      var body = el('div', 'co-hero-body');
+      body.appendChild(el('h1', 'co-hero-title', 'Ingenieurmathematik A'));
+      body.appendChild(el('p', 'co-hero-sub', 'Manage files, generate quizzes, study flashcards, and open AI or notes inside this course.'));
+      left.appendChild(body);
+      grid.appendChild(left);
+      var progress = el('aside', 'co-hero-progress');
+      progress.innerHTML = '<div class="co-hero-progress-head"><span class="co-hero-progress-label">Study progress</span><span class="co-hero-progress-value">0%</span></div><div class="co-hero-progress-track"><div class="co-hero-progress-fill" style="width:0%"></div></div><div class="co-hero-progress-stats"><span class="co-hero-stat-pill">Read 0%</span><span class="co-hero-stat-pill">Notes 0%</span><span class="co-hero-stat-pill">Practice 0%</span><span class="co-hero-stat-pill">AI 0%</span></div>';
+      grid.appendChild(progress);
+      hero.appendChild(grid);
+      inner.appendChild(hero);
+
+      var card = el('div', 'co-card co-card-v2');
+      card.innerHTML =
+        '<div class="co-course-tabs" role="tablist" aria-label="Course sections">' +
+          '<button class="co-course-tab active" type="button" data-upload-target="files-tab"><span>Files</span></button>' +
+          '<button class="co-course-tab" type="button"><span>Quiz</span></button>' +
+          '<button class="co-course-tab" type="button"><span>Flashcards</span></button>' +
+        '</div>' +
+        '<div class="co-course-panel active" data-course-panel="files">' +
+          '<div class="co-files-inner-card">' +
+            '<div class="co-panel-header co-panel-header-v2">' +
+              '<div class="co-panel-header-text"><h2 class="co-panel-title">Files</h2><p class="co-panel-sub">Folders and course documents · <b data-upload-count>0</b> total · <b>0</b> studied · <b>0</b> unread</p></div>' +
+              '<div class="co-files-toolbar co-files-actions">' +
+                '<button class="co-select-toggle co-tool-btn"><span>Select multiple</span></button>' +
+                '<button class="co-new-folder-btn co-tool-btn"><span>New folder</span></button>' +
+                '<button class="co-upload-btn co-tool-btn co-tool-btn-primary" data-upload-target="upload"><svg width="13" height="13"><use href="#i-upload-cloud"></use></svg><span>Upload files</span></button>' +
+                '<button class="co-tool-btn"><span>Update AI index</span></button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="co-files-search-row"><div class="co-files-search-wrap"><svg class="co-files-search-icon" width="14" height="14"><use href="#i-search"></use></svg><div class="co-files-search-input">Search files, folders, formulas, exercises...</div></div></div>' +
+            '<div class="co-files-list"><div class="co-separate-files"><div class="co-separate-files-head"><div><div class="co-separate-files-title">Separate files</div><div class="co-separate-files-sub">Files that are not inside a folder</div></div></div><div class="co-files-loading" data-upload-empty>No files yet - click Upload files to add some</div><div class="co-file co-file-uploaded" data-upload-target="file-row"><span class="co-file-icon">📄</span><span class="co-file-name">Ingenieurmathematik_A_Skript.pdf</span><span class="co-file-meta">2.4 MB · Uploaded</span></div></div></div>' +
+          '</div>' +
+        '</div>';
+      inner.appendChild(card);
+
+      var chooser = el('div', 'nl-file-picker');
+      chooser.setAttribute('data-upload-target', 'picker');
+      chooser.innerHTML = '<div class="nl-file-picker__bar"><b>Choose file</b><span>Minallo upload</span></div><div class="nl-file-picker__row is-selected"><span>📄</span><strong>Ingenieurmathematik_A_Skript.pdf</strong><em>PDF · 2.4 MB</em></div><button type="button">Open</button>';
+      frame.appendChild(chooser);
+
+      var modal = el('div', 'co-upmodal-overlay nl-mini-upload-modal');
+      modal.setAttribute('data-upload-target', 'modal');
+      modal.innerHTML =
+        '<div class="co-upmodal" role="dialog" aria-modal="true" aria-labelledby="coUpModalTitle">' +
+          '<div class="co-upmodal-head"><div class="co-upmodal-head-icon"><svg width="22" height="22"><use href="#i-upload-cloud"></use></svg></div><div class="co-upmodal-head-text"><h3 class="co-upmodal-head-title">Upload Files</h3><p class="co-upmodal-head-sub">Add PDFs, documents, images, and more</p></div><button class="co-upmodal-close" type="button" aria-label="Close">×</button></div>' +
+          '<div class="co-upmodal-body"><div class="co-upmodal-hero"><div class="nl-mini-upload-file">📄 Ingenieurmathematik_A_Skript.pdf</div><h2>Preparing Your Materials</h2><p>We are analyzing your content and creating smart study materials.</p></div>' +
+          '<div class="co-upmodal-stages"><div class="co-upmodal-stage" data-stage="upload" data-state="active"><div class="co-upmodal-stage-icon">⬆</div><p class="co-upmodal-stage-title">Upload</p><p class="co-upmodal-stage-status">In Progress</p></div><div class="co-upmodal-stage" data-stage="processing" data-state="pending"><div class="co-upmodal-stage-icon">📖</div><p class="co-upmodal-stage-title">Processing</p><p class="co-upmodal-stage-status">Pending...</p></div><div class="co-upmodal-stage" data-stage="ready" data-state="pending"><div class="co-upmodal-stage-icon">🎓</div><p class="co-upmodal-stage-title">Ready for AI</p><p class="co-upmodal-stage-status">Pending...</p></div></div>' +
+          '<div class="co-upmodal-bars"><div class="co-upmodal-bar-row" data-bar="upload"><div class="co-upmodal-bar-label"><strong>Uploading</strong><span class="co-upmodal-bar-pct">0%</span></div><div class="co-upmodal-bar-track"><div class="co-upmodal-bar-fill"></div></div></div><div class="co-upmodal-bar-row" data-bar="processing"><div class="co-upmodal-bar-label"><strong>Processing Progress</strong><span class="co-upmodal-bar-pct">0%</span></div><div class="co-upmodal-bar-track"><div class="co-upmodal-bar-fill"></div></div></div></div></div>' +
+          '<div class="co-upmodal-foot"><p>We are processing your materials with AI to create the best study experience</p></div>' +
+        '</div>';
+      frame.appendChild(modal);
+      frame.appendChild(el('span', 'nl-shell-cursor nl-upload-cursor'));
+      frame.appendChild(el('div', 'nl-shell-popover nl-upload-popover'));
+      return frame;
+    }
+    function startUploadCursor() {
+      clearUploadCursor();
+      var frame = els.visual.querySelector('.nl-tour--upload-flow');
+      if (!frame || prefersReducedMotion) return;
+      var cursor = frame.querySelector('.nl-upload-cursor');
+      var pop = frame.querySelector('.nl-upload-popover');
+      var title = el('strong');
+      var body = el('span');
+      clearChildren(pop);
+      pop.appendChild(title);
+      pop.appendChild(body);
+      var picker = frame.querySelector('[data-upload-target="picker"]');
+      var modal = frame.querySelector('[data-upload-target="modal"]');
+      var empty = frame.querySelector('[data-upload-empty]');
+      var row = frame.querySelector('[data-upload-target="file-row"]');
+      var count = frame.querySelector('[data-upload-count]');
+      var steps = [
+        { target: '[data-course-target="open"], [data-upload-target="files-tab"]', title: 'Open course', body: 'Open Ingenieurmathematik A and land on the Files tab.', phase: 'course' },
+        { target: '[data-upload-target="upload"]', title: 'Upload files', body: 'Click Upload files in the real course toolbar.', phase: 'button' },
+        { target: '[data-upload-target="picker"] .is-selected', title: 'Choose file', body: 'Select the PDF you need for this course.', phase: 'picker' },
+        { target: '[data-upload-target="modal"] .co-upmodal-stage[data-stage="upload"]', title: 'Upload Files', body: 'The upload modal opens and shows progress.', phase: 'modal-upload' },
+        { target: '[data-upload-target="modal"] .co-upmodal-stage[data-stage="processing"]', title: 'Processing', body: 'Minallo processes the file so AI can use it.', phase: 'modal-processing' },
+        { target: '[data-upload-target="file-row"]', title: 'File ready', body: 'The uploaded file appears in the course files list.', phase: 'done' }
+      ];
+      function setBar(kind, pct) {
+        var rowEl = frame.querySelector('.co-upmodal-bar-row[data-bar="' + kind + '"]');
+        if (!rowEl) return;
+        var fill = rowEl.querySelector('.co-upmodal-bar-fill');
+        var label = rowEl.querySelector('.co-upmodal-bar-pct');
+        if (fill) fill.style.width = pct + '%';
+        if (label) label.textContent = pct + '%';
+      }
+      function setStage(name, stateName, status) {
+        var st = frame.querySelector('.co-upmodal-stage[data-stage="' + name + '"]');
+        if (!st) return;
+        st.setAttribute('data-state', stateName);
+        var statusEl = st.querySelector('.co-upmodal-stage-status');
+        if (statusEl && status) statusEl.textContent = status;
+      }
+      function applyPhase(phase) {
+        if (picker) picker.classList.toggle('is-visible', phase === 'picker');
+        if (modal) modal.classList.toggle('is-visible', phase === 'modal-upload' || phase === 'modal-processing');
+        if (empty) empty.hidden = phase === 'done';
+        if (row) row.classList.toggle('is-visible', phase === 'done');
+        if (count) count.textContent = phase === 'done' ? '1' : '0';
+        setBar('upload', phase === 'modal-processing' || phase === 'done' ? 100 : phase === 'modal-upload' ? 72 : 0);
+        setBar('processing', phase === 'done' ? 100 : phase === 'modal-processing' ? 58 : 0);
+        setStage('upload', phase === 'modal-processing' || phase === 'done' ? 'complete' : phase === 'modal-upload' ? 'active' : 'pending', phase === 'modal-processing' || phase === 'done' ? 'Complete' : phase === 'modal-upload' ? 'In Progress' : 'Pending...');
+        setStage('processing', phase === 'done' ? 'complete' : phase === 'modal-processing' ? 'active' : 'pending', phase === 'done' ? 'Complete' : phase === 'modal-processing' ? 'In Progress' : 'Pending...');
+        setStage('ready', phase === 'done' ? 'complete' : 'pending', phase === 'done' ? 'Ready' : 'Pending...');
+      }
+      function moveTo(selector, step) {
+        var target = frame.querySelector(selector);
+        if (!target) return;
+        frame.querySelectorAll('.is-tour-hover').forEach(function (node) { node.classList.remove('is-tour-hover'); });
+        target.classList.add('is-tour-hover');
+        var fr = frame.getBoundingClientRect();
+        var tr = target.getBoundingClientRect();
+        var cx = tr.left - fr.left + tr.width / 2;
+        var cy = tr.top - fr.top + tr.height / 2;
+        cursor.style.transform = 'translate(' + Math.round(cx + 10) + 'px, ' + Math.round(cy) + 'px)';
+        var popW = 310;
+        var px = cx > fr.width * 0.58 ? Math.max(92, cx - popW - 54) : Math.min(cx + 44, fr.width - popW - 12);
+        var py = Math.max(72, Math.min(cy - 22, fr.height - 108));
+        pop.style.transform = 'translate(' + Math.round(px) + 'px, ' + Math.round(py) + 'px)';
+        title.textContent = step.title;
+        body.textContent = step.body;
+      }
+      function step(i) {
+        var s = steps[i % steps.length];
+        applyPhase(s.phase);
+        moveTo(s.target, s);
+        state.uploadTimer = setTimeout(function () { step(i + 1); }, s.phase.indexOf('modal') === 0 ? 1900 : 1700);
+      }
+      requestAnimationFrame(function () { step(0); });
+    }
 
     // -- scene visual builders (each returns a DOM node) --
     var builders = {
@@ -1232,6 +1396,9 @@
       },
       courseSetup: function () {
         return courseSetupScene();
+      },
+      courseUpload: function () {
+        return courseUploadScene();
       },
       ask: function () {
         var m = mock();
@@ -1357,6 +1524,7 @@
       course: [
         { keyBase: 'course.shell',   build: 'shell',   ms: 10400 },
         { keyBase: 'course.setup',   build: 'courseSetup', ms: 8400 },
+        { keyBase: 'course.upload',  build: 'courseUpload', ms: 11200 },
         { keyBase: 'course.ask',     build: 'ask',     ms: 4000 },
         { keyBase: 'course.sources', build: 'sources', ms: 4200 },
         { keyBase: 'course.answer',  build: 'answer',  ms: 6000 },
@@ -1417,10 +1585,12 @@
       var sc = scenes()[state.index];
       clearShellCursor();
       clearCourseSetupCursor();
+      clearUploadCursor();
       clearChildren(els.visual);
       if (builders[sc.build]) els.visual.appendChild(builders[sc.build]());
       if (sc.build === 'shell') startShellCursor();
       if (sc.build === 'courseSetup') startCourseSetupCursor();
+      if (sc.build === 'courseUpload') startUploadCursor();
       els.eyebrow.textContent = t(sc.keyBase + '.eyebrow');
       els.headline.textContent = t(sc.keyBase + '.headline');
       els.body.textContent = t(sc.keyBase + '.body');
@@ -1479,6 +1649,7 @@
       clearTimer();
       clearShellCursor();
       clearCourseSetupCursor();
+      clearUploadCursor();
       els.player.hidden = true;
       els.sw.hidden = true;
       els.chooser.hidden = false;
@@ -1797,6 +1968,7 @@
       clearTimer();
       clearShellCursor();
       clearCourseSetupCursor();
+      clearUploadCursor();
       modal.hidden = true;
       document.documentElement.classList.remove('nl-pv-open');
       document.body.classList.remove('nl-pv-open');
