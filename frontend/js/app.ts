@@ -624,6 +624,8 @@ function _ensureAiRenderBridge(): Promise<unknown> {
   ).then((mod) => mod.initAiRenderBridge());
   return _aiRenderBridgePromise;
 }
+(window as unknown as { _ensureAiRenderBridge?: () => Promise<unknown> })._ensureAiRenderBridge =
+  _ensureAiRenderBridge;
 
 let _aiExportBridgePromise: Promise<unknown> | null = null;
 function _ensureAiExportBridge(): Promise<unknown> {

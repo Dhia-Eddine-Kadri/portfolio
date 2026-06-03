@@ -429,7 +429,15 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
         if (window._renderMath) window._renderMath(bubble);
         if (window._renderCode) window._renderCode(bubble);
       };
-      if (window._ssEnsureKatex) {
+      const _renderState = window as unknown as {
+        _ensureAiRenderBridge?: () => Promise<unknown>;
+        _minalloRenderMarkdownReady?: boolean;
+      };
+      if (!_renderState._minalloRenderMarkdownReady && _renderState._ensureAiRenderBridge) {
+        _renderState._ensureAiRenderBridge()
+          .then(() => (window._ssEnsureKatex ? window._ssEnsureKatex().then(_doRender).catch(_doRender) : _doRender()))
+          .catch(_doRender);
+      } else if (window._ssEnsureKatex) {
         window._ssEnsureKatex().then(_doRender).catch(_doRender);
       } else {
         _doRender();

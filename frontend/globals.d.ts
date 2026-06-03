@@ -191,6 +191,8 @@ declare global {
     renderMarkdown?: (text: string) => string;
     _renderMath?: (el: Element | null) => void;
     _renderCode?: (el: Element | null) => void;
+    _ensureAiRenderBridge?: () => Promise<unknown>;
+    _minalloRenderMarkdownReady?: boolean;
     _ssEnsureHljs?: () => Promise<void>;
     hljs?: { highlightElement: (el: Element) => void };
     renderMathInElement?: (el: Element, opts: unknown) => void;

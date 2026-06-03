@@ -105,6 +105,7 @@ export function initAiRenderBridge(options?: RenderBridgeOptions): {
   window.renderMarkdown = renderMarkdown;
   window._renderMath = renderMath;
   window._renderCode = highlightCode;
+  (window as unknown as { _minalloRenderMarkdownReady?: boolean })._minalloRenderMarkdownReady = true;
 
   if (typeof opts.getWelcomeText === 'function') {
     setTimeout(() => {

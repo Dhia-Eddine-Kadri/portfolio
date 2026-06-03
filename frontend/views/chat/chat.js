@@ -84,6 +84,32 @@
     }
 
     // Load and re-render saved chat; returns true if history was found
+    function renderRestoredBotBubble(botBubble, text) {
+      if (!botBubble) return;
+      botBubble.setAttribute('data-raw', text || '');
+      var doRender = function () {
+        if (typeof window.renderMarkdown === 'function') {
+          botBubble.innerHTML = window.renderMarkdown(text || '');
+        } else {
+          botBubble.textContent = text || '';
+        }
+        var doMath = function () {
+          if (typeof window._renderMath === 'function') window._renderMath(botBubble);
+          if (typeof window._renderCode === 'function') window._renderCode(botBubble);
+        };
+        if (typeof window._ssEnsureKatex === 'function') {
+          window._ssEnsureKatex().then(doMath).catch(doMath);
+        } else {
+          doMath();
+        }
+      };
+      if (!window._minalloRenderMarkdownReady && typeof window._ensureAiRenderBridge === 'function') {
+        window._ensureAiRenderBridge().then(doRender).catch(doRender);
+      } else {
+        doRender();
+      }
+    }
+
     function loadChatForFile(fileKey) {
       if (!fileKey) return false;
       try {
@@ -147,12 +173,7 @@
               '</div>' +
               '</div>';
             var botBubble = wrap.querySelector('.ai-bubble.bot');
-            botBubble.setAttribute('data-raw', m.text || '');
-            if (typeof renderMarkdown === 'function') {
-              botBubble.innerHTML = renderMarkdown(m.text || '');
-            } else {
-              botBubble.textContent = m.text || '';
-            }
+            renderRestoredBotBubble(botBubble, m.text || '');
             var msgBody = wrap.querySelector('.msg-body');
             if (typeof window._aiResponseActions === 'function') {
               msgBody.appendChild(window._aiResponseActions(m.text || '', 'panel'));
@@ -162,7 +183,6 @@
                 if (typeof window.copyBubble === 'function') window.copyBubble(btn);
               });
             });
-            if (typeof window._renderMath === 'function') window._renderMath(botBubble);
             _m.appendChild(wrap);
           }
         });
