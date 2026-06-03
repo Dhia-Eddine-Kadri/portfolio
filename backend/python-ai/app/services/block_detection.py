@@ -37,6 +37,22 @@ _SOLUTION_HEADER = re.compile(
     re.IGNORECASE,
 )
 
+# "Solution for Exercise 1.4", "Lösung zu Aufgabe 2 a)", "Solution to Problem 3".
+# Unlike _EXERCISE_HEADER this is matched mid-line with `search`, because
+# markdown_indexing flattens a page into one paragraph line — so the phrase
+# rarely sits at the start of a line. The leading "Solution for/to/zu" keeps
+# it high-precision: it won't fire on a bare cross-reference like
+# "see Exercise 2". Group 1: number, Group 2: optional subpart.
+_SOLUTION_FOR_EXERCISE = re.compile(
+    r"(?:Lösung|Loesung|Solution)\s+(?:for|to|zur|zu)\s+"
+    r"(?:Übungsaufgabe|Uebungsaufgabe|Aufgabe|Übung|Uebung|Exercise|Problem|Task|Beispiel)"
+    r"\s+(\d+(?:\.\d+){0,3})"
+    # Subpart requires a closing bracket — "a)", "(b)", "[c]" — so a bare
+    # following word (e.g. "1.4 Searched") can't be mis-captured as subpart.
+    r"(?:\s*[\(\[]?([a-zA-Z])[\)\]]\.?)?",
+    re.IGNORECASE,
+)
+
 # $$ ... $$ display-math block (markdown_indexing emits these as their own paragraph).
 _DISPLAY_MATH_OPEN = re.compile(r"^\s*\$\$\s*$")
 _DISPLAY_MATH_CLOSE = re.compile(r"^\s*\$\$\s*$")
@@ -96,26 +112,44 @@ def detect_exercises(pages_markdown: list[tuple[int, str]]) -> list[ExerciseBloc
     i = 0
     while i < len(flat):
         page_n, line = flat[i]
-        m = _EXERCISE_HEADER.match(line.strip())
-        if not m:
+        stripped = line.strip()
+        m = _EXERCISE_HEADER.match(stripped)
+        sol_m = None if m else _SOLUTION_FOR_EXERCISE.search(line)
+        if not m and not sol_m:
             i += 1
             continue
 
-        exercise_number = m.group(2)
-        subpart = (m.group(3) or "").lower() or None
-        start_page = page_n
         statement_lines: list[str] = []
         solution_lines: list[str] = []
+        if m:
+            # Statement-style header. Text after it on the same line is the
+            # start of the statement (matters now that pages are flattened).
+            exercise_number = m.group(2)
+            subpart = (m.group(3) or "").lower() or None
+            in_solution = False
+            rest = stripped[m.end():].strip()
+            if rest:
+                statement_lines.append(rest)
+        else:
+            # "Solution for Exercise N" — the block is a solution from the
+            # outset; same-line remainder is the start of the solution.
+            exercise_number = sol_m.group(1)
+            subpart = (sol_m.group(2) or "").lower() or None
+            in_solution = True
+            rest = line[sol_m.end():].strip()
+            if rest:
+                solution_lines.append(rest)
+
+        start_page = page_n
         end_page = page_n
         i += 1
-        in_solution = False
 
         while i < len(flat):
             p_n, ln = flat[i]
-            stripped = ln.strip()
-            if _EXERCISE_HEADER.match(stripped):
-                break  # next exercise — stop accumulating
-            if _SOLUTION_HEADER.match(stripped) and not in_solution:
+            s = ln.strip()
+            if _EXERCISE_HEADER.match(s) or _SOLUTION_FOR_EXERCISE.search(ln):
+                break  # next exercise / next solution block — stop accumulating
+            if _SOLUTION_HEADER.match(s) and not in_solution:
                 in_solution = True
                 i += 1
                 continue

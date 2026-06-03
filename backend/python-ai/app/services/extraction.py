@@ -19,6 +19,11 @@ log = logging.getLogger(__name__)
 
 _WHITESPACE = re.compile(r"[ \t]+")
 _MULTI_NEWLINE = re.compile(r"\n{3,}")
+# pdfminer emits "(cid:NN)" for glyphs whose font lacks a ToUnicode map —
+# common for math symbols (∫ → "(cid:90)", vector arrow → "(cid:126)") and
+# ligature fonts. They're noise to every downstream consumer (chunking,
+# embeddings, formula detection), so strip them at the source.
+_CID_ARTIFACT = re.compile(r"\(cid:\d+\)")
 
 
 def _clean_page_text(raw: str) -> str:
@@ -30,6 +35,8 @@ def _clean_page_text(raw: str) -> str:
         return ""
     # Normalise CRLF, drop NUL bytes (pdfminer occasionally emits them).
     text = raw.replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
+    # Drop unmapped-glyph artifacts like "(cid:90)".
+    text = _CID_ARTIFACT.sub("", text)
     # Collapse runs of spaces/tabs (preserves single line breaks).
     text = "\n".join(_WHITESPACE.sub(" ", line).strip() for line in text.split("\n"))
     # Cap any wall of blank lines at 2 newlines = one paragraph break.

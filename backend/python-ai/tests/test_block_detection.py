@@ -111,6 +111,48 @@ def test_exercise_at_end_of_doc_terminates_cleanly():
     assert "More detail" in blocks[0].statement_markdown
 
 
+# ── "Solution for Exercise N" mid-line detection (flattened markdown) ───────
+
+
+def test_detect_solution_for_exercise_midline():
+    """Real EM2 case: pages flatten into one paragraph line, so the exercise
+    header sits mid-line as 'Solution for Exercise 1.4'. Must still be found,
+    captured as a solution, and not fire on the bare 'Exercise 3' sheet ref."""
+    pages = [(
+        1,
+        "Institute for Acoustics EngMec 2 | Exercise 3 "
+        "Solution for Exercise 1.4 Searched: a, r Given: v = const.",
+    )]
+    blocks = detect_exercises(pages)
+    assert len(blocks) == 1
+    assert blocks[0].exercise_number == "1.4"
+    assert blocks[0].solution_markdown and "Searched" in blocks[0].solution_markdown
+
+
+def test_detect_multiple_solution_for_exercises_across_pages():
+    pages = [
+        (1, "blah Solution for Exercise 1.4 first solution body"),
+        (2, "Solution for Exercise 1.5 second solution body"),
+    ]
+    nums = [b.exercise_number for b in detect_exercises(pages)]
+    assert nums == ["1.4", "1.5"]
+
+
+def test_solution_for_exercise_german_and_subpart():
+    pages = [(3, "... Lösung zu Aufgabe 2 a) der Lösungsweg folgt")]
+    blocks = detect_exercises(pages)
+    assert len(blocks) == 1
+    assert blocks[0].exercise_number == "2"
+    assert blocks[0].subpart == "a"
+
+
+def test_bare_exercise_crossref_does_not_trigger():
+    """A cross-reference like 'see Exercise 2 for details' (no 'Solution
+    for' prefix, not line-start) must NOT be detected as an exercise."""
+    pages = [(1, "Some prose, see Exercise 2 for details, then more prose.")]
+    assert detect_exercises(pages) == []
+
+
 # ── Formula detection ──────────────────────────────────────────────────────
 
 
