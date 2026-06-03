@@ -1569,7 +1569,7 @@
     try { applyLang(_getInitialLang()); } catch (e) { /* noop */ }
     try { initLangToggle(); } catch (e) { /* noop */ }
     try { initCtaButtons(); } catch (e) { /* noop */ }
-    try { initProductTourModal(); } catch (e) { /* noop */ }
+    try { initPreviewModal(); } catch (e) { console.error('initPreviewModal failed:', e); }
     try { initMobileNav(); } catch (e) { /* noop */ }
     try { initPathPicker(); } catch (e) { /* noop */ }
     try { initTutorPreviewTabs(); } catch (e) { /* noop */ }
