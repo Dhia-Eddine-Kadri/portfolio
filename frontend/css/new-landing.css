@@ -3088,6 +3088,19 @@ body.nl-pv-open {
 .nl-mini-studip .nl-mini-type-value {
   color: #fff;
 }
+.nl-mini-studip .nl-mini-type-value:not(:empty)::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 0.8em;
+  margin-left: 2px;
+  background: #7dd3fc;
+  vertical-align: -0.08em;
+  animation: nl-type-caret 0.8s steps(1) infinite;
+}
+@keyframes nl-type-caret {
+  50% { opacity: 0; }
+}
 .nl-mini-studip .sd-search-drop {
   display: none;
   position: absolute;

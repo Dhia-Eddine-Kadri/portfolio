@@ -1164,6 +1164,7 @@
       var empty = frame.querySelector('[data-course-target="empty"]');
       var card = frame.querySelector('[data-course-target="card"]');
       var courseStat = frame.querySelector('[data-mini-stat="courses"] span:last-child');
+      var typingToken = 0;
       var steps = [
         { target: '[data-tour-page="Courses"]', title: 'Courses', body: 'Click Courses in the real sidebar.', typed: '', phase: 'empty' },
         { target: '[data-course-target="search"]', title: 'Course name', body: 'Type the subject name into the course search field.', typed: 'Ingenieurmathematik A', phase: 'typing' },
@@ -1171,12 +1172,26 @@
         { target: '[data-course-target="open"]', title: 'Ingenieurmathematik A', body: 'The new course card appears in front of you, ready to open.', typed: 'Ingenieurmathematik A', phase: 'created' }
       ];
       function applyPhase(step) {
-        if (value) value.textContent = step.typed || '';
+        typingToken++;
+        if (value) value.textContent = '';
         if (placeholder) placeholder.hidden = !!step.typed;
         if (drop) drop.style.display = step.phase === 'typing' ? 'block' : 'none';
         if (empty) empty.hidden = step.phase === 'created';
         if (card) card.classList.toggle('is-created', step.phase === 'created');
         if (courseStat) courseStat.textContent = step.phase === 'created' ? '1 course' : '0 courses';
+        if (!value || !step.typed) return;
+        if (step.phase !== 'typing') {
+          value.textContent = step.typed;
+          return;
+        }
+        var token = typingToken;
+        var chars = step.typed.split('');
+        chars.forEach(function (_ch, idx) {
+          setTimeout(function () {
+            if (token !== typingToken) return;
+            value.textContent = step.typed.slice(0, idx + 1);
+          }, idx * 58);
+        });
       }
       function moveTo(selector, step) {
         var target = frame.querySelector(selector);
@@ -1190,8 +1205,11 @@
         var cx = tr.left - fr.left + (tr.width / 2);
         var cy = tr.top - fr.top + (tr.height / 2);
         cursor.style.transform = 'translate(' + Math.round(cx + 10) + 'px, ' + Math.round(cy) + 'px)';
-        var px = Math.min(cx + 44, fr.width - 310);
-        pop.style.transform = 'translate(' + Math.round(Math.max(92, px)) + 'px, ' + Math.round(Math.max(72, cy - 22)) + 'px)';
+        var popW = 310;
+        var rightSide = cx > fr.width * 0.62;
+        var px = rightSide ? Math.max(92, cx - popW - 56) : Math.min(cx + 44, fr.width - popW - 12);
+        var py = step.phase === 'ready' ? Math.max(72, cy + 32) : Math.max(72, cy - 22);
+        pop.style.transform = 'translate(' + Math.round(px) + 'px, ' + Math.round(py) + 'px)';
         title.textContent = step.title;
         body.textContent = step.body;
       }
