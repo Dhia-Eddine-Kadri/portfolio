@@ -107,6 +107,13 @@ function stripSourceMarkers(text: string): string {
     .trim();
 }
 
+function stripSourceMarkersLive(text: string): string {
+  return (text || '')
+    .replace(/\s*\[Source\s+\d+\]/gi, '')
+    .replace(/\s+\./g, '.')
+    .replace(/\s+,/g, ',');
+}
+
 function _sourceLine(s: { file_name?: string; pages?: string | null; section?: string | null }): string {
   let line = s.file_name || 'Unknown';
   if (s.pages) {
@@ -819,62 +826,11 @@ export function initAskAI(
             let _renderTimer: number | null = null;
             let _pendingMeta: SseDoneEvent | null | undefined = undefined;
             const CFG = window.AI_TYPING || ({} as Partial<NonNullable<Window['AI_TYPING']>>);
-            const STREAM_CHARS_PER_FRAME = CFG.streamCharsPerFrame || 46;
+            const STREAM_CHARS_PER_FRAME = CFG.streamCharsPerFrame || 3;
 
-            let _renderedBlockCount = 0;
             // Both `evt.done` and the reader's `result.done` can race to call
             // finalize() — guard so history/feedback bar aren't doubled.
             let _finalized = false;
-
-            function splitBlocks(text: string): string[] {
-              const blocks: string[] = [];
-              const lines = text.split('\n');
-              let buf: string[] = [];
-              let inCode = false;
-              let inMath = false;
-              let inLatex = false;
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i] ?? '';
-                if (!inCode && /^```/.test(line)) inCode = true;
-                else if (inCode && /^```/.test(line)) { buf.push(line); inCode = false; blocks.push(buf.join('\n')); buf = []; continue; }
-                if (!inLatex && /^\s*\\\[/.test(line)) inLatex = true;
-                else if (inLatex && /\\\]/.test(line)) { buf.push(line); inLatex = false; blocks.push(buf.join('\n')); buf = []; continue; }
-                if (!inMath && /^\s*\$\$/.test(line) && !/\$\$.*\$\$/.test(line)) inMath = true;
-                else if (inMath && /\$\$/.test(line)) { buf.push(line); inMath = false; blocks.push(buf.join('\n')); buf = []; continue; }
-                if (!inCode && !inMath && !inLatex && line.trim() === '' && buf.length) {
-                  blocks.push(buf.join('\n'));
-                  buf = [];
-                } else {
-                  buf.push(line);
-                }
-              }
-              if (buf.length) blocks.push(buf.join('\n'));
-              return blocks.filter((b) => b.trim());
-            }
-
-            function renderBlock(_text: string): HTMLElement {
-              const div = document.createElement('div');
-              div.className = 'ss-rendered-block';
-              div.style.opacity = '0';
-              div.style.transition = 'opacity 0.2s ease';
-              return div;
-            }
-
-            function applyKatexToBlock(div: HTMLElement, text: string): void {
-              const done = (): void => {
-                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
-                div.style.opacity = '1';
-                _autoScroll(aiMsgs);
-              };
-              if (window._ssEnsureKatex) {
-                window._ssEnsureKatex().then(done).catch(() => {
-                  div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
-                  div.style.opacity = '1';
-                });
-              } else {
-                done();
-              }
-            }
 
             function updateBlockRender(): void {
               if (!bubble) return;
@@ -886,8 +842,7 @@ export function initAskAI(
               // rendered KaTeX/markdown HTML and produces a cropped/corrupted
               // answer on reload.
               bubble.setAttribute('data-raw', rawText);
-              const display = rawText.replace(metaPattern, '').trimEnd();
-              const blocks = splitBlocks(display);
+              const display = stripSourceMarkersLive(rawText.replace(metaPattern, '').trimEnd());
 
               let typingSpan = bubble.querySelector<HTMLElement>('.ss-typing-span');
               if (!typingSpan) {
@@ -897,17 +852,7 @@ export function initAskAI(
                 bubble.appendChild(typingSpan);
               }
 
-              const completedCount = blocks.length - 1;
-              while (_renderedBlockCount < completedCount) {
-                const blockText = stripSourceMarkers(blocks[_renderedBlockCount] || '');
-                const div = renderBlock(blockText);
-                bubble.insertBefore(div, typingSpan);
-                applyKatexToBlock(div, blockText);
-                _renderedBlockCount++;
-              }
-
-              const typingText = stripSourceMarkers(blocks[blocks.length - 1] || '');
-              typingSpan.textContent = typingText;
+              typingSpan.textContent = display;
               _autoScroll(aiMsgs);
             }
 
