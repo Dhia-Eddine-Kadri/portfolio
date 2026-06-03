@@ -4926,52 +4926,6 @@ body.night .ai-rag-sources > summary {
   color: #e2e8f0;
 }
 
-/* ── PER-RESPONSE CONFIDENCE BADGE ── */
-/* Shown on every grounded answer. Colour encodes verification state:
-   green = verified, amber = partly verified, grey = unverified. */
-.ai-conf-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 12px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.6;
-  border: 1px solid transparent;
-  cursor: default;
-}
-.ai-conf-badge.conf-high {
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
-  border-color: rgba(22, 163, 74, 0.28);
-}
-.ai-conf-badge.conf-medium {
-  background: rgba(217, 119, 6, 0.12);
-  color: #b45309;
-  border-color: rgba(217, 119, 6, 0.28);
-}
-.ai-conf-badge.conf-low {
-  background: rgba(100, 116, 139, 0.12);
-  color: #475569;
-  border-color: rgba(100, 116, 139, 0.28);
-}
-body.night .ai-conf-badge.conf-high {
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.3);
-}
-body.night .ai-conf-badge.conf-medium {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fbbf24;
-  border-color: rgba(245, 158, 11, 0.3);
-}
-body.night .ai-conf-badge.conf-low {
-  background: rgba(148, 163, 184, 0.16);
-  color: #cbd5e1;
-  border-color: rgba(148, 163, 184, 0.3);
-}
-
 .ai-bubble .md-code-block {
   background: var(--dp-solid);
   border: 1px solid rgba(37, 99, 235, 0.18);
