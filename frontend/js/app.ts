@@ -401,19 +401,9 @@ document.getElementById('msmSaveBtn')?.addEventListener('click', async () => {
   await lnSaveNoteToSupabase(note);
 });
 
-// Append ?v=<assetVersion> to a base64-encoded lazy-import path so dynamically
-// imported feature bridges fetch a fresh module instance when the version bumps
-// (the files also revalidate via netlify.toml; this forces immediacy).
-function _ssLazy(encoded: string): string {
-  const path = atob(encoded);
-  const v = (window as unknown as { MinalloConfig?: { assetVersion?: unknown } }).MinalloConfig
-    ?.assetVersion;
-  return v ? path + (path.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(String(v)) : path;
-}
-
 function runMultiSummary(fnames: string[], course: LegacyCourse): unknown {
   return import(
-    /* @vite-ignore */ _ssLazy('Li9mZWF0dXJlcy9haS1jaGF0L211bHRpLXN1bW1hcnkuanM=')
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L211bHRpLXN1bW1hcnkuanM=')
   ).then((mod) => mod.runMultiSummary(fnames, course));
 }
 (window as unknown as { runMultiSummary: typeof runMultiSummary }).runMultiSummary = runMultiSummary;
@@ -630,7 +620,7 @@ let _aiRenderBridgePromise: Promise<unknown> | null = null;
 function _ensureAiRenderBridge(): Promise<unknown> {
   if (_aiRenderBridgePromise) return _aiRenderBridgePromise;
   _aiRenderBridgePromise = import(
-    /* @vite-ignore */ _ssLazy('Li9mZWF0dXJlcy9haS1jaGF0L2FpLXJlbmRlci1icmlkZ2UuanM=')
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLXJlbmRlci1icmlkZ2UuanM=')
   ).then((mod) => mod.initAiRenderBridge());
   return _aiRenderBridgePromise;
 }
@@ -639,7 +629,7 @@ let _aiExportBridgePromise: Promise<unknown> | null = null;
 function _ensureAiExportBridge(): Promise<unknown> {
   if (_aiExportBridgePromise) return _aiExportBridgePromise;
   _aiExportBridgePromise = import(
-    /* @vite-ignore */ _ssLazy('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWV4cG9ydC1icmlkZ2UuanM=')
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWV4cG9ydC1icmlkZ2UuanM=')
   ).then((mod) => mod.initAiExportBridge());
   return _aiExportBridgePromise;
 }
@@ -701,7 +691,7 @@ let _aiAskBridgePromise: Promise<{ askAI: typeof askAI; stopGeneration: () => vo
 function _ensureAiAskBridge(): Promise<{ askAI: typeof askAI; stopGeneration: () => void }> {
   if (_aiAskBridgePromise) return _aiAskBridgePromise;
   _aiAskBridgePromise = import(
-    /* @vite-ignore */ _ssLazy('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWFzay1icmlkZ2UuanM=')
+    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWFzay1icmlkZ2UuanM=')
   ).then((mod) => {
     const bridge = mod.initAiAskBridge(_aiState);
     askAI = bridge.askAI as typeof askAI;
