@@ -23,6 +23,8 @@ import {
 // namespace import a missing export is just `undefined`, so the dashboard
 // degrades to absent while the rest of the admin page still works.
 import * as adminSvc from '../../services/admin-service.js';
+import type { FinanceSeries } from '../../services/admin-service.js';
+import { renderBarChart, renderLineChart, type LinePoint } from './admin-charts.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 
 interface AdminUser {
@@ -138,8 +140,12 @@ async function loadAdminStats(): Promise<void> {
     if (stats) stats.style.display = 'none';
     return;
   }
+  _initFinanceToggle();
   try {
-    await Promise.all([loadFinancials(), loadUsage(), reloadSignupChart(), loadSubscriptionCards(), loadRetention()]);
+    await Promise.all([
+      loadFinancials(), loadUsage(), loadFinanceSeries(), loadFunnel(),
+      reloadSignupChart(), loadSubscriptionCards(), loadRetention(),
+    ]);
     if (loading) loading.style.display = 'none';
     if (body) body.style.display = '';
   } catch {
@@ -176,35 +182,124 @@ function _renderGrowthCards(data: SignupStats): void {
 function _renderSignupChart(data: SignupStats): void {
   const host = document.getElementById('adminSignupChart');
   if (!host) return;
-  host.innerHTML = '';
   const series = data.series || [];
   if (!series.length) {
     host.innerHTML = '<div class="adm-empty">No signups in this range.</div>';
     return;
   }
   const max = series.reduce((m, p) => (p.count > m ? p.count : m), 0) || 1;
-  const wrap = document.createElement('div');
-  wrap.style.cssText =
-    'display:flex;align-items:flex-end;gap:2px;height:150px;padding:8px 2px;overflow-x:auto';
-  for (const p of series) {
-    const col = document.createElement('div');
-    col.style.cssText = 'flex:1 0 6px;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%';
-    col.title = p.date + ': ' + p.count;
-    const bar = document.createElement('div');
-    const h = Math.round((p.count / max) * 100);
-    bar.style.cssText =
-      'width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#38bdf8,#0284c7);' +
-      'height:' + (p.count > 0 ? Math.max(h, 3) : 0) + '%;transition:height .2s';
-    col.appendChild(bar);
-    wrap.appendChild(col);
+  // Compact the date label for readability (YYYY-MM-DD → DD/MM, YYYY-MM → MMM).
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const label = (d: string): string => {
+    const p = d.split('-');
+    if (p.length === 2) return months[Number(p[1]) - 1] || d;
+    if (p.length === 3) return p[2] + '/' + p[1];
+    return d;
+  };
+  renderBarChart(
+    host,
+    series.map((p) => ({ label: label(p.date), value: p.count })),
+    {
+      tooltipNoun: 'signup',
+      caption: data.total + ' signups · ' + series[0]!.date + ' → ' + series[series.length - 1]!.date +
+        ' · peak ' + max + '/' + data.bucket,
+    },
+  );
+}
+
+// ── Monthly revenue / cost / profit trend ────────────────────────────────────
+
+let _financeSeries: FinanceSeries | null = null;
+let _financeMode: 'money' | 'users' = 'money';
+
+async function loadFinanceSeries(): Promise<void> {
+  const host = document.getElementById('adminFinanceChart');
+  if (!host) return;
+  _financeSeries = adminSvc.getFinanceSeries ? await adminSvc.getFinanceSeries(6) : null;
+  _renderFinanceSeries();
+}
+
+function _renderFinanceSeries(): void {
+  const host = document.getElementById('adminFinanceChart');
+  if (!host) return;
+  const data = _financeSeries;
+  if (!data || data.dataMonths < 2) {
+    host.innerHTML =
+      '<div class="adm-empty">Not enough history yet — the revenue / cost / profit trend appears once you have at least 2 months of activity. ' +
+      'Current-month figures are in the KPIs and Profit breakdown above.</div>';
+    return;
   }
-  host.appendChild(wrap);
-  const caption = document.createElement('div');
-  caption.style.cssText = 'font-size:.72rem;color:var(--on-glass-muted);margin-top:6px';
-  caption.textContent =
-    data.total + ' signups · ' + series[0]!.date + ' → ' + series[series.length - 1]!.date +
-    ' · peak ' + max + '/' + data.bucket;
-  host.appendChild(caption);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const mLabel = (m: string): string => months[Number(m.split('-')[1]) - 1] || m;
+
+  let points: LinePoint[];
+  let fmt: (n: number) => string;
+  if (_financeMode === 'money') {
+    points = data.series.map((p) => ({
+      label: mLabel(p.month),
+      revenue: p.revenueCents / 100,
+      cost: p.costCents / 100,
+      profit: p.profitCents / 100,
+    }));
+    fmt = (n: number): string => '€' + (Math.abs(n) >= 100 ? Math.round(n) : n.toFixed(0));
+  } else {
+    // "Users" view: paid users and AI-call volume share the profit/revenue lines.
+    points = data.series.map((p) => ({
+      label: mLabel(p.month),
+      revenue: p.activePaid,
+      cost: p.aiCalls,
+      profit: p.activePaid,
+    }));
+    fmt = (n: number): string => String(Math.round(n));
+  }
+  renderLineChart(host, points, fmt);
+}
+
+function _initFinanceToggle(): void {
+  const seg = document.getElementById('adminFinanceToggle');
+  if (!seg || seg.dataset['wired'] === '1') return;
+  seg.dataset['wired'] = '1';
+  seg.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('button[data-metric]') as HTMLElement | null;
+    if (!btn) return;
+    const mode = btn.dataset['metric'];
+    if (mode !== 'money' && mode !== 'users') return;
+    _financeMode = mode;
+    seg.querySelectorAll('button[data-metric]').forEach((b) => b.classList.toggle('active', b === btn));
+    _renderFinanceSeries();
+  });
+}
+
+// ── Subscription funnel ──────────────────────────────────────────────────────
+
+async function loadFunnel(): Promise<void> {
+  const host = document.getElementById('adminFunnel');
+  if (!host) return;
+  const [signups, subs] = await Promise.all([
+    adminSvc.getSignupStats ? adminSvc.getSignupStats('all', 'month') : Promise.resolve(null),
+    adminSvc.getSubscriptionStats ? adminSvc.getSubscriptionStats() : Promise.resolve(null),
+  ]);
+  const totalUsers = signups?.summary.total ?? 0;
+  const stages: Array<[string, number]> = [
+    ['Signups', totalUsers],
+    ['Trials', subs?.trialsStarted ?? 0],
+    ['Converted', subs?.converted ?? 0],
+    ['Active paid', subs?.activePaid ?? 0],
+    ['Cancelled', subs?.cancelled ?? 0],
+  ];
+  const top = Math.max(totalUsers, 1);
+  host.innerHTML = stages
+    .map(([name, n]) => {
+      const pct = Math.round((n / top) * 100);
+      return (
+        '<div class="adm-bar-row">' +
+        '<span>' + name + '</span>' +
+        '<div class="adm-track"><span style="width:' + (n > 0 ? Math.max(pct, 3) : 0) + '%"></span></div>' +
+        '<b>' + n + '</b>' +
+        '</div>'
+      );
+    })
+    .join('');
 }
 
 async function loadSubscriptionCards(): Promise<void> {

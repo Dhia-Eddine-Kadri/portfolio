@@ -334,6 +334,79 @@ export function computeFinancials(
   };
 }
 
+// ── Monthly finance trend (revenue / cost / profit over time) ────────────────
+// Real series built from: active-paid-per-month (retention history, overridden
+// with the live count for the current month) + AI request counts bucketed by
+// month + the editable cost config. Money in/out is integer cents.
+export interface FinanceSeriesPoint {
+  month: string;          // YYYY-MM
+  revenueCents: number;
+  aiCostCents: number;
+  feesCents: number;
+  fixedCents: number;
+  costCents: number;      // ai + fees + fixed
+  profitCents: number;
+  activePaid: number;
+  aiCalls: number;
+}
+
+// Build the oldest→newest list of YYYY-MM month keys ending in the current month.
+export function buildMonthList(months: number, now: Date = new Date()): string[] {
+  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const out: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    out.push(new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - i, 1)).toISOString().slice(0, 7));
+  }
+  return out;
+}
+
+// Bucket AI events into per-month interactive/generation counts.
+export function bucketAiByMonth(
+  events: UsageEvent[]
+): Record<string, { interactive: number; generation: number }> {
+  const GEN = new Set(['ai_generate', 'notes_generate']);
+  const out: Record<string, { interactive: number; generation: number }> = {};
+  for (const e of events) {
+    const d = e.created_at instanceof Date ? e.created_at : new Date(e.created_at as string);
+    if (isNaN(d.getTime())) continue;
+    const k = d.toISOString().slice(0, 7);
+    const o = out[k] || (out[k] = { interactive: 0, generation: 0 });
+    if (GEN.has(String(e.event_type))) o.generation++;
+    else o.interactive++;
+  }
+  return out;
+}
+
+export function computeFinanceSeries(
+  monthsList: string[],
+  activeByMonth: Record<string, number>,
+  aiByMonth: Record<string, { interactive: number; generation: number }>,
+  cfg: CostConfig
+): FinanceSeriesPoint[] {
+  const fixed = cfg.supabaseCostCents + cfg.hostingCostCents + cfg.otherCostCents;
+  return monthsList.map((m) => {
+    const active = activeByMonth[m] || 0;
+    const ai = aiByMonth[m] || { interactive: 0, generation: 0 };
+    const aiCost = ai.interactive * cfg.aiInteractiveCostCents + ai.generation * cfg.aiGenerationCostCents;
+    const revenue = active * cfg.monthlyPriceCents;
+    const fees = active * ((cfg.monthlyPriceCents * cfg.paymentFeePct) / 100 + cfg.paymentFeeFixedCents);
+    // Fixed infra cost only applies once the business is live (any activity).
+    const fixedThis = active > 0 || ai.interactive + ai.generation > 0 ? fixed : 0;
+    const cost = aiCost + fees + fixedThis;
+    return {
+      month: m,
+      revenueCents: _round(revenue),
+      aiCostCents: _round(aiCost),
+      feesCents: _round(fees),
+      fixedCents: _round(fixedThis),
+      costCents: _round(cost),
+      profitCents: _round(revenue - cost),
+      activePaid: active,
+      aiCalls: ai.interactive + ai.generation
+    };
+  });
+}
+
 // ── Activity & feature usage ─────────────────────────────────────────────────
 // DAU/WAU/MAU (distinct active users) + per-feature counts this month, computed
 // from a unified event stream: AI events (security_events) + chat messages

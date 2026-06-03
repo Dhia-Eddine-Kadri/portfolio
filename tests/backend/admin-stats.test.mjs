@@ -4,6 +4,9 @@ import {
   bucketSignups,
   summarizeSubscriptions,
   computeRetention,
+  buildMonthList,
+  bucketAiByMonth,
+  computeFinanceSeries,
   isBucket,
   isRange,
 } from '../../backend/lib/admin-stats.ts';
@@ -118,4 +121,55 @@ test('computeRetention ignores events without a user', () => {
     1, NOW
   );
   assert.equal(series[0].active, 0);
+});
+
+// ── Finance series ────────────────────────────────────────────────────────────
+test('buildMonthList returns oldest→newest ending in current month', () => {
+  const list = buildMonthList(3, NOW);
+  assert.deepEqual(list, ['2026-04', '2026-05', '2026-06']);
+});
+
+test('bucketAiByMonth splits interactive vs generation per month', () => {
+  const by = bucketAiByMonth([
+    { event_type: 'ai_ask', created_at: '2026-05-10T00:00:00Z' },
+    { event_type: 'ask_stream', created_at: '2026-05-20T00:00:00Z' },
+    { event_type: 'ai_generate', created_at: '2026-05-21T00:00:00Z' },
+    { event_type: 'notes_generate', created_at: '2026-06-01T00:00:00Z' },
+    { event_type: 'ai_ask', created_at: 'not-a-date' },
+  ]);
+  assert.deepEqual(by['2026-05'], { interactive: 2, generation: 1 });
+  assert.deepEqual(by['2026-06'], { interactive: 0, generation: 1 });
+});
+
+test('computeFinanceSeries computes revenue/cost/profit per month', () => {
+  const cfg = {
+    monthlyPriceCents: 1000,
+    paymentFeePct: 10,
+    paymentFeeFixedCents: 0,
+    aiInteractiveCostCents: 1,
+    aiGenerationCostCents: 5,
+    supabaseCostCents: 200,
+    hostingCostCents: 0,
+    otherCostCents: 0,
+  };
+  const series = computeFinanceSeries(
+    ['2026-05', '2026-06'],
+    { '2026-05': 0, '2026-06': 2 },
+    { '2026-06': { interactive: 10, generation: 4 } },
+    cfg
+  );
+  // May: no activity → all zero, fixed cost suppressed.
+  assert.deepEqual(series[0], {
+    month: '2026-05', revenueCents: 0, aiCostCents: 0, feesCents: 0,
+    fixedCents: 0, costCents: 0, profitCents: 0, activePaid: 0, aiCalls: 0,
+  });
+  // June: 2 paid × €10 = 2000 revenue; fees 10% = 200; ai = 10×1 + 4×5 = 30;
+  // fixed = 200; cost = 430; profit = 1570.
+  assert.equal(series[1].revenueCents, 2000);
+  assert.equal(series[1].feesCents, 200);
+  assert.equal(series[1].aiCostCents, 30);
+  assert.equal(series[1].fixedCents, 200);
+  assert.equal(series[1].costCents, 430);
+  assert.equal(series[1].profitCents, 1570);
+  assert.equal(series[1].aiCalls, 14);
 });

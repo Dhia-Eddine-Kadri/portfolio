@@ -6,6 +6,7 @@ import { logSecurityEvent } from '../lib/logger';
 import { isUuid } from '../lib/validation';
 import {
   bucketSignups, summarizeSubscriptions, computeRetention, computeFinancials, computeUsage,
+  buildMonthList, bucketAiByMonth, computeFinanceSeries,
   isBucket, isRange, RANGE_DAYS, type Bucket, type Range, type SubRow, type SubEvent,
   type CostConfig, type UserUsage, type UsageEvent
 } from '../lib/admin-stats';
@@ -90,7 +91,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'subscriptions', 'retention', 'financials', 'getcostconfig', 'savecostconfig', 'usage'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -395,6 +396,73 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       active_paid: result.activePaid, auth_method: adminCheck.method
     });
     return jsonResponse(200, { ...result, metadata: { generatedAt: new Date().toISOString() } });
+  }
+
+  // ── Financial: monthly revenue / cost / profit trend ──────────────────────
+  if (action === 'financeseries') {
+    const cfg = await loadCostConfig(serviceKey);
+    let m = typeof months === 'number' ? Math.floor(months) : parseInt(String(months || ''), 10);
+    if (!Number.isFinite(m) || m < 1) m = 6;
+    if (m > 24) m = 24;
+    const monthsList = buildMonthList(m);
+    const currentMonth = monthsList[monthsList.length - 1];
+    const sinceMonthStart = monthsList[0] + '-01T00:00:00.000Z';
+
+    // Active paid per month from subscription_events history (if available).
+    const retSinceMs = Date.now() - (m + 1) * 31 * 24 * 60 * 60 * 1000;
+    const [evRetRes, aiRes, subRes] = await Promise.all([
+      supaRequest<SubEvent[]>(
+        'GET',
+        'subscription_events?created_at=gte.' + encodeURIComponent(new Date(retSinceMs).toISOString()) +
+          '&select=user_id,event_type,created_at&order=created_at.asc&limit=100000',
+        null, serviceKey
+      ),
+      supaRequest<Array<{ event_type?: string; created_at?: string }>>(
+        'GET',
+        'security_events?event_type=in.(' +
+          ['ai_ask', 'ai_chat', 'writing_coach_analyse', 'ask_stream', 'ai_generate', 'notes_generate']
+            .map(encodeURIComponent).join(',') +
+          ')&created_at=gte.' + encodeURIComponent(sinceMonthStart) +
+          '&select=event_type,created_at&limit=300000',
+        null, serviceKey
+      ),
+      supaRequest<Array<{ plan?: string; status?: string }>>(
+        'GET', 'subscriptions?select=plan,status', null, serviceKey
+      )
+    ]);
+
+    const retEvents = Array.isArray(evRetRes.body) ? evRetRes.body : [];
+    const retentionAvailable = Array.isArray(evRetRes.body);
+    const retention = computeRetention(retEvents, m);
+    const activeByMonth: Record<string, number> = {};
+    for (const r of retention) activeByMonth[r.month] = r.active;
+
+    // The current month's active-paid count is authoritative from the live
+    // subscriptions table (covers the no-events / no-migration case too).
+    const subRows = Array.isArray(subRes.body) ? subRes.body : [];
+    const liveActivePaid = subRows.filter(
+      (r) => String(r.plan).toLowerCase() === 'pro' && String(r.status).toLowerCase() === 'active'
+    ).length;
+    if (currentMonth) {
+      activeByMonth[currentMonth] = Math.max(activeByMonth[currentMonth] || 0, liveActivePaid);
+    }
+
+    const aiRows = Array.isArray(aiRes.body) ? aiRes.body : [];
+    const aiByMonth = bucketAiByMonth(
+      aiRows.map((r) => ({ event_type: r.event_type, created_at: r.created_at }))
+    );
+
+    const series = computeFinanceSeries(monthsList, activeByMonth, aiByMonth, cfg);
+    const dataMonths = series.filter((p) => p.activePaid > 0 || p.aiCalls > 0).length;
+
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_finance_series', {
+      months: m, data_months: dataMonths, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, {
+      series, months: m, dataMonths,
+      retentionAvailable,
+      metadata: { generatedAt: new Date().toISOString() }
+    });
   }
 
   return fail(400, 'Unknown action');

@@ -352,6 +352,75 @@
   #psec-admin .adm-empty {
     color: var(--adm-muted);
     font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  /* SVG charts */
+  #psec-admin .adm-axis { fill: #93a4bd; font-size: 11px; font-weight: 700; }
+  #psec-admin .adm-gridline { stroke: rgba(148, 163, 184, 0.13); stroke-width: 1; }
+  #psec-admin .adm-axis-line { stroke: rgba(148, 163, 184, 0.28); stroke-width: 1; }
+  #psec-admin .adm-bar { fill: url(#admBar); }
+  #psec-admin .adm-bar-ghost { fill: rgba(148, 163, 184, 0.13); }
+  #psec-admin .adm-peak { fill: var(--adm-green); font-size: 11px; font-weight: 800; }
+  #psec-admin .adm-area { fill: url(#admArea); }
+  #psec-admin .adm-line-rev { fill: none; stroke: #38bdf8; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  #psec-admin .adm-line-cost { fill: none; stroke: #fb7185; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6; }
+  #psec-admin .adm-line-profit { fill: none; stroke: #6ee7b7; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  #psec-admin .adm-dot { stroke: #0a1322; stroke-width: 2.5; }
+  #psec-admin .adm-chart-tip {
+    position: absolute;
+    pointer-events: none;
+    padding: 9px 11px;
+    min-width: 130px;
+    border-radius: 12px;
+    background: rgba(5, 12, 23, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translate(-50%, -116%);
+    transition: opacity 0.12s ease;
+    z-index: 6;
+  }
+  #psec-admin .adm-chart-tip strong { display: block; font-size: 12.5px; margin-bottom: 5px; color: var(--on-glass, #f8fafc); }
+  #psec-admin .adm-chart-tip span { display: flex; align-items: center; color: var(--adm-muted); font-size: 11.5px; line-height: 1.7; }
+  #psec-admin .adm-chart-tip span i { width: 8px; height: 8px; border-radius: 99px; display: inline-block; margin-right: 6px; }
+  #psec-admin .adm-chart-cap { font-size: 11.5px; color: var(--adm-muted); margin-top: 8px; }
+
+  /* Legend + segmented toggle */
+  #psec-admin .adm-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    color: var(--adm-muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    margin-top: 12px;
+  }
+  #psec-admin .adm-legend i { width: 9px; height: 9px; border-radius: 99px; display: inline-block; margin-right: 6px; }
+  #psec-admin .adm-segmented {
+    display: inline-flex;
+    padding: 3px;
+    gap: 3px;
+    border: 1px solid var(--adm-line);
+    border-radius: 999px;
+    background: rgba(10, 19, 34, 0.5);
+    flex-shrink: 0;
+  }
+  #psec-admin .adm-segmented button {
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--adm-muted);
+    padding: 6px 12px;
+    font-weight: 800;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  #psec-admin .adm-segmented button.active {
+    color: #041725;
+    background: linear-gradient(135deg, var(--adm-blue), var(--adm-green));
   }
 
   @media (max-width: 900px) {
@@ -684,6 +753,27 @@
                   <section class="adm-card">
                     <div class="adm-card-head">
                       <div>
+                        <h2 class="adm-card-title" data-i18n="admin_trend_title">Revenue, costs &amp; profit</h2>
+                        <p class="adm-card-desc" data-i18n="admin_trend_desc">Real monthly trend after AI, payment and fixed costs.</p>
+                      </div>
+                      <div class="adm-segmented" id="adminFinanceToggle" aria-label="Metric">
+                        <button class="active" data-metric="money" data-i18n="admin_trend_money">Money</button>
+                        <button data-metric="users" data-i18n="admin_trend_users">Users</button>
+                      </div>
+                    </div>
+                    <div class="adm-card-body">
+                      <div id="adminFinanceChart"></div>
+                      <div class="adm-legend">
+                        <span><i style="background:#38bdf8"></i><span data-i18n="admin_legend_rev">Revenue</span></span>
+                        <span><i style="background:#fb7185"></i><span data-i18n="admin_legend_cost">Costs</span></span>
+                        <span><i style="background:#6ee7b7"></i><span data-i18n="admin_legend_profit">Net profit</span></span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="adm-card">
+                    <div class="adm-card-head">
+                      <div>
                         <h2 class="adm-card-title" data-i18n="admin_growth_title">User growth</h2>
                         <p class="adm-card-desc" data-i18n="admin_growth_desc">Daily signups over the selected range.</p>
                       </div>
@@ -773,6 +863,16 @@
                       </div>
                     </div>
                     <div class="adm-card-body adm-mini-grid" id="adminSubCards"></div>
+                  </section>
+
+                  <section class="adm-card">
+                    <div class="adm-card-head">
+                      <div>
+                        <h2 class="adm-card-title" data-i18n="admin_funnel_title">Subscription funnel</h2>
+                        <p class="adm-card-desc" data-i18n="admin_funnel_desc">Where students drop off, from signup to paid.</p>
+                      </div>
+                    </div>
+                    <div class="adm-card-body" id="adminFunnel"></div>
                   </section>
                 </aside>
               </div>

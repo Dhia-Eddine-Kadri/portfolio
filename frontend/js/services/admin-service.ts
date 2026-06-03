@@ -2,7 +2,7 @@ interface AdminFetchBody {
   action:
     | 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself'
     | 'signups' | 'subscriptions' | 'retention'
-    | 'financials' | 'getcostconfig' | 'savecostconfig' | 'usage';
+    | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage';
   [k: string]: unknown;
 }
 
@@ -149,6 +149,30 @@ export interface FinancialStats {
 
 export async function getFinancials(): Promise<FinancialStats | null> {
   const res = await _adminFetch({ action: 'financials' });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export interface FinanceSeriesPoint {
+  month: string;
+  revenueCents: number;
+  aiCostCents: number;
+  feesCents: number;
+  fixedCents: number;
+  costCents: number;
+  profitCents: number;
+  activePaid: number;
+  aiCalls: number;
+}
+export interface FinanceSeries {
+  series: FinanceSeriesPoint[];
+  months: number;
+  dataMonths: number;
+  retentionAvailable: boolean;
+}
+
+export async function getFinanceSeries(months = 6): Promise<FinanceSeries | null> {
+  const res = await _adminFetch({ action: 'financeseries', months });
   if (!res.ok) return null;
   return res.json().catch(() => null);
 }
