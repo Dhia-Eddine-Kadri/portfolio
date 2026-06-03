@@ -1334,7 +1334,7 @@
         eyebrow: 'Step 3 · AI side rail',
         title: 'Open the AI rail without leaving the PDF.',
         body: 'The preview shows the right rail sections: AI, Problem, Notes, and Summary. The answer preview includes the source pages used from the course files.',
-        calls: [['Open AI', 87, 30, 0], ['Problem Solver', 87, 43, 1400], ['Notes', 87, 56, 2800], ['Summary', 87, 69, 4200], ['Cited answer', 63, 42, 5400]],
+        calls: [['Open AI', 93.5, 24, 0], ['Problem Solver', 93.5, 30.7, 1400], ['Notes', 93.5, 37.2, 2800], ['Summary', 93.5, 43.7, 4200], ['Cited answer', 79, 61, 5400]],
         build: buildAiSideRail
       },
       {
@@ -1389,17 +1389,17 @@
     }
     function miniShell(active, mainHtml, extraClass) {
       var pages = [
-        ['Dashboard', 'layout-dashboard'], ['Courses', 'book-open'], ['PDF Workspace', 'file-text'],
-        ['AI Tutor', 'sparkles'], ['Chatbot', 'brain-circuit'], ['Chat', 'quote'],
-        ['Games', 'gamepad-2'], ['Study Lounge', 'trophy'], ['Profile', 'shield-check'],
-        ['Settings', 'pen-tool'], ['Subscription', 'zap']
+        ['Dashboard', 'house'], ['Courses', 'book-open'], ['PDF Workspace', 'panel-left'],
+        ['AI Tutor', 'pen-tool'], ['Study Lounge', 'briefcase'], ['Chatbot', 'message-circle'],
+        ['__divider__', ''], ['Notifications', 'bell']
       ];
       var nav = pages.map(function (p) {
+        if (p[0] === '__divider__') return '<i class="nl-mini-divider"></i>';
         var on = p[0] === active ? ' is-active' : '';
-        return '<div class="nl-mini-nav__item' + on + '" title="' + p[0] + '"><span>' + iconUse(p[1], 16) + '</span><b>' + p[0] + '</b></div>';
+        return '<div class="nl-mini-nav__item' + on + '" title="' + p[0] + '"><span class="nl-mini-nav__icon">' + iconUse(p[1], 24) + '</span><b>' + p[0] + '</b></div>';
       }).join('');
       return '<div class="nl-mini-shell ' + (extraClass || '') + '">' +
-        '<aside class="nl-mini-nav"><button class="nl-mini-toggle" aria-hidden="true">›</button><div class="nl-mini-brand"><span>M</span><strong>Minallo</strong></div><div class="nl-mini-nav-list">' + nav + '<i class="nl-mini-divider"></i></div><div class="nl-mini-night">☀</div></aside>' +
+        '<aside class="nl-mini-nav"><div class="nl-mini-nav-list">' + nav + '</div></aside>' +
         '<section class="nl-mini-main"><div class="nl-mini-top"><strong>' + active + '</strong><span>Study with clarity</span></div><div class="nl-mini-scroll">' + mainHtml + '</div></section>' +
         '</div>';
     }
