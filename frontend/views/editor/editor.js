@@ -11,7 +11,13 @@
       var sec = tmp.querySelector('#psec-editor');
       if (sec) {
         container.className = sec.className;
+        // Preserve the live display state. editor.html's #psec-editor ships with
+        // style="display:none", and this fetch resolves AFTER the first click has
+        // already revealed the (empty) section — clobbering cssText would re-hide
+        // it, forcing a pointless second click. Keep whatever display nav set.
+        var prevDisplay = container.style.display || 'none';
         container.style.cssText = sec.getAttribute('style') || '';
+        container.style.display = prevDisplay;
         while (sec.firstChild) container.appendChild(sec.firstChild);
         var writer = container.querySelector('.editor-card');
         if (writer) writer.style.display = 'none';
