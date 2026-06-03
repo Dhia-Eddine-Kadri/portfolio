@@ -843,30 +843,53 @@ function _captureSnipRegion(x1, y1, x2, y2) {
     }
   }
 
+  // Downscale + re-encode any image to a vision-friendly JPEG before attaching.
+  // The strict _ssValidateImageFile (1 MB cap, png/jpg only) is meant for course
+  // uploads to storage — real screenshots/photos routinely exceed 1 MB and may
+  // be .webp/HEIC, so they were being rejected with a "File blocked" toast. For
+  // AI vision attachments we normalise the image client-side instead.
+  function _attachImageFile(file) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var MAX = 1568; // Anthropic's recommended max edge for vision
+      var w = img.naturalWidth || img.width || 1;
+      var h = img.naturalHeight || img.height || 1;
+      var scale = Math.min(1, MAX / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      // White matte so transparent PNGs don't turn black when flattened to JPEG.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      var dataUrl;
+      try {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Could not read image', file.name || '');
+        return;
+      }
+      _addAttachedImage({ data: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      if (typeof showToast === 'function')
+        showToast('Could not read image', (file.name || '') + ' — unsupported or corrupt.');
+    };
+    img.src = url;
+  }
+
   input.addEventListener('change', function () {
     var files = Array.prototype.slice.call(this.files);
     this.value = ''; // reset so same file can be re-selected
     files.forEach(function (file) {
-      if (!isImageFile(file)) {
-        uploadCourseDocument(file);
-        return;
-      }
-      try {
-        if (window._ssValidateImageFile)
-          window._ssValidateImageFile(file, window._SS_UPLOAD_AI_IMAGE_MAX_BYTES || 1024 * 1024);
-      } catch (e) {
-        if (typeof showToast === 'function')
-          showToast('File blocked', file.name + ': ' + e.message);
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function (ev) {
-        _addAttachedImage({
-          data: ev.target.result.split(',')[1],
-          mediaType: file.type || 'image/png'
-        });
-      };
-      reader.readAsDataURL(file);
+      if (isImageFile(file)) _attachImageFile(file);
+      else uploadCourseDocument(file);
     });
     var ta = document.getElementById('aiInput');
     if (ta) ta.focus();
