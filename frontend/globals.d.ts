@@ -88,6 +88,7 @@ declare global {
     // ── AI typing config (set by ai-typing-config) ─────────────────────
     AI_TYPING?: {
       streamTokenInterval: number;
+      streamCharsPerFrame: number;
       fallbackWordsPerFrame: number;
       fallbackFrameInterval: number;
       chatbotCharInterval: number;

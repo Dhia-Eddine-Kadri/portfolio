@@ -815,11 +815,11 @@ export function initAskAI(
             let rawText = '';
             const metaPattern = /<!--META-->[\s\S]*?<!--\/META-->/g;
             const _tokenQueue: string[] = [];
-            let _renderTimer: ReturnType<typeof setTimeout> | null = null;
+            let _streamTextBuffer = '';
+            let _renderTimer: number | null = null;
             let _pendingMeta: SseDoneEvent | null | undefined = undefined;
             const CFG = window.AI_TYPING || ({} as Partial<NonNullable<Window['AI_TYPING']>>);
-            const TOKEN_INTERVAL = CFG.streamTokenInterval || 12;
-            const TOKEN_CHAR_BUDGET = 80;
+            const STREAM_CHARS_PER_FRAME = CFG.streamCharsPerFrame || 46;
 
             let _renderedBlockCount = 0;
             // Both `evt.done` and the reader's `result.done` can race to call
@@ -927,32 +927,46 @@ export function initAskAI(
               }
             }
 
+            function pullQueuedTokens(): void {
+              while (_tokenQueue.length) _streamTextBuffer += _tokenQueue.shift()!;
+            }
+
+            function scheduleDrain(): void {
+              if (_renderTimer == null) _renderTimer = window.requestAnimationFrame(drainQueue);
+            }
+
             function drainQueue(): void {
-              if (!_tokenQueue.length) {
+              _renderTimer = null;
+              pullQueuedTokens();
+              if (!_streamTextBuffer.length) {
                 _renderTimer = null;
                 if (_pendingMeta !== undefined) finalize(_pendingMeta);
                 return;
               }
-              let added = '';
-              let chars = 0;
-              while (_tokenQueue.length && chars < TOKEN_CHAR_BUDGET) {
-                const tok = _tokenQueue.shift()!;
-                added += tok;
-                chars += tok.length;
-              }
+              const frameBudget = document.hidden ? _streamTextBuffer.length : STREAM_CHARS_PER_FRAME;
+              const added = _streamTextBuffer.slice(0, frameBudget);
+              _streamTextBuffer = _streamTextBuffer.slice(added.length);
               rawText += added;
               if (bubble) updateBlockRender();
-              _renderTimer = setTimeout(drainQueue, TOKEN_INTERVAL);
+              if (_streamTextBuffer.length || _tokenQueue.length) {
+                scheduleDrain();
+              } else if (_pendingMeta !== undefined) {
+                finalize(_pendingMeta);
+              }
             }
 
             function queueToken(tok: string): void {
               _tokenQueue.push(tok);
-              if (!_renderTimer) _renderTimer = setTimeout(drainQueue, TOKEN_INTERVAL);
+              scheduleDrain();
             }
 
             window._activeStreamRender = function (): void {
-              if (_renderTimer) { clearTimeout(_renderTimer); _renderTimer = null; }
+              if (_renderTimer != null) { cancelAnimationFrame(_renderTimer); _renderTimer = null; }
               while (_tokenQueue.length) rawText += _tokenQueue.shift()!;
+              if (_streamTextBuffer) {
+                rawText += _streamTextBuffer;
+                _streamTextBuffer = '';
+              }
               fullRender(rawText);
             };
 
@@ -1085,7 +1099,7 @@ export function initAskAI(
                         }
                         if (evt.done) {
                           _pendingMeta = evt as SseDoneEvent;
-                          if (!_renderTimer && !_tokenQueue.length) finalize(_pendingMeta);
+                          if (!_renderTimer && !_tokenQueue.length && !_streamTextBuffer.length) finalize(_pendingMeta);
                         }
                         if (evt.error) fallbackToRag();
                       } catch { /* ignore malformed line */ }

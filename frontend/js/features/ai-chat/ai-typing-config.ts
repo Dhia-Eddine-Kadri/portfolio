@@ -3,6 +3,7 @@
 
 export interface AiTypingConfig {
   streamTokenInterval: number;
+  streamCharsPerFrame: number;
   fallbackWordsPerFrame: number;
   fallbackFrameInterval: number;
   chatbotCharInterval: number;
@@ -12,8 +13,9 @@ export interface AiTypingConfig {
 }
 
 export const AI_TYPING: AiTypingConfig = {
-  // Streaming path (edge function SSE tokens).
+  // Streaming path. Tokens are buffered, then revealed on animation frames.
   streamTokenInterval: 12,
+  streamCharsPerFrame: 46,
 
   // Fallback path (non-streaming ai-ask endpoint).
   fallbackWordsPerFrame: 1,
