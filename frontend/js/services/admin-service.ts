@@ -110,6 +110,8 @@ export interface CostConfig {
   paymentFeeFixedCents: number;
   aiInteractiveCostCents: number;
   aiGenerationCostCents: number;
+  aiInputCostCentsPerM: number;
+  aiOutputCostCentsPerM: number;
   supabaseCostCents: number;
   hostingCostCents: number;
   otherCostCents: number;
@@ -143,6 +145,8 @@ export interface FinancialStats {
   profitPerPaidUserCents: number;
   interactiveCalls: number;
   generationCalls: number;
+  measuredAiCostCents: number;
+  estimatedAiCostCents: number;
   dangerUsers: DangerUser[];
   config: CostConfig;
 }

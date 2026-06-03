@@ -323,6 +323,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       payment_fee_fixed_cents: num(c.paymentFeeFixedCents),
       ai_interactive_cost_cents: num(c.aiInteractiveCostCents),
       ai_generation_cost_cents: num(c.aiGenerationCostCents),
+      ai_input_cost_cents_per_m: num(c.aiInputCostCentsPerM),
+      ai_output_cost_cents_per_m: num(c.aiOutputCostCentsPerM),
       supabase_cost_cents: num(c.supabaseCostCents),
       hosting_cost_cents: num(c.hostingCostCents),
       other_cost_cents: num(c.otherCostCents),
@@ -375,22 +377,48 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       usageMap.set(uid, u);
     }
 
+    // Real token metering for interactive (ask/stream) calls this month, from
+    // retrieval_debug_log. Degrades to per-call estimates if the table is empty.
+    const tokenMap = new Map<string, { prompt: number; completion: number }>();
+    const tokRes = await supaRequest<Array<{ user_id?: string; prompt_tokens?: number; completion_tokens?: number }>>(
+      'GET',
+      'retrieval_debug_log?created_at=gte.' + encodeURIComponent(since) +
+        '&select=user_id,prompt_tokens,completion_tokens&limit=300000',
+      null, serviceKey
+    );
+    const tokRows = Array.isArray(tokRes.body) ? tokRes.body : [];
+    for (const t of tokRows) {
+      const uid = t.user_id ? String(t.user_id) : '';
+      if (!uid) continue;
+      const e = tokenMap.get(uid) || { prompt: 0, completion: 0 };
+      e.prompt += Number(t.prompt_tokens) || 0;
+      e.completion += Number(t.completion_tokens) || 0;
+      tokenMap.set(uid, e);
+    }
+
     // Union of paid users and users with usage.
-    const userIds = new Set<string>([...paidSet, ...usageMap.keys()]);
+    const userIds = new Set<string>([...paidSet, ...usageMap.keys(), ...tokenMap.keys()]);
     const users: UserUsage[] = Array.from(userIds).map((uid) => {
       const u = usageMap.get(uid) || { interactive: 0, generation: 0 };
-      return { userId: uid, interactive: u.interactive, generation: u.generation, paid: paidSet.has(uid) };
+      const tok = tokenMap.get(uid);
+      const usr: UserUsage = { userId: uid, interactive: u.interactive, generation: u.generation, paid: paidSet.has(uid) };
+      if (tok && (tok.prompt > 0 || tok.completion > 0)) {
+        usr.interactiveTokenCostCents =
+          (tok.prompt * cfg.aiInputCostCentsPerM + tok.completion * cfg.aiOutputCostCentsPerM) / 1_000_000;
+      }
+      return usr;
     });
 
     const result = computeFinancials(users, cfg);
 
-    // Attach emails for the (bounded) danger-user list only.
-    for (const d of result.dangerUsers) {
+    // Attach emails for the (bounded) danger-user list. Done in parallel — a
+    // sequential loop here was the main source of the dashboard's open latency.
+    await Promise.all(result.dangerUsers.map(async (d) => {
       try {
         const uRes = await supaAuthAdminRequest<{ email?: string }>('GET', 'users/' + d.userId, serviceKey);
         if (uRes.status >= 200 && uRes.status < 300 && uRes.body && uRes.body.email) d.email = uRes.body.email;
       } catch { /* best-effort */ }
-    }
+    }));
 
     await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_financials', {
       active_paid: result.activePaid, auth_method: adminCheck.method
@@ -477,6 +505,8 @@ async function loadCostConfig(serviceKey: string): Promise<CostConfig> {
     paymentFeeFixedCents: 35,
     aiInteractiveCostCents: 0.1,
     aiGenerationCostCents: 0.5,
+    aiInputCostCentsPerM: 300,   // ≈ $3 per 1M input tokens (Claude Sonnet)
+    aiOutputCostCentsPerM: 1500, // ≈ $15 per 1M output tokens
     supabaseCostCents: 2500,
     hostingCostCents: 500,
     otherCostCents: 0
@@ -497,6 +527,8 @@ async function loadCostConfig(serviceKey: string): Promise<CostConfig> {
       paymentFeeFixedCents: n(row.payment_fee_fixed_cents, defaults.paymentFeeFixedCents),
       aiInteractiveCostCents: n(row.ai_interactive_cost_cents, defaults.aiInteractiveCostCents),
       aiGenerationCostCents: n(row.ai_generation_cost_cents, defaults.aiGenerationCostCents),
+      aiInputCostCentsPerM: n(row.ai_input_cost_cents_per_m, defaults.aiInputCostCentsPerM),
+      aiOutputCostCentsPerM: n(row.ai_output_cost_cents_per_m, defaults.aiOutputCostCentsPerM),
       supabaseCostCents: n(row.supabase_cost_cents, defaults.supabaseCostCents),
       hostingCostCents: n(row.hosting_cost_cents, defaults.hostingCostCents),
       otherCostCents: n(row.other_cost_cents, defaults.otherCostCents)

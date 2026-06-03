@@ -7,9 +7,24 @@ import {
   buildMonthList,
   bucketAiByMonth,
   computeFinanceSeries,
+  computeFinancials,
+  tokenCostCents,
   isBucket,
   isRange,
 } from '../../backend/lib/admin-stats.ts';
+
+const CFG = {
+  monthlyPriceCents: 1199,
+  paymentFeePct: 0,
+  paymentFeeFixedCents: 0,
+  aiInteractiveCostCents: 10,
+  aiGenerationCostCents: 50,
+  aiInputCostCentsPerM: 300,
+  aiOutputCostCentsPerM: 1500,
+  supabaseCostCents: 0,
+  hostingCostCents: 0,
+  otherCostCents: 0,
+};
 
 const NOW = new Date('2026-06-02T12:00:00.000Z');
 const daysAgo = (n) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString();

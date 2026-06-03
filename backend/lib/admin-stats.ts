@@ -202,18 +202,35 @@ export interface CostConfig {
   paymentFeeFixedCents: number;     // e.g. 35 (per paying user / transaction)
   aiInteractiveCostCents: number;   // estimated cost per interactive AI call
   aiGenerationCostCents: number;    // estimated cost per generation AI call
+  aiInputCostCentsPerM: number;     // measured: cents per 1M input (prompt) tokens
+  aiOutputCostCentsPerM: number;    // measured: cents per 1M output (completion) tokens
   supabaseCostCents: number;
   hostingCostCents: number;
   otherCostCents: number;
 }
 
 // Per-user monthly AI usage + whether they're a paying (pro/active) user.
+// `interactiveTokenCostCents`, when provided, is the REAL token-metered cost of
+// this user's interactive (ask/stream) calls — it overrides the per-call
+// estimate for that portion. Generation calls stay estimate-based.
 export interface UserUsage {
   userId: string;
   email?: string;
   interactive: number;
   generation: number;
   paid: boolean;
+  interactiveTokenCostCents?: number;
+}
+
+// Compute the measured token cost (in cents) from raw token counts + config.
+export function tokenCostCents(
+  promptTokens: number,
+  completionTokens: number,
+  cfg: CostConfig
+): number {
+  return (
+    (promptTokens * cfg.aiInputCostCentsPerM + completionTokens * cfg.aiOutputCostCentsPerM) / 1_000_000
+  );
 }
 
 export interface DangerUser {
@@ -244,6 +261,8 @@ export interface FinancialResult {
   profitPerPaidUserCents: number;
   interactiveCalls: number;
   generationCalls: number;
+  measuredAiCostCents: number;     // portion of aiCost from real token metering
+  estimatedAiCostCents: number;    // portion still based on per-call estimates
   dangerUsers: DangerUser[];
   config: CostConfig;
 }
@@ -265,14 +284,24 @@ export function computeFinancials(
   let interactiveCalls = 0;
   let generationCalls = 0;
   let aiCostCents = 0;
+  let measuredAiCostCents = 0;
+  let estimatedAiCostCents = 0;
 
   const rows: DangerUser[] = [];
   for (const u of users) {
     if (u.paid) activePaid++;
     interactiveCalls += u.interactive;
     generationCalls += u.generation;
-    const userAiCost =
-      u.interactive * cfg.aiInteractiveCostCents + u.generation * cfg.aiGenerationCostCents;
+    // Interactive (ask/stream) cost: real token metering when we have it,
+    // otherwise the per-call estimate. Generation stays estimate-based.
+    const measured = typeof u.interactiveTokenCostCents === 'number';
+    const interactiveCost = measured
+      ? (u.interactiveTokenCostCents as number)
+      : u.interactive * cfg.aiInteractiveCostCents;
+    const generationCost = u.generation * cfg.aiGenerationCostCents;
+    const userAiCost = interactiveCost + generationCost;
+    if (measured) { measuredAiCostCents += interactiveCost; estimatedAiCostCents += generationCost; }
+    else { estimatedAiCostCents += userAiCost; }
     aiCostCents += userAiCost;
 
     const revenueCents = u.paid ? price : 0;
@@ -307,7 +336,12 @@ export function computeFinancials(
   const usersWithUsage = users.filter((u) => u.interactive > 0 || u.generation > 0).length;
   const paidAiCost = users
     .filter((u) => u.paid)
-    .reduce((s, u) => s + u.interactive * cfg.aiInteractiveCostCents + u.generation * cfg.aiGenerationCostCents, 0);
+    .reduce((s, u) => {
+      const interactiveCost = typeof u.interactiveTokenCostCents === 'number'
+        ? u.interactiveTokenCostCents
+        : u.interactive * cfg.aiInteractiveCostCents;
+      return s + interactiveCost + u.generation * cfg.aiGenerationCostCents;
+    }, 0);
 
   const dangerUsers = rows
     .filter((r) => r.aiCostCents > 0 || r.paid)
@@ -329,6 +363,8 @@ export function computeFinancials(
     profitPerPaidUserCents: activePaid > 0 ? _round(netProfitCents / activePaid) : 0,
     interactiveCalls,
     generationCalls,
+    measuredAiCostCents: _round(measuredAiCostCents),
+    estimatedAiCostCents: _round(estimatedAiCostCents),
     dangerUsers,
     config: cfg
   };

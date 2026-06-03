@@ -128,6 +128,11 @@ function initAdminStats(): void {
   if (bucketSel) bucketSel.addEventListener('change', () => { void reloadSignupChart(); });
 }
 
+function _sectionLoading(id: string): void {
+  const el = document.getElementById(id);
+  if (el && !el.innerHTML) el.innerHTML = '<div class="adm-empty">Loading…</div>';
+}
+
 async function loadAdminStats(): Promise<void> {
   if (_statsLoaded) return;
   _statsLoaded = true;
@@ -141,17 +146,25 @@ async function loadAdminStats(): Promise<void> {
     return;
   }
   _initFinanceToggle();
-  try {
-    await Promise.all([
-      loadFinancials(), loadUsage(), loadFinanceSeries(), loadFunnel(),
-      reloadSignupChart(), loadSubscriptionCards(), loadRetention(),
-    ]);
-    if (loading) loading.style.display = 'none';
-    if (body) body.style.display = '';
-  } catch {
-    if (loading) loading.textContent = 'Could not load stats.';
-    _statsLoaded = false; // allow a retry on next open
-  }
+
+  // Reveal the dashboard immediately with per-section "Loading…" placeholders,
+  // then let each section fill in as its own request resolves. Previously we
+  // awaited ALL requests before showing anything, so the whole page waited on
+  // the slowest call (the financials endpoint). Now it feels instant.
+  if (loading) loading.style.display = 'none';
+  if (body) body.style.display = '';
+  ['adminFinanceCards', 'adminFinanceChart', 'adminGrowthCards', 'adminDangerUsers',
+   'adminActivityCards', 'adminSubCards', 'adminFunnel', 'adminRetention'].forEach(_sectionLoading);
+
+  // Fire independently; a slow/failed section never blocks the others.
+  const guard = (p: Promise<void>): Promise<void> => p.catch(() => { /* section shows its own empty state */ });
+  void guard(loadFinancials());
+  void guard(loadUsage());
+  void guard(loadFinanceSeries());
+  void guard(loadSubscriptionCards());
+  void guard(loadRetention());
+  // Funnel reuses the signup scan rather than running a second full one.
+  void guard(reloadSignupChart().then(() => loadFunnel()));
 }
 
 async function reloadSignupChart(): Promise<void> {
@@ -161,9 +174,24 @@ async function reloadSignupChart(): Promise<void> {
   const bucket = bucketSel?.value || _defaultBucketFor(range);
   const data = adminSvc.getSignupStats ? await adminSvc.getSignupStats(range, bucket) : null;
   if (data) {
+    // summary.total is the all-time user count regardless of range — reuse it
+    // for the funnel so we don't trigger a second full auth-users scan.
+    _lastSignupTotal = data.summary.total;
     _renderGrowthCards(data);
     _renderSignupChart(data);
   }
+}
+
+let _lastSignupTotal = 0;
+
+// Subscription snapshot is needed by both the Subscriptions cards and the
+// funnel — fetch it once per dashboard open and share the promise.
+let _subStatsPromise: Promise<SubscriptionStats | null> | null = null;
+function _getSubStats(): Promise<SubscriptionStats | null> {
+  if (!_subStatsPromise) {
+    _subStatsPromise = adminSvc.getSubscriptionStats ? adminSvc.getSubscriptionStats() : Promise.resolve(null);
+  }
+  return _subStatsPromise;
 }
 
 function _renderGrowthCards(data: SignupStats): void {
@@ -285,11 +313,10 @@ function _initFinanceToggle(): void {
 async function loadFunnel(): Promise<void> {
   const host = document.getElementById('adminFunnel');
   if (!host) return;
-  const [signups, subs] = await Promise.all([
-    adminSvc.getSignupStats ? adminSvc.getSignupStats('all', 'month') : Promise.resolve(null),
-    adminSvc.getSubscriptionStats ? adminSvc.getSubscriptionStats() : Promise.resolve(null),
-  ]);
-  const totalUsers = signups?.summary.total ?? 0;
+  // Reuse the shared subscription snapshot + the signup scan's total count
+  // rather than issuing fresh requests.
+  const subs = await _getSubStats();
+  const totalUsers = _lastSignupTotal;
   const stages: Array<[string, number]> = [
     ['Signups', totalUsers],
     ['Trials', subs?.trialsStarted ?? 0],
@@ -315,7 +342,7 @@ async function loadFunnel(): Promise<void> {
 async function loadSubscriptionCards(): Promise<void> {
   const host = document.getElementById('adminSubCards');
   if (!host) return;
-  const data: SubscriptionStats | null = adminSvc.getSubscriptionStats ? await adminSvc.getSubscriptionStats() : null;
+  const data: SubscriptionStats | null = await _getSubStats();
   host.innerHTML = '';
   if (!data) {
     host.innerHTML = '<div class="adm-empty">Subscription stats unavailable.</div>';
@@ -386,6 +413,20 @@ async function loadFinancials(): Promise<void> {
   cards.appendChild(_kpiCard('Active paid', data.activePaid));
   cards.appendChild(_kpiCard('Profit / paid user', _eur(data.profitPerPaidUserCents), undefined, profitTone));
 
+  // Make the scope explicit so an all-zero month reads as "no data yet"
+  // rather than "broken". Figures are current calendar month to date.
+  const now = new Date();
+  const monthName = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  let caption = 'Current month (' + monthName + ') · revenue = active paid × price';
+  if (data.activePaid === 0 && data.aiCostCents === 0) {
+    caption = 'No active paid subscribers and no AI usage recorded yet this month (' + monthName + ').';
+  }
+  const cap = document.createElement('div');
+  cap.className = 'adm-chart-cap';
+  cap.style.cssText = 'grid-column:1/-1;margin-top:2px';
+  cap.textContent = caption;
+  cards.appendChild(cap);
+
   _renderFinanceBreakdown(data);
   _renderDangerUsers(data.dangerUsers);
   _renderCostConfig(data.config);
@@ -408,6 +449,10 @@ function _renderFinanceBreakdown(data: FinancialStats): void {
     '<div class="adm-meter"><span style="width:' + margin + '%"></span></div>' +
     '<div class="adm-note">' +
       data.interactiveCalls + ' interactive + ' + data.generationCalls + ' generation AI calls this month' +
+      (data.measuredAiCostCents > 0
+        ? ' · AI cost = ' + _eur(data.measuredAiCostCents) + ' measured (real tokens) + ' +
+          _eur(data.estimatedAiCostCents) + ' estimated'
+        : ' · AI cost estimated (no token data yet)') +
     '</div>';
 }
 
@@ -455,8 +500,10 @@ const _COST_FIELDS: Array<{ key: keyof CostConfig; label: string; unit: 'eur' | 
   { key: 'monthlyPriceCents', label: 'Subscription price (€)', unit: 'eur', cents: true },
   { key: 'paymentFeePct', label: 'Payment fee (%)', unit: 'pct', cents: false },
   { key: 'paymentFeeFixedCents', label: 'Payment fee fixed (€)', unit: 'eur', cents: true },
-  { key: 'aiInteractiveCostCents', label: 'AI cost / interactive call (¢)', unit: 'pct', cents: false },
-  { key: 'aiGenerationCostCents', label: 'AI cost / generation call (¢)', unit: 'pct', cents: false },
+  { key: 'aiInteractiveCostCents', label: 'Est. AI / interactive call (¢)', unit: 'pct', cents: false },
+  { key: 'aiGenerationCostCents', label: 'Est. AI / generation call (¢)', unit: 'pct', cents: false },
+  { key: 'aiInputCostCentsPerM', label: 'AI input (€ / 1M tokens)', unit: 'eur', cents: true },
+  { key: 'aiOutputCostCentsPerM', label: 'AI output (€ / 1M tokens)', unit: 'eur', cents: true },
   { key: 'supabaseCostCents', label: 'Supabase / mo (€)', unit: 'eur', cents: true },
   { key: 'hostingCostCents', label: 'Hosting / mo (€)', unit: 'eur', cents: true },
   { key: 'otherCostCents', label: 'Other / mo (€)', unit: 'eur', cents: true },
