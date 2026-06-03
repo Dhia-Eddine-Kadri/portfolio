@@ -1316,9 +1316,9 @@
       {
         key: 'pages', ms: 6800, icon: 'layout-dashboard', cursor: 'tour-cursor-pages',
         eyebrow: 'Step 1 · Product map',
-        title: 'See the useful Minallo pages first.',
-        body: 'The tour starts with the real app structure: Dashboard, Courses, PDF Workspace, AI Tutor, Chatbot, Chat, Games, Study Lounge, Profile, Settings, and Subscription.',
-        calls: [['Expand rail', 6, 6.2, 0], ['Profile', 6, 14.9, 900], ['Courses', 6, 39, 1800], ['Lecture Notes', 6, 51.4, 2700], ['Editor', 6, 63.8, 3600], ['Chatbot', 6, 76.3, 4700]],
+        title: 'Start from the real Minallo shell.',
+        body: 'The preview opens on an empty dashboard so the tour focuses on the actual sidebar and the next useful action.',
+        calls: [['Open Courses', 6, 39, 0]],
         build: buildPagesOverview
       },
       {
@@ -1404,20 +1404,7 @@
         '</div>';
     }
     function buildPagesOverview(scene) {
-      var cards = [
-        ['Dashboard', 'Today plan, progress, active courses'],
-        ['Courses', 'Real semester course workspace'],
-        ['PDF Workspace', 'Viewer, annotations, document rail'],
-        ['AI Tutor', 'Course-grounded answer panel'],
-        ['Chatbot', 'Full study conversations'],
-        ['Chat', 'Rooms and classmates'],
-        ['Games', 'Revision and streaks'],
-        ['Study Lounge', 'Activity and motivation'],
-        ['Profile', 'Student setup'],
-        ['Settings', 'Preferences'],
-        ['Subscription', 'Plan and free trial']
-      ].map(function (c) { return '<div class="nl-mini-card"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join('');
-      var main = '<div class="nl-mini-dashboard-hero"><span>Workspace overview</span><h4>Start from the real Minallo shell.</h4><p>The preview begins with the collapsed rail students actually use.</p></div><div class="nl-mini-grid nl-mini-grid--dense">' + cards + '</div>';
+      var main = '<div class="nl-mini-empty-dashboard" aria-hidden="true"></div>';
       return tourFrame(scene, miniShell('Dashboard', main));
     }
     function buildCoursesSetup(scene) {

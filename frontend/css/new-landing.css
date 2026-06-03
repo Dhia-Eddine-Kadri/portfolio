@@ -2635,6 +2635,13 @@ body.nl-pv-open {
   color: rgba(186, 230, 253, 0.78);
   font-weight: 800;
 }
+.nl-mini-empty-dashboard {
+  flex: 1 1 auto;
+  min-height: 27rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  background: rgba(8, 15, 31, 0.22);
+}
 .nl-mini-hero,
 .nl-mini-dashboard-hero {
   padding: 1rem;
@@ -3258,12 +3265,7 @@ body.nl-pv-open {
   to { opacity: 1; transform: scale(1); }
 }
 @keyframes nl-tour-pages {
-  0%, 14% { left: 6%; top: 6.2%; }
-  18%, 30% { left: 6%; top: 14.9%; }
-  34%, 46% { left: 6%; top: 39%; }
-  50%, 62% { left: 6%; top: 51.4%; }
-  66%, 78% { left: 6%; top: 63.8%; }
-  84%, 100% { left: 6%; top: 76.3%; }
+  0%, 100% { left: 6%; top: 39%; }
 }
 @keyframes nl-tour-courses {
   0%, 16% { left: 77%; top: 17%; }
