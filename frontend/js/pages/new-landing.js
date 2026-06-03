@@ -230,6 +230,7 @@
           gameQ: 'der / die / das  Apfel?', gameA: 'der'
         },
         course: {
+          shell: { chapter: 'Shell', eyebrow: 'Step 1 · App shell', headline: 'Start from the real Minallo sidebar.', body: 'The preview opens on an empty dashboard and uses the same sidebar order and icons students see in the app.' },
           upload: { chapter: 'Upload', eyebrow: 'Step 1 · Set up', headline: 'Start with your real material.', body: 'Drop in lecture PDFs, exercise sheets, and formula collections. Minallo organizes them into one course workspace.' },
           ask: { chapter: 'Ask', eyebrow: 'Step 2 · Ask', headline: 'Ask in your own words.', body: 'No prompt engineering. Ask the way you would ask a tutor sitting next to you.' },
           sources: { chapter: 'Sources', eyebrow: 'Step 3 · Retrieve', headline: 'It finds the exact pages.', body: 'Minallo searches your files and pulls the passages that actually answer the question.' },
@@ -450,6 +451,7 @@
           gameQ: 'der / die / das  Apfel?', gameA: 'der'
         },
         course: {
+          shell: { chapter: 'Shell', eyebrow: 'Schritt 1 · App-Shell', headline: 'Starte mit der echten Minallo-Seitenleiste.', body: 'Die Vorschau öffnet ein leeres Dashboard und nutzt dieselbe Reihenfolge und dieselben Icons wie die App.' },
           upload: { chapter: 'Hochladen', eyebrow: 'Schritt 1 · Einrichten', headline: 'Beginne mit deinem echten Material.', body: 'Lade Vorlesungs-PDFs, Übungsblätter und Formelsammlungen hoch. Minallo ordnet sie in einem Kurs-Workspace.' },
           ask: { chapter: 'Fragen', eyebrow: 'Schritt 2 · Fragen', headline: 'Frag in deinen eigenen Worten.', body: 'Kein Prompt-Engineering. Frag so, wie du einen Tutor neben dir fragen würdest.' },
           sources: { chapter: 'Quellen', eyebrow: 'Schritt 3 · Finden', headline: 'Es findet die genauen Seiten.', body: 'Minallo durchsucht deine Dateien und zieht die Stellen heraus, die die Frage wirklich beantworten.' },
@@ -960,9 +962,56 @@
       ti.appendChild(el('span', 'nl-pv-tile__sub', sub));
       return ti;
     }
+    function navIcon(label, icon, active) {
+      var item = el('div', 'nl-mini-nav__item' + (active ? ' is-active' : ''));
+      item.setAttribute('title', label);
+      item.setAttribute('aria-label', label);
+      var wrap = el('span', 'nl-mini-nav__icon');
+      wrap.appendChild(buildSvgUse(icon, 24));
+      item.appendChild(wrap);
+      item.appendChild(el('b', null, label));
+      return item;
+    }
+    function appShell(active, main) {
+      var frame = el('div', 'nl-tour nl-tour--shell');
+      var screen = el('div', 'nl-tour__screen');
+      var shell = el('div', 'nl-mini-shell');
+      var aside = el('aside', 'nl-mini-nav');
+      var list = el('div', 'nl-mini-nav-list');
+      [
+        ['Home', 'sb-home'],
+        ['Courses', 'sb-courses'],
+        ['Lecture Notes', 'sb-notes'],
+        ['Editor', 'sb-editor'],
+        ['Chatbot', 'sb-chatbot'],
+        ['Chat', 'sb-chat'],
+        ['__divider__', ''],
+        ['Notifications', 'bell']
+      ].forEach(function (p) {
+        if (p[0] === '__divider__') list.appendChild(el('i', 'nl-mini-divider'));
+        else list.appendChild(navIcon(p[0], p[1], p[0] === active));
+      });
+      aside.appendChild(list);
+      shell.appendChild(aside);
+      var content = el('section', 'nl-mini-main');
+      var top = el('div', 'nl-mini-top');
+      top.appendChild(el('strong', null, active === 'Home' ? 'Dashboard' : active));
+      top.appendChild(el('span', null, tFull('logo.tag')));
+      content.appendChild(top);
+      var scroll = el('div', 'nl-mini-scroll');
+      scroll.appendChild(main);
+      content.appendChild(scroll);
+      shell.appendChild(content);
+      screen.appendChild(shell);
+      frame.appendChild(screen);
+      return frame;
+    }
 
     // -- scene visual builders (each returns a DOM node) --
     var builders = {
+      shell: function () {
+        return appShell('Home', el('div', 'nl-mini-empty-dashboard'));
+      },
       upload: function () {
         var m = mock();
         m.appendChild(badge('check-circle-2', L('synced')));
@@ -1093,6 +1142,7 @@
     // -- track definitions (single source of truth) --
     var TRACKS = {
       course: [
+        { keyBase: 'course.shell',   build: 'shell',   ms: 5200 },
         { keyBase: 'course.upload',  build: 'upload',  ms: 4200 },
         { keyBase: 'course.ask',     build: 'ask',     ms: 4000 },
         { keyBase: 'course.sources', build: 'sources', ms: 4200 },
@@ -1291,6 +1341,9 @@
   }
 
   function initProductTourModal() {
+    if (!_pvApi) initPreviewModal();
+    return;
+
     var modal = document.getElementById('nlPreviewModal');
     if (!modal) return;
 
