@@ -1314,11 +1314,11 @@
     var state = { index: 0, playing: false, timer: null, lastFocus: null, hover: false };
     var SCENES = [
       {
-        key: 'pages', ms: 6800, icon: 'layout-dashboard', cursor: 'tour-cursor-pages',
+        key: 'pages', ms: 8400, icon: 'layout-dashboard', cursor: 'tour-cursor-pages',
         eyebrow: 'Step 1 · Product map',
         title: 'Start from the real Minallo shell.',
         body: 'The preview opens on an empty dashboard so the tour focuses on the actual sidebar and the next useful action.',
-        calls: [['Open Courses', 6, 39, 0]],
+        calls: [['Expand menu', 6, 6.2, 0], ['Profile', 6, 14.9, 1200], ['Dashboard', 6, 27, 2400], ['Courses', 6, 39, 3600], ['Lecture Notes', 6, 51.4, 4800], ['Editor', 6, 63.8, 6000], ['Chatbot', 6, 76.3, 7200]],
         build: buildPagesOverview
       },
       {
@@ -1476,7 +1476,7 @@
       var sc = SCENES[state.index];
       clearChildren(els.visual);
       els.visual.appendChild(sc.build(sc));
-      els.eyebrow.textContent = sc.eyebrow;
+      els.eyebrow.textContent = sc.key === 'pages' ? 'Step 1 - App shell' : sc.eyebrow;
       els.headline.textContent = sc.title;
       els.body.textContent = sc.body;
       els.dialog.style.setProperty('--nl-pv-dwell', sc.ms + 'ms');

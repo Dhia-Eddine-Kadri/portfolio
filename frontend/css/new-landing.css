@@ -3100,8 +3100,8 @@ body.nl-pv-open {
 .nl-tour-cursor::after {
   content: '';
   position: absolute;
-  left: 0.5rem;
-  top: 0.56rem;
+  left: 0.34rem;
+  top: 0.32rem;
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 999px;
@@ -3120,8 +3120,9 @@ body.nl-pv-open {
   font-size: 0.62rem;
   font-weight: 900;
   opacity: 0;
-  transform: translateY(6px);
+  transform: translate(1.15rem, -50%);
   animation: nl-tour-call 1.7s ease both;
+  white-space: nowrap;
 }
 .nl-tour-click {
   position: absolute;
@@ -3135,11 +3136,22 @@ body.nl-pv-open {
   pointer-events: none;
   animation: nl-tour-click 0.72s ease-out both;
 }
-.tour-cursor-pages { animation: nl-tour-pages 6.6s ease-in-out infinite; }
+.tour-cursor-pages { animation: nl-tour-pages 8.4s ease-in-out infinite; }
 .tour-cursor-courses { animation: nl-tour-courses 7.4s ease-in-out infinite; }
 .tour-cursor-rail { animation: nl-tour-rail 7.4s ease-in-out infinite; }
 .tour-cursor-practice { animation: nl-tour-practice 6.6s ease-in-out infinite; }
 .tour-cursor-chatbot { animation: nl-tour-chatbot 7s ease-in-out infinite; }
+
+.nl-tour--pages .nl-tour-call {
+  animation: nl-tour-step-call 8.4s ease-in-out infinite both;
+}
+.nl-tour--pages .nl-tour-click {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: -1.75rem 0 0 -1.75rem;
+  border-color: rgba(56, 189, 248, 0.92);
+  animation: nl-tour-step-click 8.4s ease-in-out infinite both;
+}
 
 .nl-tour--courses .nl-mini-add {
   animation: nl-tour-target 1.1s ease 0s both;
@@ -3245,6 +3257,15 @@ body.nl-pv-open {
   20% { opacity: 1; transform: scale(0.75); }
   100% { opacity: 0; transform: scale(1.8); }
 }
+@keyframes nl-tour-step-call {
+  0%, 17%, 100% { opacity: 0; transform: translate(1rem, -50%) scale(0.96); }
+  3%, 13% { opacity: 1; transform: translate(1.25rem, -50%) scale(1); }
+}
+@keyframes nl-tour-step-click {
+  0%, 17%, 100% { opacity: 0; transform: scale(0.92); }
+  3%, 12% { opacity: 1; transform: scale(1); }
+  16% { opacity: 0; transform: scale(1.14); }
+}
 @keyframes nl-tour-target {
   0%, 100% { box-shadow: none; transform: none; }
   45% { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18), 0 0 24px rgba(56, 189, 248, 0.32); transform: translateY(-1px); }
@@ -3265,7 +3286,13 @@ body.nl-pv-open {
   to { opacity: 1; transform: scale(1); }
 }
 @keyframes nl-tour-pages {
-  0%, 100% { left: 6%; top: 39%; }
+  0%, 11% { left: 6%; top: 6.2%; }
+  14%, 25% { left: 6%; top: 14.9%; }
+  28%, 39% { left: 6%; top: 27%; }
+  42%, 53% { left: 6%; top: 39%; }
+  56%, 67% { left: 6%; top: 51.4%; }
+  70%, 81% { left: 6%; top: 63.8%; }
+  84%, 100% { left: 6%; top: 76.3%; }
 }
 @keyframes nl-tour-courses {
   0%, 16% { left: 77%; top: 17%; }
