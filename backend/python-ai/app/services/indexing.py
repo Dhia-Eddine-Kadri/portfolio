@@ -657,6 +657,19 @@ def _replace_pages(
             "page_number": page_number,
             "raw_text": raw,
             "cleaned_text": text,
+            # Uniform defaults for the additive OCR columns. PostgREST normalises
+            # a batch insert to the UNION of keys across its rows and sends an
+            # explicit NULL for any row missing a key — so a MIXED batch (some
+            # OCR'd pages carrying ocr_* keys, some not) would push NULL into the
+            # NOT NULL columns (ocr_needs_review / ocr_unclear_count) and fail.
+            # A column DEFAULT only applies when the key is omitted from EVERY
+            # row. Setting defaults on every row keeps the batch uniform; the
+            # ocr_page_metadata update below overrides them for recovered pages.
+            "ocr_provider": None,
+            "ocr_mode": None,
+            "ocr_confidence": None,
+            "ocr_needs_review": False,
+            "ocr_unclear_count": 0,
         }
         md = md_by_page.get(page_number)
         if md is not None:
