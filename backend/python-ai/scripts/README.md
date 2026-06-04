@@ -2,6 +2,34 @@
 
 Utility scripts for live evaluation and manual tuning of the Python AI service.
 
+## `diagnose_cheatsheet_source.py`
+
+Read-only Stage 0 diagnostic for the cheatsheet upgrade. Answers **where**
+formulas are being lost — indexing, retrieval, or generation — before any
+generation work is done. Makes no writes; embedding calls only for the
+optional per-topic retrieval probe.
+
+```bash
+cd backend/python-ai
+py scripts/diagnose_cheatsheet_source.py --course <uuid> --user dalimovich.pp@gmail.com
+py scripts/diagnose_cheatsheet_source.py --course <uuid> --topics 10
+py scripts/diagnose_cheatsheet_source.py --course <uuid> --no-retrieval   # skip embeddings
+```
+
+Reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY` from
+`backend/python-ai/.env`. Writes a Markdown report to `scripts/diag_runs/` and
+prints a one-line **VERDICT**:
+
+- **INDEXING** — formulas weren't extracted cleanly at upload. Per the no-reindex
+  rule, fix the ingestion path for future uploads or re-upload the key lecture.
+- **RETRIEVAL** — formulas are indexed but don't surface per topic. Cheap to fix
+  (formula-aware queries / ranking), no reindex.
+- **GENERATION** — indexing + retrieval are healthy; proceed to Stage 1.
+
+The verdict is a heuristic over: `document_formulas` count + LaTeX cleanliness,
+formula-bearing chunk density, page extraction quality, and per-topic retrieval
+coverage. Read the full report, don't act on the headline alone.
+
 ## `run_math_eval.py`
 
 Runs the math/RAG fixture at a live `/ask` endpoint and writes a Markdown report under `scripts/eval_runs/`.
