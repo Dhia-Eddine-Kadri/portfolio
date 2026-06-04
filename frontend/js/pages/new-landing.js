@@ -1427,6 +1427,12 @@
         thinking.appendChild(el('span'));
         chat.appendChild(thinking);
 
+        var status = el('div', 'nl-pv-ask-status');
+        status.appendChild(el('span', null, 'Searching course files...'));
+        var statusBar = el('i');
+        status.appendChild(statusBar);
+        chat.appendChild(status);
+
         var answer = el('div', 'nl-pv-bubble nl-pv-bubble--ai nl-pv-ask-answer');
         answer.appendChild(el('p', null, 'I found the matching exercise and formula sheet. Use the equilibrium equations, substitute the given force and distances, then check the signs with force balance.'));
         answer.appendChild(el('div', 'nl-pv-formula', 'ΣF = 0  ·  ΣM = 0'));
