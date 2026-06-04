@@ -141,11 +141,70 @@
   font-weight: 800;
 }
 
+.ef-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ef-link-muted {
+  color: #a9b7ca;
+}
+
 .ef-docs,
 .ef-sessions,
 .ef-question-list {
   display: grid;
   gap: 10px;
+}
+
+.ef-doc-group {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, .42);
+}
+
+.ef-doc-group-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 11px;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  background: rgba(30, 41, 59, .46);
+}
+
+.ef-folder-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, .12);
+  font-size: .8rem;
+}
+
+.ef-folder-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.ef-folder-count {
+  color: #93a4bb;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.ef-doc-group-list {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
 }
 
 .ef-history-head {
@@ -162,6 +221,10 @@
   border: 1px solid rgba(148, 163, 184, .16);
   border-radius: 12px;
   background: rgba(15, 23, 42, .58);
+}
+
+.ef-doc {
+  border-radius: 10px;
 }
 
 .ef-doc-name,

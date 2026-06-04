@@ -98,7 +98,10 @@
         '<aside class="ef-side">' +
           '<div class="ef-side-head">' +
             '<div><h3>Sources</h3><p id="efDocStatus">Loading course files...</p></div>' +
-            '<button class="ef-link" id="efSelectAll" type="button">Select ready</button>' +
+            '<div class="ef-source-actions">' +
+              '<button class="ef-link" id="efSelectAll" type="button">Select ready</button>' +
+              '<button class="ef-link ef-link-muted" id="efClearSelection" type="button">Clear</button>' +
+            '</div>' +
           '</div>' +
           '<div class="ef-docs" id="efDocs"></div>' +
           '<div class="ef-side-head ef-history-head">' +
@@ -135,10 +138,41 @@
       docs: root.querySelector('#efDocs'),
       docStatus: root.querySelector('#efDocStatus'),
       selectAll: root.querySelector('#efSelectAll'),
+      clearSelection: root.querySelector('#efClearSelection'),
       sessions: root.querySelector('#efSessions'),
       empty: root.querySelector('#efEmpty'),
       exam: root.querySelector('#efExam'),
     };
+
+    function courseFolderNameFor(fileName) {
+      var name = String(fileName || '').trim();
+      if (!name || !course || !course.userFolders) return null;
+      for (var i = 0; i < course.userFolders.length; i++) {
+        var fd = course.userFolders[i];
+        var files = (fd && fd.files) || [];
+        for (var j = 0; j < files.length; j++) {
+          if (String(files[j].name || '') === name) return fd.name || null;
+        }
+      }
+      return null;
+    }
+
+    function groupedDocs() {
+      var groups = [];
+      var byName = {};
+      (course.userFolders || []).forEach(function (fd) {
+        var group = { name: fd.name || 'Folder', docs: [] };
+        groups.push(group);
+        byName[group.name] = group;
+      });
+      var loose = { name: 'Separate files', docs: [] };
+      st.docs.forEach(function (d) {
+        var folder = courseFolderNameFor(d.file_name);
+        if (folder && byName[folder]) byName[folder].docs.push(d);
+        else loose.docs.push(d);
+      });
+      return groups.filter(function (g) { return g.docs.length; }).concat(loose.docs.length ? [loose] : []);
+    }
 
     function renderDocs() {
       var summary = _docSummary(st.docs);
@@ -152,15 +186,34 @@
         els.docs.innerHTML = '<div class="ef-muted">No course files found yet.</div>';
         return;
       }
-      els.docs.innerHTML = st.docs.map(function (d) {
-        var ready = d.processing_status === 'ready';
-        var checked = ready ? ' checked' : '';
+      var groups = groupedDocs();
+      if (!groups.length) {
+        els.docs.innerHTML = '<div class="ef-muted">No organized indexed files found yet.</div>';
+        return;
+      }
+      els.docs.innerHTML = groups.map(function (group) {
+        var readyCount = group.docs.filter(function (d) { return d.processing_status === 'ready'; }).length;
         return (
-          '<label class="ef-doc ' + (ready ? 'is-ready' : 'is-muted') + '">' +
-            '<input type="checkbox" value="' + _esc(d.id) + '"' + checked + (ready ? '' : ' disabled') + '>' +
-            '<span class="ef-doc-name">' + _esc(d.file_name || 'Untitled') + '</span>' +
-            '<span class="ef-doc-state">' + _esc(ready ? 'Ready' : (d.processing_status || 'Waiting')) + '</span>' +
-          '</label>'
+          '<section class="ef-doc-group">' +
+            '<div class="ef-doc-group-head">' +
+              '<span class="ef-folder-icon">▣</span>' +
+              '<span class="ef-folder-name">' + _esc(group.name) + '</span>' +
+              '<span class="ef-folder-count">' + readyCount + '/' + group.docs.length + ' ready</span>' +
+            '</div>' +
+            '<div class="ef-doc-group-list">' +
+              group.docs.map(function (d) {
+                var ready = d.processing_status === 'ready';
+                var checked = ready ? ' checked' : '';
+                return (
+                  '<label class="ef-doc ' + (ready ? 'is-ready' : 'is-muted') + '">' +
+                    '<input type="checkbox" value="' + _esc(d.id) + '"' + checked + (ready ? '' : ' disabled') + '>' +
+                    '<span class="ef-doc-name">' + _esc(d.file_name || 'Untitled') + '</span>' +
+                    '<span class="ef-doc-state">' + _esc(ready ? 'Ready' : (d.processing_status || 'Waiting')) + '</span>' +
+                  '</label>'
+                );
+              }).join('') +
+            '</div>' +
+          '</section>'
         );
       }).join('');
     }
@@ -322,6 +375,15 @@
         if (!els.docs) return;
         els.docs.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(function (box) {
           box.checked = true;
+        });
+      });
+    }
+
+    if (els.clearSelection) {
+      els.clearSelection.addEventListener('click', function () {
+        if (!els.docs) return;
+        els.docs.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+          box.checked = false;
         });
       });
     }
