@@ -2422,6 +2422,276 @@ body.nl-pv-open {
   margin-top: 0.3rem;
 }
 
+.nl-pv-german-scene {
+  min-height: 17.5rem;
+  gap: 0.72rem;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(110, 231, 183, 0.11), transparent 34%),
+    radial-gradient(circle at 88% 4%, rgba(56, 189, 248, 0.10), transparent 32%),
+    linear-gradient(160deg, rgba(6, 78, 59, 0.34), rgba(2, 6, 23, 0.58));
+}
+.nl-pv-german-plan {
+  display: grid;
+  gap: 0.55rem;
+}
+.nl-pv-german-plan .nl-pv-row {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: nl-pv-german-rise 0.44s ease forwards;
+}
+.nl-pv-german-plan .nl-pv-row:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.nl-pv-german-plan .nl-pv-row:nth-child(3) {
+  animation-delay: 0.36s;
+}
+.nl-pv-german-card {
+  min-height: 8.8rem;
+  padding: 0;
+  overflow: hidden;
+  perspective: 900px;
+}
+.nl-pv-german-card__inner {
+  position: relative;
+  width: 100%;
+  min-height: 8.8rem;
+  transform-style: preserve-3d;
+  animation: nl-pv-german-flip 4.2s ease-in-out infinite;
+}
+.nl-pv-german-card__face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.28rem;
+  padding: 1rem;
+  backface-visibility: hidden;
+}
+.nl-pv-german-card__face strong {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+.nl-pv-german-card__face span {
+  color: var(--nl-sky-100);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.nl-pv-german-card__face small {
+  color: var(--nl-slate-400);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.nl-pv-german-card__face--back {
+  transform: rotateY(180deg);
+}
+.nl-pv-german-article {
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.34);
+}
+.nl-pv-german-card__chips .nl-pv-chip {
+  opacity: 0;
+  transform: translateY(7px);
+  animation: nl-pv-german-rise 0.35s ease forwards;
+  animation-delay: 2.25s;
+}
+.nl-pv-german-card__chips .nl-pv-chip:nth-child(2) {
+  animation-delay: 2.45s;
+}
+.nl-pv-german-chat .nl-pv-bubble p {
+  margin: 0;
+}
+.nl-pv-german-question,
+.nl-pv-german-answer {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: nl-pv-german-rise 0.42s ease forwards;
+}
+.nl-pv-german-answer {
+  animation-delay: 0.85s;
+}
+.nl-pv-german-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+.nl-pv-german-rule span,
+.nl-pv-german-rule strong {
+  padding: 0.46rem 0.55rem;
+  border-radius: 0.55rem;
+  text-align: center;
+  font-size: 0.76rem;
+}
+.nl-pv-german-rule span {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--nl-slate-300);
+  text-decoration: line-through;
+}
+.nl-pv-german-rule strong {
+  background: rgba(110, 231, 183, 0.16);
+  border: 1px solid rgba(110, 231, 183, 0.35);
+  color: var(--nl-emerald-100);
+}
+.nl-pv-german-input {
+  display: grid;
+  align-items: center;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(2, 6, 23, 0.46);
+  color: #fff;
+  font-weight: 850;
+  overflow: hidden;
+}
+.nl-pv-german-input span {
+  display: inline-block;
+  max-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: nl-pv-german-type 2.2s steps(31, end) forwards;
+}
+.nl-pv-german-input span::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--nl-sky-200);
+  vertical-align: -0.12em;
+  animation: nl-pv-caret 0.8s steps(1, end) infinite;
+}
+.nl-pv-german-sentences .nl-pv-row,
+.nl-pv-german-sentences .nl-pv-chips {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: nl-pv-german-rise 0.38s ease forwards;
+}
+.nl-pv-german-sentences .nl-pv-row:nth-child(3) {
+  animation-delay: 1.2s;
+}
+.nl-pv-german-sentences .nl-pv-chips {
+  animation-delay: 2.25s;
+}
+.nl-pv-german-game__q {
+  padding: 0.8rem;
+  border-radius: 0.85rem;
+  background: rgba(2, 6, 23, 0.42);
+  border: 1px solid var(--nl-white-08);
+  color: #fff;
+  font-weight: 900;
+  text-align: center;
+}
+.nl-pv-german-game .nl-pv-chip {
+  min-width: 4.25rem;
+  justify-content: center;
+  transform: translateY(4px);
+  animation: nl-pv-german-option 3.2s ease-in-out infinite;
+}
+.nl-pv-german-game .nl-pv-chip:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.nl-pv-german-game .nl-pv-chip:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.nl-pv-german-game .nl-pv-chip.is-correct {
+  background: rgba(110, 231, 183, 0.18);
+  border-color: rgba(110, 231, 183, 0.55);
+  color: var(--nl-emerald-100);
+  animation-name: nl-pv-german-correct;
+}
+.nl-pv-german-feedback {
+  align-self: flex-start;
+  padding: 0.42rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(110, 231, 183, 0.14);
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  color: var(--nl-emerald-100);
+  font-size: 0.72rem;
+  font-weight: 900;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: nl-pv-german-rise 0.36s ease forwards;
+  animation-delay: 1.4s;
+}
+.nl-pv-german-progress .nl-pv-bar__fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: nl-pv-german-progress-fill 1.8s ease forwards;
+}
+.nl-pv-german-progress .nl-pv-bar:nth-of-type(2) .nl-pv-bar__fill {
+  animation-delay: 0.35s;
+}
+.nl-pv-german-cta {
+  align-items: center;
+  text-align: center;
+}
+.nl-pv-german-cta .nl-pv-tile__icon {
+  animation: nl-pv-send-pulse 1.05s ease-in-out infinite;
+}
+.nl-pv-german-cta__word {
+  color: #fff;
+  font-size: 1.55rem;
+  font-weight: 950;
+}
+.nl-pv-german-cta__line {
+  max-width: 22rem;
+  color: var(--nl-slate-300);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@keyframes nl-pv-german-rise {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes nl-pv-german-flip {
+  0%, 38% { transform: rotateY(0); }
+  52%, 88% { transform: rotateY(180deg); }
+  100% { transform: rotateY(360deg); }
+}
+@keyframes nl-pv-german-type {
+  to { max-width: 24rem; }
+}
+@keyframes nl-pv-german-option {
+  50% { transform: translateY(0); }
+}
+@keyframes nl-pv-german-correct {
+  45%, 70% {
+    transform: translateY(0) scale(1.04);
+    box-shadow: 0 0 0 8px rgba(110, 231, 183, 0.12);
+  }
+}
+@keyframes nl-pv-german-progress-fill {
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nl-pv-german-plan .nl-pv-row,
+  .nl-pv-german-card__inner,
+  .nl-pv-german-card__chips .nl-pv-chip,
+  .nl-pv-german-question,
+  .nl-pv-german-answer,
+  .nl-pv-german-input span,
+  .nl-pv-german-input span::after,
+  .nl-pv-german-sentences .nl-pv-row,
+  .nl-pv-german-sentences .nl-pv-chips,
+  .nl-pv-german-game .nl-pv-chip,
+  .nl-pv-german-feedback,
+  .nl-pv-german-progress .nl-pv-bar__fill,
+  .nl-pv-german-cta .nl-pv-tile__icon {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .nl-pv-german-input span {
+    max-width: none;
+  }
+}
+
 .nl-pv-ask-scene {
   --nl-pv-ask-cycle: 7600ms;
   min-height: 21rem;

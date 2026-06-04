@@ -1613,64 +1613,99 @@
         return m;
       },
       gIntro: function () {
-        var m = mock();
+        var m = mock('nl-pv-german-scene nl-pv-german-intro');
         var chips = el('div', 'nl-pv-chips');
-        chips.appendChild(chip('languages', 'der · die · das'));
-        chips.appendChild(chip('book-open', 'A1 – B2'));
+        chips.appendChild(chip('languages', 'A2 German'));
+        chips.appendChild(chip('book-open', 'Today: articles + cafe phrases'));
         m.appendChild(chips);
-        m.appendChild(row('languages', t('german.intro.chapter'), ''));
+        var plan = el('div', 'nl-pv-german-plan');
+        plan.appendChild(row('layers-3', '12 words', '8 min'));
+        plan.appendChild(row('graduation-cap', 'Dative case', '5 min'));
+        plan.appendChild(row('quote', 'Order politely', '4 min'));
+        m.appendChild(plan);
         return m;
       },
       gVocab: function () {
-        var m = mock();
-        var card = el('div', 'nl-pv-flip');
-        var inner = el('div');
-        inner.appendChild(el('div', 'nl-pv-flip__front', M('vocabFront')));
-        inner.appendChild(el('div', 'nl-pv-flip__back', M('vocabBack')));
+        var m = mock('nl-pv-german-scene');
+        var card = el('div', 'nl-pv-flip nl-pv-german-card');
+        var inner = el('div', 'nl-pv-german-card__inner');
+        var front = el('div', 'nl-pv-german-card__face');
+        front.appendChild(el('span', 'nl-pv-german-article', 'die'));
+        front.appendChild(el('strong', null, 'Rechnung'));
+        front.appendChild(el('small', null, 'tap / wait to reveal'));
+        var back = el('div', 'nl-pv-german-card__face nl-pv-german-card__face--back');
+        back.appendChild(el('strong', null, 'the bill'));
+        back.appendChild(el('span', null, 'Kann ich bitte die Rechnung haben?'));
+        inner.appendChild(front);
+        inner.appendChild(back);
         card.appendChild(inner);
         m.appendChild(card);
-        m.appendChild(el('p', 'nl-pv-tile__sub', L('tapToFlip')));
+        var saved = el('div', 'nl-pv-chips nl-pv-german-card__chips');
+        saved.appendChild(chip('languages', 'listen'));
+        saved.appendChild(chip('check-circle-2', 'saved'));
+        m.appendChild(saved);
         return m;
       },
       gGrammar: function () {
-        var m = mock();
-        m.appendChild(badge('graduation-cap', t('german.grammar.chapter')));
-        m.appendChild(el('div', 'nl-pv-bubble nl-pv-bubble--ai', M('grammarTip')));
+        var m = mock('nl-pv-german-scene nl-pv-german-chat');
+        m.appendChild(badge('graduation-cap', 'Dative after "mit"'));
+        m.appendChild(el('div', 'nl-pv-bubble nl-pv-bubble--user nl-pv-german-question', 'Why is it "mit dem Mann" and not "mit der Mann"?'));
+        var answer = el('div', 'nl-pv-bubble nl-pv-bubble--ai nl-pv-german-answer');
+        answer.appendChild(el('p', null, '"mit" always takes dative. Masculine "der Mann" changes to "dem Mann".'));
+        var rule = el('div', 'nl-pv-german-rule');
+        rule.appendChild(el('span', null, 'der Mann'));
+        rule.appendChild(el('strong', null, 'mit dem Mann'));
+        answer.appendChild(rule);
+        m.appendChild(answer);
         return m;
       },
       gSentences: function () {
-        var m = mock();
-        m.appendChild(row('quote', M('sentence1'), ''));
-        m.appendChild(el('p', 'nl-pv-tile__sub', M('sentence1Gloss')));
-        m.appendChild(row('quote', M('sentence2'), ''));
-        m.appendChild(el('p', 'nl-pv-tile__sub', M('sentence2Gloss')));
-        return m;
-      },
-      gGames: function () {
-        var m = mock();
-        m.appendChild(el('div', 'nl-pv-flip__front', M('gameQ')));
+        var m = mock('nl-pv-german-scene nl-pv-german-sentences');
+        m.appendChild(row('quote', 'I would like a coffee.', 'translate'));
+        var typed = el('div', 'nl-pv-german-input');
+        typed.appendChild(el('span', null, 'Ich hätte gern einen Kaffee.'));
+        m.appendChild(typed);
+        m.appendChild(row('check-circle-2', 'Natural and polite', 'B1'));
         var chips = el('div', 'nl-pv-chips');
-        ['der', 'die', 'das'].forEach(function (opt) {
-          var c = chip('gamepad-2', opt);
-          if (opt === M('gameA')) c.style.borderColor = 'rgba(110,231,183,0.55)';
-          chips.appendChild(c);
-        });
+        chips.appendChild(chip('quote', 'Könnten Sie...?'));
+        chips.appendChild(chip('quote', 'Ich suche...'));
         m.appendChild(chips);
         return m;
       },
+      gGames: function () {
+        var m = mock('nl-pv-german-scene nl-pv-german-game');
+        m.appendChild(el('div', 'nl-pv-german-game__q', 'Choose the article: Apfel'));
+        var chips = el('div', 'nl-pv-chips');
+        ['der', 'die', 'das'].forEach(function (opt) {
+          var c = chip('gamepad-2', opt);
+          if (opt === 'der') c.classList.add('is-correct');
+          chips.appendChild(c);
+        });
+        m.appendChild(chips);
+        m.appendChild(el('div', 'nl-pv-german-feedback', 'Correct: der Apfel'));
+        return m;
+      },
       gStreak: function () {
-        var m = mock();
+        var m = mock('nl-pv-german-scene nl-pv-german-progress');
         var sr = el('div', 'nl-pv-streak');
         sr.appendChild(buildSvgUse('trophy', 16));
         sr.appendChild(el('span', null, L('dayStreak')));
         m.appendChild(sr);
-        m.appendChild(bar(72));
+        m.appendChild(row('languages', 'Vocabulary', '84%'));
+        m.appendChild(bar(84));
+        m.appendChild(row('graduation-cap', 'Grammar', '68%'));
+        m.appendChild(bar(68));
         return m;
       },
       gCta: function () {
-        var m = mock();
+        var m = mock('nl-pv-german-scene nl-pv-german-cta');
         var ic = el('div', 'nl-pv-tile__icon'); ic.appendChild(buildSvgUse('sparkles', 26)); m.appendChild(ic);
-        m.appendChild(el('div', 'nl-pv-flip__front', 'Deutsch'));
+        m.appendChild(el('div', 'nl-pv-german-cta__word', 'Deutsch'));
+        m.appendChild(el('div', 'nl-pv-german-cta__line', '10 minutes today: words, grammar, speaking'));
+        var ctaChips = el('div', 'nl-pv-chips');
+        ctaChips.appendChild(chip('check-circle-2', 'ready'));
+        ctaChips.appendChild(chip('trophy', 'next streak'));
+        m.appendChild(ctaChips);
         return m;
       }
     };
