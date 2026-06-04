@@ -25,6 +25,7 @@ interface PyCheatsheetResponse {
   topicsCovered?: unknown[];
   groundedSources?: unknown[];
   warning?: string;
+  citationWarning?: string;
   error?: string;
 }
 

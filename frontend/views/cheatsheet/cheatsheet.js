@@ -200,6 +200,7 @@
         '<div class="cs-writing-line">Writing section 1 of ' + sections.length + '</div>' +
         '<div class="cs-sheet-body"></div>' +
         '<div class="cs-after" hidden>' +
+          (res.citationWarning ? '<div class="cs-cite-warn">' + _esc(res.citationWarning) + '</div>' : '') +
           (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
           (sources.length
             ? '<div class="cs-sources">Sources: ' +
@@ -378,6 +379,7 @@
           '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button>' +
         '</div>' +
         '<div class="cs-sheet-body"></div>' +
+        (res.citationWarning ? '<div class="cs-cite-warn">' + _esc(res.citationWarning) + '</div>' : '') +
         (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
         (sources.length
           ? '<div class="cs-sources">Sources: ' +

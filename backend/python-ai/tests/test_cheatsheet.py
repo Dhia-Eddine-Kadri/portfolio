@@ -34,6 +34,51 @@ def test_topic_names_empty_map():
     assert cs._topic_names([], None) == [None]
 
 
+# ── sanitizer (Stage 4) ──────────────────────────────────────────────────────
+
+
+def test_sanitize_strips_replacement_char():
+    out, dropped = cs.sanitize_cheatsheet_markdown("## K�rpersystemen\n- text�")
+    assert "�" not in out
+    assert "## Krpersystemen" in out
+    assert dropped == 0
+
+
+def test_sanitize_drops_unbalanced_brace_formula():
+    out, dropped = cs.sanitize_cheatsheet_markdown("$$\\frac{a}{b$$")
+    assert dropped == 1
+    assert "omitted" in out
+    assert "frac" not in out
+
+
+def test_sanitize_drops_equation_number_misread_as_formula():
+    out, dropped = cs.sanitize_cheatsheet_markdown("Foo $$ (20) $$ bar")
+    assert dropped == 1
+    assert "(20)" not in out
+
+
+def test_sanitize_keeps_valid_display_formula():
+    src = "$$E_k = \\frac{1}{2} m v^2$$"
+    out, dropped = cs.sanitize_cheatsheet_markdown(src)
+    assert dropped == 0
+    assert out == src
+
+
+def test_sanitize_keeps_inline_symbols_and_strips_corruption_inside():
+    out, dropped = cs.sanitize_cheatsheet_markdown("velocity $v�$ and $a=0$")
+    assert dropped == 0
+    assert "$v$" in out and "$a=0$" in out
+
+
+def test_sanitize_removes_control_chars():
+    out, _ = cs.sanitize_cheatsheet_markdown("a\x07b\x00c")
+    assert out == "abc"
+
+
+def test_sanitize_empty():
+    assert cs.sanitize_cheatsheet_markdown("") == ("", 0)
+
+
 # ── generation ──────────────────────────────────────────────────────────────
 
 

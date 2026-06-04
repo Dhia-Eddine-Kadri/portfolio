@@ -379,6 +379,7 @@ export interface CheatsheetResult {
   topicsCovered?: string[];
   groundedSources?: Array<{ fileName?: string; pageStart?: number | null }>;
   warning?: string;
+  citationWarning?: string;
   error?: string;
 }
 

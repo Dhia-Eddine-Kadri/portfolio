@@ -21,6 +21,7 @@ just another generated document.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .learning_agent import get_course_topic_map, retrieve_learning_context
@@ -96,6 +97,63 @@ _SYSTEM = (
     "\n"
     'Return ONLY JSON: {"text":"<markdown cheatsheet>"}'
 )
+
+
+# ── Sanitization (Stage 4) ───────────────────────────────────────────────────
+#
+# OCR'd source material leaks two kinds of garbage into generated sheets, both
+# observed in real output:
+#   * the Unicode replacement char � (�) where OCR couldn't decode a glyph
+#     (e.g. "Körpersystemen" → "K�rpersystemen"), and stray control chars;
+#   * malformed display formulas — unbalanced braces, empty bodies, or "$$ (20)
+#     $$" (an equation NUMBER mis-captured as a formula).
+# A broken formula on a cheatsheet is worse than a missing one (it looks
+# authoritative and is wrong), so we drop what we can't trivially trust. This is
+# strictly mechanical — no LLM, no guessing the intended content.
+
+_CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+_DISPLAY_FORMULA_RE = re.compile(r"\$\$(.+?)\$\$", re.S)
+# A real formula body has at least one relational/operator/structure token.
+_HAS_MATH_RE = re.compile(r"[=<>+\-*/^_]|\\frac|\\int|\\sum|\\sqrt|\\partial|\\cdot|\\times|\\le|\\ge")
+
+
+def _formula_body_ok(body: str) -> bool:
+    """True if a display-formula body is safe to render: balanced braces, no
+    replacement char, non-empty, and actually contains math (not just "(20)")."""
+    b = body.strip()
+    if not b or "�" in b:
+        return False
+    if b.count("{") != b.count("}"):
+        return False
+    return bool(_HAS_MATH_RE.search(b))
+
+
+def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
+    """Mechanically clean a generated cheatsheet. Returns (cleaned, dropped),
+    where ``dropped`` is the number of malformed display formulas removed.
+
+    - Strips the replacement char � and control chars everywhere.
+    - Drops any ``$$...$$`` block whose body isn't safe to render, replacing it
+      with a subtle, honest marker rather than broken LaTeX.
+    """
+    if not text:
+        return "", 0
+    # 1) corruption chars (also fixes � inside inline $...$ and headings)
+    cleaned = text.replace("�", "").replace("\r", "")
+    cleaned = _CTRL_RE.sub("", cleaned)
+
+    # 2) malformed display formulas
+    dropped = 0
+
+    def _repl(m: "re.Match[str]") -> str:
+        nonlocal dropped
+        if _formula_body_ok(m.group(1)):
+            return m.group(0)
+        dropped += 1
+        return "*(formula omitted — unreadable in source)*"
+
+    cleaned = _DISPLAY_FORMULA_RE.sub(_repl, cleaned)
+    return cleaned, dropped
 
 
 def _topic_names(topic_map: list[dict[str, Any]], topic_focus: str | None) -> list[str | None]:
@@ -227,7 +285,10 @@ def generate_cheatsheet(
         log.exception("cheatsheet LLM call failed")
         return {"text": "", "error": str(e), "groundedSources": []}
 
-    text = (res.data.get("text") if isinstance(res.data, dict) else "") or ""
+    raw_text = (res.data.get("text") if isinstance(res.data, dict) else "") or ""
+    text, dropped_formulas = sanitize_cheatsheet_markdown(raw_text)
+    if dropped_formulas:
+        log.info("cheatsheet sanitizer dropped %d malformed formula(s)", dropped_formulas)
     sources = [
         {
             "documentId": c.get("documentId"),
@@ -254,7 +315,7 @@ def generate_cheatsheet(
             note_type="cheatsheet",
         )
 
-    return {
+    out: dict[str, Any] = {
         "noteId": note_id,
         "title": title,
         "text": text,
@@ -264,6 +325,14 @@ def generate_cheatsheet(
         "promptTokens": res.prompt_tokens,
         "completionTokens": res.completion_tokens,
     }
+    if dropped_formulas:
+        # Honest, not hidden: the student should know some source formulas were
+        # too garbled to render rather than be shown a silently-thinner sheet.
+        out["citationWarning"] = (
+            f"{dropped_formulas} formula(s) were omitted because the source text "
+            "was unreadable (likely scan/OCR quality)."
+        )
+    return out
 
 
-__all__ = ("generate_cheatsheet",)
+__all__ = ("generate_cheatsheet", "sanitize_cheatsheet_markdown")
