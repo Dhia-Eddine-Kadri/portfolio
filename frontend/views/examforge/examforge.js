@@ -125,6 +125,11 @@
             '</div>' +
           '</div>' +
           '<div class="ef-docs" id="efDocs"></div>' +
+          '<div class="ef-side-head ef-topics-head">' +
+            '<div><h3>Topics</h3><p id="efTopicStatus">Loading topic map...</p></div>' +
+            '<button class="ef-link" id="efBuildTopics" type="button">Rebuild</button>' +
+          '</div>' +
+          '<div class="ef-topics" id="efTopicMap"></div>' +
           '<div class="ef-side-head ef-history-head">' +
             '<div><h3>Exam runs</h3><p>Latest generated practice exams</p></div>' +
           '</div>' +
@@ -163,7 +168,46 @@
       sessions: root.querySelector('#efSessions'),
       empty: root.querySelector('#efEmpty'),
       exam: root.querySelector('#efExam'),
+      topicMap: root.querySelector('#efTopicMap'),
+      topicStatus: root.querySelector('#efTopicStatus'),
+      buildTopics: root.querySelector('#efBuildTopics'),
     };
+
+    // ── Course Topic Map (Learning Agent Core) ──────────────────────────────
+    // Renders the aggregated topic map as chips; clicking one fills the
+    // "topic focus" the exam generator already understands.
+    function renderTopicMap(topics) {
+      if (!els.topicMap) return;
+      if (!topics || !topics.length) {
+        els.topicMap.innerHTML =
+          '<p class="ef-topics-empty">No topic map yet — click Rebuild to generate one from your indexed files.</p>';
+        if (els.topicStatus) els.topicStatus.textContent = 'Not built';
+        return;
+      }
+      if (els.topicStatus) els.topicStatus.textContent = topics.length + ' topics';
+      var active = (els.topic && els.topic.value || '').trim().toLowerCase();
+      els.topicMap.innerHTML = topics.map(function (t) {
+        var imp = t.importance || 'medium';
+        var pages = (t.source_pages && t.source_pages.length) ? (' · ' + t.source_pages.length + 'p') : '';
+        var title = (t.chunk_count || 0) + ' chunks · ' + imp + pages;
+        var cls = 'ef-topic-chip' + (String(t.name || '').toLowerCase() === active ? ' is-active' : '');
+        return '<button type="button" class="' + cls + '" data-imp="' + _esc(imp) +
+          '" data-topic="' + _esc(t.name) + '" title="' + _esc(title) + '">' + _esc(t.name) + '</button>';
+      }).join('');
+      els.topicMap.querySelectorAll('.ef-topic-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          if (els.topic) els.topic.value = chip.getAttribute('data-topic') || '';
+          els.topicMap.querySelectorAll('.ef-topic-chip').forEach(function (c) { c.classList.remove('is-active'); });
+          chip.classList.add('is-active');
+        });
+      });
+    }
+
+    function loadTopicMap() {
+      _service().then(function (svc) {
+        return svc.getCourseTopicMap ? svc.getCourseTopicMap(courseId) : [];
+      }).then(renderTopicMap).catch(function () { renderTopicMap([]); });
+    }
 
     function courseFolderNameFor(fileName) {
       var name = String(fileName || '').trim();
@@ -445,7 +489,24 @@
       });
     }
 
+    if (els.buildTopics) {
+      els.buildTopics.addEventListener('click', function () {
+        if (els.topicStatus) els.topicStatus.textContent = 'Building...';
+        els.buildTopics.disabled = true;
+        _service().then(function (svc) {
+          return svc.generateCourseTopicMap ? svc.generateCourseTopicMap(courseId) : [];
+        }).then(function (topics) {
+          renderTopicMap(topics);
+          // /generate rebuilds in the background; re-read to pick up the refresh.
+          setTimeout(loadTopicMap, 4000);
+        }).catch(function () { /* ignore */ }).then(function () {
+          els.buildTopics.disabled = false;
+        });
+      });
+    }
+
     function loadInitial() {
+      loadTopicMap();
       _service().then(function (svc) {
         return svc.listCourseDocuments(courseId);
       }).then(function (docs) {

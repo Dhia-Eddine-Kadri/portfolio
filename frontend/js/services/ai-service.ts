@@ -293,6 +293,43 @@ export async function correctDocumentPage(
   return response.json();
 }
 
+export interface CourseTopic {
+  name: string;
+  importance?: string;
+  difficulty?: string;
+  chunk_count?: number;
+  source_pages?: number[];
+  source_document_ids?: string[];
+  related_exercise_ids?: string[];
+}
+
+/** Read the stored per-course Topic Map (Learning Agent Core). */
+export async function getCourseTopicMap(courseId: string): Promise<CourseTopic[]> {
+  const response = await fetch(_backendUrl() + '/api/learning/topic-map', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({ courseId }),
+  });
+  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (!response.ok) return [];
+  const data = (await response.json()) as { topics?: CourseTopic[] };
+  return data.topics || [];
+}
+
+/** Trigger a (background) rebuild of the course Topic Map; returns the current
+ *  map immediately (callers should re-read shortly after to get the refresh). */
+export async function generateCourseTopicMap(courseId: string): Promise<CourseTopic[]> {
+  const response = await fetch(_backendUrl() + '/api/learning/topic-map-generate', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({ courseId }),
+  });
+  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (!response.ok) return [];
+  const data = (await response.json()) as { topics?: CourseTopic[] };
+  return data.topics || [];
+}
+
 export interface GenerateOpts {
   topic?: string;
   count?: number;

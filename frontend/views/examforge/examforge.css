@@ -311,6 +311,40 @@
   background: rgba(30, 64, 117, .52);
 }
 
+/* Course Topic Map (Learning Agent Core) */
+.ef-topics-head { margin-top: 14px; }
+.ef-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.ef-topics-empty {
+  margin: 4px 0;
+  font-size: .8rem;
+  color: #98a8bf;
+}
+.ef-topic-chip {
+  border: 1px solid rgba(148, 163, 184, .28);
+  background: rgba(148, 163, 184, .08);
+  color: #cdd8ea;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.ef-topic-chip:hover { background: rgba(56, 189, 248, .14); }
+.ef-topic-chip.is-active {
+  border-color: rgba(56, 189, 248, .7);
+  background: rgba(56, 189, 248, .22);
+  color: #e6f3ff;
+}
+/* Importance accent on the left edge */
+.ef-topic-chip[data-imp="high"] { border-left: 3px solid #f87171; }
+.ef-topic-chip[data-imp="medium"] { border-left: 3px solid #fbbf24; }
+.ef-topic-chip[data-imp="low"] { border-left: 3px solid #34d399; }
+
 .ef-empty {
   min-height: 520px;
   display: grid;
