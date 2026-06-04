@@ -30,6 +30,10 @@
         '<input type="text" id="csTopic" class="cs-topic" placeholder="Focus on one topic (optional) — leave blank for the whole course">' +
         '<button class="cs-btn cs-btn-primary" id="csGenerate" type="button">Generate cheatsheet</button>' +
       '</div>' +
+      '<div class="cs-saved-wrap" id="csSaved" hidden>' +
+        '<div class="cs-saved-head">Saved cheatsheets</div>' +
+        '<div class="cs-saved-list" id="csSavedList"></div>' +
+      '</div>' +
       '<div class="cs-result" id="csResult"></div>' +
     '</div>';
 
@@ -100,6 +104,66 @@
     _bindSourceClicks(els.result);
   }
 
+  // ── saved cheatsheets (persisted as notes of type 'cheatsheet') ────────────
+
+  function _fmtDate(s) {
+    if (!s) return '';
+    try {
+      return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch (e) { return ''; }
+  }
+
+  function _viewSaved(svc, els, id) {
+    if (!id || !svc.getNoteById) return;
+    els.result.innerHTML = '<div class="cs-msg cs-loading">Loading cheatsheet…</div>';
+    svc.getNoteById(id).then(function (note) {
+      if (!note) { els.result.innerHTML = '<div class="cs-msg cs-error">Could not load this cheatsheet.</div>'; return; }
+      els.result.innerHTML =
+        '<div class="cs-sheet"><div class="cs-sheet-head"><h3>' + _esc(note.title || 'Cheatsheet') + '</h3></div>' +
+        '<div class="cs-sheet-body"></div></div>';
+      var body = els.result.querySelector('.cs-sheet-body');
+      if (body) _renderMarkdown(body, note.content_markdown || '');
+    }).catch(function () {
+      els.result.innerHTML = '<div class="cs-msg cs-error">Could not load this cheatsheet.</div>';
+    });
+  }
+
+  function _renderSavedList(svc, els, courseId, sheets) {
+    if (!els.saved || !els.savedList) return;
+    if (!sheets || !sheets.length) {
+      els.saved.setAttribute('hidden', '');
+      els.savedList.innerHTML = '';
+      return;
+    }
+    els.saved.removeAttribute('hidden');
+    els.savedList.innerHTML = sheets.map(function (n) {
+      return '<div class="cs-saved-item">' +
+        '<button type="button" class="cs-saved-open" data-id="' + _esc(n.id) + '">' +
+          '<span class="cs-saved-title">' + _esc(n.title || 'Cheatsheet') + '</span>' +
+          '<span class="cs-saved-date">' + _esc(_fmtDate(n.created_at || n.updated_at)) + '</span>' +
+        '</button>' +
+        '<button type="button" class="cs-saved-del" data-id="' + _esc(n.id) + '" title="Delete cheatsheet" aria-label="Delete cheatsheet">×</button>' +
+      '</div>';
+    }).join('');
+    els.savedList.querySelectorAll('.cs-saved-open').forEach(function (b) {
+      b.addEventListener('click', function () { _viewSaved(svc, els, b.getAttribute('data-id')); });
+    });
+    els.savedList.querySelectorAll('.cs-saved-del').forEach(function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        svc.deleteNote(b.getAttribute('data-id')).then(function () { _loadSaved(svc, els, courseId); });
+      });
+    });
+  }
+
+  function _loadSaved(svc, els, courseId) {
+    if (!svc.listCourseNotes || !courseId) return;
+    svc.listCourseNotes(courseId).then(function (notes) {
+      var sheets = (notes || []).filter(function (n) { return n.type === 'cheatsheet'; });
+      _renderSavedList(svc, els, courseId, sheets);
+    }).catch(function () { /* non-fatal: saved list is additive */ });
+  }
+
   window.mountCheatsheet = function (target, course) {
     if (!target) return;
     target.innerHTML = _HTML;
@@ -110,8 +174,13 @@
       topic: root.querySelector('#csTopic'),
       gen: root.querySelector('#csGenerate'),
       result: root.querySelector('#csResult'),
+      saved: root.querySelector('#csSaved'),
+      savedList: root.querySelector('#csSavedList'),
     };
     if (!els.gen) return;
+
+    _aiService().then(function (svc) { _loadSaved(svc, els, courseId); });
+
     els.gen.addEventListener('click', function () {
       if (!courseId) return;
       var topic = ((els.topic && els.topic.value) || '').trim();
@@ -119,11 +188,13 @@
       els.result.innerHTML = '<div class="cs-msg cs-loading">Generating cheatsheet… this can take a moment.</div>';
       _aiService()
         .then(function (svc) {
-          return svc.generateCheatsheet(courseId, topic ? { topic: topic } : {});
-        })
-        .then(function (res) {
-          els.gen.disabled = false;
-          _renderResult(els, res);
+          return svc.generateCheatsheet(courseId, topic ? { topic: topic } : {}).then(function (res) {
+            els.gen.disabled = false;
+            _renderResult(els, res);
+            // A new cheatsheet was just saved — refresh the saved list.
+            if (res && res.noteId) _loadSaved(svc, els, courseId);
+            return res;
+          });
         })
         .catch(function (err) {
           els.gen.disabled = false;
