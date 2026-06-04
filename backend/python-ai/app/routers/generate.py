@@ -14,6 +14,7 @@ from ..services.flashcards import generate_flashcards, save_flashcard_set
 from ..services.notes import generate_notes, save_note
 from ..services.quiz import generate_quiz, save_quiz_set
 from ..services.examforge import generate_examforge, grade_examforge_answer
+from ..services.cheatsheet import generate_cheatsheet
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -114,6 +115,27 @@ class GradeExamForgeAnswerResponse(BaseModel):
     error: str | None = None
 
 
+class GenerateCheatsheetRequest(BaseModel):
+    userId: str
+    courseId: str
+    documentIds: list[str] | None = None
+    topic: str | None = None
+    save: bool = True
+
+
+class GenerateCheatsheetResponse(BaseModel):
+    noteId: str | None = None
+    title: str | None = None
+    text: str
+    topicsCovered: list[str] = []
+    groundedSources: list[dict[str, Any]] = []
+    warning: str | None = None
+    error: str | None = None
+    model: str | None = None
+    promptTokens: int | None = None
+    completionTokens: int | None = None
+
+
 @router.post("/generate-quiz", response_model=GenerateQuizResponse)
 async def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizResponse:
     _require_uuid(payload.userId, "userId")
@@ -205,6 +227,39 @@ async def grade_examforge_answer_endpoint(payload: GradeExamForgeAnswerRequest) 
         user_answer=payload.userAnswer,
     )
     return GradeExamForgeAnswerResponse(**out)
+
+
+# ── /generate-cheatsheet ──────────────────────────────────────────────────────
+
+
+@router.post("/generate-cheatsheet", response_model=GenerateCheatsheetResponse)
+async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> GenerateCheatsheetResponse:
+    _require_uuid(payload.userId, "userId")
+    if payload.documentIds:
+        for did in payload.documentIds:
+            _require_uuid(did, "documentId")
+    doc_names = _verify_user_owns_documents(payload.userId, payload.courseId, payload.documentIds)
+
+    out = generate_cheatsheet(
+        user_id=payload.userId,
+        course_id=payload.courseId,
+        document_ids=payload.documentIds,
+        topic=payload.topic,
+        doc_names=doc_names,
+        save=payload.save,
+    )
+    return GenerateCheatsheetResponse(
+        noteId=out.get("noteId"),
+        title=out.get("title"),
+        text=out.get("text", ""),
+        topicsCovered=out.get("topicsCovered", []),
+        groundedSources=out.get("groundedSources", []),
+        warning=out.get("warning"),
+        error=out.get("error"),
+        model=out.get("model"),
+        promptTokens=out.get("promptTokens"),
+        completionTokens=out.get("completionTokens"),
+    )
 
 
 # ── /generate-flashcards ─────────────────────────────────────────────────────

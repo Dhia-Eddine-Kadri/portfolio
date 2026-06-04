@@ -372,6 +372,29 @@ export async function generateExamForge(
   return response.json();
 }
 
+export interface CheatsheetResult {
+  noteId?: string | null;
+  title?: string | null;
+  text: string;
+  topicsCovered?: string[];
+  groundedSources?: Array<{ fileName?: string; pageStart?: number | null }>;
+  warning?: string;
+  error?: string;
+}
+
+export async function generateCheatsheet(
+  courseId: string,
+  opts?: { topic?: string; documentIds?: string[] }
+): Promise<CheatsheetResult> {
+  const response = await fetch(_backendUrl() + '/api/ai/cheatsheet', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({ courseId, ...(opts || {}) }),
+  });
+  await _detectAiCapError(response);
+  return response.json();
+}
+
 export async function gradeExamForgeAnswer(
   examSessionId: string,
   examQuestionId: string,

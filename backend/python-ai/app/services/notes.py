@@ -189,6 +189,7 @@ def save_note(
     title: str,
     text: str,
     sources: list[dict[str, Any]],
+    note_type: str = "notes",
 ) -> str | None:
     if not text.strip():
         return None
@@ -199,7 +200,7 @@ def save_note(
             "course_id":        course_id,
             "document_id":      document_id,
             "title":            title[:180] or "Untitled notes",
-            "type":             "notes",
+            "type":             note_type,
             "content_markdown": text,
             "updated_at":       datetime.now(timezone.utc).isoformat(),
         }).execute()
