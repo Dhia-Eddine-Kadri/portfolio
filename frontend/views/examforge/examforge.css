@@ -10,6 +10,27 @@
   margin-bottom: 16px;
 }
 
+.ef-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -4px 0 16px;
+}
+
+.ef-type-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 999px;
+  color: #c8d5e7;
+  background: rgba(15, 23, 42, .52);
+  font-size: .84rem;
+  font-weight: 800;
+}
+
 .ef-btn,
 .ef-link,
 .ef-session,
@@ -378,6 +399,26 @@
 .ef-option.wrong {
   border-color: rgba(248, 113, 113, .62);
   background: rgba(127, 29, 29, .3);
+}
+
+.ef-written {
+  width: 100%;
+  min-height: 118px;
+  margin-top: 12px;
+  resize: vertical;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 12px;
+  padding: 12px 13px;
+  color: #e5eefb;
+  background: rgba(8, 13, 26, .56);
+  font: inherit;
+  line-height: 1.45;
+  outline: none;
+}
+
+.ef-written:focus {
+  border-color: rgba(56, 189, 248, .58);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .12);
 }
 
 .ef-feedback {

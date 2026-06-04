@@ -79,6 +79,7 @@ class GenerateExamForgeRequest(BaseModel):
     documentIds: list[str] | None = None
     requestedCount: int = Field(6, ge=1, le=20)
     difficulty: str = "medium"
+    questionTypes: list[str] | None = None
     topic: str | None = None
     save: bool = True
 
@@ -173,6 +174,7 @@ async def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> Gene
         requested_count=payload.requestedCount,
         difficulty=payload.difficulty,
         topic=payload.topic,
+        question_types=payload.questionTypes,
         doc_names=doc_names,
     )
 

@@ -26,6 +26,7 @@
         sessions: [],
         activeId: null,
         answers: {},
+        grades: {},
         submitted: false,
         docs: [],
         loaded: false,
@@ -57,7 +58,7 @@
             id: q.id,
             type: q.question_type || 'mcq',
             question: q.question_text,
-            options: Array.isArray(q.options) ? q.options : [],
+            options: normalizeOptions(q.question_type || 'mcq', q.options),
             answer: q.correct_answer || 'A',
             explanation: q.explanation || '',
             difficulty: q.difficulty || 'medium',
@@ -72,7 +73,7 @@
           id: q.id || null,
           type: q.type || 'mcq',
           question: q.question || '',
-          options: Array.isArray(q.options) ? q.options : [],
+          options: normalizeOptions(q.type || 'mcq', q.options),
           answer: q.answer || 'A',
           explanation: q.explanation || '',
           difficulty: q.difficulty || 'medium',
@@ -93,6 +94,11 @@
         '<div class="ef-field"><label>Questions</label><select id="efCount"><option>6</option><option>8</option><option>10</option><option>12</option></select></div>' +
         '<div class="ef-field"><label>Difficulty</label><select id="efDifficulty"><option value="medium">Medium</option><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="hard">Hard</option></select></div>' +
         '<div class="ef-search"><input id="efTopic" type="text" placeholder="Optional topic focus" autocomplete="off"></div>' +
+      '</div>' +
+      '<div class="ef-type-row" aria-label="Question types">' +
+        '<label><input type="checkbox" name="efType" value="mcq" checked> MCQ</label>' +
+        '<label><input type="checkbox" name="efType" value="true_false" checked> True/False</label>' +
+        '<label><input type="checkbox" name="efType" value="short_answer" checked> Written</label>' +
       '</div>' +
       '<div class="ef-layout">' +
         '<aside class="ef-side">' +
@@ -238,6 +244,7 @@
           st.activeId = btn.getAttribute('data-session');
           st.submitted = false;
           st.answers = {};
+          st.grades = {};
           renderAll();
         });
       });
@@ -251,6 +258,40 @@
       return ['A', 'B', 'C', 'D'][idx] || 'A';
     }
 
+    function normalizeOptions(type, options) {
+      if (type === 'true_false') return ['True', 'False'];
+      if (Array.isArray(options)) return options;
+      if (options && typeof options === 'object') {
+        return ['A', 'B', 'C', 'D'].map(function (letter) { return options[letter] || ''; }).filter(Boolean);
+      }
+      return [];
+    }
+
+    function questionTypeLabel(type) {
+      if (type === 'true_false') return 'True/False';
+      if (type === 'short_answer') return 'Written';
+      return 'MCQ';
+    }
+
+    function selectedQuestionTypes() {
+      var types = Array.from(root.querySelectorAll('input[name="efType"]:checked')).map(function (x) {
+        return x.value;
+      });
+      return types.length ? types : ['mcq'];
+    }
+
+    function answerIsComplete(q, idx) {
+      var val = st.answers[idx];
+      if (q.type === 'short_answer') return !!String(val || '').trim();
+      return !!val;
+    }
+
+    function objectiveCorrect(q, idx) {
+      var val = st.answers[idx];
+      if (q.type === 'short_answer') return false;
+      return String(val || '').toLowerCase() === String(q.answer || '').toLowerCase();
+    }
+
     function renderExam() {
       var s = activeSession();
       if (!els.empty || !els.exam) return;
@@ -258,10 +299,19 @@
       els.exam.hidden = !s;
       if (!s) return;
       var correct = 0;
+      var earned = 0;
+      var totalPoints = 0;
       s.questions.forEach(function (q, idx) {
-        if (st.answers[idx] && st.answers[idx] === q.answer) correct++;
+        totalPoints += Number(q.points || 1);
+        if (q.type === 'short_answer' && st.grades[idx]) {
+          earned += Number(st.grades[idx].score || 0);
+          if (st.grades[idx].isCorrect) correct++;
+        } else if (objectiveCorrect(q, idx)) {
+          earned += Number(q.points || 1);
+          correct++;
+        }
       });
-      var score = s.questions.length ? Math.round(correct / s.questions.length * 100) : 0;
+      var score = totalPoints ? Math.round(earned / totalPoints * 100) : 0;
       els.exam.innerHTML =
         '<div class="ef-exam-head">' +
           '<div><h2>' + _esc(s.title || 'ExamForge') + '</h2><p>' + s.questions.length + ' source-grounded questions</p></div>' +
@@ -277,23 +327,13 @@
               '<article class="ef-question">' +
                 '<div class="ef-question-top">' +
                   '<span>Question ' + (idx + 1) + '</span>' +
+                  '<span>' + _esc(questionTypeLabel(q.type)) + '</span>' +
                   '<span>' + _esc(q.topic || q.difficulty || 'medium') + '</span>' +
                 '</div>' +
                 '<h3>' + _esc(q.question) + '</h3>' +
-                '<div class="ef-options">' +
-                  (q.options || []).map(function (opt, optIdx) {
-                    var letter = answerLetter(optIdx);
-                    var cls = chosen === letter ? ' selected' : '';
-                    if (st.submitted && letter === q.answer) cls += ' correct';
-                    if (st.submitted && chosen === letter && letter !== q.answer) cls += ' wrong';
-                    return '<button class="ef-option' + cls + '" type="button" data-q="' + idx + '" data-a="' + letter + '"' + (st.submitted ? ' disabled' : '') + '><b>' + letter + '</b><span>' + _esc(opt) + '</span></button>';
-                  }).join('') +
-                '</div>' +
+                renderAnswerControl(q, idx, chosen) +
                 (st.submitted
-                  ? '<div class="ef-feedback ' + (isCorrect ? 'ok' : isWrong ? 'bad' : '') + '">' +
-                      '<strong>' + (isCorrect ? 'Correct' : 'Answer: ' + _esc(q.answer)) + '</strong>' +
-                      '<span>' + _esc(q.explanation || '') + '</span>' +
-                    '</div>'
+                  ? renderFeedback(q, idx, isCorrect, isWrong)
                   : '') +
                 ((q.sources || []).length
                   ? '<div class="ef-sources">' + q.sources.map(function (src) {
@@ -314,15 +354,22 @@
           renderExam();
         });
       });
+      els.exam.querySelectorAll('.ef-written').forEach(function (input) {
+        input.addEventListener('input', function () {
+          st.answers[Number(input.getAttribute('data-q'))] = input.value || '';
+        });
+      });
       var reset = els.exam.querySelector('#efResetAnswers');
       if (reset) reset.addEventListener('click', function () {
         st.answers = {};
+        st.grades = {};
         st.submitted = false;
         renderExam();
       });
       var submit = els.exam.querySelector('#efSubmitAnswers');
       if (submit) submit.addEventListener('click', function () {
-        if (Object.keys(st.answers).length < s.questions.length) {
+        var missing = s.questions.some(function (q, idx) { return !answerIsComplete(q, idx); });
+        if (missing) {
           _toast('Finish the exam', 'Answer every question before submitting.');
           return;
         }
@@ -330,6 +377,38 @@
         renderExam();
         _persistAnswers(s, st.answers);
       });
+    }
+
+    function renderAnswerControl(q, idx, chosen) {
+      if (q.type === 'short_answer') {
+        return '<textarea class="ef-written" data-q="' + idx + '" placeholder="Write your answer..."' + (st.submitted ? ' disabled' : '') + '>' + _esc(chosen || '') + '</textarea>';
+      }
+      return '<div class="ef-options">' +
+        (q.options || []).map(function (opt, optIdx) {
+          var value = q.type === 'true_false' ? String(opt).toLowerCase() : answerLetter(optIdx);
+          var label = q.type === 'true_false' ? (optIdx === 0 ? 'T' : 'F') : answerLetter(optIdx);
+          var chosenHit = String(chosen || '').toLowerCase() === String(value).toLowerCase();
+          var answerHit = String(value).toLowerCase() === String(q.answer || '').toLowerCase();
+          var cls = chosenHit ? ' selected' : '';
+          if (st.submitted && answerHit) cls += ' correct';
+          if (st.submitted && chosenHit && !answerHit) cls += ' wrong';
+          return '<button class="ef-option' + cls + '" type="button" data-q="' + idx + '" data-a="' + _esc(value) + '"' + (st.submitted ? ' disabled' : '') + '><b>' + _esc(label) + '</b><span>' + _esc(opt) + '</span></button>';
+        }).join('') +
+      '</div>';
+    }
+
+    function renderFeedback(q, idx, isCorrect, isWrong) {
+      if (q.type === 'short_answer') {
+        var grade = st.grades[idx];
+        if (!grade) {
+          return '<div class="ef-feedback"><strong>Grading...</strong><span>Your written answer is being checked against the rubric.</span></div>';
+        }
+        return '<div class="ef-feedback ' + (grade.isCorrect ? 'ok' : 'bad') + '"><strong>' + _esc(String(grade.score || 0)) + ' pt</strong><span>' + _esc(grade.feedback || q.explanation || '') + '</span></div>';
+      }
+      return '<div class="ef-feedback ' + (isCorrect ? 'ok' : isWrong ? 'bad' : '') + '">' +
+        '<strong>' + (isCorrect ? 'Correct' : 'Answer: ' + _esc(String(q.answer || '').toUpperCase())) + '</strong>' +
+        '<span>' + _esc(q.explanation || '') + '</span>' +
+      '</div>';
     }
 
     function renderAll() {
@@ -404,6 +483,7 @@
             documentIds: docs,
             count: Number(els.count && els.count.value || 6),
             difficulty: els.difficulty && els.difficulty.value || 'medium',
+            questionTypes: selectedQuestionTypes(),
             topic: els.topic && els.topic.value || '',
           });
         }).then(function (res) {
@@ -415,6 +495,7 @@
           st.sessions.unshift(session);
           st.activeId = session.id;
           st.answers = {};
+          st.grades = {};
           st.submitted = false;
           renderAll();
         }).catch(function (err) {
@@ -431,7 +512,12 @@
       _service().then(function (svc) {
         session.questions.forEach(function (q, idx) {
           if (!q.id || !answers[idx]) return;
-          svc.gradeExamForgeAnswer(session.id, q.id, answers[idx]).catch(function () {});
+          svc.gradeExamForgeAnswer(session.id, q.id, answers[idx]).then(function (grade) {
+            if (q.type === 'short_answer' && grade && grade.ok) {
+              st.grades[idx] = grade;
+              renderExam();
+            }
+          }).catch(function () {});
         });
       }).catch(function () {});
     }

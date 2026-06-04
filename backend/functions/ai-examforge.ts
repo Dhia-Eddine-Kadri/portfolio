@@ -14,6 +14,7 @@ const AI_GENERATE_RATE_LIMIT_WINDOW = parseInt(optionalEnv('AI_GENERATE_RATE_LIM
 const MAX_DOCUMENT_IDS = 25;
 const MAX_REQUESTED_COUNT = 20;
 const MAX_TOPIC_LENGTH = 500;
+const VALID_QUESTION_TYPES = new Set(['mcq', 'true_false', 'short_answer']);
 
 interface PyExamForgeResponse {
   sessionId?: string | null;
@@ -30,6 +31,12 @@ interface PyExamForgeResponse {
 function _docIds(raw: unknown): string[] | null {
   if (!Array.isArray(raw) || !raw.length) return null;
   return raw.filter((x): x is string => typeof x === 'string').slice(0, MAX_DOCUMENT_IDS);
+}
+
+function _questionTypes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return ['mcq', 'true_false', 'short_answer'];
+  const types = raw.filter((x): x is string => typeof x === 'string' && VALID_QUESTION_TYPES.has(x));
+  return types.length ? types.slice(0, 3) : ['mcq', 'true_false', 'short_answer'];
 }
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
@@ -87,11 +94,13 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (typeof topic === 'string' && topic.length > MAX_TOPIC_LENGTH) return fail(400, 'topic is too long');
   const requestedCount = Math.min(Math.max(parseInt(String(count), 10) || 6, 1), MAX_REQUESTED_COUNT);
   const docIds = _docIds(body.documentIds ?? body.docIds);
+  const questionTypes = _questionTypes(body.questionTypes);
 
   await logSecurityEvent(serviceKey, user.id, 'ai_generate', {
     course_id: courseId,
     tool: 'examforge',
     requested_count: requestedCount,
+    question_types: questionTypes,
     document_count: docIds ? docIds.length : 0,
   });
 
@@ -101,6 +110,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     documentIds: docIds,
     requestedCount,
     difficulty: typeof difficulty === 'string' ? difficulty : 'medium',
+    questionTypes,
     topic: typeof topic === 'string' ? topic : null,
     save: true,
   });
