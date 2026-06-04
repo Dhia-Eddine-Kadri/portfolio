@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 # "Übung" prefix and failing the digit lookahead.
 _EXERCISE_HEADER = re.compile(
     r"^(?:#{1,6}\s*)?"
-    r"(Übungsaufgabe|Uebungsaufgabe|Aufgabe|Übung|Uebung|Exercise|Problem|Task|Beispiel)"
+    r"(Übungsaufgabe|Uebungsaufgabe|Aufgabe|Übung|Uebung|Exercise|Problem|Task|Beispiel|Example)"
     r"\s+(\d+(?:\.\d+){0,3})"
     r"(?:\s*[\(\[]?([a-zA-Z])[\)\]]?\.?)?"
     r"[:\.\s]*",
@@ -45,7 +45,7 @@ _SOLUTION_HEADER = re.compile(
 # "see Exercise 2". Group 1: number, Group 2: optional subpart.
 _SOLUTION_FOR_EXERCISE = re.compile(
     r"(?:Lösung|Loesung|Solution)\s+(?:for|to|zur|zu)\s+"
-    r"(?:Übungsaufgabe|Uebungsaufgabe|Aufgabe|Übung|Uebung|Exercise|Problem|Task|Beispiel)"
+    r"(?:Übungsaufgabe|Uebungsaufgabe|Aufgabe|Übung|Uebung|Exercise|Problem|Task|Beispiel|Example)"
     r"\s+(\d+(?:\.\d+){0,3})"
     # Subpart requires a closing bracket — "a)", "(b)", "[c]" — so a bare
     # following word (e.g. "1.4 Searched") can't be mis-captured as subpart.

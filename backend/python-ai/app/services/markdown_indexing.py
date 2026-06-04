@@ -316,7 +316,7 @@ _BLANK_LINE = re.compile(r"\n\s*\n")
 # fires — leaving the exercise-exact retrieval path completely dead.
 _EXERCISE_HEADING_LINE = re.compile(
     r"^\s*"
-    r"(?:Aufgabe|Übungsaufgabe|Übung|Uebungsaufgabe|Uebung|Exercise|Problem|Task|Beispiel)"
+    r"(?:Aufgabe|Übungsaufgabe|Übung|Uebungsaufgabe|Uebung|Exercise|Problem|Task|Beispiel|Example)"
     r"\s+\d+(?:\.\d+){0,3}"
     r"(?:\s*[\(\[]?[a-zA-Z][\)\]]?\.?)?"
     r"\s*$",

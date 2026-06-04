@@ -24,6 +24,20 @@ def test_detect_single_exercise():
     assert b.solution_markdown is None
 
 
+def test_detect_english_example_label():
+    """Lecture/exercise decks (the EngMec2 series) label worked problems
+    'Example 1.2' — the English equivalent of the German 'Beispiel'. The
+    detector recognised Beispiel but not Example, so vision-OCR'd slides whose
+    only exercise marker was 'Example N' produced zero exercise blocks even
+    after the figure text was recovered. Markdown-heading form too ('# ...')."""
+    pages = [
+        (4, "# Example 1.2\n\nA particle moves so that v = alpha x."),
+        (5, "## Example 1.3\n\nGiven the acceleration field, find the path."),
+    ]
+    blocks = detect_exercises(pages)
+    assert {b.exercise_number for b in blocks} == {"1.2", "1.3"}
+
+
 def test_detect_exercise_with_subpart():
     pages = [(2, "Exercise 3.1 (a)\n\nDerive Newton's second law from first principles.")]
     blocks = detect_exercises(pages)
