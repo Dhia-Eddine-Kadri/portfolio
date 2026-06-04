@@ -371,6 +371,94 @@ def test_routing_off_always_openai() -> None:
     assert _provider_with(S, "Formelzettel.pdf", ["x = y " * 10], [0]) == "openai"
 
 
+# ── Mathpix transient-error retry ───────────────────────────────────────────
+
+
+class _FakeResp:
+    def __init__(self, status: int, text: str | None = None) -> None:
+        self.status_code = status
+        self._text = text
+
+    def json(self):  # noqa: ANN201
+        return {"text": self._text}
+
+    def raise_for_status(self) -> None:
+        import httpx
+
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("err", request=None, response=self)
+
+
+def _patch_httpx(script):
+    """Return (ClientPatch, calls) where ClientPatch feeds ``script`` (a list
+    of _FakeResp or Exception) to successive .post() calls."""
+    import httpx
+
+    calls = {"n": 0}
+
+    class FakeClient:
+        def __init__(self, *a, **k) -> None:
+            pass
+
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, *a) -> bool:
+            return False
+
+        def post(self, *a, **k):  # noqa: ANN201
+            item = script[min(calls["n"], len(script) - 1)]
+            calls["n"] += 1
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+    return patch.object(httpx, "Client", FakeClient), calls
+
+
+def test_mathpix_retries_then_succeeds() -> None:
+    from app.services import vision_ocr
+
+    client_patch, calls = _patch_httpx([_FakeResp(429), _FakeResp(200, "$$ x $$")])
+    with client_patch, patch.object(vision_ocr.time, "sleep", lambda *_: None):
+        out = vision_ocr._mathpix_extract("id", "key", b"PNG")
+    assert out == "$$ x $$"
+    assert calls["n"] == 2  # one retry after the 429
+
+
+def test_mathpix_retries_on_timeout() -> None:
+    import httpx
+    from app.services import vision_ocr
+
+    script = [httpx.TimeoutException("t"), _FakeResp(200, "$$ y $$")]
+    client_patch, calls = _patch_httpx(script)
+    with client_patch, patch.object(vision_ocr.time, "sleep", lambda *_: None):
+        out = vision_ocr._mathpix_extract("id", "key", b"PNG")
+    assert out == "$$ y $$"
+    assert calls["n"] == 2
+
+
+def test_mathpix_gives_up_after_max_attempts() -> None:
+    from app.services import vision_ocr
+
+    client_patch, calls = _patch_httpx([_FakeResp(503)])
+    with client_patch, patch.object(vision_ocr.time, "sleep", lambda *_: None):
+        out = vision_ocr._mathpix_extract("id", "key", b"PNG")
+    assert out == ""
+    assert calls["n"] == vision_ocr._MATHPIX_MAX_ATTEMPTS  # no infinite retry
+
+
+def test_mathpix_fails_fast_on_permanent_error() -> None:
+    """A 4xx other than 429 (bad image / bad creds) must not be retried."""
+    from app.services import vision_ocr
+
+    client_patch, calls = _patch_httpx([_FakeResp(400)])
+    with client_patch, patch.object(vision_ocr.time, "sleep", lambda *_: None):
+        out = vision_ocr._mathpix_extract("id", "key", b"PNG")
+    assert out == ""
+    assert calls["n"] == 1  # failed fast, no retry
+
+
 def test_routing_always_picks_mathpix_with_credentials() -> None:
     class S(_FakeSettings):
         mathpix_routing = "always"

@@ -26,6 +26,7 @@ import base64
 import io
 import logging
 import re
+import time
 from typing import Iterable
 
 from ..config import get_settings
@@ -244,41 +245,67 @@ def _strip_outer_code_fence(text: str) -> str:
 
 
 _MATHPIX_ENDPOINT = "https://api.mathpix.com/v3/text"
+# Mathpix is a raw httpx call, so (unlike the OpenAI SDK, which retries 429/
+# 5xx/timeouts itself) we have to retry transient failures ourselves —
+# otherwise a single rate-limit blip silently drops that page's formulas.
+_MATHPIX_MAX_ATTEMPTS = 3
+_MATHPIX_RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 def _mathpix_extract(app_id: str, app_key: str, image_bytes: bytes) -> str:
-    """One Mathpix /v3/text call. Returns extracted Markdown or "" on failure.
+    """One Mathpix /v3/text page extraction. Returns Markdown or "" on failure.
 
     Mathpix is purpose-built for math OCR and returns LaTeX directly. We
     request the ``text`` format with ``$$ ... $$`` display fences so the
     output is shape-compatible with the OpenAI vision path.
+
+    Retries up to ``_MATHPIX_MAX_ATTEMPTS`` on transient errors (HTTP 429 /
+    5xx and network timeouts) with exponential backoff. Permanent errors
+    (4xx other than 429 — bad image, bad credentials) fail fast.
     """
     try:
         import httpx
     except Exception:  # noqa: BLE001
         log.warning("Mathpix OCR requested but httpx is not installed")
         return ""
-    try:
-        b64 = base64.b64encode(image_bytes).decode("ascii")
-        payload = {
-            "src": f"data:image/png;base64,{b64}",
-            "formats": ["text"],
-            "math_inline_delimiters": ["$", "$"],
-            "math_display_delimiters": ["$$", "$$"],
-            "rm_spaces": True,
-        }
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(
-                _MATHPIX_ENDPOINT,
-                headers={"app_id": app_id, "app_key": app_key},
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
-        return (data.get("text") or "").strip()
-    except Exception:  # noqa: BLE001
-        log.exception("Mathpix OCR call failed")
-        return ""
+
+    b64 = base64.b64encode(image_bytes).decode("ascii")
+    payload = {
+        "src": f"data:image/png;base64,{b64}",
+        "formats": ["text"],
+        "math_inline_delimiters": ["$", "$"],
+        "math_display_delimiters": ["$$", "$$"],
+        "rm_spaces": True,
+    }
+    headers = {"app_id": app_id, "app_key": app_key}
+
+    last_err: str | None = None
+    for attempt in range(1, _MATHPIX_MAX_ATTEMPTS + 1):
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(_MATHPIX_ENDPOINT, headers=headers, json=payload)
+            if response.status_code in _MATHPIX_RETRY_STATUS:
+                last_err = f"HTTP {response.status_code}"
+            else:
+                response.raise_for_status()
+                return (response.json().get("text") or "").strip()
+        except httpx.HTTPStatusError as exc:
+            # Non-retryable status (4xx other than 429) — fail fast.
+            log.exception("Mathpix OCR call failed (non-retryable): %s", exc)
+            return ""
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            last_err = repr(exc)
+        except Exception:  # noqa: BLE001
+            log.exception("Mathpix OCR call failed")
+            return ""
+
+        if attempt < _MATHPIX_MAX_ATTEMPTS:
+            time.sleep(min(0.5 * 2 ** (attempt - 1), 4.0))
+
+    log.warning(
+        "Mathpix OCR gave up after %d attempts (%s)", _MATHPIX_MAX_ATTEMPTS, last_err
+    )
+    return ""
 
 
 def pages_via_vision(
