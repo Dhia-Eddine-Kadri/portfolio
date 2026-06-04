@@ -99,6 +99,67 @@ _SYSTEM = (
 )
 
 
+# ── Settings (Stage 3) ───────────────────────────────────────────────────────
+#
+# Four presets cover ~90% of the value; only two free overrides (pages, language)
+# are exposed — deliberately NOT an 8-dimension à-la-carte matrix, which would be
+# untestable and need a conflict-warning babysitter. Each preset resolves to a
+# concrete generation budget (how many topics/sections, how hard to push density)
+# and a layout hint (columns/font) echoed back so the renderer matches.
+
+_PRESETS: dict[str, dict[str, Any]] = {
+    # name            topics  density   columns  font
+    "exam_night":     {"topics": 10, "density": "max",     "columns": 4, "font": "xs"},
+    "balanced":       {"topics": 14, "density": "high",    "columns": 3, "font": "sm"},
+    "deep_revision":  {"topics": 18, "density": "high",    "columns": 3, "font": "md"},
+    "topic_mastery":  {"topics": 6,  "density": "thorough","columns": 2, "font": "md"},
+}
+_DEFAULT_PRESET = "balanced"
+_VALID_PAGES = (1, 2, 3, 4)
+_VALID_LANGS = ("source", "en", "de")
+# Density label → the count band we ask the model to aim for. Bounded so even
+# "max" stays inside the 45s output budget (see Stage 1 validation).
+_DENSITY_TARGET = {
+    "max": "40-60", "high": "30-50", "thorough": "20-40",
+}
+_LANG_INSTRUCTION = {
+    "source": "Match the language of the source material.",
+    "en": "Write the cheatsheet in English regardless of the source language.",
+    "de": "Write the cheatsheet in German (Deutsch) regardless of the source language.",
+}
+
+
+def normalize_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
+    """Resolve a (possibly partial/garbage) settings dict into a concrete,
+    clamped config. Always returns a full dict so callers never branch on None."""
+    s = settings or {}
+    preset = str(s.get("preset") or _DEFAULT_PRESET).lower()
+    if preset not in _PRESETS:
+        preset = _DEFAULT_PRESET
+    base = dict(_PRESETS[preset])
+
+    pages = s.get("pages")
+    pages = pages if pages in _VALID_PAGES else (1 if preset == "exam_night" else 2)
+    # More pages → room for more sections; fewer → tighter. Scale topics with
+    # pages but keep the preset's character and stay output-budget-safe.
+    base["topics"] = max(4, min(20, int(base["topics"] * (0.6 + 0.35 * pages))))
+
+    lang = str(s.get("language") or "source").lower()
+    if lang not in _VALID_LANGS:
+        lang = "source"
+
+    return {
+        "preset": preset,
+        "pages": pages,
+        "language": lang,
+        "columns": base["columns"],
+        "font": base["font"],
+        "densityTarget": _DENSITY_TARGET.get(base["density"], "30-50"),
+        "maxTopics": base["topics"],
+        "langInstruction": _LANG_INSTRUCTION.get(lang, _LANG_INSTRUCTION["source"]),
+    }
+
+
 # ── Sanitization (Stage 4) ───────────────────────────────────────────────────
 #
 # OCR'd source material leaks two kinds of garbage into generated sheets, both
@@ -156,11 +217,15 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     return cleaned, dropped
 
 
-def _topic_names(topic_map: list[dict[str, Any]], topic_focus: str | None) -> list[str | None]:
+def _topic_names(
+    topic_map: list[dict[str, Any]],
+    topic_focus: str | None,
+    limit: int = _MAX_TOPICS,
+) -> list[str | None]:
     if topic_focus:
         return [topic_focus]
     names = [t.get("name") for t in (topic_map or []) if t.get("name")]
-    return names[:_MAX_TOPICS] or [None]
+    return names[:limit] or [None]
 
 
 def _pool_evidence(
@@ -243,6 +308,18 @@ def _format_evidence(
     return "\n\n---\n\n".join(parts)
 
 
+def _settings_system_prompt(cfg: dict[str, Any]) -> str:
+    """Append the settings-specific overrides to the base system prompt. These
+    come LAST so they take precedence over the generic guidance in _SYSTEM."""
+    return (
+        _SYSTEM
+        + "\n\nSETTINGS (override any generic guidance above):\n"
+        + f"- Aim for {cfg['densityTarget']} formulas across the sheet when the "
+        "evidence supports them; never invent to hit the number.\n"
+        + f"- {cfg['langInstruction']}"
+    )
+
+
 def generate_cheatsheet(
     *,
     user_id: str,
@@ -251,15 +328,17 @@ def generate_cheatsheet(
     topic: str | None,
     doc_names: dict[str, str],
     save: bool = True,
+    settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate (and optionally save) a grounded, Topic-Map-driven cheatsheet."""
+    cfg = normalize_settings(settings)
     topic_query = (topic or "").strip() or None
     try:
         topic_map = get_course_topic_map(user_id, course_id)
     except Exception:  # noqa: BLE001
         log.exception("cheatsheet: topic map read failed")
         topic_map = []
-    topics = _topic_names(topic_map, topic_query)
+    topics = _topic_names(topic_map, topic_query, limit=cfg["maxTopics"])
 
     evidence = _pool_evidence(
         user_id=user_id, course_id=course_id, topics=topics, document_ids=document_ids,
@@ -269,6 +348,7 @@ def generate_cheatsheet(
             "text": "",
             "warning": "No relevant material found to build a cheatsheet from.",
             "groundedSources": [],
+            "settings": cfg,
         }
     # Caller-supplied names (selected docs) take precedence; backfill the rest
     # so course-wide sheets still cite real filenames instead of "Unknown".
@@ -280,7 +360,7 @@ def generate_cheatsheet(
         # Keep output bounded: at ~40 tok/s a longer sheet blows the edge
         # proxy's upstream timeout. ~2800 tokens (a tight 1.5-page sheet) plus
         # the raised proxy timeout keeps generation inside the budget.
-        res = chat_json(system=_SYSTEM, user=user, max_tokens=2800)
+        res = chat_json(system=_settings_system_prompt(cfg), user=user, max_tokens=2800)
     except Exception as e:  # noqa: BLE001
         log.exception("cheatsheet LLM call failed")
         return {"text": "", "error": str(e), "groundedSources": []}
@@ -321,6 +401,7 @@ def generate_cheatsheet(
         "text": text,
         "topicsCovered": [t for t in topics if t],
         "groundedSources": sources[:20],
+        "settings": cfg,
         "model": res.model,
         "promptTokens": res.prompt_tokens,
         "completionTokens": res.completion_tokens,

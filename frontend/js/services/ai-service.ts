@@ -372,12 +372,27 @@ export async function generateExamForge(
   return response.json();
 }
 
+export interface CheatsheetSettings {
+  preset?: 'exam_night' | 'balanced' | 'deep_revision' | 'topic_mastery';
+  pages?: number;
+  language?: 'source' | 'en' | 'de';
+}
+
+/** Normalized layout config the backend echoes back (drives the renderer). */
+export interface CheatsheetResolvedSettings extends CheatsheetSettings {
+  columns?: number;
+  font?: 'xs' | 'sm' | 'md';
+  densityTarget?: string;
+  maxTopics?: number;
+}
+
 export interface CheatsheetResult {
   noteId?: string | null;
   title?: string | null;
   text: string;
   topicsCovered?: string[];
   groundedSources?: Array<{ fileName?: string; pageStart?: number | null }>;
+  settings?: CheatsheetResolvedSettings;
   warning?: string;
   citationWarning?: string;
   error?: string;
@@ -385,7 +400,7 @@ export interface CheatsheetResult {
 
 export async function generateCheatsheet(
   courseId: string,
-  opts?: { topic?: string; documentIds?: string[] }
+  opts?: { topic?: string; documentIds?: string[]; settings?: CheatsheetSettings }
 ): Promise<CheatsheetResult> {
   const response = await fetch(_backendUrl() + '/api/ai/cheatsheet', {
     method: 'POST',

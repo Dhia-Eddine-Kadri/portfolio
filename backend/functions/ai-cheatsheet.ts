@@ -24,6 +24,7 @@ interface PyCheatsheetResponse {
   text?: string;
   topicsCovered?: unknown[];
   groundedSources?: unknown[];
+  settings?: unknown;
   warning?: string;
   citationWarning?: string;
   error?: string;
@@ -32,6 +33,21 @@ interface PyCheatsheetResponse {
 function _docIds(raw: unknown): string[] | null {
   if (!Array.isArray(raw) || !raw.length) return null;
   return raw.filter((x): x is string => typeof x === 'string').slice(0, MAX_DOCUMENT_IDS);
+}
+
+// Whitelist + clamp settings before forwarding — never trust the client body.
+// Only preset + two overrides are accepted; everything else is dropped.
+const _VALID_PRESETS = ['exam_night', 'balanced', 'deep_revision', 'topic_mastery'];
+const _VALID_LANGS = ['source', 'en', 'de'];
+
+function _settings(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const s = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof s.preset === 'string' && _VALID_PRESETS.includes(s.preset)) out.preset = s.preset;
+  if (typeof s.pages === 'number' && s.pages >= 1 && s.pages <= 4) out.pages = Math.floor(s.pages);
+  if (typeof s.language === 'string' && _VALID_LANGS.includes(s.language)) out.language = s.language;
+  return Object.keys(out).length ? out : null;
 }
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
@@ -57,6 +73,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (typeof topic === 'string' && topic.length > MAX_TOPIC_LENGTH) return fail(400, 'topic is too long');
   const docIds = _docIds(body.documentIds ?? body.docIds);
+  const settings = _settings(body.settings);
 
   const monthlyCapped = await enforceGenerationCap(serviceKey, user.id);
   if (monthlyCapped) return monthlyCapped;
@@ -82,6 +99,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     documentIds: docIds,
     topic: typeof topic === 'string' ? topic : null,
     save: true,
+    settings,
   });
   if (!upstream.ok) {
     const err = (upstream.body as { error?: string }).error;

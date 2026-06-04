@@ -26,6 +26,23 @@
         '<h2>Cheatsheet</h2>' +
         '<p>A dense, exam-ready summary of this course — the key formulas, definitions and rules, ranked by importance and grounded in your uploaded files.</p>' +
       '</div>' +
+      '<div class="cs-settings" id="csSettings">' +
+        '<div class="cs-preset-row" role="group" aria-label="Cheatsheet preset">' +
+          '<button type="button" class="cs-preset" data-preset="exam_night">Exam Night</button>' +
+          '<button type="button" class="cs-preset is-active" data-preset="balanced">Balanced Study</button>' +
+          '<button type="button" class="cs-preset" data-preset="deep_revision">Deep Revision</button>' +
+          '<button type="button" class="cs-preset" data-preset="topic_mastery">Topic Mastery</button>' +
+        '</div>' +
+        '<div class="cs-opt-row">' +
+          '<label class="cs-opt">Pages' +
+            '<select id="csPages"><option value="">Auto</option><option>1</option><option>2</option><option>3</option><option>4</option></select>' +
+          '</label>' +
+          '<label class="cs-opt">Language' +
+            '<select id="csLang"><option value="source">Same as material</option><option value="en">English</option><option value="de">Deutsch</option></select>' +
+          '</label>' +
+          '<span class="cs-conflict" id="csConflict" hidden></span>' +
+        '</div>' +
+      '</div>' +
       '<div class="cs-controls">' +
         '<input type="text" id="csTopic" class="cs-topic" placeholder="Focus on one topic (optional) — leave blank for the whole course">' +
         '<button class="cs-btn cs-btn-primary" id="csGenerate" type="button">Generate cheatsheet</button>' +
@@ -189,6 +206,7 @@
       scope: res.title || 'Course cheatsheet',
       meta: (fileCount ? 'Based on ' + fileCount + ' file' + (fileCount === 1 ? '' : 's') + ' · ' : '') + 'generated cheatsheet',
       markdown: res.text,
+      settings: res.settings,
     };
     els.result.innerHTML =
       '<div class="cs-sheet">' +
@@ -327,6 +345,14 @@
       '</div>';
     document.body.appendChild(ov);
     _paperEl = ov;
+    // Settings drive the existing dense paper layout via CSS custom properties.
+    var paper = ov.querySelector('.cs-paper');
+    var st = opts.settings || {};
+    if (paper) {
+      if (st.columns) paper.style.setProperty('--cs-columns', String(st.columns));
+      var fontEm = { xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm'];
+      if (fontEm) paper.style.setProperty('--cs-font', fontEm);
+    }
     var body = ov.querySelector('.cs-paper-body');
     if (body) _renderMarkdown(body, opts.markdown || '', true);
     ov.querySelector('[data-act="close"]').addEventListener('click', _closePaper);
@@ -370,6 +396,7 @@
       scope: res.title || 'Course cheatsheet',
       meta: (fileCount ? 'Based on ' + fileCount + ' file' + (fileCount === 1 ? '' : 's') + ' · ' : '') + 'generated cheatsheet',
       markdown: res.text,
+      settings: res.settings,
     };
     els.result.innerHTML =
       '<div class="cs-sheet">' +
@@ -482,21 +509,63 @@
       result: root.querySelector('#csResult'),
       saved: root.querySelector('#csSaved'),
       savedList: root.querySelector('#csSavedList'),
+      pages: root.querySelector('#csPages'),
+      lang: root.querySelector('#csLang'),
+      conflict: root.querySelector('#csConflict'),
     };
     if (!els.gen) return;
+
+    var state = { preset: 'balanced' };
+
+    // ── settings panel ──
+    function _readSettings() {
+      var s = { preset: state.preset };
+      var p = els.pages && els.pages.value;
+      if (p) s.pages = parseInt(p, 10);
+      var l = els.lang && els.lang.value;
+      if (l && l !== 'source') s.language = l;
+      return s;
+    }
+    function _checkConflicts() {
+      if (!els.conflict) return;
+      var topic = ((els.topic && els.topic.value) || '').trim();
+      var pages = els.pages && els.pages.value ? parseInt(els.pages.value, 10) : null;
+      var msg = '';
+      if (state.preset === 'topic_mastery' && !topic) {
+        msg = 'Topic Mastery works best with a topic in the focus box.';
+      } else if (state.preset === 'deep_revision' && pages === 1) {
+        msg = 'Deep Revision on 1 page will be very cramped — consider 2+ pages.';
+      } else if (state.preset === 'exam_night' && pages && pages >= 3) {
+        msg = 'Exam Night is tuned for 1 dense page; more pages dilute it.';
+      }
+      els.conflict.textContent = msg;
+      els.conflict.hidden = !msg;
+    }
+    root.querySelectorAll('.cs-preset').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.preset = b.getAttribute('data-preset') || 'balanced';
+        root.querySelectorAll('.cs-preset').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+        _checkConflicts();
+      });
+    });
+    if (els.pages) els.pages.addEventListener('change', _checkConflicts);
+    if (els.topic) els.topic.addEventListener('input', _checkConflicts);
 
     _aiService().then(function (svc) { _loadSaved(svc, els, courseId); });
 
     els.gen.addEventListener('click', function () {
       if (!courseId) return;
       var topic = ((els.topic && els.topic.value) || '').trim();
+      var settings = _readSettings();
       els.gen.disabled = true;
       var progress;
       els.result.innerHTML = '<div class="cs-msg cs-loading">Generating cheatsheet… this can take a moment.</div>';
       progress = _startBuildSteps(els, topic);
       _aiService()
         .then(function (svc) {
-          return svc.generateCheatsheet(courseId, topic ? { topic: topic } : {}).then(function (res) {
+          var opts = { settings: settings };
+          if (topic) opts.topic = topic;
+          return svc.generateCheatsheet(courseId, opts).then(function (res) {
             els.gen.disabled = false;
             progress.stop();
             _renderResultProgressive(els, res, progress.id);

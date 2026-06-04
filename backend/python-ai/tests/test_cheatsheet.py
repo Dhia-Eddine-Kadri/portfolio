@@ -79,6 +79,47 @@ def test_sanitize_empty():
     assert cs.sanitize_cheatsheet_markdown("") == ("", 0)
 
 
+# ── settings (Stage 3) ───────────────────────────────────────────────────────
+
+
+def test_settings_default_is_balanced():
+    cfg = cs.normalize_settings(None)
+    assert cfg["preset"] == "balanced"
+    assert cfg["pages"] == 2
+    assert cfg["language"] == "source"
+    assert cfg["columns"] == 3
+
+
+def test_settings_unknown_preset_falls_back():
+    assert cs.normalize_settings({"preset": "nonsense"})["preset"] == "balanced"
+
+
+def test_settings_exam_night_defaults_one_page():
+    cfg = cs.normalize_settings({"preset": "exam_night"})
+    assert cfg["pages"] == 1
+    assert cfg["columns"] == 4
+    assert cfg["densityTarget"] == "40-60"
+
+
+def test_settings_pages_clamped():
+    # out-of-range pages ignored → preset default
+    assert cs.normalize_settings({"preset": "balanced", "pages": 99})["pages"] == 2
+    assert cs.normalize_settings({"preset": "balanced", "pages": 3})["pages"] == 3
+
+
+def test_settings_language_override():
+    assert cs.normalize_settings({"language": "de"})["language"] == "de"
+    assert "German" in cs.normalize_settings({"language": "de"})["langInstruction"]
+    assert cs.normalize_settings({"language": "klingon"})["language"] == "source"
+
+
+def test_settings_maxtopics_scales_with_pages():
+    one = cs.normalize_settings({"preset": "deep_revision", "pages": 1})["maxTopics"]
+    four = cs.normalize_settings({"preset": "deep_revision", "pages": 4})["maxTopics"]
+    assert four > one
+    assert 4 <= one <= 20 and 4 <= four <= 20
+
+
 # ── generation ──────────────────────────────────────────────────────────────
 
 

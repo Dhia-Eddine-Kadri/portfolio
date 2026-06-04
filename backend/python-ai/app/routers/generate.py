@@ -116,12 +116,21 @@ class GradeExamForgeAnswerResponse(BaseModel):
     error: str | None = None
 
 
+class CheatsheetSettings(BaseModel):
+    # All optional; the service normalizes/clamps. Only preset + two overrides
+    # are exposed (no à-la-carte matrix).
+    preset: str | None = None        # exam_night | balanced | deep_revision | topic_mastery
+    pages: int | None = None         # 1..4
+    language: str | None = None      # source | en | de
+
+
 class GenerateCheatsheetRequest(BaseModel):
     userId: str
     courseId: str
     documentIds: list[str] | None = None
     topic: str | None = None
     save: bool = True
+    settings: CheatsheetSettings | None = None
 
 
 class GenerateCheatsheetResponse(BaseModel):
@@ -130,6 +139,7 @@ class GenerateCheatsheetResponse(BaseModel):
     text: str
     topicsCovered: list[str] = []
     groundedSources: list[dict[str, Any]] = []
+    settings: dict[str, Any] | None = None
     warning: str | None = None
     citationWarning: str | None = None
     error: str | None = None
@@ -274,6 +284,7 @@ async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> Ge
         topic=payload.topic,
         doc_names=doc_names,
         save=payload.save,
+        settings=payload.settings.model_dump() if payload.settings else None,
     )
     return GenerateCheatsheetResponse(
         noteId=out.get("noteId"),
@@ -281,6 +292,7 @@ async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> Ge
         text=out.get("text", ""),
         topicsCovered=out.get("topicsCovered", []),
         groundedSources=out.get("groundedSources", []),
+        settings=out.get("settings"),
         warning=out.get("warning"),
         citationWarning=out.get("citationWarning"),
         error=out.get("error"),

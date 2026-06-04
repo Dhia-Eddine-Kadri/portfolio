@@ -45,6 +45,46 @@
 .cs-btn-primary:hover { background: #5457e6; }
 .cs-btn-primary:disabled { opacity: 0.55; cursor: default; }
 
+/* Settings panel (presets + two overrides) */
+.cs-settings { margin-bottom: 14px; }
+.cs-preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.cs-preset {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #334155);
+  background: var(--card-inner, rgba(255, 255, 255, 0.04));
+  color: var(--text, #e2e8f0);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cs-preset:hover { background: rgba(255, 255, 255, 0.08); }
+.cs-preset.is-active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+.cs-opt-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.cs-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.cs-opt select {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #334155);
+  background: var(--card-inner, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  font-size: 0.82rem;
+}
+.cs-conflict {
+  font-size: 0.78rem;
+  color: #fbbf24;
+}
+
 .cs-msg {
   padding: 18px;
   border-radius: 8px;
@@ -159,7 +199,7 @@
   padding: 26px 30px 34px;
   border-radius: 4px;
   box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
-  font-size: 0.78rem;
+  font-size: var(--cs-font, 0.78rem);
   line-height: 1.4;
 }
 .cs-paper-head { border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 14px; }
@@ -168,7 +208,7 @@
 .cs-paper-meta { font-size: 0.72rem; color: #6b7280; margin-top: 3px; }
 
 .cs-paper-body {
-  column-count: 4;
+  column-count: var(--cs-columns, 4);
   column-gap: 22px;
   column-rule: 1px solid #e5e7eb;
 }
