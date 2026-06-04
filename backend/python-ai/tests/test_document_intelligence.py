@@ -30,6 +30,14 @@ from app.services.document_intelligence import (
         ("Lecture-12-Slides.pdf", "lecture"),
         ("Cheatsheet_Final.pdf", "formula_sheet"),
         ("Übung_2.pdf", "exercise_sheet"),
+        # Abbreviated "ExN" exercise marker (EngMec2 series).
+        ("EngMec2_Ex2.pdf", "exercise_sheet"),
+        ("EngMec2_Ex10.pdf", "exercise_sheet"),
+        ("Ex_3.pdf", "exercise_sheet"),
+        # Must NOT fire inside a word — these have no real filename hint and
+        # an empty-ish body, so they stay unknown.
+        ("index2.pdf", "unknown"),
+        ("complex_4.pdf", "unknown"),
     ],
 )
 def test_filename_classification(file_name: str, expected: str) -> None:

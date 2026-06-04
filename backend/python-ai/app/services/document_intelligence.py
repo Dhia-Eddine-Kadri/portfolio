@@ -92,6 +92,14 @@ _LECTURE_HEADING_RE = re.compile(
 )
 
 
+# Abbreviated exercise marker in a filename: "Ex2", "Ex_10", "Ex 3", "ExN"
+# as used by the EngMec2 series ("EngMec2_Ex2.pdf"). Requires a separator (or
+# start) before "ex" so it can't fire inside words like "index2" / "annex 3"
+# / "complex_4". Checked only as a FALLBACK, after the explicit word hints, so
+# a "…Solutions.pdf" still classifies as solution_sheet.
+_EX_FILENAME_RE = re.compile(r"(?:^|[_\s\-])ex[._\s]*\d")
+
+
 def _filename_class(file_name: str) -> str | None:
     if not file_name:
         return None
@@ -99,6 +107,8 @@ def _filename_class(file_name: str) -> str | None:
     for needles, doc_type in _FILENAME_HINTS:
         if any(n in lower for n in needles):
             return doc_type
+    if _EX_FILENAME_RE.search(lower):
+        return "exercise_sheet"
     return None
 
 
