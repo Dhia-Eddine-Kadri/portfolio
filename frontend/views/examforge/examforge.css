@@ -319,6 +319,13 @@
   text-align: center;
 }
 
+/* `display: grid` above overrides the browser's `[hidden]` rule, so the
+   placeholder stayed visible (and its 520px min-height pushed the generated
+   exam to the bottom) once renderExam set `hidden`. Restore the hide. */
+.ef-empty[hidden] {
+  display: none;
+}
+
 .ef-empty-icon {
   display: grid;
   place-items: center;
