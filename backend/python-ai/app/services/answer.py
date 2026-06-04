@@ -41,6 +41,13 @@ _STRONG_SIMILARITY = 0.32   # at least one chunk above this → strong context
 _STRONG_AVG_SCORE  = 0.30   # OR average reranked score across top chunks
 _MIN_CONTEXT_CHARS = 400    # below this, we treat it as no useful context
 
+# Chunk types whose page bitmap carries problem data the OCR text loses —
+# the exercise drawing, a section view, a diagram. answer_stream renders
+# these pages and attaches them to the vision model; here we also use their
+# presence to recognise that an exercise's given VALUES live in the figure
+# (see pick_system_prompt). Single source of truth: answer_stream imports it.
+FIGURE_CHUNK_TYPES = frozenset({"exercise", "diagram", "figure", "image", "solution"})
+
 
 _SYSTEM_PROMPT_STRONG = """You are Minallo's exam-prep tutor for a university student.
 
@@ -860,7 +867,27 @@ def pick_system_prompt(
                     for c in chunks
                 )
                 completeness = assess_retrieval_completeness(chunks)
-                if completeness.is_complete_for_math and (has_exercise_anchor or context_math_problem):
+                # AG-9.1-style exercises put their given VALUES (diameters,
+                # lengths, wall thicknesses) in the DRAWING, not the OCR text,
+                # so has_given_values stays False and is_complete_for_math
+                # would never fire — which in turn blocked the page bitmap
+                # from being attached (answer_stream gates figure vision on
+                # answer_mode == "math"). That was circular: the figure was
+                # withheld because the text lacked the givens that live only
+                # in the figure. When a figure/exercise/diagram chunk is
+                # present, its bitmap WILL be attached at answer time, so the
+                # givens are effectively available — treat statement+formula
+                # +figure as math-ready even without text-extracted givens.
+                has_figure_chunk = any(
+                    (getattr(c, "chunk_type", None) or "") in FIGURE_CHUNK_TYPES
+                    for c in chunks
+                )
+                math_ready = completeness.is_complete_for_math or (
+                    completeness.has_exercise_statement
+                    and completeness.has_formula
+                    and has_figure_chunk
+                )
+                if math_ready and (has_exercise_anchor or context_math_problem):
                     use_math = True
         if use_math:
             base, label = _SYSTEM_PROMPT_MATH, "math"

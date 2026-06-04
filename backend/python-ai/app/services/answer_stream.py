@@ -27,6 +27,7 @@ from ..config import get_settings
 from ..supabase_client import get_supabase
 from .answer import (
     DEFAULT_TUTOR_MODE,
+    FIGURE_CHUNK_TYPES,
     MINALLO_APP_CONTEXT,
     _APP_ONLY_SYSTEM_PROMPT,
     _build_context_block,
@@ -52,7 +53,9 @@ log = logging.getLogger(__name__)
 # page bitmap of the retrieved exercise/figure pages and attach it to the
 # (vision-capable) strong model alongside the OCR text chunks, so it can read
 # values straight off the drawing. Best-effort: any failure attaches no image.
-_FIGURE_CHUNK_TYPES = {"exercise", "diagram", "figure", "image", "solution"}
+# Imported from .answer so the math-mode gate and the figure-attach gate
+# agree on what counts as a figure-bearing chunk.
+_FIGURE_CHUNK_TYPES = FIGURE_CHUNK_TYPES
 _FIGURE_RENDER_DPI = 150
 _MAX_ATTACHED_IMAGES = 2  # hard cap on open-file + figure images per request
 
@@ -916,6 +919,17 @@ def stream_answer(
     wants_diagram = _wants_diagram(question, problem_solver) and not app_question
     if wants_diagram:
         system_prompt += _diagram_overlay(bool(used_chunks or (has_open and deictic)))
+    # An exercise/figure page bitmap will be attached below whenever retrieval
+    # surfaced a figure-bearing chunk on a math/exercise question — even if the
+    # rigid math worksheet template wasn't picked (e.g. the formula sheet wasn't
+    # retrieved, so answer_mode stayed "strong"). Compute the flag here so it can
+    # also route the request to the vision-capable strong model.
+    will_attach_figure = (
+        not app_question
+        and answer_mode in ("math", "strong")
+        and bool(used_chunks)
+        and any((getattr(c, "chunk_type", None) or "") in _FIGURE_CHUNK_TYPES for c in used_chunks)
+    )
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Must compute AFTER
     # pick_system_prompt because we need its returned label. Math reasoning
@@ -926,7 +940,13 @@ def stream_answer(
     # predictable.
     if model:
         target_model = model
-    elif answer_mode == "math" or problem_mode in {"setup", "check", "solve"} or wants_diagram or has_open_image:
+    elif (
+        answer_mode == "math"
+        or problem_mode in {"setup", "check", "solve"}
+        or wants_diagram
+        or has_open_image
+        or will_attach_figure
+    ):
         target_model = settings.openai_generate_model_strong
     else:
         target_model = settings.openai_generate_model
@@ -936,7 +956,12 @@ def stream_answer(
     # off mid-calculation. Give the solving paths a larger budget so the
     # Given/Formula/Substitution/Calculation/Final answer structure completes.
     effective_max_tokens = max_tokens
-    if answer_mode == "math" or problem_mode in {"setup", "check", "solve"} or wants_diagram:
+    if (
+        answer_mode == "math"
+        or problem_mode in {"setup", "check", "solve"}
+        or wants_diagram
+        or will_attach_figure
+    ):
         effective_max_tokens = max(max_tokens, 4500)
 
     # Compose the context block. Open-file text goes first as [Source 0] so
@@ -1013,10 +1038,14 @@ def stream_answer(
     # Auto-attach the exercise/figure page bitmap on math/exercise questions so
     # the vision model can read dimensions and geometry off the drawing — most
     # of an engineering exercise's data lives in the figure, which OCR loses.
-    # Only when solving (answer_mode == "math"), only up to the image cap, and
-    # only when the student hasn't already supplied that visible page.
+    # Fires whenever retrieval surfaced a figure-bearing chunk on a math/strong
+    # answer (will_attach_figure), not only when the rigid math worksheet was
+    # picked — an AG-9.1-style exercise whose givens live in the drawing may
+    # land in "strong" mode if the formula sheet wasn't retrieved, and it's
+    # exactly those that need the figure most. Capped at the image budget and
+    # skipped when the student already supplied that visible page.
     figure_image_parts: list[dict[str, Any]] = []
-    if not app_question and answer_mode == "math" and used_chunks:
+    if will_attach_figure:
         remaining = _MAX_ATTACHED_IMAGES - len(open_image_parts)
         if remaining > 0:
             figure_image_parts = _figure_page_image_parts(used_chunks, max_images=remaining)

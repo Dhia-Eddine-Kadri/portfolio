@@ -520,25 +520,53 @@ def test_completeness_to_api_shape() -> None:
     }
 
 
-def test_math_template_now_requires_completeness() -> None:
+def test_math_template_skips_when_no_figure_and_no_text_givens() -> None:
     """``pick_system_prompt`` should fall back to the STRONG (explanatory)
-    prompt — not the rigid MATH worksheet — when retrieval is strong but
-    the chunks lack one of the math-readiness components. Previously,
-    has_exercise_anchor + has_formula was enough; now givens are required
-    too so the model doesn't fill the Substitution section with
-    placeholders."""
+    prompt — not the rigid MATH worksheet — when retrieval is strong but a
+    NON-figure chunk lacks given values. There are neither text givens nor a
+    figure to read them from, so the Substitution section would be
+    placeholders. (Figure-bearing exercises whose givens live in the drawing
+    are handled separately — see test_figure_borne_givens_still_enter_math_mode.)"""
     from app.services.answer import pick_system_prompt
     chunks = [
         _mk_chunk(
             "Übung 1.2: δ = l / (A·E)",
-            chunk_type="exercise",
-            similarity=0.5,  # strong-similarity anchor
+            chunk_type="lecture",      # NOT a figure-bearing type
+            similarity=0.5,
         ),
     ]
-    # Strong retrieval but no given values in any chunk → no MATH template.
+    # Strong retrieval, no givens, no figure chunk → no MATH template.
     prompt, mode = pick_system_prompt("Berechne δ", "strong", chunks)
     assert mode == "strong"
-    # Now add a chunk with explicit givens — same query, same other inputs.
-    chunks.append(_mk_chunk("Gegeben: l = 0,5 m, A = 100 mm², E = 210000 N/mm²"))
+    # Full completeness: exercise anchor + formula + explicit text givens → MATH.
+    chunks = [
+        _mk_chunk("Übung 1.2: δ = l / (A·E)", chunk_type="exercise", similarity=0.5),
+        _mk_chunk("Gegeben: l = 0,5 m, A = 100 mm², E = 210000 N/mm²"),
+    ]
     prompt, mode = pick_system_prompt("Berechne δ", "strong", chunks)
+    assert mode == "math"
+
+
+def test_figure_borne_givens_still_enter_math_mode() -> None:
+    """AG-9.1-style exercises put their given VALUES in the DRAWING, so no
+    `symbol = number` patterns appear in the OCR text and has_given_values
+    stays False. As long as the statement + a formula + a figure/exercise
+    chunk are present, the worksheet template must still fire so the page
+    bitmap gets attached and the model can read the dimensions off the
+    figure. Otherwise the figure is withheld for lack of the very givens
+    that live only in the figure (the circular bug)."""
+    from app.services.answer import pick_system_prompt, assess_retrieval_completeness
+    chunks = [
+        _mk_chunk(
+            "Aufgabe 9.1: Bestimmen Sie die Nachgiebigkeit der Schraubenverbindung.",
+            chunk_type="exercise",
+            similarity=0.5,  # strong-similarity exercise anchor
+        ),
+        _mk_chunk("δ = l / (A·E)", chunk_type="formula", similarity=0.4),
+    ]
+    # Sanity: the text-based completeness check does NOT consider this ready
+    # (the givens are in the figure, not the text).
+    assert assess_retrieval_completeness(chunks).is_complete_for_math is False
+    # But the figure/exercise chunk presence makes it math-ready anyway.
+    prompt, mode = pick_system_prompt("Berechne die Nachgiebigkeit", "strong", chunks)
     assert mode == "math"
