@@ -1,4 +1,4 @@
-import { generateStudyTool, courseHasRagDocs } from '../../services/ai-service.js';
+import { generateStudyTool, courseHasRagDocs, generateCheatsheet } from '../../services/ai-service.js';
 
 export function closeAllOpts(): void {
   document.querySelectorAll('.chip-drawer').forEach((el) => {
@@ -160,6 +160,44 @@ async function _generateWithRag(tool: string, level?: string, topic?: string): P
   }
 }
 
+async function _generateCheatsheetChip(): Promise<void> {
+  const courseId = window.activeCourseId || window.currentCourseId || '';
+  if (!courseId) {
+    if (window.addBotMsg) window.addBotMsg('Open a course first to generate a cheatsheet.');
+    return;
+  }
+  const hasRag = await courseHasRagDocs(courseId).catch(() => false);
+  if (!hasRag) {
+    if (window.addBotMsg) window.addBotMsg('This course has no indexed materials to build a cheatsheet from yet.');
+    return;
+  }
+
+  if (window.addUserMsg) window.addUserMsg('🧾 Generate cheatsheet');
+  _ragSetGenerating(true);
+  if (window.addTyping) window.addTyping();
+
+  try {
+    const result = await generateCheatsheet(courseId);
+    let md: string;
+    if (result.error) md = '⚠️ ' + result.error;
+    else if (!result.text || !result.text.trim()) {
+      md = result.warning || 'No cheatsheet could be generated from your course materials.';
+    } else {
+      const topics = (result.topicsCovered || []).filter(Boolean);
+      md = '## ' + (result.title || 'Cheatsheet') + '\n\n' + result.text;
+      if (topics.length) md += '\n\n*Topics covered: ' + topics.join(' · ') + '*';
+      if (result.noteId) md += '\n\n*Saved to your notes.*';
+    }
+    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    _ragSetGenerating(false);
+    if (!_ragAborted && window.addBotMsg) window.addBotMsg(md);
+  } catch {
+    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    _ragSetGenerating(false);
+    if (window.addBotMsg) window.addBotMsg('⚠️ Cheatsheet generation failed. Please try again.');
+  }
+}
+
 const prompts = {
   summarise: {
     short: 'give me a SHORT summary',
@@ -259,6 +297,10 @@ export function initChipListeners(): void {
         );
       }
     });
+  });
+  document.getElementById('chip-cheatsheet')?.addEventListener('click', () => {
+    closeAllOpts();
+    void _generateCheatsheetChip();
   });
   document.querySelectorAll<HTMLElement>('.chip-sub').forEach((opt) => {
     opt.addEventListener('click', () => {
