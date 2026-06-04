@@ -220,16 +220,7 @@
         '<div class="cs-after" hidden>' +
           (res.citationWarning ? '<div class="cs-cite-warn">' + _esc(res.citationWarning) + '</div>' : '') +
           (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
-          (sources.length
-            ? '<div class="cs-sources">Sources: ' +
-                sources.map(function (s) {
-                  var pg = s.pageStart == null ? '' : s.pageStart;
-                  return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(s.fileName || '') +
-                    '" data-src-page="' + _esc(pg) + '">' + _esc(s.fileName || 'Source') +
-                    (pg ? ', p.' + _esc(pg) : '') + '</span>';
-                }).join(' · ') +
-              '</div>'
-            : '') +
+          _sourcesHtml(sources, res.grounding) +
         '</div>' +
       '</div>';
     var body = els.result.querySelector('.cs-sheet-body');
@@ -365,6 +356,27 @@
     document.addEventListener('keydown', _paperEsc);
   }
 
+  // Honest sources block. The chips are the files/pages where these TOPICS
+  // appear in the user's materials — not a per-formula verification. When the
+  // mechanical grounding check passed for most formulas we say so, modestly.
+  function _sourcesHtml(sources, grounding) {
+    if (!sources || !sources.length) return '';
+    var chips = sources.map(function (s) {
+      var pg = s.pageStart == null ? '' : s.pageStart;
+      return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(s.fileName || '') +
+        '" data-src-page="' + _esc(pg) + '">' + _esc(s.fileName || 'Source') +
+        (pg ? ', p.' + _esc(pg) : '') + '</span>';
+    }).join(' · ');
+    var note = '';
+    if (grounding && grounding.ratio != null && grounding.total >= 3) {
+      note = grounding.ratio >= 0.8
+        ? '<div class="cs-ground cs-ground-ok">✓ ' + grounding.grounded + '/' + grounding.total + ' formulas matched to your source text</div>'
+        : '<div class="cs-ground cs-ground-weak">' + grounding.grounded + '/' + grounding.total + ' formulas matched to your source text — verify the rest</div>';
+    }
+    return '<div class="cs-sources"><span class="cs-sources-label">From your files (where these topics appear):</span> ' +
+      chips + '</div>' + note;
+  }
+
   function _bindSourceClicks(scope) {
     scope.querySelectorAll('.cs-sources .src-cite').forEach(function (el) {
       el.addEventListener('click', function () {
@@ -408,16 +420,7 @@
         '<div class="cs-sheet-body"></div>' +
         (res.citationWarning ? '<div class="cs-cite-warn">' + _esc(res.citationWarning) + '</div>' : '') +
         (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
-        (sources.length
-          ? '<div class="cs-sources">Sources: ' +
-              sources.map(function (s) {
-                var pg = s.pageStart == null ? '' : s.pageStart;
-                return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(s.fileName || '') +
-                  '" data-src-page="' + _esc(pg) + '">' + _esc(s.fileName || 'Source') +
-                  (pg ? ', p.' + _esc(pg) : '') + '</span>';
-              }).join(' · ') +
-            '</div>'
-          : '') +
+        _sourcesHtml(sources, res.grounding) +
       '</div>';
     var body = els.result.querySelector('.cs-sheet-body');
     if (body) _renderMarkdown(body, res.text);

@@ -217,6 +217,48 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     return cleaned, dropped
 
 
+# ── Grounding (Stage 2) ──────────────────────────────────────────────────────
+#
+# We can cheaply check that a formula's distinctive tokens actually appear in the
+# retrieved source text — a mechanical hallucination signal, NOT proof the
+# formula is on the exact cited page (the LLM still chooses the page, and LLMs
+# attribute sloppily). So this only LABELS honestly and WARNS; it never drops a
+# formula, because OCR noise can make a correct formula fail to match garbled
+# source text — dropping it would be worse than flagging.
+
+# LaTeX command words to ignore when extracting a formula's "real" tokens.
+_LATEX_WORDS = frozenset({
+    "frac", "cdot", "times", "sqrt", "int", "sum", "partial", "left", "right",
+    "begin", "end", "text", "mathrm", "mathbf", "vec", "hat", "bar", "dot",
+    "ddot", "infty", "alpha", "beta", "gamma", "delta", "theta", "lambda",
+    "omega", "pi", "mu", "rho", "sigma", "tau", "phi", "psi", "nabla",
+})
+_FORMULA_TOK_RE = re.compile(r"[a-z0-9]{2,}")
+
+
+def _formula_grounded(body: str, corpus: str) -> bool:
+    """True if a formula body's distinctive multi-char tokens appear in the
+    evidence corpus. Single-symbol formulas (no multi-char token) can't be
+    disproved mechanically, so they're treated as grounded (no false alarm)."""
+    toks = {t for t in _FORMULA_TOK_RE.findall(body.lower()) if t not in _LATEX_WORDS}
+    if not toks:
+        return True
+    hits = sum(1 for t in toks if t in corpus)
+    return hits >= max(1, len(toks) // 2)
+
+
+def formula_grounding(text: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    """Mechanical grounding metric over the sheet's display formulas. Returns
+    {total, grounded, ratio}. ratio is None when there are no display formulas."""
+    bodies = _DISPLAY_FORMULA_RE.findall(text or "")
+    total = len(bodies)
+    if not total:
+        return {"total": 0, "grounded": 0, "ratio": None}
+    corpus = " ".join((c.get("text") or "") for c in evidence).lower()
+    grounded = sum(1 for b in bodies if _formula_grounded(b, corpus))
+    return {"total": total, "grounded": grounded, "ratio": round(grounded / total, 3)}
+
+
 def _topic_names(
     topic_map: list[dict[str, Any]],
     topic_focus: str | None,
@@ -369,6 +411,7 @@ def generate_cheatsheet(
     text, dropped_formulas = sanitize_cheatsheet_markdown(raw_text)
     if dropped_formulas:
         log.info("cheatsheet sanitizer dropped %d malformed formula(s)", dropped_formulas)
+    grounding = formula_grounding(text, evidence)
     sources = [
         {
             "documentId": c.get("documentId"),
@@ -402,18 +445,32 @@ def generate_cheatsheet(
         "topicsCovered": [t for t in topics if t],
         "groundedSources": sources[:20],
         "settings": cfg,
+        "grounding": grounding,
         "model": res.model,
         "promptTokens": res.prompt_tokens,
         "completionTokens": res.completion_tokens,
     }
+    # Build one honest warning from both signals (sanitizer drops + weak grounding).
+    warns: list[str] = []
     if dropped_formulas:
-        # Honest, not hidden: the student should know some source formulas were
-        # too garbled to render rather than be shown a silently-thinner sheet.
-        out["citationWarning"] = (
+        warns.append(
             f"{dropped_formulas} formula(s) were omitted because the source text "
             "was unreadable (likely scan/OCR quality)."
         )
+    if grounding["ratio"] is not None and grounding["total"] >= 3 and grounding["ratio"] < 0.6:
+        ungrounded = grounding["total"] - grounding["grounded"]
+        warns.append(
+            f"{ungrounded} of {grounding['total']} formulas could not be matched "
+            "to your source text — double-check them before relying on the sheet."
+        )
+    if warns:
+        out["citationWarning"] = " ".join(warns)
     return out
 
 
-__all__ = ("generate_cheatsheet", "sanitize_cheatsheet_markdown")
+__all__ = (
+    "generate_cheatsheet",
+    "sanitize_cheatsheet_markdown",
+    "normalize_settings",
+    "formula_grounding",
+)

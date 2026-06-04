@@ -140,6 +140,7 @@ class GenerateCheatsheetResponse(BaseModel):
     topicsCovered: list[str] = []
     groundedSources: list[dict[str, Any]] = []
     settings: dict[str, Any] | None = None
+    grounding: dict[str, Any] | None = None
     warning: str | None = None
     citationWarning: str | None = None
     error: str | None = None
@@ -293,6 +294,7 @@ async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> Ge
         topicsCovered=out.get("topicsCovered", []),
         groundedSources=out.get("groundedSources", []),
         settings=out.get("settings"),
+        grounding=out.get("grounding"),
         warning=out.get("warning"),
         citationWarning=out.get("citationWarning"),
         error=out.get("error"),

@@ -120,6 +120,39 @@ def test_settings_maxtopics_scales_with_pages():
     assert 4 <= one <= 20 and 4 <= four <= 20
 
 
+# ── grounding (Stage 2) ──────────────────────────────────────────────────────
+
+
+def test_grounding_none_when_no_display_formulas():
+    g = cs.formula_grounding("just text, $inline$ only", [])
+    assert g["ratio"] is None
+    assert g["total"] == 0
+
+
+def test_grounding_formula_matched_to_evidence():
+    text = "$$E_{kin} = \\frac{1}{2} m v^2$$"
+    evidence = [{"text": "The kinetic energy E_kin depends on m and v squared."}]
+    g = cs.formula_grounding(text, evidence)
+    assert g["total"] == 1
+    assert g["grounded"] == 1
+    assert g["ratio"] == 1.0
+
+
+def test_grounding_flags_ungrounded_formula():
+    text = "$$\\zeta_{xyz} = \\alpha_{qrs} + \\beta_{tuv}$$"
+    evidence = [{"text": "completely unrelated lecture content about history"}]
+    g = cs.formula_grounding(text, evidence)
+    assert g["total"] == 1
+    assert g["grounded"] == 0
+    assert g["ratio"] == 0.0
+
+
+def test_grounding_single_symbol_not_penalized():
+    # No multi-char token to disprove → treated as grounded (no false alarm).
+    g = cs.formula_grounding("$$x$$", [{"text": "nothing relevant"}])
+    assert g["grounded"] == 1
+
+
 # ── generation ──────────────────────────────────────────────────────────────
 
 

@@ -129,6 +129,15 @@
   opacity: 0.85;
 }
 
+.cs-sources-label { opacity: 0.7; }
+/* Honest mechanical grounding note (formula tokens matched to source text). */
+.cs-ground {
+  margin-top: 6px;
+  font-size: 0.76rem;
+}
+.cs-ground-ok { color: #34d399; }
+.cs-ground-weak { color: #fbbf24; }
+
 /* Honest note when the sanitizer dropped garbled source formulas. */
 .cs-cite-warn {
   margin-top: 12px;

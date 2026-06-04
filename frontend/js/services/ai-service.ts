@@ -393,6 +393,7 @@ export interface CheatsheetResult {
   topicsCovered?: string[];
   groundedSources?: Array<{ fileName?: string; pageStart?: number | null }>;
   settings?: CheatsheetResolvedSettings;
+  grounding?: { total: number; grounded: number; ratio: number | null };
   warning?: string;
   citationWarning?: string;
   error?: string;
