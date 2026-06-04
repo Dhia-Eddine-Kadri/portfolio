@@ -181,6 +181,16 @@ def test_math_prompt_allows_universal_geometry() -> None:
     assert "diameter is given" in body or "from the given diameter" in body
 
 
+def test_math_prompt_forbids_inventing_missing_lengths() -> None:
+    # Regression: the model abused the universal-geometry carve-out to invent
+    # a clamping length (l_K = 0.5*d) and label it "standard geometry". Rule
+    # 1b must forbid guessing inputs that must be read from the figure/text.
+    body = _SYSTEM_PROMPT_MATH.lower()
+    assert "boundary on rule 1a" in body
+    assert "keep it symbolic" in body
+    assert "rule of thumb" in body
+
+
 def test_math_prompt_reserves_missing_context_for_absent_formula() -> None:
     # Having the formula but lacking some numeric inputs must be
     # "Partially verified", not "Missing context".

@@ -78,6 +78,7 @@ The question is mathematical or asks you to solve an exercise. Answer it STRICTL
 Rules:
 1. Use ONLY the context for the exercise statement, givens, requested quantities, and COURSE-SPECIFIC formulas/conventions. Do not invent numbers or symbols. Do not silently fall back to generic textbook equations for course-specific engineering topics (e.g. do NOT write `τ = F/A`, `σ = M·y/I`, or any other course-specific "standard" formula unless it appears verbatim — symbol-for-symbol — in the COURSE CONTEXT).
 1a. EXCEPTION — universal mathematics is ALWAYS allowed and is NOT "inventing". You may and SHOULD use elementary, professor-independent identities even when they are not printed in the context: the area of a circle or annulus ($A = \\pi d^2/4$, $A = \\pi (d_a^2 - d_i^2)/4$), basic geometry (Pythagoras, triangle/rectangle/trapezoid areas), unit conversions, and ordinary algebra/trigonometry. These are not course-specific conventions, so compute them directly instead of declaring them missing. When you use one, label it briefly e.g. "(standard geometry)" / "(Standardgeometrie)" rather than attaching a `[Source N]`. In particular: whenever a cross-sectional area is needed and the corresponding diameter is given (e.g. core diameter $d_3$, nominal diameter $d$), COMPUTE the area from the given diameter — never leave it as "not given".
+1b. BOUNDARY on rule 1a — it covers ONLY quantities fully DETERMINED by values you already have (an area from a given diameter, a hypotenuse from two given sides). It does NOT license guessing an input that must be measured or read from the problem statement or figure. Never approximate a length, clamping length, segment length, wall thickness, or distance with a made-up rule of thumb (e.g. do NOT invent $l_K = 0.5\\,d$) unless that exact relation is printed in the COURSE CONTEXT. If such a value is not given in the text and not visible in an attached figure, keep it SYMBOLIC and mark the answer Partially verified — do not fabricate it, and never label a guessed dimension as "(standard geometry)".
 2. Before writing the Formula section, verify the required formula appears in at least one chunk. If it does NOT, STOP after the Required section and write only:
    ### Confidence
    Missing context — the formula for this exercise is not in your uploaded course files.
@@ -1095,10 +1096,14 @@ def generate_answer(
     if context_block:
         user_message += "\n\nCOURSE CONTEXT:\n\n" + context_block
 
+    # Worked math/exercise solutions in KaTeX overrun the small default budget
+    # and truncate mid-calculation; give the math path room to finish.
+    effective_max_tokens = max(max_tokens, 4500) if (answer_mode == "math" or wants_diagram) else max_tokens
+
     client = OpenAI(api_key=settings.openai_api_key)
     completion = client.chat.completions.create(
         model=target_model,
-        max_tokens=max_tokens,
+        max_tokens=effective_max_tokens,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_message},

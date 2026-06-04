@@ -931,6 +931,14 @@ def stream_answer(
     else:
         target_model = settings.openai_generate_model
 
+    # Worked engineering solutions (multi-term formulas rendered in KaTeX,
+    # which is token-heavy) routinely overran the default ceiling and got cut
+    # off mid-calculation. Give the solving paths a larger budget so the
+    # Given/Formula/Substitution/Calculation/Final answer structure completes.
+    effective_max_tokens = max_tokens
+    if answer_mode == "math" or problem_mode in {"setup", "check", "solve"} or wants_diagram:
+        effective_max_tokens = max(max_tokens, 4500)
+
     # Compose the context block. Open-file text goes first as [Source 0] so
     # the model cites it preferentially for deictic ("this question /
     # this section / the exercise above") queries. RAG-retrieved chunks
@@ -1087,7 +1095,7 @@ def stream_answer(
     try:
         stream = client.chat.completions.create(
             model=target_model,
-            max_tokens=max_tokens,
+            max_tokens=effective_max_tokens,
             stream=True,
             stream_options={"include_usage": True},
             messages=[
