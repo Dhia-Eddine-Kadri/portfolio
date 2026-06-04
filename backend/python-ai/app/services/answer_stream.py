@@ -56,6 +56,30 @@ _FIGURE_CHUNK_TYPES = {"exercise", "diagram", "figure", "image", "solution"}
 _FIGURE_RENDER_DPI = 150
 _MAX_ATTACHED_IMAGES = 2  # hard cap on open-file + figure images per request
 
+# Instruction appended to the user turn when an exercise/figure page image is
+# attached. Deliberately exhaustive: engineering figures pack the bulk of the
+# problem data (every diameter, length, wall thickness, thread, hole size,
+# section view) and the model otherwise reads only the one or two values the
+# question names. Force a full inventory of the drawing BEFORE solving.
+_FIGURE_READ_INSTRUCTION = (
+    "\n\nEXERCISE FIGURE — READ IT EXHAUSTIVELY. The attached page image(s) are"
+    " from the exercise itself, and most of the data lives in the drawing, not in"
+    " the surrounding text. BEFORE you solve, inventory the figure completely:\n"
+    "- List EVERY labelled value you can see: every diameter (⌀ / Ø), every length"
+    " and wall thickness, every thread designation (e.g. M24), every bore/hole"
+    " diameter, every angle, and every symbol (l_K, l_i, d, D_A, …). Read small"
+    " dimension-line numbers carefully; do not skip any.\n"
+    "- Use the section views and hatching to tell clamped parts apart: stacked"
+    " thicknesses are the individual clamped-plate lengths (their sum is the"
+    " clamping length l_K); concentric circles are different diameters (outer"
+    " diameter, bolt-circle, bore, through-hole).\n"
+    "- Map each figure value to the correct symbol in your formula, then treat it"
+    " as a given and cite the source page. Only declare a value missing if it is"
+    " genuinely absent from BOTH the text and the figure.\n"
+    "Then proceed with the normal Given/Required/Formula/Substitution/Calculation"
+    " structure, substituting the figure values."
+)
+
 
 def _figure_vision_enabled() -> bool:
     return os.getenv("MINALLO_FIGURE_VISION", "1").strip().lower() not in ("0", "false", "no", "off")
@@ -84,14 +108,20 @@ def _figure_page_image_parts(
         if getattr(c, "is_synthetic", False):
             continue
         doc_id = c.document_id
-        page = c.page_start
-        if not doc_id or doc_id.startswith("__") or not page:
+        if not doc_id or doc_id.startswith("__"):
             continue
-        key = (doc_id, int(page))
-        if key in seen:
-            continue
-        seen.add(key)
-        candidates.append(key)
+        # Consider both ends of the chunk's page span: a "pp.1-3" exercise
+        # chunk often has its statement on the first page and the figure on
+        # the last, so rendering only page_start would miss the drawing.
+        pages = [p for p in (c.page_start, c.page_end) if p]
+        for page in pages:
+            key = (doc_id, int(page))
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(key)
+            if len(candidates) >= max_images:
+                break
         if len(candidates) >= max_images:
             break
     if not candidates:
@@ -983,13 +1013,7 @@ def stream_answer(
         if remaining > 0:
             figure_image_parts = _figure_page_image_parts(used_chunks, max_images=remaining)
             if figure_image_parts:
-                user_message += (
-                    "\n\nEXERCISE FIGURE: the attached page image(s) are from the exercise"
-                    " itself. Read dimensions, lengths, diameters, geometry, and labels"
-                    " directly from the figure and treat values you read there as given"
-                    " (cite the source page). Most of the exercise's data is in the figure,"
-                    " not in the surrounding text."
-                )
+                user_message += _FIGURE_READ_INSTRUCTION
 
     image_parts = [*open_image_parts, *figure_image_parts]
     user_content: str | list[dict[str, Any]]

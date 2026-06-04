@@ -85,6 +85,24 @@ def test_prefers_figure_chunks_and_dedups_pages(monkeypatch):
     assert rendered == [4]
 
 
+def test_multi_page_exercise_renders_both_ends(monkeypatch):
+    # A "pp.1-3" exercise chunk: statement on page 1, figure on page 3.
+    # Both ends should be rendered (0-based 0 and 2), capped at max_images.
+    rows = [{"id": "d1", "storage_path": "course/d1.pdf"}]
+    _patch_render_ok(monkeypatch, rows)
+    rendered: list[int] = []
+    monkeypatch.setattr(vo, "_render_page_to_png",
+                        lambda pdfium, b, idx, dpi: (rendered.append(idx) or b"PNG"))
+    chunk = RetrievedChunk(
+        chunk_id="c1", document_id="d1", page_start=1, page_end=3,
+        text="x", score=1.0, similarity=0.5, chunk_type="exercise",
+        section_title=None,
+    )
+    parts = ast._figure_page_image_parts([chunk], max_images=2)
+    assert len(parts) == 2
+    assert rendered == [0, 2]
+
+
 def test_skips_synthetic_and_pageless(monkeypatch):
     rows = [{"id": "d1", "storage_path": "course/d1.pdf"}]
     _patch_render_ok(monkeypatch, rows)
