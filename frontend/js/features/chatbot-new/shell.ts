@@ -257,25 +257,32 @@ function bindSearch(sidebar: HTMLElement): void {
   if (!input || !list || input.dataset.ncbBound === '1') return;
   input.dataset.ncbBound = '1';
 
+  let searchRaf = 0;
   input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
-    const items = list.querySelectorAll<HTMLElement>('.ncb-chat-item');
-    items.forEach((item) => {
-      const titleEl = item.querySelector<HTMLElement>('.ncb-chat-title');
-      const text = (titleEl?.textContent || '').toLowerCase();
-      item.style.display = !q || text.includes(q) ? '' : 'none';
-    });
+    if (searchRaf) window.cancelAnimationFrame(searchRaf);
+    searchRaf = window.requestAnimationFrame(() => {
+      searchRaf = 0;
+      const q = input.value.trim().toLowerCase();
+      const items = list.querySelectorAll<HTMLElement>('.ncb-chat-item');
+      items.forEach((item) => {
+        const text =
+          item.dataset.searchText ||
+          (item.querySelector<HTMLElement>('.ncb-chat-title')?.textContent || '').toLowerCase();
+        item.dataset.searchText = text;
+        item.style.display = !q || text.includes(q) ? '' : 'none';
+      });
 
-    // Hide section labels whose section has no visible items.
-    const labels = list.querySelectorAll<HTMLElement>('.ncb-chat-section-label');
-    labels.forEach((label) => {
-      let visible = 0;
-      let sib = label.nextElementSibling as HTMLElement | null;
-      while (sib && !sib.classList.contains('ncb-chat-section-label')) {
-        if (sib.classList.contains('ncb-chat-item') && sib.style.display !== 'none') visible++;
-        sib = sib.nextElementSibling as HTMLElement | null;
-      }
-      label.style.display = visible === 0 ? 'none' : '';
+      // Hide section labels whose section has no visible items.
+      const labels = list.querySelectorAll<HTMLElement>('.ncb-chat-section-label');
+      labels.forEach((label) => {
+        let visible = 0;
+        let sib = label.nextElementSibling as HTMLElement | null;
+        while (sib && !sib.classList.contains('ncb-chat-section-label')) {
+          if (sib.classList.contains('ncb-chat-item') && sib.style.display !== 'none') visible++;
+          sib = sib.nextElementSibling as HTMLElement | null;
+        }
+        label.style.display = visible === 0 ? 'none' : '';
+      });
     });
   });
 }
@@ -292,6 +299,7 @@ const TUTOR_MODE_STORAGE_KEY = 'ncb_tutor_mode';
 const TUTOR_MODE_MIGRATION_KEY = 'ncb_tutor_mode_direct_default_v1';
 const TUTOR_MODE_DEFAULT: TutorMode = 'explain';
 let currentTutorMode: TutorMode = TUTOR_MODE_DEFAULT;
+let messageRenderRun = 0;
 
 function _readStoredTutorMode(): TutorMode {
   try {
@@ -2365,7 +2373,7 @@ function buildSidebarRow(c: SavedChat): string {
     ? '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>'
     : '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
   return `
-    <button type="button" class="ncb-chat-item${isActive ? ' ncb-chat-item--active' : ''}" data-chat-id="${escapeAttr(c.id)}">
+    <button type="button" class="ncb-chat-item${isActive ? ' ncb-chat-item--active' : ''}" data-chat-id="${escapeAttr(c.id)}" data-search-text="${escapeAttr(displayChatTitle(c.title).toLowerCase())}">
       <span class="ncb-chat-icon">
         <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>
       </span>
@@ -2380,13 +2388,22 @@ function buildSidebarRow(c: SavedChat): string {
   `;
 }
 
+function updateActiveSidebarItem(root: HTMLElement, chatId: string): void {
+  const list = root.querySelector<HTMLElement>('.ncb-chat-list');
+  if (!list) return;
+  list.querySelector<HTMLElement>('.ncb-chat-item--active')?.classList.remove('ncb-chat-item--active');
+  list
+    .querySelector<HTMLElement>('.ncb-chat-item[data-chat-id="' + cssEscape(chatId) + '"]')
+    ?.classList.add('ncb-chat-item--active');
+}
+
 function switchActiveChat(root: HTMLElement, chatId: string): void {
   if (chatId === chatStore.activeId) return;
   // Abort in-flight response on the old chat.
   if (liveState?.controller) liveState.controller.abort();
   chatStore.activeId = chatId;
   saveChatStore();
-  renderSidebar(root);
+  updateActiveSidebarItem(root, chatId);
   loadActiveChatIntoCenter(root);
 }
 
@@ -2425,18 +2442,7 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   // Stage mode: active iff there are any messages.
   stage.dataset.state = chat.messages.length > 0 ? 'active' : 'empty';
 
-  // Re-render messages from persisted state.
-  msgs.innerHTML = '';
-  chat.messages.forEach((m) => {
-    if (m.role === 'user') {
-      appendUserBubble(msgs, m.text, m.images || [], m.files || []);
-    } else {
-      const row = appendAiBubble(msgs);
-      const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
-      if (bubble) bubble.innerHTML = renderInlineMarkdown(m.text);
-      appendBubbleActions(row, m.text);
-    }
-  });
+  renderConversationMessages(msgs, chat.messages);
 
   // Re-render attached folders + sources panel + saved-replies count.
   renderAttachChips(root);
@@ -2446,6 +2452,37 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   if (count) count.textContent = String(chat.savedReplies.length);
   const notesCard = root.querySelector<HTMLElement>('.ncb-notes-card');
   if (notesCard && !notesCard.hidden) renderNotesTab(root);
+}
+
+function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
+  if (m.role === 'user') {
+    appendUserBubble(msgs, m.text, m.images || [], m.files || []);
+    return;
+  }
+  const row = appendAiBubble(msgs);
+  const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
+  if (bubble) bubble.innerHTML = renderInlineMarkdown(m.text);
+  appendBubbleActions(row, m.text);
+}
+
+function renderConversationMessages(msgs: HTMLElement, messages: ChatMessage[]): void {
+  const runId = ++messageRenderRun;
+  msgs.innerHTML = '';
+  if (!messages.length) return;
+
+  let index = 0;
+  const firstChunk = Math.min(messages.length, 8);
+  while (index < firstChunk) appendStoredMessage(msgs, messages[index++]!);
+  scrollMsgsToBottom(msgs);
+
+  const renderChunk = (): void => {
+    if (runId !== messageRenderRun) return;
+    const end = Math.min(index + 12, messages.length);
+    while (index < end) appendStoredMessage(msgs, messages[index++]!);
+    scrollMsgsToBottom(msgs);
+    if (index < messages.length) window.requestAnimationFrame(renderChunk);
+  };
+  if (index < messages.length) window.requestAnimationFrame(renderChunk);
 }
 
 // ============ PR-06: file upload + pdf extraction + files row + regenerate ============

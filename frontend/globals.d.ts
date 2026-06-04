@@ -43,6 +43,8 @@ declare global {
     _ssLoadPortalFeature?: (name: string) => Promise<void>;
     _ssLoadFeatureSection?: (name: string) => Promise<void>;
     _ssPrewarmPortalFeature?: (name: string) => Promise<void>;
+    _ncbHtmlPromise?: Promise<string>;
+    _ncbShellPromise?: Promise<void>;
     forceCloseAI?: () => void;
     _statsStopFile?: () => void;
     _stRunning?: boolean;

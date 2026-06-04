@@ -253,8 +253,7 @@ let askAI = function (question, skipUserBubble) {
       setTimeout(function () {
         var words = rawText.split(/(\s+)/);
         var wIdx = 0;
-        var CHUNK = 6,
-          DELAY = 28;
+        var CHUNK = 18;
         function typeNext() {
           if (generationStopped || myGenId !== currentGenId) {
             _finishRender(words.slice(0, wIdx).join('') || rawText);
@@ -274,17 +273,19 @@ let askAI = function (question, skipUserBubble) {
             renderMarkdown(words.slice(0, wIdx).join('')) +
             '<span class="stream-cursor">\u258b</span>';
           if (!_aiUserScrolled) aiMsgs.scrollTop = aiMsgs.scrollHeight;
-          activeTypeTimer = setTimeout(typeNext, DELAY);
+          activeTypeTimer = setTimeout(function () {
+            window.requestAnimationFrame(typeNext);
+          }, 34);
         }
         var _visHandler = function () {
           if (!document.hidden && myGenId === currentGenId) {
             clearTimeout(activeTypeTimer);
-            typeNext();
+            window.requestAnimationFrame(typeNext);
           }
           document.removeEventListener('visibilitychange', _visHandler);
         };
         document.addEventListener('visibilitychange', _visHandler);
-        typeNext();
+        window.requestAnimationFrame(typeNext);
       }, 340);
     })
     .catch(function (e) {

@@ -667,6 +667,7 @@ interface LandingTranslation {
               settings: 'views/settings/settings.html',
               subscription: 'views/subscription/subscription.html',
             };
+            if (name === 'aipage') prewarmChatbotShell();
             const htmlPromise = htmlFiles[name]
               ? loadFeatureSection({ id: 'psec-' + name, file: htmlFiles[name] })
               : Promise.resolve();
@@ -674,6 +675,30 @@ interface LandingTranslation {
               _ssLoadPortalFeature?: (featureName: string) => Promise<void>;
             })._ssLoadPortalFeature?.(name) || Promise.resolve();
             return Promise.all([htmlPromise, featurePromise]).then(() => undefined);
+          }
+
+          function prewarmChatbotShell(): void {
+            const w = window as unknown as {
+              _ncbHtmlPromise?: Promise<string>;
+            };
+            if (!w._ncbHtmlPromise) {
+              w._ncbHtmlPromise = _fetchTimeout('views/chatbot/chatbot.html', 10000).then((r) => {
+                if (!r.ok) throw new Error('HTTP ' + r.status + ' loading chatbot.html');
+                return r.text();
+              });
+            }
+            const shellSrc =
+              'js/features/chatbot-new/shell.js?v=5&av=' +
+              encodeURIComponent(String(window.MinalloConfig?.assetVersion || SS?.version || '1'));
+            const exists = Array.from(document.querySelectorAll('link[rel="modulepreload"]')).some(
+              (link) => (link.getAttribute('href') || '') === shellSrc
+            );
+            if (!exists) {
+              const link = document.createElement('link');
+              link.rel = 'modulepreload';
+              link.href = shellSrc;
+              document.head.appendChild(link);
+            }
           }
 
           (window as unknown as {

@@ -18,8 +18,8 @@ export const AI_TYPING: AiTypingConfig = {
   streamCharsPerFrame: 18,
 
   // Fallback path (non-streaming ai-ask endpoint).
-  fallbackWordsPerFrame: 1,
-  fallbackFrameInterval: 38,
+  fallbackWordsPerFrame: 8,
+  fallbackFrameInterval: 24,
 
   // Chatbot page typewriter.
   chatbotCharInterval: 6,

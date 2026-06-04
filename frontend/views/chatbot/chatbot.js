@@ -23,7 +23,8 @@
     // edge cache the chatbot shell indefinitely, so prompt updates
     // (e.g. MINALLO_APP_CONTEXT) never reach existing users. Bump on
     // every shell-affecting change.
-    s.src = 'js/features/chatbot-new/shell.js?v=4';
+    var av = window.MinalloConfig && window.MinalloConfig.assetVersion ? window.MinalloConfig.assetVersion : '1';
+    s.src = 'js/features/chatbot-new/shell.js?v=5&av=' + encodeURIComponent(av);
     s.onload = function () { resolve(); };
     s.onerror = function () {
       console.error('chatbot-new/shell.js failed to load');
@@ -32,11 +33,15 @@
     document.head.appendChild(s);
   }));
 
-  Promise.all([
-    fetch('views/chatbot/chatbot.html').then(function (r) {
+  var htmlPromise = (window._ncbHtmlPromise || Promise.reject()).catch(function () {
+    return fetch('views/chatbot/chatbot.html').then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
-    }),
+    });
+  });
+
+  Promise.all([
+    htmlPromise,
     shellPromise,
   ])
     .then(function (results) {
