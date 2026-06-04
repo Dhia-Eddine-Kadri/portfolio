@@ -203,10 +203,48 @@
       });
     }
 
+    var _autoBuiltTopics = false;
+
     function loadTopicMap() {
       _service().then(function (svc) {
         return svc.getCourseTopicMap ? svc.getCourseTopicMap(courseId) : [];
-      }).then(renderTopicMap).catch(function () { renderTopicMap([]); });
+      }).then(function (topics) {
+        // The map is derived from indexed files but nothing builds it until
+        // asked. On first sight of an empty map, build it once automatically
+        // so topics appear without the user having to find "Rebuild".
+        if ((!topics || !topics.length) && !_autoBuiltTopics) {
+          _autoBuiltTopics = true;
+          autoBuildTopicMap();
+          return;
+        }
+        renderTopicMap(topics);
+      }).catch(function () { renderTopicMap([]); });
+    }
+
+    function autoBuildTopicMap() {
+      if (els.topicMap) {
+        els.topicMap.innerHTML =
+          '<p class="ef-topics-empty">Building your topic map from your indexed files…</p>';
+      }
+      if (els.topicStatus) els.topicStatus.textContent = 'Building...';
+      _service().then(function (svc) {
+        return svc.generateCourseTopicMap ? svc.generateCourseTopicMap(courseId) : [];
+      }).then(function (topics) {
+        if (topics && topics.length) { renderTopicMap(topics); return; }
+        pollTopicMap(0);  // /generate builds in the background — poll for it.
+      }).catch(function () { renderTopicMap([]); });
+    }
+
+    function pollTopicMap(tries) {
+      setTimeout(function () {
+        _service().then(function (svc) {
+          return svc.getCourseTopicMap ? svc.getCourseTopicMap(courseId) : [];
+        }).then(function (topics) {
+          if (topics && topics.length) { renderTopicMap(topics); return; }
+          if (tries < 3) { pollTopicMap(tries + 1); return; }
+          renderTopicMap([]);  // give up → shows the empty/Rebuild message
+        }).catch(function () { renderTopicMap([]); });
+      }, 3000);
     }
 
     function courseFolderNameFor(fileName) {

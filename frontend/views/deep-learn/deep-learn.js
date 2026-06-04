@@ -113,22 +113,57 @@
     });
   }
 
-  function _populateTopics(svc, sel) {
-    svc.getCourseTopicMap(((sel && sel._courseId) || ''))
+  function _fillTopicSelect(sel, topics) {
+    if (!sel || !sel.isConnected) return;
+    sel.innerHTML = '<option value="">Choose a topic…</option>' +
+      topics.map(function (t) {
+        var imp = t.importance ? ' (' + t.importance + ')' : '';
+        return '<option value="' + _esc(t.name) + '">' + _esc(t.name) + imp + '</option>';
+      }).join('');
+  }
+
+  // The Topic Map is auto-derived from the user's indexed files, but nothing
+  // builds it until something asks. So when it's empty we trigger a build and
+  // poll until the rolled-up topics appear — the user never has to know the
+  // map exists. The free-text box stays available the whole time as a fallback.
+  function _buildAndPollTopics(svc, sel, courseId) {
+    if (!svc.generateCourseTopicMap) {
+      if (sel) sel.innerHTML = '<option value="">No topic map yet — type a topic below</option>';
+      return;
+    }
+    if (sel) sel.innerHTML = '<option value="">Building your topic map…</option>';
+    var poll = function (tries) {
+      svc.getCourseTopicMap(courseId).then(function (topics) {
+        if (!sel || !sel.isConnected) return;
+        if (topics && topics.length) { _fillTopicSelect(sel, topics); return; }
+        if (tries < 4) { setTimeout(function () { poll(tries + 1); }, 2500); return; }
+        sel.innerHTML = '<option value="">No topics found — type a topic below</option>';
+      }).catch(function () {
+        if (sel) sel.innerHTML = '<option value="">Type a topic below</option>';
+      });
+    };
+    svc.generateCourseTopicMap(courseId)
       .then(function (topics) {
         if (!sel || !sel.isConnected) return;
-        if (!topics || !topics.length) {
-          sel.innerHTML = '<option value="">No topic map yet — type a topic</option>';
-          return;
-        }
-        sel.innerHTML = '<option value="">Choose a topic…</option>' +
-          topics.map(function (t) {
-            var imp = t.importance ? ' (' + t.importance + ')' : '';
-            return '<option value="' + _esc(t.name) + '">' + _esc(t.name) + imp + '</option>';
-          }).join('');
+        if (topics && topics.length) { _fillTopicSelect(sel, topics); return; }
+        setTimeout(function () { poll(0); }, 2500);
       })
       .catch(function () {
-        if (sel) sel.innerHTML = '<option value="">Type a topic</option>';
+        if (sel) sel.innerHTML = '<option value="">No topic map yet — type a topic below</option>';
+      });
+  }
+
+  function _populateTopics(svc, sel) {
+    var courseId = (sel && sel._courseId) || '';
+    svc.getCourseTopicMap(courseId)
+      .then(function (topics) {
+        if (!sel || !sel.isConnected) return;
+        if (topics && topics.length) { _fillTopicSelect(sel, topics); return; }
+        // Empty map → build it from the user's files, then poll for the result.
+        _buildAndPollTopics(svc, sel, courseId);
+      })
+      .catch(function () {
+        if (sel) sel.innerHTML = '<option value="">Type a topic below</option>';
       });
   }
 
