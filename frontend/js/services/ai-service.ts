@@ -396,6 +396,7 @@ export async function generateCheatsheet(
 }
 
 export interface DeepLearnResult {
+  noteId?: string | null;
   topic: string;
   title?: string | null;
   lesson: string;
@@ -418,6 +419,51 @@ export async function generateDeepLearn(
   });
   await _detectAiCapError(response);
   return response.json();
+}
+
+export interface SavedNote {
+  id: string;
+  title: string;
+  type: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** List the user's saved notes for a course (all types). */
+export async function listCourseNotes(courseId: string): Promise<SavedNote[]> {
+  const response = await fetch(
+    _backendUrl() + '/api/notes?courseId=' + encodeURIComponent(courseId),
+    { headers: _authJsonHeaders() }
+  );
+  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (!response.ok) return [];
+  const data = (await response.json()) as { notes?: SavedNote[] };
+  return data.notes || [];
+}
+
+/** Fetch one saved note (with full content_markdown). */
+export async function getNoteById(
+  id: string
+): Promise<{ id: string; title: string; content_markdown: string } | null> {
+  const response = await fetch(
+    _backendUrl() + '/api/notes?id=' + encodeURIComponent(id),
+    { headers: _authJsonHeaders() }
+  );
+  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (!response.ok) return null;
+  const data = (await response.json()) as {
+    note?: { id: string; title: string; content_markdown: string } | null;
+  };
+  return data.note || null;
+}
+
+/** Delete a saved note by id. */
+export async function deleteNote(id: string): Promise<boolean> {
+  const response = await fetch(_backendUrl() + '/api/notes?id=' + encodeURIComponent(id), {
+    method: 'DELETE',
+    headers: _authJsonHeaders(),
+  });
+  return response.ok;
 }
 
 export async function gradeExamForgeAnswer(

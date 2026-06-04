@@ -83,3 +83,50 @@
   font-size: 0.8rem;
   opacity: 0.85;
 }
+
+/* Saved lessons */
+.dl-saved { margin-bottom: 18px; }
+.dl-saved-head {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+.dl-saved-list { display: flex; flex-direction: column; gap: 6px; }
+.dl-saved-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.dl-saved-open {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #1e293b);
+  background: var(--card-inner, rgba(255, 255, 255, 0.04));
+  color: var(--text, #e2e8f0);
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-align: left;
+}
+.dl-saved-open:hover { background: rgba(255, 255, 255, 0.07); }
+.dl-saved-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-saved-date { flex: 0 0 auto; opacity: 0.55; font-size: 0.8rem; }
+.dl-saved-del {
+  flex: 0 0 auto;
+  width: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #1e293b);
+  background: transparent;
+  color: var(--text, #e2e8f0);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dl-saved-del:hover { background: rgba(248, 113, 113, 0.15); color: #fca5a5; opacity: 1; }

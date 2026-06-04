@@ -23,6 +23,7 @@ from typing import Any
 
 from .learning_agent import retrieve_learning_context
 from .llm_json import chat_json
+from .notes import save_note
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,24 @@ def _sources(chunks: list[dict[str, Any]], doc_names: dict[str, str]) -> list[di
     return out
 
 
+def _compose_lesson_markdown(title: str, lesson: str, worked: str, check: dict[str, Any] | None) -> str:
+    """Flatten the structured lesson into one markdown doc for storage, so a
+    saved lesson reloads as a complete, readable note (math/citations intact)."""
+    parts: list[str] = []
+    if lesson.strip():
+        parts.append(lesson.strip())
+    if worked.strip():
+        parts.append("## Worked example\n\n" + worked.strip())
+    if check and str(check.get("question") or "").strip():
+        block = "## Check yourself\n\n" + str(check["question"]).strip()
+        if str(check.get("answer") or "").strip():
+            block += "\n\n**Answer:** " + str(check["answer"]).strip()
+        if str(check.get("explanation") or "").strip():
+            block += "\n\n*" + str(check["explanation"]).strip() + "*"
+        parts.append(block)
+    return "\n\n".join(parts)
+
+
 def generate_deep_learn(
     *,
     user_id: str,
@@ -110,8 +129,14 @@ def generate_deep_learn(
     topic: str,
     document_ids: list[str] | None,
     doc_names: dict[str, str],
+    save: bool = True,
 ) -> dict[str, Any]:
-    """Generate a grounded, single-topic deep-dive lesson."""
+    """Generate (and, by default, save) a grounded, single-topic deep-dive lesson.
+
+    Saved lessons are stored as ``notes`` rows (type ``deep_learn``) reusing the
+    same table/RLS/CRUD as cheatsheets, so the Deep Learn tab can list and reopen
+    past lessons.
+    """
     topic = (topic or "").strip()
     if not topic:
         return {"error": "A topic is required for Deep Learn.", "topic": topic}
@@ -162,13 +187,32 @@ def generate_deep_learn(
             "explanation": str(check_raw.get("explanation") or ""),
         }
 
+    title = str(data.get("title") or topic)
+    lesson = str(data.get("lesson") or "")
+    worked = str(data.get("workedExample") or "")
+    sources = _sources(chunks, merged_names)
+
+    note_id: str | None = None
+    if save and lesson.strip():
+        single_doc = document_ids[0] if document_ids and len(document_ids) == 1 else None
+        note_id = save_note(
+            user_id=user_id,
+            course_id=course_id,
+            document_id=single_doc,
+            title=title,
+            text=_compose_lesson_markdown(title, lesson, worked, check),
+            sources=sources,
+            note_type="deep_learn",
+        )
+
     return {
+        "noteId": note_id,
         "topic": topic,
-        "title": str(data.get("title") or topic),
-        "lesson": str(data.get("lesson") or ""),
-        "workedExample": str(data.get("workedExample") or ""),
+        "title": title,
+        "lesson": lesson,
+        "workedExample": worked,
         "check": check,
-        "groundedSources": _sources(chunks, merged_names),
+        "groundedSources": sources,
         "model": res.model,
         "promptTokens": res.prompt_tokens,
         "completionTokens": res.completion_tokens,

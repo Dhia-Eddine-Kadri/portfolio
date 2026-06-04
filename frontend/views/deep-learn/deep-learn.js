@@ -30,6 +30,10 @@
         '<input type="text" id="dlTopicText" class="dl-topic" placeholder="…or type any topic">' +
         '<button class="dl-btn dl-btn-primary" id="dlGenerate" type="button">Teach me this</button>' +
       '</div>' +
+      '<div class="dl-saved" id="dlSaved" hidden>' +
+        '<div class="dl-saved-head">Saved lessons</div>' +
+        '<div class="dl-saved-list" id="dlSavedList"></div>' +
+      '</div>' +
       '<div class="dl-result" id="dlResult"></div>' +
     '</div>';
 
@@ -177,6 +181,66 @@
       });
   }
 
+  // ── saved lessons (persisted as notes of type 'deep_learn') ────────────────
+
+  function _fmtDate(s) {
+    if (!s) return '';
+    try {
+      return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch (e) { return ''; }
+  }
+
+  function _viewSaved(svc, els, id) {
+    if (!id || !svc.getNoteById) return;
+    els.result.innerHTML = '<div class="dl-msg dl-loading">Loading lesson…</div>';
+    svc.getNoteById(id).then(function (note) {
+      if (!note) { els.result.innerHTML = '<div class="dl-msg dl-error">Could not load this lesson.</div>'; return; }
+      els.result.innerHTML =
+        '<div class="dl-lesson-card"><h3>' + _esc(note.title || 'Lesson') + '</h3>' +
+        '<div class="dl-section dl-saved-body"></div></div>';
+      var body = els.result.querySelector('.dl-saved-body');
+      if (body) _renderMarkdown(body, note.content_markdown || '');
+    }).catch(function () {
+      els.result.innerHTML = '<div class="dl-msg dl-error">Could not load this lesson.</div>';
+    });
+  }
+
+  function _renderSavedList(svc, els, courseId, lessons) {
+    if (!els.saved || !els.savedList) return;
+    if (!lessons || !lessons.length) {
+      els.saved.setAttribute('hidden', '');
+      els.savedList.innerHTML = '';
+      return;
+    }
+    els.saved.removeAttribute('hidden');
+    els.savedList.innerHTML = lessons.map(function (n) {
+      return '<div class="dl-saved-item">' +
+        '<button type="button" class="dl-saved-open" data-id="' + _esc(n.id) + '">' +
+          '<span class="dl-saved-title">' + _esc(n.title || 'Lesson') + '</span>' +
+          '<span class="dl-saved-date">' + _esc(_fmtDate(n.created_at || n.updated_at)) + '</span>' +
+        '</button>' +
+        '<button type="button" class="dl-saved-del" data-id="' + _esc(n.id) + '" title="Delete lesson" aria-label="Delete lesson">×</button>' +
+      '</div>';
+    }).join('');
+    els.savedList.querySelectorAll('.dl-saved-open').forEach(function (b) {
+      b.addEventListener('click', function () { _viewSaved(svc, els, b.getAttribute('data-id')); });
+    });
+    els.savedList.querySelectorAll('.dl-saved-del').forEach(function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        svc.deleteNote(b.getAttribute('data-id')).then(function () { _loadSaved(svc, els, courseId); });
+      });
+    });
+  }
+
+  function _loadSaved(svc, els, courseId) {
+    if (!svc.listCourseNotes || !courseId) return;
+    svc.listCourseNotes(courseId).then(function (notes) {
+      var lessons = (notes || []).filter(function (n) { return n.type === 'deep_learn'; });
+      _renderSavedList(svc, els, courseId, lessons);
+    }).catch(function () { /* non-fatal: saved list is additive */ });
+  }
+
   window.mountDeepLearn = function (target, course) {
     if (!target) return;
     target.innerHTML = _HTML;
@@ -188,11 +252,14 @@
       text: root.querySelector('#dlTopicText'),
       gen: root.querySelector('#dlGenerate'),
       result: root.querySelector('#dlResult'),
+      saved: root.querySelector('#dlSaved'),
+      savedList: root.querySelector('#dlSavedList'),
     };
     if (els.select) els.select._courseId = courseId;
 
     _aiService().then(function (svc) {
       _populateTopics(svc, els.select);
+      _loadSaved(svc, els, courseId);
     });
 
     // Selecting a topic from the map clears the free-text box and vice-versa.
@@ -213,8 +280,14 @@
       els.gen.disabled = true;
       els.result.innerHTML = '<div class="dl-msg dl-loading">Building your lesson on “' + _esc(topic) + '”…</div>';
       _aiService()
-        .then(function (svc) { return svc.generateDeepLearn(courseId, topic); })
-        .then(function (res) { els.gen.disabled = false; _renderResult(els, res); })
+        .then(function (svc) {
+          return svc.generateDeepLearn(courseId, topic).then(function (res) {
+            els.gen.disabled = false;
+            _renderResult(els, res);
+            // A new lesson was just saved — refresh the saved list.
+            if (res && res.noteId) _loadSaved(svc, els, courseId);
+          });
+        })
         .catch(function (err) {
           els.gen.disabled = false;
           els.result.innerHTML = '<div class="dl-msg dl-error">' + _esc(err && err.message ? err.message : 'Deep Learn failed. Please try again.') + '</div>';

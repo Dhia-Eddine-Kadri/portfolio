@@ -18,6 +18,7 @@ const MAX_DOCUMENT_IDS = 25;
 const MAX_TOPIC_LENGTH = 500;
 
 interface PyDeepLearnResponse {
+  noteId?: string | null;
   topic?: string;
   title?: string | null;
   lesson?: string;
