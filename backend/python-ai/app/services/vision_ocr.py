@@ -156,7 +156,14 @@ def _vision_extract(client, model: str, image_bytes: bytes) -> str:
         b64 = base64.b64encode(image_bytes).decode("ascii")
         response = client.chat.completions.create(
             model=model,
-            max_tokens=2000,
+            # OCR is a transcription task — temperature 0 for faithful, stable
+            # output. The SDK default of 1.0 invites paraphrase / hallucination.
+            temperature=0,
+            # A dense formula page rendered to LaTeX-heavy Markdown can run
+            # long; 2000 truncated the bottom of such pages (and could leave a
+            # ``$$`` unclosed, breaking formula detection). 4096 is well within
+            # the model's output limit.
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": _VISION_SYSTEM_PROMPT},
                 {
@@ -165,14 +172,25 @@ def _vision_extract(client, model: str, image_bytes: bytes) -> str:
                         {"type": "text", "text": "Extract the page content as Markdown."},
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                            # ``detail: high`` keeps the full resolution so small
+                            # subscripts, fraction bars and diagram labels survive
+                            # — the whole reason we OCR these pages.
+                            "image_url": {
+                                "url": f"data:image/png;base64,{b64}",
+                                "detail": "high",
+                            },
                         },
                     ],
                 },
             ],
         )
-        msg = response.choices[0].message if response.choices else None
+        choice = response.choices[0] if response.choices else None
+        msg = choice.message if choice else None
         raw = (msg.content if msg else "") or ""
+        if choice is not None and getattr(choice, "finish_reason", None) == "length":
+            log.warning(
+                "vision OCR output hit the max_tokens cap — page may be truncated"
+            )
         return _post_process_latin_alpha(_strip_outer_code_fence(raw))
     except Exception:  # noqa: BLE001
         log.exception("vision OCR call failed")
