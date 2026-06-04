@@ -313,6 +313,10 @@ function buildFilesContent(course: LegacyCourse): string {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-5"/></svg>' +
         '<span>ExamForge</span>' +
       '</button>' +
+      '<button class="co-course-tab" type="button" data-course-tab="cheatsheet" role="tab" aria-selected="false">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>' +
+        '<span>Cheatsheet</span>' +
+      '</button>' +
     '</div>' +
     '<div class="co-course-panel active" id="coFilesPanel" data-course-panel="files">' +
       '<div class="co-files-inner-card">' +
@@ -386,7 +390,8 @@ function buildFilesContent(course: LegacyCourse): string {
     '</div>' +
     '<div class="co-course-panel" id="coQuizPanel" data-course-panel="quiz"></div>' +
     '<div class="co-course-panel" id="coFlashPanel" data-course-panel="flashcards"></div>' +
-    '<div class="co-course-panel" id="coExamForgePanel" data-course-panel="examforge"></div>'
+    '<div class="co-course-panel" id="coExamForgePanel" data-course-panel="examforge"></div>' +
+    '<div class="co-course-panel" id="coCheatsheetPanel" data-course-panel="cheatsheet"></div>'
   );
 }
 
@@ -567,7 +572,7 @@ export function openCourse(course: LegacyCourse): void {
 }
 
 export function showCourseSection(course: LegacyCourse, section: string): void {
-  const sec = ['files', 'quiz', 'flashcards', 'examforge'].includes(section) ? section : 'files';
+  const sec = ['files', 'quiz', 'flashcards', 'examforge', 'cheatsheet'].includes(section) ? section : 'files';
   window.activeCourseRef = course;
   window.activeCourseSection = sec;
 
@@ -819,7 +824,7 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
     co.querySelectorAll<HTMLElement>('[data-course-panel]').forEach((panel) => {
       panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
     });
-    if (targetTab === 'quiz' || targetTab === 'flashcards' || targetTab === 'examforge') {
+    if (targetTab === 'quiz' || targetTab === 'flashcards' || targetTab === 'examforge' || targetTab === 'cheatsheet') {
       // The quiz/flashcards scripts are lazy-loaded on demand. On the FIRST
       // visit the module isn't on `window` yet, so a one-shot mount check
       // silently no-ops and the panel stays empty until a second click. Kick
@@ -827,7 +832,8 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
       const panelSelector =
         targetTab === 'quiz' ? '#coQuizPanel' :
         targetTab === 'flashcards' ? '#coFlashPanel' :
-        '#coExamForgePanel';
+        targetTab === 'examforge' ? '#coExamForgePanel' :
+        '#coCheatsheetPanel';
       const panel = co.querySelector<HTMLElement>(panelSelector);
       const loadFeature = (window as unknown as {
         _ssLoadPortalFeature?: (name: string) => Promise<void>;
@@ -837,7 +843,8 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
         const mountFn =
           targetTab === 'quiz' ? window.mountQuiz :
           targetTab === 'flashcards' ? window.mountFlashcards :
-          window.mountExamForge;
+          targetTab === 'examforge' ? window.mountExamForge :
+          window.mountCheatsheet;
         if (typeof mountFn === 'function') {
           // Guard against a later tab switch having replaced/detached the panel.
           if (panel && panel.isConnected) {

@@ -1,0 +1,90 @@
+/* Cheatsheet course tool. */
+.cs-root {
+  padding: 18px 20px;
+  color: var(--text, #e2e8f0);
+}
+.cs-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+}
+.cs-head p {
+  margin: 0 0 16px;
+  opacity: 0.75;
+  font-size: 0.9rem;
+  max-width: 60ch;
+}
+.cs-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.cs-topic {
+  flex: 1 1 320px;
+  min-width: 220px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #1e293b);
+  background: var(--card-inner, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  font-size: 0.9rem;
+}
+.cs-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cs-btn-primary {
+  background: #6366f1;
+  color: #fff;
+}
+.cs-btn-primary:hover { background: #5457e6; }
+.cs-btn-primary:disabled { opacity: 0.55; cursor: default; }
+
+.cs-msg {
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--card-inner, rgba(255, 255, 255, 0.05));
+  font-size: 0.9rem;
+}
+.cs-msg.cs-error { color: #fca5a5; }
+.cs-msg.cs-loading { opacity: 0.8; }
+
+.cs-sheet {
+  border: 1px solid var(--border, #1e293b);
+  border-radius: 10px;
+  background: var(--card, #0f172a);
+  padding: 16px 18px;
+}
+.cs-sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cs-sheet-head h3 { margin: 0; font-size: 1.05rem; }
+.cs-saved {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.cs-sheet-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.cs-sheet-body h2,
+.cs-sheet-body h3 { margin: 14px 0 6px; }
+.cs-sheet-body ul { margin: 4px 0 10px; padding-left: 20px; }
+.cs-topics,
+.cs-sources {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #1e293b);
+  font-size: 0.8rem;
+  opacity: 0.85;
+}

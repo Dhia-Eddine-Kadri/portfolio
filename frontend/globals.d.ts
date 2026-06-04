@@ -56,6 +56,7 @@ declare global {
     mountQuiz?: (el: HTMLElement, course: LegacyCourse, opts: { generate: unknown }) => void;
     mountFlashcards?: (el: HTMLElement, course: LegacyCourse, opts: { generate: unknown }) => void;
     mountExamForge?: (el: HTMLElement, course: LegacyCourse, opts: { generate?: unknown }) => void;
+    mountCheatsheet?: (el: HTMLElement, course: LegacyCourse, opts?: { generate?: unknown }) => void;
 
     // ── i18n + toasts ──────────────────────────────────────────────────
     _t?: (key: string) => string;
