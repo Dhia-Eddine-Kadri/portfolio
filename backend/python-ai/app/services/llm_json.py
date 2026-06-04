@@ -21,18 +21,109 @@ from ..config import get_settings
 _FENCE_OPEN = re.compile(r"^\s*```(?:json)?\s*", re.IGNORECASE)
 _FENCE_CLOSE = re.compile(r"\s*```\s*$")
 
+# Backslashes that, after a backslash, form a JSON escape we must never touch.
+_JSON_KEEP_AFTER_BS = set('"\\/u')
+
+
+def _repair_json_backslashes(s: str) -> str:
+    r"""Re-escape under-escaped LaTeX backslashes so json.loads keeps them.
+
+    Models asked for JSON routinely emit LaTeX with single backslashes
+    (``\frac``, ``\triangle``, ``\rho``) instead of the doubled ``\\frac`` valid
+    JSON requires. ``json.loads`` then silently decodes the collisions —
+    ``\f``→form-feed, ``\t``→tab, ``\b``→backspace — so ``\frac`` becomes
+    ``rac`` and the math renders as garbage.
+
+    This walks the raw model text and doubles any backslash that is clearly the
+    start of a LaTeX command, while preserving genuine JSON escapes:
+
+      * ``\" \\ \/ \uXXXX``                  → always kept (unambiguous escapes)
+      * ``\f \t \r \b`` + a letter            → LaTeX (``\frac``…) → doubled
+      * ``\n`` + a lowercase letter           → LaTeX (``\nabla``, ``\nu``) → doubled
+      * ``\n \t \r \b \f`` + non-letter       → real whitespace escape → kept
+      * ``\`` + anything else (``\D \alpha``) → invalid escape → doubled
+
+    Real form-feed/tab/backspace never legitimately appear in this generated
+    content, and real newlines (``\n``) before markdown/sentence text run into a
+    non-lowercase character, so the heuristic preserves them.
+    """
+    out: list[str] = []
+    i, n = 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch != "\\":
+            out.append(ch)
+            i += 1
+            continue
+        nxt = s[i + 1] if i + 1 < n else ""
+        nxt2 = s[i + 2] if i + 2 < n else ""
+        if nxt in _JSON_KEEP_AFTER_BS:
+            out.append(ch + nxt)
+            i += 2
+            continue
+        if nxt in "ntrbf":
+            is_latex = nxt2.islower() if nxt == "n" else nxt2.isalpha()
+            out.append(("\\\\" + nxt) if is_latex else (ch + nxt))
+            i += 2
+            continue
+        # Any other char: an invalid JSON escape — the model meant a literal
+        # backslash (start of a LaTeX command). Double it; re-read nxt normally.
+        out.append("\\\\")
+        i += 1
+    return "".join(out)
+
+
+# Control chars that only appear in a parsed value when JSON decoded an
+# under-escaped LaTeX command (\frac→form-feed, \beta→backspace, \rho→CR).
+# They never legitimately occur in this generated content — newline (\n) and
+# tab (\t, legit in code) are deliberately excluded — so their presence is a
+# reliable signal that the backslash repair is needed.
+_EATEN_LATEX_CHARS = ("\x0c", "\x08", "\x0b", "\x0d")
+
+
+def _has_eaten_latex(obj: Any) -> bool:
+    if isinstance(obj, str):
+        return any(c in obj for c in _EATEN_LATEX_CHARS)
+    if isinstance(obj, dict):
+        return any(_has_eaten_latex(v) for v in obj.values())
+    if isinstance(obj, list):
+        return any(_has_eaten_latex(v) for v in obj)
+    return False
+
 
 def _parse_json_lenient(text: str) -> Any:
     s = (text or "").strip()
     s = _FENCE_OPEN.sub("", s)
     s = _FENCE_CLOSE.sub("", s)
+
+    # Strict parse first. If it succeeds cleanly (no LaTeX backslashes eaten by
+    # JSON escaping), the model escaped correctly — return it untouched so valid
+    # output is never altered.
+    strict: Any = None
+    strict_ok = False
     try:
-        return json.loads(s)
-    except Exception:
-        m = re.search(r"\{[\s\S]*\}", s)
-        if not m:
-            raise
-        return json.loads(m.group(0))
+        strict = json.loads(s)
+        strict_ok = True
+        if not _has_eaten_latex(strict):
+            return strict
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Parse failed, or LaTeX was eaten — re-escape under-escaped backslashes.
+    repaired = _repair_json_backslashes(s)
+    for cand in (repaired, s):
+        try:
+            return json.loads(cand)
+        except Exception:  # noqa: BLE001
+            m = re.search(r"\{[\s\S]*\}", cand)
+            if m:
+                try:
+                    return json.loads(m.group(0))
+                except Exception:  # noqa: BLE001
+                    continue
+    if strict_ok:
+        return strict  # fall back to the strict parse (LaTeX imperfect but usable)
+    raise ValueError("could not parse model JSON")
 
 
 @dataclass

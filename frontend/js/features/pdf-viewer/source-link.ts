@@ -195,30 +195,101 @@ async function _renderPdfInto(
   // The popup may have been closed while bytes/doc loaded — bail quietly.
   if (!_activePopup || !body.isConnected) return;
 
+  const total = pdf.numPages;
+  const tp = targetPage >= 1 && targetPage <= total ? targetPage : 1;
+
+  // Base (unscaled) size from page 1 — most PDFs are uniform, so this sizes the
+  // lazy-render placeholders so the scrollbar is right before pages paint.
+  const firstPage = await pdf.getPage(1);
+  const baseVp = firstPage.getViewport({ scale: 1 });
+
   body.innerHTML = '';
+
+  // Zoom toolbar: 100% = fit-to-width; the user zooms from there. Sticky so it
+  // stays put while the pages scroll under it.
+  const bar = document.createElement('div');
+  bar.className = 'src-pdf-toolbar';
+  bar.innerHTML =
+    '<button class="src-pdf-zoom" data-z="out" aria-label="Zoom out">−</button>' +
+    '<span class="src-pdf-zoom-val">100%</span>' +
+    '<button class="src-pdf-zoom" data-z="in" aria-label="Zoom in">+</button>';
+  body.appendChild(bar);
+
   const col = document.createElement('div');
   col.className = 'src-pdf-pages';
   body.appendChild(col);
 
-  const scale = 1.4;
-  let targetWrap: HTMLElement | null = null;
-  for (let p = 1; p <= pdf.numPages; p++) {
-    if (!_activePopup) return; // closed mid-render
-    const pdfPage = await pdf.getPage(p);
-    const vp = pdfPage.getViewport({ scale });
-    const wrap = document.createElement('div');
-    wrap.className = 'src-pdf-page';
-    wrap.dataset.pageNum = String(p);
+  // Fit-to-width baseline, then a user zoom factor on top of it.
+  const fitScale = Math.max(0.2, (body.clientWidth - 40) / baseVp.width);
+  let zoom = 1;
+  const zoomVal = bar.querySelector('.src-pdf-zoom-val') as HTMLElement;
+
+  const wraps: HTMLElement[] = [];
+  const rendered = new Set<number>();
+  let io: IntersectionObserver | null = null;
+
+  const renderPage = async (p: number): Promise<void> => {
+    if (rendered.has(p) || !_activePopup) return;
+    rendered.add(p);
+    const wrap = wraps[p - 1];
+    if (!wrap) return;
+    const page = await pdf.getPage(p);
+    const vp = page.getViewport({ scale: fitScale * zoom });
     const canvas = document.createElement('canvas');
     canvas.width = vp.width;
     canvas.height = vp.height;
-    wrap.appendChild(canvas);
-    col.appendChild(wrap);
     const ctx = canvas.getContext('2d');
-    if (ctx) await pdfPage.render({ canvasContext: ctx, viewport: vp }).promise;
-    if (p === targetPage) targetWrap = wrap;
-  }
-  if (targetWrap) targetWrap.scrollIntoView({ block: 'start' });
+    if (!_activePopup || !wrap.isConnected) return;
+    wrap.style.minHeight = '';
+    wrap.replaceChildren(canvas);
+    if (ctx) await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  };
+
+  const build = (): void => {
+    io?.disconnect();
+    rendered.clear();
+    wraps.length = 0;
+    col.replaceChildren();
+    const phW = baseVp.width * fitScale * zoom;
+    const phH = baseVp.height * fitScale * zoom;
+    for (let p = 1; p <= total; p++) {
+      const wrap = document.createElement('div');
+      wrap.className = 'src-pdf-page';
+      wrap.dataset.pageNum = String(p);
+      wrap.style.width = phW + 'px';
+      wrap.style.minHeight = phH + 'px';
+      col.appendChild(wrap);
+      wraps.push(wrap);
+    }
+    // Render pages a screenful ahead/behind as they approach the viewport.
+    io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) void renderPage(Number((e.target as HTMLElement).dataset.pageNum));
+        });
+      },
+      { root: body, rootMargin: '800px 0px' }
+    );
+    wraps.forEach((wr) => io?.observe(wr));
+  };
+
+  const goToTarget = async (): Promise<void> => {
+    await renderPage(tp); // paint the cited page first so it's there to land on
+    wraps[tp - 1]?.scrollIntoView({ block: 'start' });
+  };
+
+  build();
+  await goToTarget();
+
+  bar.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.src-pdf-zoom') as HTMLElement | null;
+    if (!btn) return;
+    const next = btn.dataset.z === 'in' ? zoom + 0.25 : zoom - 0.25;
+    zoom = Math.min(3, Math.max(0.5, Math.round(next * 100) / 100));
+    zoomVal.textContent = Math.round(zoom * 100) + '%';
+    build();
+    void goToTarget();
+  });
 }
 
 // ── public entry point ────────────────────────────────────────────────────────

@@ -33,14 +33,24 @@
       '<div class="cs-result" id="csResult"></div>' +
     '</div>';
 
+  // The real markdown+KaTeX renderer lives in the AI render bridge, which the
+  // app loads lazily (only when the chatbot opens). Until then window.renderMarkdown
+  // is a plain escapeHtml stub — so without this the cheatsheet shows raw "##" and
+  // "$$". Ensure the bridge AND KaTeX before rendering.
+  function _ensureRenderers() {
+    var ps = [];
+    if (typeof window._ensureAiRenderBridge === 'function') ps.push(window._ensureAiRenderBridge());
+    if (typeof window._ssEnsureKatex === 'function') ps.push(window._ssEnsureKatex());
+    return Promise.all(ps);
+  }
+
   function _renderMarkdown(el, md) {
-    var ensure = typeof window._ssEnsureKatex === 'function' ? window._ssEnsureKatex() : Promise.resolve();
     var doRender = function () {
       el.innerHTML = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(md) : _esc(md);
       if (typeof window._renderMath === 'function') window._renderMath(el);
       if (typeof window._renderCode === 'function') window._renderCode(el);
     };
-    ensure.then(doRender).catch(doRender);
+    _ensureRenderers().then(doRender).catch(doRender);
   }
 
   function _bindSourceClicks(scope) {
