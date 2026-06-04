@@ -189,12 +189,42 @@
 
 .ef-doc-group-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
+  width: 100%;
   padding: 10px 11px;
+  border: 0;
   border-bottom: 1px solid rgba(148, 163, 184, .12);
   background: rgba(30, 41, 59, .46);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ef-doc-group-head:hover {
+  background: rgba(30, 41, 59, .64);
+}
+
+.ef-folder-chevron {
+  color: #93a4bb;
+  font-size: .8rem;
+  line-height: 1;
+  transition: transform .15s ease;
+  transform: rotate(90deg);
+}
+
+.ef-doc-group.collapsed .ef-folder-chevron {
+  transform: rotate(0deg);
+}
+
+.ef-doc-group.collapsed .ef-doc-group-head {
+  border-bottom: 0;
+}
+
+.ef-doc-group.collapsed .ef-doc-group-list {
+  display: none;
 }
 
 .ef-folder-icon {

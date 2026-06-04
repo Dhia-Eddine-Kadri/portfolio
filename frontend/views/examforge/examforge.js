@@ -30,6 +30,7 @@
         submitted: false,
         docs: [],
         loaded: false,
+        collapsedFolders: {},
       };
     }
     return _state[courseId];
@@ -43,6 +44,20 @@
       else out.pending++;
     });
     return out;
+  }
+
+  // Normalise question options to an array of strings, for any question type.
+  // Module-scoped so _normaliseSession (also module-scoped) can call it — this
+  // used to live inside _init, which left it out of scope here and made every
+  // generate/load throw "ReferenceError: normalizeOptions is not defined"
+  // before a single exam could render.
+  function normalizeOptions(type, options) {
+    if (type === 'true_false') return ['True', 'False'];
+    if (Array.isArray(options)) return options;
+    if (options && typeof options === 'object') {
+      return ['A', 'B', 'C', 'D'].map(function (letter) { return options[letter] || ''; }).filter(Boolean);
+    }
+    return [];
   }
 
   function _normaliseSession(raw) {
@@ -199,13 +214,15 @@
       }
       els.docs.innerHTML = groups.map(function (group) {
         var readyCount = group.docs.filter(function (d) { return d.processing_status === 'ready'; }).length;
+        var collapsed = !!st.collapsedFolders[group.name];
         return (
-          '<section class="ef-doc-group">' +
-            '<div class="ef-doc-group-head">' +
+          '<section class="ef-doc-group' + (collapsed ? ' collapsed' : '') + '">' +
+            '<button class="ef-doc-group-head" type="button" data-folder="' + _esc(group.name) + '" aria-expanded="' + (collapsed ? 'false' : 'true') + '">' +
+              '<span class="ef-folder-chevron" aria-hidden="true">▸</span>' +
               '<span class="ef-folder-icon">▣</span>' +
               '<span class="ef-folder-name">' + _esc(group.name) + '</span>' +
               '<span class="ef-folder-count">' + readyCount + '/' + group.docs.length + ' ready</span>' +
-            '</div>' +
+            '</button>' +
             '<div class="ef-doc-group-list">' +
               group.docs.map(function (d) {
                 var ready = d.processing_status === 'ready';
@@ -222,6 +239,19 @@
           '</section>'
         );
       }).join('');
+      // Expand/collapse a folder on header click. Toggling a class (rather than
+      // re-rendering) keeps the checkbox selections inside untouched — and a
+      // collapsed folder's checked boxes still count toward selectedDocIds().
+      els.docs.querySelectorAll('.ef-doc-group-head').forEach(function (head) {
+        head.addEventListener('click', function () {
+          var name = head.getAttribute('data-folder');
+          var section = head.closest('.ef-doc-group');
+          var collapse = !st.collapsedFolders[name];
+          st.collapsedFolders[name] = collapse;
+          if (section) section.classList.toggle('collapsed', collapse);
+          head.setAttribute('aria-expanded', collapse ? 'false' : 'true');
+        });
+      });
     }
 
     function renderSessions() {
@@ -256,15 +286,6 @@
 
     function answerLetter(idx) {
       return ['A', 'B', 'C', 'D'][idx] || 'A';
-    }
-
-    function normalizeOptions(type, options) {
-      if (type === 'true_false') return ['True', 'False'];
-      if (Array.isArray(options)) return options;
-      if (options && typeof options === 'object') {
-        return ['A', 'B', 'C', 'D'].map(function (letter) { return options[letter] || ''; }).filter(Boolean);
-      }
-      return [];
     }
 
     function questionTypeLabel(type) {
