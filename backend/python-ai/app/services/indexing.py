@@ -315,50 +315,47 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         # Force the rollup quality down to 'weak' so the frontend badge
         # warns the student that this doc may answer poorly, and stash
         # the counts into ocr_assessment for ops visibility.
-        if ocr_pages_run > 0 and ocr_pages_recovered * 2 < ocr_pages_run:
+        # Only an actual OCR *attempt* (feature enabled) can signal a quality
+        # problem, and a doc is only "weak" when the pages OCR couldn't recover
+        # are a MATERIAL share of the whole document. Two false positives this
+        # guards against:
+        #   * OCR disabled → ``ocr_pages_run`` is still set by the page selector,
+        #     so the old rule demoted every figure-heavy doc to weak even with
+        #     no OCR attempted.
+        #   * A text-clean lecture with a handful of flagged figure pages (the
+        #     attempt is capped at vision_ocr_max_pages=20) — 20 unrecovered
+        #     pages out of 238 is not a weak document.
+        from ..config import get_settings as _get_settings  # noqa: WPS433
+
+        ocr_attempted = _get_settings().vision_ocr_enabled and ocr_pages_run > 0
+        unrecovered = ocr_pages_run - ocr_pages_recovered
+        material_failure = unrecovered / max(1, len(pages)) >= 0.25
+        if ocr_attempted and ocr_pages_recovered * 2 < ocr_pages_run and material_failure:
             log.warning(
-                "indexing.ocr_partial_failure document_id=%s attempted=%d recovered=%d — demoting extraction_quality to weak",
-                document_id, ocr_pages_run, ocr_pages_recovered,
+                "indexing.ocr_partial_failure document_id=%s attempted=%d recovered=%d pages=%d — demoting extraction_quality to weak",
+                document_id, ocr_pages_run, ocr_pages_recovered, len(pages),
             )
             if rollup_quality == "good":
                 rollup_quality = "weak"
-            if isinstance(ocr_assessment_json, dict):
-                ocr_assessment_json = {
-                    **ocr_assessment_json,
-                    "indexer_ocr_provider": ocr_provider,
-                    "indexer_ocr_attempted": ocr_pages_run,
-                    "indexer_ocr_recovered": ocr_pages_recovered,
-                    "indexer_ocr_status": "partial_failure",
-                }
-            else:
-                ocr_assessment_json = {
-                    "indexer_ocr_provider": ocr_provider,
-                    "indexer_ocr_attempted": ocr_pages_run,
-                    "indexer_ocr_recovered": ocr_pages_recovered,
-                    "indexer_ocr_status": "partial_failure",
-                }
-        elif ocr_pages_run > 0:
-            # Successful OCR pass — still record the counts so we can
-            # spot patterns ("docs always need 5+ OCR pages = expensive").
-            if isinstance(ocr_assessment_json, dict):
-                ocr_assessment_json = {
-                    **ocr_assessment_json,
-                    "indexer_ocr_provider": ocr_provider,
-                    "indexer_ocr_attempted": ocr_pages_run,
-                    "indexer_ocr_recovered": ocr_pages_recovered,
-                    "indexer_ocr_status": (
-                        "succeeded" if ocr_pages_recovered == ocr_pages_run else "partial"
-                    ),
-                }
-            else:
-                ocr_assessment_json = {
-                    "indexer_ocr_provider": ocr_provider,
-                    "indexer_ocr_attempted": ocr_pages_run,
-                    "indexer_ocr_recovered": ocr_pages_recovered,
-                    "indexer_ocr_status": (
-                        "succeeded" if ocr_pages_recovered == ocr_pages_run else "partial"
-                    ),
-                }
+            ocr_assessment_json = {
+                **(ocr_assessment_json or {}),
+                "indexer_ocr_provider": ocr_provider,
+                "indexer_ocr_attempted": ocr_pages_run,
+                "indexer_ocr_recovered": ocr_pages_recovered,
+                "indexer_ocr_status": "partial_failure",
+            }
+        elif ocr_attempted:
+            # OCR ran without a material failure — record the counts (so we can
+            # spot patterns) but DON'T demote quality.
+            ocr_assessment_json = {
+                **(ocr_assessment_json or {}),
+                "indexer_ocr_provider": ocr_provider,
+                "indexer_ocr_attempted": ocr_pages_run,
+                "indexer_ocr_recovered": ocr_pages_recovered,
+                "indexer_ocr_status": (
+                    "succeeded" if ocr_pages_recovered == ocr_pages_run else "partial"
+                ),
+            }
 
         now = datetime.now(timezone.utc).isoformat()
         update_payload: dict[str, Any] = {
