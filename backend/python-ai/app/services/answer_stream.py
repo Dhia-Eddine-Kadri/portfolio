@@ -56,7 +56,12 @@ log = logging.getLogger(__name__)
 # Imported from .answer so the math-mode gate and the figure-attach gate
 # agree on what counts as a figure-bearing chunk.
 _FIGURE_CHUNK_TYPES = FIGURE_CHUNK_TYPES
-_FIGURE_RENDER_DPI = 150
+# Engineering drawings pack the answer into small dimension-line numerals
+# (l_K, plate thicknesses, ⌀ values). 150 DPI rendered them too small for the
+# vision model to read reliably — it would "see" the figure but still report
+# l_K as not visible. 220 DPI keeps an A4 page well under gpt-4o's pixel limit
+# while making those numerals legible.
+_FIGURE_RENDER_DPI = 220
 _MAX_ATTACHED_IMAGES = 2  # hard cap on open-file + figure images per request
 
 # Instruction appended to the user turn when an exercise/figure page image is
@@ -128,14 +133,17 @@ def _figure_page_image_parts(
         if len(candidates) >= max_images:
             break
     if not candidates:
+        log.info("figure-vision: no renderable candidates among %d chunk(s)", len(used_chunks))
         return []
 
     try:
         from .vision_ocr import _render_page_to_png, _try_import_pypdfium2  # noqa: WPS433
     except Exception:  # noqa: BLE001
+        log.warning("figure-vision: could not import render helpers", exc_info=True)
         return []
     pdfium = _try_import_pypdfium2()
     if pdfium is None:
+        log.warning("figure-vision: pypdfium2 not importable — no figure will be attached")
         return []
 
     try:
@@ -172,6 +180,10 @@ def _figure_page_image_parts(
         parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
         if len(parts) >= max_images:
             break
+    log.info(
+        "figure-vision: attached %d/%d candidate page image(s) at %d DPI",
+        len(parts), len(candidates), _FIGURE_RENDER_DPI,
+    )
     return parts
 
 # Questions that legitimately need the open-PDF text override. Deictic refs
@@ -1046,11 +1058,16 @@ def stream_answer(
     # skipped when the student already supplied that visible page.
     figure_image_parts: list[dict[str, Any]] = []
     if will_attach_figure:
-        remaining = _MAX_ATTACHED_IMAGES - len(open_image_parts)
-        if remaining > 0:
-            figure_image_parts = _figure_page_image_parts(used_chunks, max_images=remaining)
-            if figure_image_parts:
-                user_message += _FIGURE_READ_INSTRUCTION
+        # Guarantee the exercise figure at least one slot. The open visible
+        # page (open_image_parts) may not be the page the drawing is on, and
+        # for a figure-exercise the drawing is the most valuable image — don't
+        # let the visible page starve it. Absolute ceiling stays at 3 images.
+        remaining = max(_MAX_ATTACHED_IMAGES - len(open_image_parts), 1)
+        figure_image_parts = _figure_page_image_parts(used_chunks, max_images=remaining)
+        if figure_image_parts:
+            user_message += _FIGURE_READ_INSTRUCTION
+        else:
+            log.info("figure-vision: will_attach_figure was set but no image rendered")
 
     image_parts = [*open_image_parts, *figure_image_parts]
     user_content: str | list[dict[str, Any]]
