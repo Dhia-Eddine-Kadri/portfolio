@@ -793,12 +793,13 @@ function initCourseStudyTools(co: HTMLElement, course: LegacyCourse): void {
 }
 
 function setCourseStudyMode(co: HTMLElement, _course: LegacyCourse, mode: string): void {
-  const nextMode = ['files', 'quiz', 'flashcards'].includes(mode) ? mode : 'files';
+  const nextMode = ['files', 'quiz', 'flashcards', 'examforge'].includes(mode) ? mode : 'files';
   const featureLoader = (window as unknown as {
     _ssLoadPortalFeature?: (name: string) => Promise<void>;
   })._ssLoadPortalFeature;
   if (nextMode === 'quiz' && typeof featureLoader === 'function') void featureLoader('quiz');
   if (nextMode === 'flashcards' && typeof featureLoader === 'function') void featureLoader('flashcards');
+  if (nextMode === 'examforge' && typeof featureLoader === 'function') void featureLoader('examforge');
   co.querySelectorAll<HTMLElement>('[data-course-tab]').forEach((tab) => {
     const isActive = tab.getAttribute('data-course-tab') === nextMode;
     tab.classList.toggle('active', isActive);
@@ -809,9 +810,14 @@ function setCourseStudyMode(co: HTMLElement, _course: LegacyCourse, mode: string
   });
 
   const inner = co.closest<HTMLElement>('.co-inner');
-  if (inner) inner.classList.toggle('co-inner-wide', nextMode === 'quiz' || nextMode === 'flashcards');
+  if (inner) {
+    inner.classList.toggle(
+      'co-inner-wide',
+      nextMode === 'quiz' || nextMode === 'flashcards' || nextMode === 'examforge'
+    );
+  }
 
-  // Mounting the quiz/flashcards panel is owned by showCourseSection(), which
+  // Mounting the quiz/flashcards/ExamForge panel is owned by showCourseSection(), which
   // re-renders the whole course overview right after this runs (the tab click
   // calls both). Mounting here too would target a node that's about to be
   // detached — wasted work and a duplicate DB fetch — so we only kick off the

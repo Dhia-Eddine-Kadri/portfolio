@@ -1,0 +1,380 @@
+// ExamForge course tool.
+
+(function () {
+  var _state = {};
+
+  function _esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function _toast(title, body) {
+    if (typeof window.showToast === 'function') window.showToast(title, body);
+  }
+
+  function _service() {
+    return import('/js/services/ai-service.js');
+  }
+
+  function _supaHeaders() { return window._ssDb && window._ssDb.supaHeaders ? window._ssDb.supaHeaders() : {}; }
+  function _supaUrl() { return window._ssDb && window._ssDb.supaUrl ? window._ssDb.supaUrl() : ''; }
+
+  function _getState(courseId) {
+    if (!_state[courseId]) {
+      _state[courseId] = {
+        sessions: [],
+        activeId: null,
+        answers: {},
+        submitted: false,
+        docs: [],
+        loaded: false,
+      };
+    }
+    return _state[courseId];
+  }
+
+  function _docSummary(docs) {
+    var out = { ready: [], pending: 0, failed: 0, total: docs.length };
+    docs.forEach(function (d) {
+      if (d.processing_status === 'ready') out.ready.push(d);
+      else if (d.processing_status === 'failed') out.failed++;
+      else out.pending++;
+    });
+    return out;
+  }
+
+  function _normaliseSession(raw) {
+    var qs = raw.questions || raw.exam_questions || [];
+    return {
+      id: raw.sessionId || raw.id || ('local-' + Date.now()),
+      title: raw.title || 'ExamForge',
+      createdAt: raw.created_at || raw.createdAt || new Date().toISOString(),
+      difficulty: raw.difficulty || 'medium',
+      questions: (qs || []).map(function (q, idx) {
+        if (q.question_text) {
+          return {
+            id: q.id,
+            type: q.question_type || 'mcq',
+            question: q.question_text,
+            options: Array.isArray(q.options) ? q.options : [],
+            answer: q.correct_answer || 'A',
+            explanation: q.explanation || '',
+            difficulty: q.difficulty || 'medium',
+            topic: q.topic || null,
+            points: q.points || 1,
+            sources: (q.source_document_names || []).map(function (name, i) {
+              return { fileName: name, pages: (q.source_pages || [])[i] || null };
+            }),
+          };
+        }
+        return {
+          id: q.id || null,
+          type: q.type || 'mcq',
+          question: q.question || '',
+          options: Array.isArray(q.options) ? q.options : [],
+          answer: q.answer || 'A',
+          explanation: q.explanation || '',
+          difficulty: q.difficulty || 'medium',
+          topic: q.topic || null,
+          points: q.points || 1,
+          sources: q.sources || [],
+        };
+      }).filter(function (q) { return q.question; }),
+      groundedSources: raw.groundedSources || [],
+      warning: raw.warning || raw.error || null,
+    };
+  }
+
+  var _HTML =
+    '<div class="ef-root" data-examforge-root>' +
+      '<div class="ef-toolbar">' +
+        '<button class="ef-btn ef-btn-primary" id="efGenerateBtn" type="button">Generate exam</button>' +
+        '<div class="ef-field"><label>Questions</label><select id="efCount"><option>6</option><option>8</option><option>10</option><option>12</option></select></div>' +
+        '<div class="ef-field"><label>Difficulty</label><select id="efDifficulty"><option value="medium">Medium</option><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="hard">Hard</option></select></div>' +
+        '<div class="ef-search"><input id="efTopic" type="text" placeholder="Optional topic focus" autocomplete="off"></div>' +
+      '</div>' +
+      '<div class="ef-layout">' +
+        '<aside class="ef-side">' +
+          '<div class="ef-side-head">' +
+            '<div><h3>Sources</h3><p id="efDocStatus">Loading course files...</p></div>' +
+            '<button class="ef-link" id="efSelectAll" type="button">Select ready</button>' +
+          '</div>' +
+          '<div class="ef-docs" id="efDocs"></div>' +
+          '<div class="ef-side-head ef-history-head">' +
+            '<div><h3>Exam runs</h3><p>Latest generated practice exams</p></div>' +
+          '</div>' +
+          '<div class="ef-sessions" id="efSessions"></div>' +
+        '</aside>' +
+        '<main class="ef-main">' +
+          '<div class="ef-empty" id="efEmpty">' +
+            '<div class="ef-empty-icon">EF</div>' +
+            '<h3>Forge an exam from this course.</h3>' +
+            '<p>Select indexed files, choose the size, then generate source-grounded questions.</p>' +
+          '</div>' +
+          '<div class="ef-exam" id="efExam" hidden></div>' +
+        '</main>' +
+      '</div>' +
+    '</div>';
+
+  window.mountExamForge = function (target, course) {
+    if (!target) return;
+    target.innerHTML = _HTML;
+    var root = target.querySelector('[data-examforge-root]');
+    if (root) _init(root, course || {});
+  };
+
+  function _init(root, course) {
+    var courseId = course.id || 'unknown';
+    var st = _getState(courseId);
+    var els = {
+      gen: root.querySelector('#efGenerateBtn'),
+      count: root.querySelector('#efCount'),
+      difficulty: root.querySelector('#efDifficulty'),
+      topic: root.querySelector('#efTopic'),
+      docs: root.querySelector('#efDocs'),
+      docStatus: root.querySelector('#efDocStatus'),
+      selectAll: root.querySelector('#efSelectAll'),
+      sessions: root.querySelector('#efSessions'),
+      empty: root.querySelector('#efEmpty'),
+      exam: root.querySelector('#efExam'),
+    };
+
+    function renderDocs() {
+      var summary = _docSummary(st.docs);
+      if (els.docStatus) {
+        els.docStatus.textContent = summary.ready.length + ' ready' +
+          (summary.pending ? ' · ' + summary.pending + ' indexing' : '') +
+          (summary.failed ? ' · ' + summary.failed + ' failed' : '');
+      }
+      if (!els.docs) return;
+      if (!st.docs.length) {
+        els.docs.innerHTML = '<div class="ef-muted">No course files found yet.</div>';
+        return;
+      }
+      els.docs.innerHTML = st.docs.map(function (d) {
+        var ready = d.processing_status === 'ready';
+        var checked = ready ? ' checked' : '';
+        return (
+          '<label class="ef-doc ' + (ready ? 'is-ready' : 'is-muted') + '">' +
+            '<input type="checkbox" value="' + _esc(d.id) + '"' + checked + (ready ? '' : ' disabled') + '>' +
+            '<span class="ef-doc-name">' + _esc(d.file_name || 'Untitled') + '</span>' +
+            '<span class="ef-doc-state">' + _esc(ready ? 'Ready' : (d.processing_status || 'Waiting')) + '</span>' +
+          '</label>'
+        );
+      }).join('');
+    }
+
+    function renderSessions() {
+      if (!els.sessions) return;
+      if (!st.sessions.length) {
+        els.sessions.innerHTML = '<div class="ef-muted">No ExamForge runs yet.</div>';
+        return;
+      }
+      els.sessions.innerHTML = st.sessions.map(function (s) {
+        var active = s.id === st.activeId;
+        return (
+          '<button class="ef-session ' + (active ? 'active' : '') + '" type="button" data-session="' + _esc(s.id) + '">' +
+            '<span class="ef-session-title">' + _esc(s.title || 'ExamForge') + '</span>' +
+            '<span class="ef-session-meta">' + s.questions.length + ' questions · ' + _esc(s.difficulty || 'medium') + '</span>' +
+          '</button>'
+        );
+      }).join('');
+      els.sessions.querySelectorAll('[data-session]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          st.activeId = btn.getAttribute('data-session');
+          st.submitted = false;
+          st.answers = {};
+          renderAll();
+        });
+      });
+    }
+
+    function activeSession() {
+      return st.sessions.find(function (s) { return s.id === st.activeId; }) || null;
+    }
+
+    function answerLetter(idx) {
+      return ['A', 'B', 'C', 'D'][idx] || 'A';
+    }
+
+    function renderExam() {
+      var s = activeSession();
+      if (!els.empty || !els.exam) return;
+      els.empty.hidden = !!s;
+      els.exam.hidden = !s;
+      if (!s) return;
+      var correct = 0;
+      s.questions.forEach(function (q, idx) {
+        if (st.answers[idx] && st.answers[idx] === q.answer) correct++;
+      });
+      var score = s.questions.length ? Math.round(correct / s.questions.length * 100) : 0;
+      els.exam.innerHTML =
+        '<div class="ef-exam-head">' +
+          '<div><h2>' + _esc(s.title || 'ExamForge') + '</h2><p>' + s.questions.length + ' source-grounded questions</p></div>' +
+          '<div class="ef-score">' + (st.submitted ? score + '%' : correct + ' / ' + s.questions.length) + '</div>' +
+        '</div>' +
+        (s.warning ? '<div class="ef-warning">' + _esc(s.warning) + '</div>' : '') +
+        '<div class="ef-question-list">' +
+          s.questions.map(function (q, idx) {
+            var chosen = st.answers[idx] || '';
+            var isCorrect = st.submitted && chosen === q.answer;
+            var isWrong = st.submitted && chosen && chosen !== q.answer;
+            return (
+              '<article class="ef-question">' +
+                '<div class="ef-question-top">' +
+                  '<span>Question ' + (idx + 1) + '</span>' +
+                  '<span>' + _esc(q.topic || q.difficulty || 'medium') + '</span>' +
+                '</div>' +
+                '<h3>' + _esc(q.question) + '</h3>' +
+                '<div class="ef-options">' +
+                  (q.options || []).map(function (opt, optIdx) {
+                    var letter = answerLetter(optIdx);
+                    var cls = chosen === letter ? ' selected' : '';
+                    if (st.submitted && letter === q.answer) cls += ' correct';
+                    if (st.submitted && chosen === letter && letter !== q.answer) cls += ' wrong';
+                    return '<button class="ef-option' + cls + '" type="button" data-q="' + idx + '" data-a="' + letter + '"' + (st.submitted ? ' disabled' : '') + '><b>' + letter + '</b><span>' + _esc(opt) + '</span></button>';
+                  }).join('') +
+                '</div>' +
+                (st.submitted
+                  ? '<div class="ef-feedback ' + (isCorrect ? 'ok' : isWrong ? 'bad' : '') + '">' +
+                      '<strong>' + (isCorrect ? 'Correct' : 'Answer: ' + _esc(q.answer)) + '</strong>' +
+                      '<span>' + _esc(q.explanation || '') + '</span>' +
+                    '</div>'
+                  : '') +
+                ((q.sources || []).length
+                  ? '<div class="ef-sources">' + q.sources.map(function (src) {
+                      return '<span>' + _esc(src.fileName || 'Source') + (src.pages ? ', ' + _esc(src.pages) : '') + '</span>';
+                    }).join('') + '</div>'
+                  : '') +
+              '</article>'
+            );
+          }).join('') +
+        '</div>' +
+        '<div class="ef-submit-row">' +
+          '<button class="ef-btn ef-btn-secondary" id="efResetAnswers" type="button">Reset answers</button>' +
+          '<button class="ef-btn ef-btn-primary" id="efSubmitAnswers" type="button"' + (st.submitted ? ' disabled' : '') + '>Submit exam</button>' +
+        '</div>';
+      els.exam.querySelectorAll('.ef-option').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          st.answers[Number(btn.getAttribute('data-q'))] = btn.getAttribute('data-a') || '';
+          renderExam();
+        });
+      });
+      var reset = els.exam.querySelector('#efResetAnswers');
+      if (reset) reset.addEventListener('click', function () {
+        st.answers = {};
+        st.submitted = false;
+        renderExam();
+      });
+      var submit = els.exam.querySelector('#efSubmitAnswers');
+      if (submit) submit.addEventListener('click', function () {
+        if (Object.keys(st.answers).length < s.questions.length) {
+          _toast('Finish the exam', 'Answer every question before submitting.');
+          return;
+        }
+        st.submitted = true;
+        renderExam();
+        _persistAnswers(s, st.answers);
+      });
+    }
+
+    function renderAll() {
+      renderDocs();
+      renderSessions();
+      renderExam();
+    }
+
+    function selectedDocIds() {
+      if (!els.docs) return [];
+      return Array.from(els.docs.querySelectorAll('input[type="checkbox"]:checked')).map(function (x) {
+        return x.value;
+      });
+    }
+
+    function loadInitial() {
+      _service().then(function (svc) {
+        return svc.listCourseDocuments(courseId);
+      }).then(function (docs) {
+        st.docs = docs || [];
+        renderDocs();
+      }).catch(function () {
+        if (els.docStatus) els.docStatus.textContent = 'Could not load files.';
+      });
+
+      if (!_supaUrl()) return;
+      fetch(_supaUrl() + '/rest/v1/exam_sessions?course_id=eq.' + encodeURIComponent(courseId) + '&select=*,exam_questions(*)&order=created_at.desc&limit=20', {
+        headers: _supaHeaders()
+      }).then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (rows) {
+          st.sessions = (rows || []).map(_normaliseSession);
+          if (!st.activeId && st.sessions[0]) st.activeId = st.sessions[0].id;
+          st.loaded = true;
+          renderAll();
+        }).catch(function () {
+          st.loaded = true;
+          renderSessions();
+        });
+    }
+
+    if (els.selectAll) {
+      els.selectAll.addEventListener('click', function () {
+        if (!els.docs) return;
+        els.docs.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(function (box) {
+          box.checked = true;
+        });
+      });
+    }
+
+    if (els.gen) {
+      els.gen.addEventListener('click', function () {
+        var docs = selectedDocIds();
+        var summary = _docSummary(st.docs);
+        if (!docs.length) {
+          if (!summary.ready.length) _toast('No ready files', 'Wait for indexing to finish, then generate the exam.');
+          else _toast('Choose sources', 'Select at least one indexed file for ExamForge.');
+          return;
+        }
+        els.gen.disabled = true;
+        els.gen.textContent = 'Forging exam...';
+        _service().then(function (svc) {
+          return svc.generateExamForge(courseId, {
+            documentIds: docs,
+            count: Number(els.count && els.count.value || 6),
+            difficulty: els.difficulty && els.difficulty.value || 'medium',
+            topic: els.topic && els.topic.value || '',
+          });
+        }).then(function (res) {
+          var session = _normaliseSession(res || {});
+          if (!session.questions.length) {
+            _toast('ExamForge could not create questions', res && (res.error || res.warning) || 'Try different files.');
+            return;
+          }
+          st.sessions.unshift(session);
+          st.activeId = session.id;
+          st.answers = {};
+          st.submitted = false;
+          renderAll();
+        }).catch(function (err) {
+          _toast('ExamForge failed', err && err.message ? err.message : 'Please try again.');
+        }).finally(function () {
+          els.gen.disabled = false;
+          els.gen.textContent = 'Generate exam';
+        });
+      });
+    }
+
+    function _persistAnswers(session, answers) {
+      if (!session.id || String(session.id).indexOf('local-') === 0) return;
+      _service().then(function (svc) {
+        session.questions.forEach(function (q, idx) {
+          if (!q.id || !answers[idx]) return;
+          svc.gradeExamForgeAnswer(session.id, q.id, answers[idx]).catch(function () {});
+        });
+      }).catch(function () {});
+    }
+
+    renderAll();
+    loadInitial();
+  }
+})();

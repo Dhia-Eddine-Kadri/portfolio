@@ -28,6 +28,7 @@ export const onRequest = async (
   // Dynamic import so the Deno shim is in place before the module body runs.
   // (The handler doesn't reference Deno at top level, but defensive ordering
   // costs nothing here.)
+  // @ts-expect-error The legacy stream handler is a Web-standard JS module.
   const mod = await import('../../../backend/edge-functions/ai-stream.js');
   return mod.default(ctx.request, {});
 };

@@ -13,6 +13,7 @@ from ..auth import require_internal_token
 from ..services.flashcards import generate_flashcards, save_flashcard_set
 from ..services.notes import generate_notes, save_note
 from ..services.quiz import generate_quiz, save_quiz_set
+from ..services.examforge import generate_examforge, grade_examforge_answer
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -72,6 +73,46 @@ class GenerateQuizResponse(BaseModel):
     completionTokens: int | None = None
 
 
+class GenerateExamForgeRequest(BaseModel):
+    userId: str
+    courseId: str
+    documentIds: list[str] | None = None
+    requestedCount: int = Field(6, ge=1, le=20)
+    difficulty: str = "medium"
+    topic: str | None = None
+    save: bool = True
+
+
+class GenerateExamForgeResponse(BaseModel):
+    sessionId: str | None = None
+    title: str
+    requestedCount: int
+    actualCount: int
+    questions: list[dict[str, Any]]
+    topicMap: list[dict[str, Any]] = []
+    groundedSources: list[dict[str, Any]] = []
+    warning: str | None = None
+    model: str | None = None
+    promptTokens: int | None = None
+    completionTokens: int | None = None
+
+
+class GradeExamForgeAnswerRequest(BaseModel):
+    userId: str
+    examSessionId: str
+    examQuestionId: str
+    userAnswer: str
+
+
+class GradeExamForgeAnswerResponse(BaseModel):
+    ok: bool
+    isCorrect: bool | None = None
+    score: float | None = None
+    correctAnswer: str | None = None
+    feedback: str | None = None
+    error: str | None = None
+
+
 @router.post("/generate-quiz", response_model=GenerateQuizResponse)
 async def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizResponse:
     _require_uuid(payload.userId, "userId")
@@ -112,6 +153,56 @@ async def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizRe
         promptTokens=out.get("promptTokens"),
         completionTokens=out.get("completionTokens"),
     )
+
+
+# ── /generate-examforge ──────────────────────────────────────────────────────
+
+
+@router.post("/generate-examforge", response_model=GenerateExamForgeResponse)
+async def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> GenerateExamForgeResponse:
+    _require_uuid(payload.userId, "userId")
+    if payload.documentIds:
+        for did in payload.documentIds:
+            _require_uuid(did, "documentId")
+    doc_names = _verify_user_owns_documents(payload.userId, payload.courseId, payload.documentIds)
+
+    out = generate_examforge(
+        user_id=payload.userId,
+        course_id=payload.courseId,
+        document_ids=payload.documentIds,
+        requested_count=payload.requestedCount,
+        difficulty=payload.difficulty,
+        topic=payload.topic,
+        doc_names=doc_names,
+    )
+
+    return GenerateExamForgeResponse(
+        sessionId=out.get("sessionId"),
+        title=out.get("title") or "ExamForge",
+        requestedCount=out["requestedCount"],
+        actualCount=out["actualCount"],
+        questions=out["questions"],
+        topicMap=out.get("topicMap", []),
+        groundedSources=out.get("groundedSources", []),
+        warning=out.get("warning"),
+        model=out.get("model"),
+        promptTokens=out.get("promptTokens"),
+        completionTokens=out.get("completionTokens"),
+    )
+
+
+@router.post("/grade-examforge-answer", response_model=GradeExamForgeAnswerResponse)
+async def grade_examforge_answer_endpoint(payload: GradeExamForgeAnswerRequest) -> GradeExamForgeAnswerResponse:
+    _require_uuid(payload.userId, "userId")
+    _require_uuid(payload.examSessionId, "examSessionId")
+    _require_uuid(payload.examQuestionId, "examQuestionId")
+    out = grade_examforge_answer(
+        user_id=payload.userId,
+        exam_session_id=payload.examSessionId,
+        exam_question_id=payload.examQuestionId,
+        user_answer=payload.userAnswer,
+    )
+    return GradeExamForgeAnswerResponse(**out)
 
 
 # ── /generate-flashcards ─────────────────────────────────────────────────────

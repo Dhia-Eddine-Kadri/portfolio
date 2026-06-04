@@ -266,6 +266,45 @@ export async function generateStudyTool(
   return response.json();
 }
 
+export interface ExamForgeOpts extends GenerateOpts {
+  requestedCount?: number;
+}
+
+export async function generateExamForge(
+  courseId: string,
+  opts?: ExamForgeOpts
+): Promise<unknown> {
+  const response = await fetch(_backendUrl() + '/api/ai/examforge', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({
+      action: 'generate',
+      courseId,
+      ...(opts || {}),
+    }),
+  });
+  await _detectAiCapError(response);
+  return response.json();
+}
+
+export async function gradeExamForgeAnswer(
+  examSessionId: string,
+  examQuestionId: string,
+  userAnswer: string
+): Promise<unknown> {
+  const response = await fetch(_backendUrl() + '/api/ai/examforge', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({
+      action: 'grade',
+      examSessionId,
+      examQuestionId,
+      userAnswer,
+    }),
+  });
+  return response.json();
+}
+
 export async function submitRagFeedback(
   courseId: string,
   question: string,
