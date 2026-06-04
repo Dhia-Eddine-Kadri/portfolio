@@ -143,10 +143,21 @@
 .ss-print-course { font-size: 0.78rem; color: #6b7280; }
 .ss-print-head h1 { font-size: 1.4rem; margin: 2px 0 0; color: #111827; }
 .ss-print-body { font-size: 0.92rem; color: #111827; }
-.ss-print-body h2 { font-size: 1.05rem; margin: 16px 0 6px; }
-.ss-print-body h3, .ss-print-body h4 { margin: 12px 0 4px; }
+.ss-print-body h2 {
+  font-size: 1.05rem;
+  margin: 18px 0 6px;
+  color: #1d4ed8;
+  border-bottom: 1px solid #bfdbfe;
+  padding-bottom: 3px;
+}
+.ss-print-body h3, .ss-print-body h4 { margin: 12px 0 4px; color: #334155; }
 .ss-print-body ul { padding-left: 20px; }
 .ss-print-body .katex-display { overflow-x: auto; }
+/* Coloured bold labels in the printable lesson */
+.ss-print-body .dl-c-warn { color: #b91c1c; }
+.ss-print-body .dl-c-ok { color: #047857; }
+.ss-print-body .dl-c-muted { color: #6b7280; }
+.ss-print-body .dl-c-key { color: #1d4ed8; }
 
 /* Saved lessons */
 .dl-saved { margin-bottom: 18px; }

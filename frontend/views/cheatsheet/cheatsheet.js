@@ -125,6 +125,57 @@
     if (_paperEl) { _paperEl.remove(); _paperEl = null; }
   }
 
+  // Lazy-load html2pdf (jsPDF + html2canvas) once, so "Download PDF" produces a
+  // file directly — no browser print dialog.
+  function _ensureHtml2Pdf() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (window._ssHtml2PdfP) return window._ssHtml2PdfP;
+    window._ssHtml2PdfP = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      s.onload = function () { resolve(window.html2pdf); };
+      s.onerror = function () { reject(new Error('pdf lib failed to load')); };
+      document.head.appendChild(s);
+    });
+    return window._ssHtml2PdfP;
+  }
+
+  function _safeName(s) {
+    return String(s || 'document').replace(/[^\w.\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 80) || 'document';
+  }
+
+  function _downloadPdf(el, filename) {
+    return _ensureHtml2Pdf().then(function (h2p) {
+      return h2p().set({
+        margin: [8, 8, 10, 8],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: '.cs-block' },
+      }).from(el).save();
+    });
+  }
+
+  function _wireDownload(btn, getEl, filename) {
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var el = getEl();
+      if (!el) return;
+      var label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+      _downloadPdf(el, filename).then(function () {
+        btn.disabled = false;
+        btn.textContent = label;
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = label;
+        if (window.showToast) window.showToast('Download failed', 'Could not generate the PDF. Please try again.');
+      });
+    });
+  }
+
   function _openPaper(opts) {
     opts = opts || {};
     _closePaper();
@@ -134,7 +185,7 @@
       '<div class="cs-paper-bar">' +
         '<span class="cs-paper-bar-title">' + _esc(opts.title || 'Cheatsheet') + '</span>' +
         '<div class="cs-paper-bar-actions">' +
-          '<button type="button" class="cs-paper-btn" data-act="print">⤓ Download PDF</button>' +
+          '<button type="button" class="cs-paper-btn" data-act="download">⤓ Download PDF</button>' +
           '<button type="button" class="cs-paper-btn cs-paper-close" data-act="close">Close</button>' +
         '</div>' +
       '</div>' +
@@ -152,12 +203,12 @@
     _paperEl = ov;
     var body = ov.querySelector('.cs-paper-body');
     if (body) _renderMarkdown(body, opts.markdown || '', true);
-    ov.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]');
-      if (!b) return;
-      if (b.getAttribute('data-act') === 'close') _closePaper();
-      else if (b.getAttribute('data-act') === 'print') window.print();
-    });
+    ov.querySelector('[data-act="close"]').addEventListener('click', _closePaper);
+    _wireDownload(
+      ov.querySelector('[data-act="download"]'),
+      function () { return ov.querySelector('.cs-paper'); },
+      _safeName((opts.course || 'cheatsheet') + ' cheatsheet') + '.pdf'
+    );
     _paperEsc = function (e) { if (e.key === 'Escape') _closePaper(); };
     document.addEventListener('keydown', _paperEsc);
   }

@@ -275,6 +275,64 @@
     if (_printEl) { _printEl.remove(); _printEl = null; }
   }
 
+  // Lazy-load html2pdf once so "Download PDF" yields a file directly — no
+  // browser print dialog.
+  function _ensureHtml2Pdf() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (window._ssHtml2PdfP) return window._ssHtml2PdfP;
+    window._ssHtml2PdfP = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      s.onload = function () { resolve(window.html2pdf); };
+      s.onerror = function () { reject(new Error('pdf lib failed to load')); };
+      document.head.appendChild(s);
+    });
+    return window._ssHtml2PdfP;
+  }
+
+  function _safeName(s) {
+    return String(s || 'lesson').replace(/[^\w.\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 80) || 'lesson';
+  }
+
+  function _downloadPdf(el, filename) {
+    return _ensureHtml2Pdf().then(function (h2p) {
+      return h2p().set({
+        margin: [10, 10, 12, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] },
+      }).from(el).save();
+    });
+  }
+
+  // Add colour to the printable lesson: section headings + known bold labels.
+  function _decorateLesson(root) {
+    if (!root) return;
+    var RED = ['Common mistake:', 'Common mistakes:', 'Common Mistakes'];
+    var GREEN = ['Answer:', 'Final answer:'];
+    var MUTED = ['Source:', 'Source or basis:'];
+    var KEY = ['Formula:', 'Problem:', 'Question:', 'Meaning:'];
+    root.querySelectorAll('strong').forEach(function (s) {
+      var t = (s.textContent || '').trim();
+      if (RED.indexOf(t) >= 0) s.classList.add('dl-c-warn');
+      else if (GREEN.indexOf(t) >= 0) s.classList.add('dl-c-ok');
+      else if (MUTED.indexOf(t) >= 0) s.classList.add('dl-c-muted');
+      else if (KEY.indexOf(t) >= 0) s.classList.add('dl-c-key');
+    });
+  }
+
+  function _renderLessonInto(el, md) {
+    var done = function () {
+      el.innerHTML = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(md) : _esc(md);
+      if (typeof window._renderMath === 'function') window._renderMath(el);
+      if (typeof window._renderCode === 'function') window._renderCode(el);
+      _decorateLesson(el);
+    };
+    _ensureRenderers().then(done).catch(done);
+  }
+
   function _openPrint(opts) {
     opts = opts || {};
     _closePrint();
@@ -284,7 +342,7 @@
       '<div class="ss-print-bar">' +
         '<span class="ss-print-bar-title">' + _esc(opts.title || 'Lesson') + '</span>' +
         '<div class="ss-print-bar-actions">' +
-          '<button type="button" class="ss-print-btn" data-act="print">⤓ Download PDF</button>' +
+          '<button type="button" class="ss-print-btn" data-act="download">⤓ Download PDF</button>' +
           '<button type="button" class="ss-print-btn" data-act="close">Close</button>' +
         '</div>' +
       '</div>' +
@@ -300,12 +358,21 @@
     document.body.appendChild(ov);
     _printEl = ov;
     var body = ov.querySelector('.ss-print-body');
-    if (body) _renderMarkdown(body, opts.markdown || '');
-    ov.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]');
-      if (!b) return;
-      if (b.getAttribute('data-act') === 'close') _closePrint();
-      else window.print();
+    if (body) _renderLessonInto(body, opts.markdown || '');
+    ov.querySelector('[data-act="close"]').addEventListener('click', _closePrint);
+    var dlBtn = ov.querySelector('[data-act="download"]');
+    if (dlBtn) dlBtn.addEventListener('click', function () {
+      var doc = ov.querySelector('.ss-print-doc');
+      if (!doc) return;
+      var label = dlBtn.textContent;
+      dlBtn.disabled = true;
+      dlBtn.textContent = 'Generating…';
+      _downloadPdf(doc, _safeName(opts.title || 'lesson') + '.pdf').then(function () {
+        dlBtn.disabled = false; dlBtn.textContent = label;
+      }).catch(function () {
+        dlBtn.disabled = false; dlBtn.textContent = label;
+        if (window.showToast) window.showToast('Download failed', 'Could not generate the PDF. Please try again.');
+      });
     });
     _printEsc = function (e) { if (e.key === 'Escape') _closePrint(); };
     document.addEventListener('keydown', _printEsc);
