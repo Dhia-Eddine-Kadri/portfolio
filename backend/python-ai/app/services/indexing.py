@@ -126,6 +126,16 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
                 ocr_provider = choose_ocr_provider(
                     doc.get("file_name") or "", pages, normal_idx
                 )
+                # Handwriting pages normally take the dedicated OpenAI
+                # handwriting prompt/preprocess path. But when Mathpix is the
+                # chosen backend (MINALLO_MATHPIX_ROUTING), route them to Mathpix
+                # too: it transcribes handwriting/math and — critically — keeps
+                # OCR off the OpenAI tokens-per-minute budget. Otherwise a bulk
+                # pass saturates the OpenAI TPM cap and the handwriting batch
+                # 429-fails wholesale (the normal batch already went to Mathpix).
+                handwriting_provider = (
+                    "mathpix" if ocr_provider == "mathpix" else "openai_handwriting"
+                )
                 # pages_via_vision caps the batch at vision_ocr_max_pages.
                 # Mirror that cap here so ocr_pages_run counts what was
                 # actually attempted — counting the uncapped bad_idx would
@@ -153,7 +163,7 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
                         pages_via_vision_results(
                             pdf_bytes,
                             handwriting_attempt,
-                            provider="openai_handwriting",
+                            provider=handwriting_provider,
                         )
                     )
                 if normal_attempt:
