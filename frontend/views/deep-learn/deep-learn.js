@@ -165,6 +165,94 @@
     });
   }
 
+  var _dlRun = 0;
+
+  function _sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function _startBuildSteps(els, topic) {
+    var runId = ++_dlRun;
+    var steps = [
+      'Checking whether your files cover this topic',
+      'Retrieving definitions, formulas, examples, and traps',
+      'Planning the tutor path',
+      'Writing the guided lesson',
+      'Validating citations and sources',
+    ];
+    var idx = 0;
+    els.result.innerHTML =
+      '<div class="dl-build" data-run="' + runId + '">' +
+        '<div class="dl-build-title">Teaching ' + _esc(topic) + '</div>' +
+        '<div class="dl-build-steps">' + steps.map(function (s, i) {
+          return '<div class="dl-build-step' + (i === 0 ? ' is-active' : '') + '" data-step="' + i + '">' +
+            '<span class="dl-step-dot"></span><span>' + _esc(s) + '</span></div>';
+        }).join('') + '</div>' +
+      '</div>';
+    var timer = setInterval(function () {
+      if (runId !== _dlRun || !els.result.querySelector('.dl-build')) {
+        clearInterval(timer);
+        return;
+      }
+      idx = Math.min(idx + 1, steps.length - 1);
+      els.result.querySelectorAll('.dl-build-step').forEach(function (el, i) {
+        el.classList.toggle('is-done', i < idx);
+        el.classList.toggle('is-active', i === idx);
+      });
+    }, 1200);
+    return {
+      id: runId,
+      stop: function () { clearInterval(timer); },
+    };
+  }
+
+  function _revealLessonSections(els, runId) {
+    var card = els.result.querySelector('.dl-lesson-card');
+    if (!card) return;
+    var sections = Array.prototype.slice.call(card.querySelectorAll('.dl-study-section, .dl-section, .dl-check, .dl-sources'));
+    if (!sections.length) return;
+    var head = card.querySelector('.dl-lesson-head');
+    var status = document.createElement('div');
+    status.className = 'dl-writing-line';
+    status.textContent = 'Writing section 1 of ' + sections.length;
+    if (head && head.nextSibling) card.insertBefore(status, head.nextSibling);
+    else card.insertBefore(status, card.firstChild);
+    sections.forEach(function (section) {
+      section.classList.add('dl-progress-hidden');
+    });
+    var printBtn = card.querySelector('[data-dl-print]');
+    if (printBtn) printBtn.disabled = true;
+    (async function () {
+      for (var i = 0; i < sections.length; i += 1) {
+        if (runId !== _dlRun || !card.isConnected) return;
+        var title = sections[i].querySelector('h4');
+        if (status) status.textContent = 'Writing section ' + (i + 1) + ' of ' + sections.length + (title ? ': ' + title.textContent : '');
+        await _sleep(i === 0 ? 120 : 520);
+        sections[i].classList.remove('dl-progress-hidden');
+        sections[i].classList.add('dl-progress-visible');
+        await _sleep(360);
+      }
+      if (runId !== _dlRun) return;
+      if (status) status.textContent = 'Lesson complete';
+      if (printBtn) printBtn.disabled = false;
+    })();
+  }
+
+  function _renderResultProgressive(els, res, runId) {
+    if (runId !== _dlRun) return;
+    els.result.style.visibility = 'hidden';
+    _renderResult(els, res);
+    var card = els.result.querySelector('.dl-lesson-card');
+    if (!card) {
+      els.result.style.visibility = '';
+      return;
+    }
+    var sections = Array.prototype.slice.call(card.querySelectorAll('.dl-study-section, .dl-section, .dl-check, .dl-sources'));
+    sections.forEach(function (section) { section.classList.add('dl-progress-hidden'); });
+    els.result.style.visibility = '';
+    _revealLessonSections(els, runId);
+  }
+
   function _renderStructuredResult(els, res, lesson) {
     var formulas = _asList(lesson.keyFormulas);
     var worked = lesson.workedExample || {};
@@ -667,18 +755,22 @@
         return;
       }
       els.gen.disabled = true;
+      var progress;
       els.result.innerHTML = '<div class="dl-msg dl-loading">Building your lesson on “' + _esc(topic) + '”…</div>';
+      progress = _startBuildSteps(els, topic);
       _aiService()
         .then(function (svc) {
           return svc.generateDeepLearn(courseId, topic).then(function (res) {
             els.gen.disabled = false;
-            _renderResult(els, res);
+            progress.stop();
+            _renderResultProgressive(els, res, progress.id);
             // A new lesson was just saved — refresh the saved list.
             if (res && res.noteId) _loadSaved(svc, els, courseId);
           });
         })
         .catch(function (err) {
           els.gen.disabled = false;
+          progress.stop();
           els.result.innerHTML = '<div class="dl-msg dl-error">' + _esc(err && err.message ? err.message : 'Deep Learn failed. Please try again.') + '</div>';
         });
     });

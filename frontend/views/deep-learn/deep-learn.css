@@ -354,3 +354,64 @@
 .dl-saved-actions button:hover {
   background: rgba(255, 255, 255, 0.07);
 }
+
+/* Progressive generation */
+.dl-build {
+  padding: 16px 18px;
+  border: 1px solid var(--border, #1e293b);
+  border-radius: 10px;
+  background: var(--card, #0f172a);
+}
+.dl-build-title {
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.dl-build-steps {
+  display: grid;
+  gap: 8px;
+}
+.dl-build-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted, #94a3b8);
+  font-size: 0.88rem;
+}
+.dl-step-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid #64748b;
+}
+.dl-build-step.is-active {
+  color: var(--text, #e2e8f0);
+}
+.dl-build-step.is-active .dl-step-dot {
+  border-color: #93c5fd;
+  background: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.14);
+}
+.dl-build-step.is-done .dl-step-dot {
+  border-color: #34d399;
+  background: #34d399;
+}
+.dl-writing-line {
+  margin: 10px 0 2px;
+  color: #93c5fd;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.dl-progress-hidden {
+  display: none;
+}
+.dl-progress-visible {
+  animation: dlFadeIn 200ms ease-out;
+}
+.dl-download:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@keyframes dlFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

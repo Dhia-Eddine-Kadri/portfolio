@@ -24,7 +24,7 @@
     // (e.g. MINALLO_APP_CONTEXT) never reach existing users. Bump on
     // every shell-affecting change.
     var av = window.MinalloConfig && window.MinalloConfig.assetVersion ? window.MinalloConfig.assetVersion : '1';
-    s.src = 'js/features/chatbot-new/shell.js?v=5&av=' + encodeURIComponent(av);
+    s.src = 'js/features/chatbot-new/shell.js?v=6&av=' + encodeURIComponent(av);
     s.onload = function () { resolve(); };
     s.onerror = function () {
       console.error('chatbot-new/shell.js failed to load');
@@ -45,7 +45,9 @@
     shellPromise,
   ])
     .then(function (results) {
-      container.innerHTML = results[0];
+      if (!container.querySelector('#ncbRoot')) {
+        container.innerHTML = results[0];
+      }
       if (typeof window.initNewChatbotShell === 'function') {
         window.initNewChatbotShell();
       } else {

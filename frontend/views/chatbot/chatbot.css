@@ -2630,3 +2630,84 @@ body.ncb-fullbleed .ncb-main {
 .ncb-tutor-mode-label {
   white-space: nowrap;
 }
+
+/* ============ Performance pass: keep chatbot navigation responsive ============
+   The full chatbot shell is visible for long study sessions, so avoid effects
+   that force large repaint regions on every hover, click, scroll, or screen
+   recording frame. */
+.ncb-root *,
+.ncb-modal-overlay,
+.ncb-row-menu {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.ncb-bg-gradients,
+.ncb-bg-grid {
+  display: none;
+}
+
+.ncb-root {
+  background:
+    linear-gradient(135deg, #071124 0%, #0a1a33 48%, #071124 100%);
+}
+
+.ncb-card,
+.ncb-header,
+.ncb-sidebar,
+.ncb-context,
+.ncb-context-card,
+.ncb-notes-card,
+.ncb-streak-card,
+.ncb-safe-card,
+.ncb-input,
+.ncb-action-card,
+.ncb-modal,
+.ncb-row-menu {
+  box-shadow: none !important;
+}
+
+.ncb-empty-head,
+.ncb-input,
+.ncb-actions,
+.ncb-stream-chunk,
+.ncb-modal-overlay,
+.ncb-modal,
+.ncb-row-menu {
+  animation: none !important;
+}
+
+.ncb-stream-chunk {
+  filter: none !important;
+  transform: none !important;
+}
+
+.ncb-action-card,
+.ncb-new-chat-btn,
+.ncb-input-action-btn,
+.ncb-send-btn,
+.ncb-modal-import {
+  transition-property: background, border-color, color, opacity !important;
+  transition-duration: 90ms !important;
+}
+
+.ncb-action-card:hover,
+.ncb-new-chat-btn:hover,
+.ncb-send-btn:hover,
+.ncb-modal-import:hover:not(:disabled) {
+  transform: none !important;
+}
+
+.ncb-context,
+.ncb-card[data-context-open="false"] .ncb-context {
+  transition: none !important;
+}
+
+@media (max-width: 1024px) {
+  .ncb-context,
+  .ncb-card[data-context-open="true"] .ncb-context,
+  .ncb-card[data-context-open="false"] .ncb-context {
+    box-shadow: none !important;
+    transition: none !important;
+  }
+}

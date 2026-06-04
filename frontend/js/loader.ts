@@ -581,7 +581,7 @@ interface LandingTranslation {
             ],
             dashboardCalendar: ['views/dashboard/dashboard-calendar.js'],
             chat: ['views/chat/chat.js'],
-            aipage: ['views/chatbot/chatbot.js?v=4'],
+            aipage: ['views/chatbot/chatbot.js?v=5'],
             german: ['views/practice/practice.js'],
             notes: ['views/lecturenotes/lecturenotes.js'],
             profile: ['views/profile/profile.js'],
@@ -603,7 +603,7 @@ interface LandingTranslation {
           const lazyCssMap: Record<string, string[]> = {
             dashboard: ['views/dashboard/dashboard.css'],
             chat: ['views/chat/chat.css'],
-            aipage: ['views/chatbot/chatbot.css'],
+            aipage: ['views/chatbot/chatbot.css?v=2'],
             german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
             notes: ['views/lecturenotes/lecturenotes.css'],
             profile: ['views/profile/profile.css'],
@@ -695,7 +695,7 @@ interface LandingTranslation {
               });
             }
             const shellSrc =
-              'js/features/chatbot-new/shell.js?v=5&av=' +
+              'js/features/chatbot-new/shell.js?v=6&av=' +
               encodeURIComponent(String(window.MinalloConfig?.assetVersion || SS?.version || '1'));
             const exists = Array.from(document.querySelectorAll('link[rel="modulepreload"]')).some(
               (link) => (link.getAttribute('href') || '') === shellSrc

@@ -117,6 +117,131 @@
 
   // ── white "paper" view (Hyperknow-style) + print/PDF ───────────────────────
 
+  var _csRun = 0;
+
+  function _sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function _startBuildSteps(els, topic) {
+    var runId = ++_csRun;
+    var steps = [
+      'Finding the strongest course evidence',
+      'Grouping formulas, definitions, and rules',
+      'Drafting exam-ready sections',
+      'Checking source coverage',
+      'Preparing the cheatsheet view',
+    ];
+    var idx = 0;
+    els.result.innerHTML =
+      '<div class="cs-build" data-run="' + runId + '">' +
+        '<div class="cs-build-title">Writing ' + _esc(topic || 'the course cheatsheet') + '</div>' +
+        '<div class="cs-build-steps">' + steps.map(function (s, i) {
+          return '<div class="cs-build-step' + (i === 0 ? ' is-active' : '') + '" data-step="' + i + '">' +
+            '<span class="cs-step-dot"></span><span>' + _esc(s) + '</span></div>';
+        }).join('') + '</div>' +
+      '</div>';
+    var timer = setInterval(function () {
+      if (runId !== _csRun || !els.result.querySelector('.cs-build')) {
+        clearInterval(timer);
+        return;
+      }
+      idx = Math.min(idx + 1, steps.length - 1);
+      els.result.querySelectorAll('.cs-build-step').forEach(function (el, i) {
+        el.classList.toggle('is-done', i < idx);
+        el.classList.toggle('is-active', i === idx);
+      });
+    }, 1100);
+    return {
+      id: runId,
+      stop: function () { clearInterval(timer); },
+    };
+  }
+
+  function _splitSections(md) {
+    var text = String(md || '').trim();
+    if (!text) return [];
+    var chunks = text.split(/\n(?=##\s+)/g).filter(function (x) { return x && x.trim(); });
+    return chunks.map(function (chunk, i) {
+      var m = chunk.match(/^##\s+(.+?)(?:\n|$)/);
+      return {
+        title: m ? m[1].trim() : (i === 0 ? 'Overview' : 'Section ' + (i + 1)),
+        markdown: chunk,
+      };
+    });
+  }
+
+  function _renderResultProgressive(els, res, runId) {
+    if (runId !== _csRun) return;
+    if (!res || res.error || !res.text || !res.text.trim()) {
+      _renderResult(els, res);
+      return;
+    }
+    var topics = (res.topicsCovered || []).filter(Boolean);
+    var sources = res.groundedSources || [];
+    var nFiles = sources.reduce(function (set, s) { if (s.fileName) set[s.fileName] = 1; return set; }, {});
+    var fileCount = Object.keys(nFiles).length;
+    var sections = _splitSections(res.text);
+    if (!sections.length) sections = [{ title: res.title || 'Cheatsheet', markdown: res.text }];
+    els._paper = {
+      course: els.courseName || 'Cheatsheet',
+      title: res.title || 'Cheatsheet',
+      scope: res.title || 'Course cheatsheet',
+      meta: (fileCount ? 'Based on ' + fileCount + ' file' + (fileCount === 1 ? '' : 's') + ' · ' : '') + 'generated cheatsheet',
+      markdown: res.text,
+    };
+    els.result.innerHTML =
+      '<div class="cs-sheet">' +
+        '<div class="cs-sheet-head">' +
+          '<h3>' + _esc(res.title || 'Cheatsheet') + '</h3>' +
+          (res.noteId ? '<span class="cs-saved">Saved to your notes</span>' : '') +
+          '<button type="button" class="cs-btn cs-view-print" data-cs-view disabled>View / Print</button>' +
+        '</div>' +
+        '<div class="cs-writing-line">Writing section 1 of ' + sections.length + '</div>' +
+        '<div class="cs-sheet-body"></div>' +
+        '<div class="cs-after" hidden>' +
+          (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
+          (sources.length
+            ? '<div class="cs-sources">Sources: ' +
+                sources.map(function (s) {
+                  var pg = s.pageStart == null ? '' : s.pageStart;
+                  return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(s.fileName || '') +
+                    '" data-src-page="' + _esc(pg) + '">' + _esc(s.fileName || 'Source') +
+                    (pg ? ', p.' + _esc(pg) : '') + '</span>';
+                }).join(' · ') +
+              '</div>'
+            : '') +
+        '</div>' +
+      '</div>';
+    var body = els.result.querySelector('.cs-sheet-body');
+    var line = els.result.querySelector('.cs-writing-line');
+    var viewBtn = els.result.querySelector('[data-cs-view]');
+    var after = els.result.querySelector('.cs-after');
+    if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
+    (async function () {
+      for (var i = 0; i < sections.length; i += 1) {
+        if (runId !== _csRun || !body || !body.isConnected) return;
+        if (line) line.textContent = 'Writing section ' + (i + 1) + ' of ' + sections.length + ': ' + sections[i].title;
+        var block = document.createElement('div');
+        block.className = 'cs-progress-section';
+        block.innerHTML = '<div class="cs-section-writing">Writing...</div><div class="cs-section-content"></div>';
+        body.appendChild(block);
+        await _sleep(i === 0 ? 120 : 420);
+        if (runId !== _csRun || !block.isConnected) return;
+        _renderMarkdown(block.querySelector('.cs-section-content'), sections[i].markdown);
+        var writing = block.querySelector('.cs-section-writing');
+        if (writing) writing.remove();
+        block.classList.add('is-written');
+        await _sleep(360);
+      }
+      if (runId !== _csRun) return;
+      if (line) line.textContent = 'Cheatsheet complete';
+      if (after) after.removeAttribute('hidden');
+      if (viewBtn) viewBtn.disabled = false;
+      _bindSourceClicks(els.result);
+    })();
+  }
+
   var _paperEl = null;
   var _paperEsc = null;
 
@@ -364,12 +489,15 @@
       if (!courseId) return;
       var topic = ((els.topic && els.topic.value) || '').trim();
       els.gen.disabled = true;
+      var progress;
       els.result.innerHTML = '<div class="cs-msg cs-loading">Generating cheatsheet… this can take a moment.</div>';
+      progress = _startBuildSteps(els, topic);
       _aiService()
         .then(function (svc) {
           return svc.generateCheatsheet(courseId, topic ? { topic: topic } : {}).then(function (res) {
             els.gen.disabled = false;
-            _renderResult(els, res);
+            progress.stop();
+            _renderResultProgressive(els, res, progress.id);
             // A new cheatsheet was just saved — refresh the saved list.
             if (res && res.noteId) _loadSaved(svc, els, courseId);
             return res;
@@ -377,6 +505,7 @@
         })
         .catch(function (err) {
           els.gen.disabled = false;
+          progress.stop();
           els.result.innerHTML =
             '<div class="cs-msg cs-error">' + _esc(err && err.message ? err.message : 'Cheatsheet failed. Please try again.') + '</div>';
         });

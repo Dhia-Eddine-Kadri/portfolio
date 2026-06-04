@@ -301,6 +301,9 @@ const TUTOR_MODE_MIGRATION_KEY = 'ncb_tutor_mode_direct_default_v1';
 const TUTOR_MODE_DEFAULT: TutorMode = 'explain';
 let currentTutorMode: TutorMode = TUTOR_MODE_DEFAULT;
 let messageRenderRun = 0;
+let sidebarRenderRun = 0;
+let activeChatLoadRaf: number | null = null;
+let suppressMessageAutoScroll = false;
 
 function _readStoredTutorMode(): TutorMode {
   try {
@@ -979,6 +982,7 @@ function appendUserBubble(
   const row = document.createElement('div');
   row.className = 'ncb-msg-row ncb-msg-row--user';
   const attachments = images
+    .filter((img) => !!img.dataUrl)
     .map(
       (img) =>
         `<img class="ncb-bubble-image" src="${escapeAttr(img.dataUrl)}" alt="${escapeAttr(img.name)}" />`
@@ -1084,6 +1088,7 @@ function setSendBtnMode(btn: HTMLButtonElement, mode: 'send' | 'pause'): void {
 }
 
 function scrollMsgsToBottom(msgs: HTMLElement): void {
+  if (suppressMessageAutoScroll) return;
   const scroller = msgs.closest<HTMLElement>('.ncb-center');
   if (scroller) scroller.scrollTop = scroller.scrollHeight;
 }
@@ -1121,6 +1126,7 @@ function buildApiMessages(
       });
     }
     (m.images || []).forEach((img) => {
+      if (!img.dataUrl) return;
       blocks.push({
         type: 'image',
         source: {
@@ -2173,6 +2179,12 @@ interface SourceLibraryItem {
 const NCB_STORE_KEY = 'ss_ncb_chats_v1';
 const NCB_ACTIVE_KEY = 'ss_ncb_active_v1';
 const NCB_SOURCES_KEY = 'ss_ncb_sources_v1';
+const NCB_MAX_STORED_CHATS = 200;
+const NCB_MAX_STORED_MESSAGES_PER_CHAT = 120;
+const NCB_MAX_STORED_MESSAGE_CHARS = 80000;
+const NCB_MAX_SOURCE_ITEMS = 120;
+const NCB_MAX_SOURCE_DOCS_PER_ITEM = 20;
+const NCB_MAX_SOURCE_DOC_CHARS = 24000;
 
 const sourceLibrary: { items: SourceLibraryItem[] } = { items: [] };
 
@@ -2223,6 +2235,97 @@ function getOrInitLiveState(): ConversationState {
   };
   liveState = fresh;
   return fresh;
+}
+
+function truncateForStorage(text: string, max: number): string {
+  if (!text || text.length <= max) return text || '';
+  return text.slice(0, max) + '\n\n[Stored transcript trimmed for browser performance.]';
+}
+
+function compactMessageForStorage(m: ChatMessage): ChatMessage {
+  const compact: ChatMessage = {
+    role: m.role,
+    text: truncateForStorage(m.text || '', NCB_MAX_STORED_MESSAGE_CHARS),
+  };
+  if (m.images?.length) {
+    compact.images = m.images.map((img) => ({
+      id: img.id,
+      name: img.name,
+      mediaType: img.mediaType,
+      dataUrl: '',
+    }));
+  }
+  if (m.files?.length) {
+    compact.files = m.files.map((f) => ({
+      id: f.id,
+      name: f.name,
+      kind: f.kind,
+      mediaType: f.mediaType,
+      size: f.size,
+    }));
+  }
+  return compact;
+}
+
+function compactChatForStorage(c: SavedChat): SavedChat {
+  const messages = c.messages.slice(-NCB_MAX_STORED_MESSAGES_PER_CHAT);
+  return {
+    id: c.id,
+    title: c.title,
+    messages: messages.map(compactMessageForStorage),
+    attachedFolders: [],
+    selectedSourceIds: Array.isArray(c.selectedSourceIds) ? c.selectedSourceIds.slice() : [],
+    savedReplies: (c.savedReplies || []).map((r) => ({
+      id: r.id,
+      text: truncateForStorage(r.text || '', NCB_MAX_STORED_MESSAGE_CHARS),
+      createdAt: r.createdAt,
+    })),
+    pinned: !!c.pinned,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+}
+
+function compactChatsForStorage(chats: SavedChat[], activeId: string): SavedChat[] {
+  const picked = new Map<string, SavedChat>();
+  const byRecent = chats.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const add = (c: SavedChat | undefined): void => {
+    if (c && !picked.has(c.id)) picked.set(c.id, c);
+  };
+  add(chats.find((c) => c.id === activeId));
+  byRecent.filter((c) => c.pinned).forEach(add);
+  byRecent.forEach((c) => {
+    if (picked.size < NCB_MAX_STORED_CHATS) add(c);
+  });
+  return Array.from(picked.values()).map(compactChatForStorage);
+}
+
+function compactSourcesForStorage(items: SourceLibraryItem[], selectedIds: Set<string>): SourceLibraryItem[] {
+  const selected = items.filter((s) => selectedIds.has(s.id));
+  const recent = items
+    .filter((s) => !selectedIds.has(s.id))
+    .sort((a, b) => (b.importedAt || 0) - (a.importedAt || 0));
+  return selected
+    .concat(recent)
+    .slice(0, NCB_MAX_SOURCE_ITEMS)
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      count: s.count,
+      courseId: s.courseId,
+      courseName: s.courseName,
+      importedAt: s.importedAt,
+      documents: (s.documents || []).slice(0, NCB_MAX_SOURCE_DOCS_PER_ITEM).map((d) => ({
+        name: d.name,
+        text: truncateForStorage(d.text || '', NCB_MAX_SOURCE_DOC_CHARS),
+      })),
+    }));
+}
+
+function selectedSourceIdsFromChats(chats: SavedChat[]): Set<string> {
+  const ids = new Set<string>();
+  chats.forEach((c) => (c.selectedSourceIds || []).forEach((id) => ids.add(id)));
+  return ids;
 }
 
 function loadChatStore(): void {
@@ -2289,11 +2392,26 @@ function loadChatStore(): void {
   } else if (!chatStore.chats.find((c) => c.id === chatStore.activeId)) {
     chatStore.activeId = chatStore.chats[0]!.id;
   }
+  chatStore.chats = compactChatsForStorage(chatStore.chats, chatStore.activeId);
+  sourceLibrary.items = compactSourcesForStorage(
+    sourceLibrary.items,
+    selectedSourceIdsFromChats(chatStore.chats)
+  );
+  try {
+    localStorage.setItem(NCB_STORE_KEY, JSON.stringify(chatStore.chats));
+    localStorage.setItem(NCB_ACTIVE_KEY, chatStore.activeId);
+    localStorage.setItem(NCB_SOURCES_KEY, JSON.stringify(sourceLibrary.items));
+  } catch {
+    // The regular debounced save path will show the user-facing quota warning.
+  }
 }
 
 function saveSourceLibrary(): void {
   try {
-    localStorage.setItem(NCB_SOURCES_KEY, JSON.stringify(sourceLibrary.items));
+    localStorage.setItem(
+      NCB_SOURCES_KEY,
+      JSON.stringify(compactSourcesForStorage(sourceLibrary.items, selectedSourceIdsFromChats(chatStore.chats)))
+    );
   } catch {
     // Quota exceeded etc. — the chat-store save path will surface a toast.
   }
@@ -2305,7 +2423,10 @@ function saveChatStore(): void {
   if (_saveTimer != null) window.clearTimeout(_saveTimer);
   _saveTimer = window.setTimeout(() => {
     try {
-      localStorage.setItem(NCB_STORE_KEY, JSON.stringify(chatStore.chats));
+      localStorage.setItem(
+        NCB_STORE_KEY,
+        JSON.stringify(compactChatsForStorage(chatStore.chats, chatStore.activeId))
+      );
       localStorage.setItem(NCB_ACTIVE_KEY, chatStore.activeId);
     } catch (err) {
       // Quota exceeded or private-mode write block. Tell the user once per
@@ -2374,6 +2495,7 @@ function chatMeta(c: SavedChat): string {
 function renderSidebar(root: HTMLElement): void {
   const list = root.querySelector<HTMLElement>('.ncb-chat-list');
   if (!list) return;
+  const runId = ++sidebarRenderRun;
 
   const pinned = chatStore.chats.filter((c) => c.pinned);
   const recent = chatStore.chats.filter((c) => !c.pinned);
@@ -2387,7 +2509,21 @@ function renderSidebar(root: HTMLElement): void {
     sections.push('<p class="ncb-chat-section-label">' + escapeHtml(tStr('cb_section_recent', 'Recent')) + '</p>');
     recent.forEach((c) => sections.push(buildSidebarRow(c)));
   }
-  list.innerHTML = sections.join('');
+  list.innerHTML = '';
+  if (!sections.length) return;
+
+  const firstChunk = Math.min(sections.length, 48);
+  list.insertAdjacentHTML('beforeend', sections.slice(0, firstChunk).join(''));
+  let index = firstChunk;
+
+  const renderChunk = (): void => {
+    if (runId !== sidebarRenderRun) return;
+    const end = Math.min(index + 96, sections.length);
+    list.insertAdjacentHTML('beforeend', sections.slice(index, end).join(''));
+    index = end;
+    if (index < sections.length) window.requestAnimationFrame(renderChunk);
+  };
+  if (index < sections.length) window.requestAnimationFrame(renderChunk);
 }
 
 function buildSidebarRow(c: SavedChat): string {
@@ -2427,7 +2563,11 @@ function switchActiveChat(root: HTMLElement, chatId: string): void {
   chatStore.activeId = chatId;
   saveChatStore();
   updateActiveSidebarItem(root, chatId);
-  loadActiveChatIntoCenter(root);
+  if (activeChatLoadRaf != null) window.cancelAnimationFrame(activeChatLoadRaf);
+  activeChatLoadRaf = window.requestAnimationFrame(() => {
+    activeChatLoadRaf = null;
+    loadActiveChatIntoCenter(root);
+  });
 }
 
 function loadActiveChatIntoCenter(root: HTMLElement): void {
@@ -2494,14 +2634,24 @@ function renderConversationMessages(msgs: HTMLElement, messages: ChatMessage[]):
   if (!messages.length) return;
 
   let index = 0;
-  const firstChunk = Math.min(messages.length, 8);
-  while (index < firstChunk) appendStoredMessage(msgs, messages[index++]!);
+  const firstChunk = Math.min(messages.length, 2);
+  suppressMessageAutoScroll = true;
+  try {
+    while (index < firstChunk) appendStoredMessage(msgs, messages[index++]!);
+  } finally {
+    suppressMessageAutoScroll = false;
+  }
   scrollMsgsToBottom(msgs);
 
   const renderChunk = (): void => {
     if (runId !== messageRenderRun) return;
-    const end = Math.min(index + 12, messages.length);
-    while (index < end) appendStoredMessage(msgs, messages[index++]!);
+    suppressMessageAutoScroll = true;
+    try {
+      const end = Math.min(index + 4, messages.length);
+      while (index < end) appendStoredMessage(msgs, messages[index++]!);
+    } finally {
+      suppressMessageAutoScroll = false;
+    }
     scrollMsgsToBottom(msgs);
     if (index < messages.length) window.requestAnimationFrame(renderChunk);
   };
