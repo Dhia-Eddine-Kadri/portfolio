@@ -166,6 +166,26 @@ def test_math_prompt_forbids_invention() -> None:
     assert "do not invent" in body
 
 
+def test_math_prompt_allows_universal_geometry() -> None:
+    # Regression: the model must be allowed to compute a circle/annulus area
+    # from a given diameter — that is universal maths, not a course-specific
+    # formula. Previously `A = π·d²/4` was in the BANNED list, which made the
+    # model refuse to compute A_3 from a given d_3 and bail with "Missing
+    # context" even after finding the correct compliance formula.
+    body = _SYSTEM_PROMPT_MATH.lower()
+    assert "universal mathematics is always allowed" in body
+    assert "area of a circle" in body
+    # It must actively instruct deriving the area from a given diameter.
+    assert "diameter is given" in body or "from the given diameter" in body
+
+
+def test_math_prompt_reserves_missing_context_for_absent_formula() -> None:
+    # Having the formula but lacking some numeric inputs must be
+    # "Partially verified", not "Missing context".
+    body = _SYSTEM_PROMPT_MATH.lower()
+    assert "having the formula but lacking some numeric inputs is not" in body
+
+
 def test_all_prompts_include_exact_intent_overlay() -> None:
     prompt, _mode = pick_system_prompt("solve it", "none")
     assert USER_INTENT_OVERLAY in prompt
