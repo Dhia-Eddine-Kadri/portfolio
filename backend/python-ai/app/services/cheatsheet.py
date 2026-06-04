@@ -30,31 +30,47 @@ from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
 
-# A cheatsheet is dense but bounded — one to two pages. Cap topics so a huge
-# course doesn't blow the context window or produce an unusable wall of text.
-_MAX_TOPICS = 12
+# A cheatsheet is dense but bounded. Cover broadly (like a printed handout) but
+# cap topics/evidence so a huge course doesn't blow the context window.
+_MAX_TOPICS = 16
 _PER_TOPIC_TOP_K = 4
-_MAX_EVIDENCE = 28
+_MAX_EVIDENCE = 40
 
 _SYSTEM = (
-    "You are ExamForge by Minallo, writing a DENSE, exam-ready cheatsheet from a "
-    "student's own course materials.\n"
+    "You are ExamForge by Minallo, writing a DENSE, exam-ready CHEATSHEET from a "
+    "student's own course materials — a compressed, multi-column academic "
+    "reference sheet (Hyperknow style), NOT a study guide or an AI summary.\n"
     "\n"
     "Use ONLY the provided COURSE CONTEXT. Do not use outside knowledge.\n"
     "\n"
-    "A cheatsheet is NOT a study guide — it is the one page a student keeps beside "
-    "them during revision. Be terse and high-density:\n"
-    "- Organise by the topics given, in the order given (most important first). "
-    "One `##` section per topic.\n"
-    "- Under each topic, lead with the key FORMULAS (KaTeX: $...$ inline, $$...$$ "
-    "display, every symbol named once), then crisp DEFINITIONS (term — meaning), "
-    "then any rules / conditions / common pitfalls. Bullets, not prose.\n"
-    "- Keep each item to one line where possible. No filler, no intros, no "
-    "\"In this section…\".\n"
-    "- Cite the source of each non-trivial item inline as (filename, p.N).\n"
-    "- If the context has nothing for a planned topic, omit that topic — do NOT "
-    "invent material or pad it.\n"
+    "STRUCTURE — organise by the topics given, in order (most important first), "
+    "one `##` section per topic. Each section is a tight block:\n"
+    "- Lead with a ONE-LINE definition / core idea.\n"
+    "- Then the key FORMULAS (KaTeX: $...$ inline, $$...$$ display; name each "
+    "symbol once; state assumptions/conditions).\n"
+    "- Then SPECIAL CASES as a numbered list (e.g. `1. Uniform motion (a=0)`), "
+    "each with its formula and the condition it needs.\n"
+    "- Then terse notes / pitfalls. Bullets with a bold lead-in: "
+    "`- **Term:** meaning`. One line each. No prose paragraphs, no intros.\n"
+    "\n"
+    "PRECISION (be slightly MORE precise than a generic cheatsheet):\n"
+    "- Only formulas SUPPORTED BY THE CONTEXT. Never invent or guess a formula.\n"
+    "- Distinguish general formulas from special cases; keep notation consistent; "
+    "define a symbol the first time it is ambiguous; include key edge conditions.\n"
+    "- If the context has nothing for a planned topic, OMIT it — never pad.\n"
     "- Match the language of the source material.\n"
+    "\n"
+    "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
+    "- Wrap THE single most important fact/result of a block in ==double "
+    "equals== (renders as a yellow highlight). At most one per block.\n"
+    "- Begin a hard warning with `Important:` or `Critical:` (renders red).\n"
+    "- Begin a soft remark with `Note:` (renders orange).\n"
+    "- Wrap a key concept term in {{double braces}} (renders blue). Use "
+    "sparingly — only genuinely central terms.\n"
+    "\n"
+    "SOURCES — keep them subtle: do NOT cite every line. Add a small "
+    "`(filename, p.N)` only where a specific formula needs provenance, and end "
+    "with one short `## Sources` list. Never spam citations.\n"
     "\n"
     'Return ONLY JSON: {"text":"<markdown cheatsheet>"}'
 )
@@ -181,7 +197,7 @@ def generate_cheatsheet(
     title = (topic_query + " — Cheatsheet") if topic_query else "Course Cheatsheet"
     user = "COURSE CONTEXT:\n\n" + _format_evidence(evidence, merged_names, topics)
     try:
-        res = chat_json(system=_SYSTEM, user=user, max_tokens=4500)
+        res = chat_json(system=_SYSTEM, user=user, max_tokens=7000)
     except Exception as e:  # noqa: BLE001
         log.exception("cheatsheet LLM call failed")
         return {"text": "", "error": str(e), "groundedSources": []}

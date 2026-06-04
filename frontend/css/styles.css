@@ -8112,3 +8112,32 @@ body:not(.night) .ai-cap-modal-btn-secondary {
   color: #e2e8f0;
   font-size: 0.9rem;
 }
+
+/* ── Print isolation (cheatsheet paper, Deep Learn lesson) ─────────────────── */
+/* A printable overlay carries `ss-print-root`; on print, hide the rest of the
+   app and the overlay's own toolbar so only the white document prints. */
+@media print {
+  body > *:not(.ss-print-root) { display: none !important; }
+  .ss-print-root {
+    position: static !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+  .ss-print-root .cs-paper-bar,
+  .ss-print-root .ss-print-bar { display: none !important; }
+  .ss-print-root .cs-paper-scroll,
+  .ss-print-root .ss-print-scroll {
+    overflow: visible !important;
+    padding: 0 !important;
+    height: auto !important;
+  }
+  .ss-print-root .cs-paper,
+  .ss-print-root .ss-print-doc {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .cs-paper-body { column-count: 4 !important; }
+  @page { size: A4; margin: 10mm; }
+}

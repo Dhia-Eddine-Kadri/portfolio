@@ -48,13 +48,118 @@
     return Promise.all(ps);
   }
 
-  function _renderMarkdown(el, md) {
+  var _LABEL_WARN = /^(\s*)(Important:|Critical:|Warning:|Trap:)/;
+  var _LABEL_NOTE = /^(\s*)(Note:)/;
+
+  // Apply the cheatsheet emphasis markers the generator emits, on the rendered
+  // DOM (after KaTeX, so formulas — which can contain == or {{ }} — are already
+  // .katex spans and are skipped):
+  //   ==fact==     → yellow highlight   {{term}} → blue key term
+  //   Note:/Important:/Critical: lines → orange / red
+  function _decorate(root) {
+    if (!root) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var targets = [];
+    var n;
+    while ((n = walker.nextNode())) {
+      var p = n.parentNode;
+      if (!p || p.closest('.katex, code, pre')) continue;
+      var t = n.nodeValue || '';
+      if (t.indexOf('==') === -1 && t.indexOf('{{') === -1 && !_LABEL_WARN.test(t) && !_LABEL_NOTE.test(t)) continue;
+      targets.push(n);
+    }
+    targets.forEach(function (node) {
+      var t = node.nodeValue || '';
+      var html = _esc(t)
+        .replace(/==([^=]+)==/g, '<mark class="cs-hl">$1</mark>')
+        .replace(/\{\{([^}]+)\}\}/g, '<span class="cs-key">$1</span>');
+      if (_LABEL_WARN.test(t)) html = '<span class="cs-warn">' + html + '</span>';
+      else if (_LABEL_NOTE.test(t)) html = '<span class="cs-note">' + html + '</span>';
+      var span = document.createElement('span');
+      span.innerHTML = html;
+      node.parentNode.replaceChild(span, node);
+    });
+  }
+
+  // Group each `##` section (h2 + following siblings) into a .cs-block so a
+  // section never splits across columns in the multi-column paper.
+  function _wrapBlocks(body) {
+    if (!body) return;
+    var kids = Array.prototype.slice.call(body.childNodes);
+    var blocks = [];
+    var cur = null;
+    kids.forEach(function (node) {
+      if (node.nodeType === 1 && node.tagName === 'H2') {
+        cur = document.createElement('div');
+        cur.className = 'cs-block';
+        blocks.push(cur);
+      } else if (!cur) {
+        cur = document.createElement('div');
+        cur.className = 'cs-block';
+        blocks.push(cur);
+      }
+      cur.appendChild(node);
+    });
+    body.innerHTML = '';
+    blocks.forEach(function (b) { body.appendChild(b); });
+  }
+
+  function _renderMarkdown(el, md, paper) {
     var doRender = function () {
       el.innerHTML = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(md) : _esc(md);
       if (typeof window._renderMath === 'function') window._renderMath(el);
       if (typeof window._renderCode === 'function') window._renderCode(el);
+      _decorate(el);
+      if (paper) _wrapBlocks(el);
     };
     _ensureRenderers().then(doRender).catch(doRender);
+  }
+
+  // ── white "paper" view (Hyperknow-style) + print/PDF ───────────────────────
+
+  var _paperEl = null;
+  var _paperEsc = null;
+
+  function _closePaper() {
+    if (_paperEsc) { document.removeEventListener('keydown', _paperEsc); _paperEsc = null; }
+    if (_paperEl) { _paperEl.remove(); _paperEl = null; }
+  }
+
+  function _openPaper(opts) {
+    opts = opts || {};
+    _closePaper();
+    var ov = document.createElement('div');
+    ov.className = 'cs-paper-overlay ss-print-root';
+    ov.innerHTML =
+      '<div class="cs-paper-bar">' +
+        '<span class="cs-paper-bar-title">' + _esc(opts.title || 'Cheatsheet') + '</span>' +
+        '<div class="cs-paper-bar-actions">' +
+          '<button type="button" class="cs-paper-btn" data-act="print">⤓ Download PDF</button>' +
+          '<button type="button" class="cs-paper-btn cs-paper-close" data-act="close">Close</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cs-paper-scroll">' +
+        '<article class="cs-paper">' +
+          '<header class="cs-paper-head">' +
+            '<h1>' + _esc(opts.course || 'Cheatsheet') + '</h1>' +
+            (opts.scope ? '<div class="cs-paper-scope">' + _esc(opts.scope) + '</div>' : '') +
+            (opts.meta ? '<div class="cs-paper-meta">' + _esc(opts.meta) + '</div>' : '') +
+          '</header>' +
+          '<div class="cs-paper-body"></div>' +
+        '</article>' +
+      '</div>';
+    document.body.appendChild(ov);
+    _paperEl = ov;
+    var body = ov.querySelector('.cs-paper-body');
+    if (body) _renderMarkdown(body, opts.markdown || '', true);
+    ov.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.getAttribute('data-act') === 'close') _closePaper();
+      else if (b.getAttribute('data-act') === 'print') window.print();
+    });
+    _paperEsc = function (e) { if (e.key === 'Escape') _closePaper(); };
+    document.addEventListener('keydown', _paperEsc);
   }
 
   function _bindSourceClicks(scope) {
@@ -80,11 +185,21 @@
     }
     var topics = (res.topicsCovered || []).filter(Boolean);
     var sources = res.groundedSources || [];
+    var nFiles = sources.reduce(function (set, s) { if (s.fileName) set[s.fileName] = 1; return set; }, {});
+    var fileCount = Object.keys(nFiles).length;
+    els._paper = {
+      course: els.courseName || 'Cheatsheet',
+      title: res.title || 'Cheatsheet',
+      scope: res.title || 'Course cheatsheet',
+      meta: (fileCount ? 'Based on ' + fileCount + ' file' + (fileCount === 1 ? '' : 's') + ' · ' : '') + 'generated cheatsheet',
+      markdown: res.text,
+    };
     els.result.innerHTML =
       '<div class="cs-sheet">' +
         '<div class="cs-sheet-head">' +
           '<h3>' + _esc(res.title || 'Cheatsheet') + '</h3>' +
           (res.noteId ? '<span class="cs-saved">Saved to your notes</span>' : '') +
+          '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button>' +
         '</div>' +
         '<div class="cs-sheet-body"></div>' +
         (topics.length ? '<div class="cs-topics">Topics: ' + topics.map(_esc).join(' · ') + '</div>' : '') +
@@ -101,6 +216,8 @@
       '</div>';
     var body = els.result.querySelector('.cs-sheet-body');
     if (body) _renderMarkdown(body, res.text);
+    var viewBtn = els.result.querySelector('[data-cs-view]');
+    if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
     _bindSourceClicks(els.result);
   }
 
@@ -118,11 +235,21 @@
     els.result.innerHTML = '<div class="cs-msg cs-loading">Loading cheatsheet…</div>';
     svc.getNoteById(id).then(function (note) {
       if (!note) { els.result.innerHTML = '<div class="cs-msg cs-error">Could not load this cheatsheet.</div>'; return; }
+      els._paper = {
+        course: els.courseName || 'Cheatsheet',
+        title: note.title || 'Cheatsheet',
+        scope: note.title || 'Saved cheatsheet',
+        meta: 'Saved cheatsheet',
+        markdown: note.content_markdown || '',
+      };
       els.result.innerHTML =
-        '<div class="cs-sheet"><div class="cs-sheet-head"><h3>' + _esc(note.title || 'Cheatsheet') + '</h3></div>' +
+        '<div class="cs-sheet"><div class="cs-sheet-head"><h3>' + _esc(note.title || 'Cheatsheet') + '</h3>' +
+        '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button></div>' +
         '<div class="cs-sheet-body"></div></div>';
       var body = els.result.querySelector('.cs-sheet-body');
       if (body) _renderMarkdown(body, note.content_markdown || '');
+      var viewBtn = els.result.querySelector('[data-cs-view]');
+      if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
     }).catch(function () {
       els.result.innerHTML = '<div class="cs-msg cs-error">Could not load this cheatsheet.</div>';
     });
@@ -171,6 +298,7 @@
     if (!root) return;
     var courseId = (course && course.id) || window.activeCourseId || '';
     var els = {
+      courseName: (course && (course.name || course.title)) || 'Cheatsheet',
       topic: root.querySelector('#csTopic'),
       gen: root.querySelector('#csGenerate'),
       result: root.querySelector('#csResult'),

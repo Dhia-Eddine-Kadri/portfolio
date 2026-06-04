@@ -57,6 +57,66 @@
     _ensureRenderers().then(doRender).catch(doRender);
   }
 
+  // Flatten a live lesson into one markdown doc for the printable view.
+  function _composeLesson(res) {
+    var parts = [];
+    if (res.lesson && res.lesson.trim()) parts.push(res.lesson.trim());
+    if (res.workedExample && res.workedExample.trim()) parts.push('## Worked example\n\n' + res.workedExample.trim());
+    if (res.check && res.check.question) {
+      var b = '## Check yourself\n\n' + res.check.question;
+      if (res.check.answer) b += '\n\n**Answer:** ' + res.check.answer;
+      if (res.check.explanation) b += '\n\n*' + res.check.explanation + '*';
+      parts.push(b);
+    }
+    return parts.join('\n\n');
+  }
+
+  // ── printable white lesson view + download (PDF via the browser) ───────────
+
+  var _printEl = null;
+  var _printEsc = null;
+
+  function _closePrint() {
+    if (_printEsc) { document.removeEventListener('keydown', _printEsc); _printEsc = null; }
+    if (_printEl) { _printEl.remove(); _printEl = null; }
+  }
+
+  function _openPrint(opts) {
+    opts = opts || {};
+    _closePrint();
+    var ov = document.createElement('div');
+    ov.className = 'dl-print-overlay ss-print-root';
+    ov.innerHTML =
+      '<div class="ss-print-bar">' +
+        '<span class="ss-print-bar-title">' + _esc(opts.title || 'Lesson') + '</span>' +
+        '<div class="ss-print-bar-actions">' +
+          '<button type="button" class="ss-print-btn" data-act="print">⤓ Download PDF</button>' +
+          '<button type="button" class="ss-print-btn" data-act="close">Close</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ss-print-scroll">' +
+        '<article class="ss-print-doc">' +
+          '<header class="ss-print-head">' +
+            (opts.course ? '<div class="ss-print-course">' + _esc(opts.course) + '</div>' : '') +
+            '<h1>' + _esc(opts.title || 'Lesson') + '</h1>' +
+          '</header>' +
+          '<div class="ss-print-body"></div>' +
+        '</article>' +
+      '</div>';
+    document.body.appendChild(ov);
+    _printEl = ov;
+    var body = ov.querySelector('.ss-print-body');
+    if (body) _renderMarkdown(body, opts.markdown || '');
+    ov.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.getAttribute('data-act') === 'close') _closePrint();
+      else window.print();
+    });
+    _printEsc = function (e) { if (e.key === 'Escape') _closePrint(); };
+    document.addEventListener('keydown', _printEsc);
+  }
+
   function _renderResult(els, res) {
     if (!res || res.error) {
       els.result.innerHTML = '<div class="dl-msg dl-error">' + _esc((res && res.error) || 'Deep Learn failed. Please try again.') + '</div>';
@@ -68,9 +128,17 @@
     }
     var sources = res.groundedSources || [];
     var hasCheck = res.check && res.check.question;
+    els._print = {
+      course: els.courseName || '',
+      title: res.title || res.topic || 'Lesson',
+      markdown: _composeLesson(res),
+    };
     els.result.innerHTML =
       '<div class="dl-lesson-card">' +
-        '<h3>' + _esc(res.title || res.topic || 'Lesson') + '</h3>' +
+        '<div class="dl-lesson-head">' +
+          '<h3>' + _esc(res.title || res.topic || 'Lesson') + '</h3>' +
+          '<button type="button" class="dl-btn dl-download" data-dl-print>⤓ Download PDF</button>' +
+        '</div>' +
         '<div class="dl-section dl-lesson-body"></div>' +
         (res.workedExample && res.workedExample.trim()
           ? '<h4>Worked example</h4><div class="dl-section dl-example-body"></div>'
@@ -117,6 +185,9 @@
         });
       }
     }
+
+    var dlBtn = els.result.querySelector('[data-dl-print]');
+    if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
 
     els.result.querySelectorAll('.dl-sources .src-cite').forEach(function (el) {
       el.addEventListener('click', function () {
@@ -195,11 +266,15 @@
     els.result.innerHTML = '<div class="dl-msg dl-loading">Loading lesson…</div>';
     svc.getNoteById(id).then(function (note) {
       if (!note) { els.result.innerHTML = '<div class="dl-msg dl-error">Could not load this lesson.</div>'; return; }
+      els._print = { course: els.courseName || '', title: note.title || 'Lesson', markdown: note.content_markdown || '' };
       els.result.innerHTML =
-        '<div class="dl-lesson-card"><h3>' + _esc(note.title || 'Lesson') + '</h3>' +
+        '<div class="dl-lesson-card"><div class="dl-lesson-head"><h3>' + _esc(note.title || 'Lesson') + '</h3>' +
+        '<button type="button" class="dl-btn dl-download" data-dl-print>⤓ Download PDF</button></div>' +
         '<div class="dl-section dl-saved-body"></div></div>';
       var body = els.result.querySelector('.dl-saved-body');
       if (body) _renderMarkdown(body, note.content_markdown || '');
+      var dlBtn = els.result.querySelector('[data-dl-print]');
+      if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
     }).catch(function () {
       els.result.innerHTML = '<div class="dl-msg dl-error">Could not load this lesson.</div>';
     });
@@ -248,6 +323,7 @@
     if (!root) return;
     var courseId = (course && course.id) || window.activeCourseId || '';
     var els = {
+      courseName: (course && (course.name || course.title)) || '',
       select: root.querySelector('#dlTopicSelect'),
       text: root.querySelector('#dlTopicText'),
       gen: root.querySelector('#dlGenerate'),
