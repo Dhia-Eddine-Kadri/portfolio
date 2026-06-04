@@ -31,11 +31,20 @@ from ..supabase_client import get_supabase
 log = logging.getLogger(__name__)
 
 # A cheatsheet is dense but bounded. Generation runs ~40 tok/s on this account,
-# so output length is the main driver of latency: keep topics/evidence modest so
-# a full sheet generates in time for the edge proxy's upstream timeout.
-_MAX_TOPICS = 10
-_PER_TOPIC_TOP_K = 3
-_MAX_EVIDENCE = 20
+# so OUTPUT length is the main driver of latency — but INPUT evidence is nearly
+# free by comparison. The Stage 0 diagnostic (scripts/diagnose_cheatsheet_source)
+# showed that on a well-indexed course retrieval returns ~6 clean formula-bearing
+# chunks per topic across 124 topics, yet the old caps (10 topics × top_k 3,
+# 20 evidence) starved the model: it never SAW most of the formulas it was
+# accused of "missing". The fix is to widen the evidence pool the model chooses
+# from — not to make it write more — so the same bounded output is spent on the
+# best real formulas. Output stays capped for the edge proxy's upstream timeout.
+# Evidence (INPUT) is widened hard — that's the Stage 0 fix. Topic/section count
+# (which drives OUTPUT length, hence wall-clock against the 45s proxy timeout) is
+# raised only modestly so a full sheet still finishes in budget.
+_MAX_TOPICS = 14            # importance-ranked sections (was 10)
+_PER_TOPIC_TOP_K = 5        # retrieval supplies ~6 formula chunks/topic (was 3)
+_MAX_EVIDENCE = 36          # richer pool for the model to SELECT from (was 20)
 
 _SYSTEM = (
     "You are ExamForge by Minallo, writing a DENSE, exam-ready CHEATSHEET from a "
@@ -59,6 +68,10 @@ _SYSTEM = (
     "- Distinguish general formulas from special cases; keep notation consistent; "
     "define a symbol the first time it is ambiguous; include key edge conditions.\n"
     "- If the context has nothing for a planned topic, OMIT it — never pad.\n"
+    "- The COURSE CONTEXT is a broad pool: mine it for EVERY distinct, "
+    "high-value formula/rule it actually supports — coverage of real formulas "
+    "is the goal. Keep each one tight (one line); drop duplicates and trivia "
+    "rather than spending space on prose.\n"
     "- Match the language of the source material.\n"
     "\n"
     "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
