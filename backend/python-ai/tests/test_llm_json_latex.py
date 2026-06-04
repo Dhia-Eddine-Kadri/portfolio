@@ -2,7 +2,27 @@
 
 import json
 
-from app.services.llm_json import _parse_json_lenient
+from app.services.llm_json import _parse_json_lenient, _salvage_string_value
+
+
+def test_salvage_truncated_text_value():
+    # A cheatsheet response cut off at the token cap: no closing quote/brace.
+    bs = "\\"
+    raw = '{"text": "## Kinematik' + bs + 'n$$x = v_0 t + ' + bs + 'frac{1}{2} a t^2$$' + bs + 'nmore'
+    out = _salvage_string_value(raw, "text")
+    assert out is not None
+    assert r"\frac" in out          # LaTeX preserved, not eaten
+    assert "## Kinematik\n" in out  # real newline decoded
+    assert out.endswith("more")     # partial tail kept
+
+
+def test_salvage_complete_value_stops_at_quote():
+    out = _salvage_string_value('{"text": "abc", "x": 1}', "text")
+    assert out == "abc"
+
+
+def test_salvage_missing_key():
+    assert _salvage_string_value('{"other": "z"}', "text") is None
 
 
 def test_under_escaped_latex_is_repaired():

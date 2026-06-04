@@ -79,6 +79,14 @@ def test_sanitize_empty():
     assert cs.sanitize_cheatsheet_markdown("") == ("", 0)
 
 
+def test_sanitize_trims_dangling_truncated_formula():
+    # Salvaged/truncated sheet ends with an unterminated $$ → trim it.
+    out, _ = cs.sanitize_cheatsheet_markdown("## A\n$$E=mc^2$$\n## B\n$$F = m a")
+    assert out.count("$$") % 2 == 0
+    assert "$$E=mc^2$$" in out
+    assert "F = m a" not in out
+
+
 # ── settings (Stage 3) ───────────────────────────────────────────────────────
 
 

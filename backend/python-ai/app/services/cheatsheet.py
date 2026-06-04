@@ -124,9 +124,12 @@ _VALID_LANGS = ("source", "en", "de")
 _DENSITY_TARGET = {
     "max": "16-24", "high": "14-20", "thorough": "10-16",
 }
-# Headroom above the typical ~1300-1500 completion tokens so normal variance
-# never truncates the JSON; wall-clock (not this cap) is the real budget.
-_MAX_TOKENS = 2400
+# Hard time bound: output runs ~40 tok/s, so 1400 tokens ≈ 35s + overhead < 45s,
+# fitting even the OLD proxy timeout (so the feature works regardless of whether
+# the 60s proxy bump is deployed). A verbose run that hits this cap is salvaged
+# (chat_json salvage_key) into a slightly-shorter but renderable sheet instead of
+# a JSON parse failure.
+_MAX_TOKENS = 1400
 _LANG_INSTRUCTION = {
     "source": "Match the language of the source material.",
     "en": "Write the cheatsheet in English regardless of the source language.",
@@ -208,6 +211,12 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     # 1) corruption chars (also fixes � inside inline $...$ and headings)
     cleaned = text.replace("�", "").replace("\r", "")
     cleaned = _CTRL_RE.sub("", cleaned)
+
+    # 1b) a salvaged (token-cap-truncated) sheet can end mid-formula, leaving a
+    # dangling unterminated "$$" that would break KaTeX. If the display-delimiter
+    # count is odd, drop everything from the last "$$" onward.
+    if cleaned.count("$$") % 2 == 1:
+        cleaned = cleaned[: cleaned.rfind("$$")].rstrip()
 
     # 2) malformed display formulas
     dropped = 0
@@ -408,7 +417,10 @@ def generate_cheatsheet(
         # Keep output bounded: at ~40 tok/s, output length is wall-clock, and the
         # edge proxy aborts at 45s. _MAX_TOKENS caps generation so a verbose sheet
         # can't run past the timeout ("Upstream AI service error").
-        res = chat_json(system=_settings_system_prompt(cfg), user=user, max_tokens=_MAX_TOKENS)
+        res = chat_json(
+            system=_settings_system_prompt(cfg), user=user,
+            max_tokens=_MAX_TOKENS, salvage_key="text",
+        )
     except Exception as e:  # noqa: BLE001
         log.exception("cheatsheet LLM call failed")
         return {"text": "", "error": str(e), "groundedSources": []}

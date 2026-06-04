@@ -126,6 +126,38 @@ def _parse_json_lenient(text: str) -> Any:
     raise ValueError("could not parse model JSON")
 
 
+def _salvage_string_value(raw: str, key: str) -> str | None:
+    r"""Best-effort extraction of one top-level JSON string value, tolerant of
+    TRUNCATION (no closing quote/brace) — used when a long single-field response
+    (e.g. a whole cheatsheet in ``{"text": "..."}``) is cut off at the token cap
+    and ``json.loads`` can't parse it. A truncated markdown body still renders.
+
+    Decodes JSON escapes manually so LaTeX backslashes survive: ``\n``→newline,
+    ``\"``→quote, ``\\``→backslash, but ``\frac``/``\mu`` (no JSON meaning) are
+    kept verbatim instead of being eaten.
+    """
+    m = re.search(r'"' + re.escape(key) + r'"\s*:\s*"', raw)
+    if not m:
+        return None
+    body = raw[m.end():]
+    out: list[str] = []
+    i = 0
+    decode = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/"}
+    while i < len(body):
+        ch = body[i]
+        if ch == "\\" and i + 1 < len(body):
+            nxt = body[i + 1]
+            out.append(decode.get(nxt, "\\" + nxt))  # keep \frac etc. verbatim
+            i += 2
+            continue
+        if ch == '"':  # unescaped closing quote → end of value
+            break
+        out.append(ch)
+        i += 1
+    salvaged = "".join(out).strip()
+    return salvaged or None
+
+
 @dataclass
 class LlmResult:
     data: Any
@@ -140,6 +172,7 @@ def chat_json(
     user: str,
     model: str | None = None,
     max_tokens: int = 2000,
+    salvage_key: str | None = None,
 ) -> LlmResult:
     settings = get_settings()
     chosen = model or settings.openai_generate_model
@@ -155,7 +188,19 @@ def chat_json(
     )
     choice = resp.choices[0] if resp.choices else None
     text = (choice.message.content if choice and choice.message else "") or ""
-    parsed = _parse_json_lenient(text)
+    try:
+        parsed = _parse_json_lenient(text)
+    except ValueError:
+        # Likely truncated at max_tokens. If the caller named a salvage key,
+        # recover its (possibly partial) string value instead of failing.
+        if salvage_key:
+            salvaged = _salvage_string_value(text, salvage_key)
+            if salvaged:
+                parsed = {salvage_key: salvaged}
+            else:
+                raise
+        else:
+            raise
     return LlmResult(
         data=parsed,
         model=chosen,
