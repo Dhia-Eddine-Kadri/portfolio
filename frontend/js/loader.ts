@@ -478,6 +478,7 @@ interface LandingTranslation {
 
     // Load dependency helpers and early feature globals first, then app/router.
     loadScript('js/dependencies.js', 'dependencies-script')
+      .then(() => loadScript('js/utils/db-helpers.js', 'db-helpers-script'))
       .then(() => loadScript('views/subscription/subscription.js', 'subscription-script'))
       .then(() => {
         // app-data.js must load before app.js — it declares SEMS, COLORS, MAJOR_LIST, SUBJECT_LIST
@@ -585,9 +586,9 @@ interface LandingTranslation {
             notes: ['views/lecturenotes/lecturenotes.js'],
             profile: ['views/profile/profile.js'],
             settings: ['views/settings/settings.js'],
-            flashcards: ['views/flashcards/flashcards.js'],
-            quiz: ['views/quiz/quiz.js'],
-            examforge: ['views/examforge/examforge.js'],
+            flashcards: ['js/utils/db-helpers.js', 'views/flashcards/flashcards.js'],
+            quiz: ['js/utils/db-helpers.js', 'views/quiz/quiz.js'],
+            examforge: ['js/utils/db-helpers.js', 'views/examforge/examforge.js'],
             notesPanel: ['views/notes/notes-panel.js'],
             // writer/merger register listeners for ss-editor-ready, so load
             // them before editor.js fetches markup and dispatches the event.

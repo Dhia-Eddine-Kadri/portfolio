@@ -7,11 +7,29 @@
   var _state = {};
 
   // ── DB helpers (shared via js/utils/db-helpers.js) ──────────────────────────
-  function _supaHeaders() { return window._ssDb.supaHeaders(); }
-  function _supaUrl()     { return window._ssDb.supaUrl(); }
-  function _userId()      { return window._ssDb.userId(); }
+  function _supaHeaders() {
+    if (window._ssDb && window._ssDb.supaHeaders) return window._ssDb.supaHeaders();
+    return {
+      'Content-Type': 'application/json',
+      apikey: window._SAKEY || '',
+      Authorization: 'Bearer ' + (window._sbToken || '')
+    };
+  }
+  function _supaUrl() {
+    if (window._ssDb && window._ssDb.supaUrl) return window._ssDb.supaUrl();
+    return String(window._SUPA || '').replace(/\/$/, '');
+  }
+  function _userId() {
+    if (window._ssDb && window._ssDb.userId) return window._ssDb.userId();
+    try {
+      var part = (window._sbToken || '').split('.')[1];
+      if (!part) return null;
+      return (JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))).sub) || null;
+    } catch (e) { return null; }
+  }
 
   function _dbLoadDecks(courseId) {
+    if (!_supaUrl()) return Promise.resolve([]);
     var url = _supaUrl() + '/rest/v1/flashcard_decks?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=50';
     return fetch(url, { headers: _supaHeaders() })
       .then(function(r) { return r.ok ? r.json() : []; })
@@ -20,7 +38,7 @@
 
   function _dbSaveDeck(courseId, deck) {
     var uid = _userId();
-    if (!uid) return Promise.resolve(null);
+    if (!uid || !_supaUrl()) return Promise.resolve(null);
     var payload = { user_id: uid, course_id: courseId, name: deck.name, cards: deck.cards };
     return fetch(_supaUrl() + '/rest/v1/flashcard_decks', {
       method: 'POST',
