@@ -27,11 +27,29 @@ import io
 import logging
 import re
 import time
+from dataclasses import dataclass
 from typing import Iterable
 
 from ..config import get_settings
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class OcrPageResult:
+    """Structured OCR output for one PDF page.
+
+    ``text`` remains the indexed Markdown. The metadata lets the indexer store
+    whether a page was handled by the handwriting path and whether a student
+    should review/correct it later.
+    """
+
+    text: str
+    provider: str
+    mode: str
+    confidence: float
+    needs_review: bool
+    unclear_count: int
 
 
 # Rendering and OpenAI are imported lazily so the module is still
@@ -129,6 +147,29 @@ _VISION_SYSTEM_PROMPT = (
 )
 
 
+_HANDWRITING_SYSTEM_PROMPT = (
+    "You are a careful handwriting transcription system for university course "
+    "notes, worked engineering exercises, formulas, and diagrams. Extract all "
+    "readable handwritten and printed content from the single page image into "
+    "clean Markdown.\n"
+    "\n"
+    "RULES:\n"
+    "1. Preserve the visual order of the page. Keep short handwritten lines as "
+    "separate Markdown lines when line breaks matter.\n"
+    "2. Transcribe numbers, units, signs, decimal separators, subscripts, and "
+    "formula symbols exactly. Wrap formulas in $$ ... $$ display math fences "
+    "when they are standalone.\n"
+    "3. Do not clean up a student's math into a different formula. If a crossed "
+    "out or overwritten value is visible, transcribe only the final intended "
+    "value when clear.\n"
+    "4. If a word, value, or symbol is not readable, write [unclear] at that "
+    "location. Do not guess.\n"
+    "5. Include diagram labels, axis labels, annotations, and arrows as short "
+    "lines. If spatial context matters, use brief labels like Diagram label: ...\n"
+    "6. Return Markdown only. No commentary, JSON, or outer code fence."
+)
+
+
 def _render_page_to_png(pdfium, pdf_bytes: bytes, page_index: int, dpi: int) -> bytes | None:
     """Render one 0-based page index to PNG bytes. None on failure."""
     try:
@@ -151,10 +192,42 @@ def _render_page_to_png(pdfium, pdf_bytes: bytes, page_index: int, dpi: int) -> 
         return None
 
 
-def _vision_extract(client, model: str, image_bytes: bytes) -> str:
+def _preprocess_handwriting_image(image_bytes: bytes) -> bytes:
+    """Improve contrast/edges before sending likely handwritten pages.
+
+    This is intentionally conservative: no aggressive thresholding, because
+    pale pencil strokes and light grid paper can disappear if binarised.
+    """
+    try:
+        from PIL import Image, ImageFilter, ImageOps
+
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            grey = im.convert("L")
+            grey = ImageOps.autocontrast(grey, cutoff=1)
+            grey = grey.filter(
+                ImageFilter.UnsharpMask(radius=1.1, percent=140, threshold=3)
+            )
+            rgb = ImageOps.grayscale(grey).convert("RGB")
+            buf = io.BytesIO()
+            rgb.save(buf, format="PNG", optimize=True)
+            return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        log.exception("handwriting OCR preprocessing failed; using original render")
+        return image_bytes
+
+
+def _vision_extract(client, model: str, image_bytes: bytes, *, mode: str = "standard") -> str:
     """One vision-model call. Returns extracted Markdown or "" on failure."""
     try:
         b64 = base64.b64encode(image_bytes).decode("ascii")
+        system_prompt = (
+            _HANDWRITING_SYSTEM_PROMPT if mode == "handwriting" else _VISION_SYSTEM_PROMPT
+        )
+        user_prompt = (
+            "Transcribe the handwritten page as Markdown."
+            if mode == "handwriting"
+            else "Extract the page content as Markdown."
+        )
         response = client.chat.completions.create(
             model=model,
             # OCR is a transcription task — temperature 0 for faithful, stable
@@ -166,11 +239,11 @@ def _vision_extract(client, model: str, image_bytes: bytes) -> str:
             # the model's output limit.
             max_tokens=4096,
             messages=[
-                {"role": "system", "content": _VISION_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Extract the page content as Markdown."},
+                        {"type": "text", "text": user_prompt},
                         {
                             "type": "image_url",
                             # ``detail: high`` keeps the full resolution so small
@@ -196,6 +269,41 @@ def _vision_extract(client, model: str, image_bytes: bytes) -> str:
     except Exception:  # noqa: BLE001
         log.exception("vision OCR call failed")
         return ""
+
+
+_UNCLEAR_RE = re.compile(r"\[unclear\]", re.IGNORECASE)
+_WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüß]{3,}")
+_MATH_SIGNAL_RE = re.compile(r"\$\$|\\frac|\\sum|\\int|[=+\-*/≤≥≈∑∫]")
+
+
+def _estimate_ocr_confidence(text: str, *, mode: str) -> tuple[float, bool, int]:
+    """Cheap page-level confidence signal for review UX.
+
+    Vision OCR does not return token confidences, so this measures whether the
+    result contains enough readable structure and how much of it is explicitly
+    uncertain. Handwriting starts slightly lower because the risk profile is
+    worse than printed OCR.
+    """
+    if not text or not text.strip():
+        return 0.0, True, 0
+
+    unclear = len(_UNCLEAR_RE.findall(text))
+    words = len(_WORD_RE.findall(text))
+    math = len(_MATH_SIGNAL_RE.findall(text))
+    chars = len(text.strip())
+
+    base = 0.78 if mode == "handwriting" else 0.9
+    if words >= 20 or chars >= 300:
+        base += 0.08
+    elif words < 5 and math < 2:
+        base -= 0.22
+    if math >= 4:
+        base += 0.04
+
+    penalty = min(0.55, unclear * (0.12 if mode == "handwriting" else 0.08))
+    confidence = max(0.05, min(0.99, base - penalty))
+    needs_review = mode == "handwriting" or unclear > 0 or confidence < 0.72
+    return round(confidence, 2), needs_review, unclear
 
 
 # Vision models reliably wrap their answer in a markdown code fence even
@@ -308,11 +416,11 @@ def _mathpix_extract(app_id: str, app_key: str, image_bytes: bytes) -> str:
     return ""
 
 
-def pages_via_vision(
+def pages_via_vision_results(
     pdf_bytes: bytes,
     page_indices: Iterable[int],
     provider: str = "openai",
-) -> dict[int, str]:
+) -> dict[int, OcrPageResult]:
     """Run vision OCR on the given 0-based page indices.
 
     ``provider`` selects the backend:
@@ -336,6 +444,8 @@ def pages_via_vision(
         log.warning("vision OCR requested but pypdfium2 is not installed")
         return {}
 
+    mode = "handwriting" if provider == "openai_handwriting" else "standard"
+
     if provider == "mathpix":
         if not (settings.mathpix_app_id and settings.mathpix_app_key):
             log.warning("Mathpix OCR requested but MATHPIX_APP_ID/KEY not set")
@@ -343,14 +453,20 @@ def pages_via_vision(
         extract = lambda png: _mathpix_extract(  # noqa: E731
             settings.mathpix_app_id, settings.mathpix_app_key, png
         )
-    elif provider == "openai":
+    elif provider in ("openai", "openai_handwriting"):
+        if provider == "openai_handwriting" and not getattr(
+            settings, "handwriting_ocr_enabled", True
+        ):
+            log.debug("handwriting OCR mode disabled by flag; using standard OpenAI OCR")
+            provider = "openai"
+            mode = "standard"
         OpenAI = _try_import_openai()
         if OpenAI is None:
             log.warning("vision OCR requested but openai SDK is not installed")
             return {}
         openai_client = OpenAI(api_key=settings.openai_api_key)
         extract = lambda png: _vision_extract(  # noqa: E731
-            openai_client, settings.vision_ocr_model, png
+            openai_client, settings.vision_ocr_model, png, mode=mode
         )
     else:
         log.warning("unknown OCR provider %r — skipping", provider)
@@ -372,18 +488,49 @@ def pages_via_vision(
     render_dpi = (
         getattr(settings, "vision_ocr_mathpix_dpi", settings.vision_ocr_render_dpi)
         if provider == "mathpix"
+        else getattr(
+            settings, "vision_ocr_handwriting_dpi", settings.vision_ocr_render_dpi
+        )
+        if provider == "openai_handwriting"
         else settings.vision_ocr_render_dpi
     )
 
-    out: dict[int, str] = {}
+    out: dict[int, OcrPageResult] = {}
     for idx in indices:
         png = _render_page_to_png(pdfium, pdf_bytes, idx, render_dpi)
         if not png:
             continue
+        if mode == "handwriting":
+            png = _preprocess_handwriting_image(png)
         text = extract(png)
         if text and text.strip():
-            out[idx] = text.strip()
+            stripped = text.strip()
+            confidence, needs_review, unclear_count = _estimate_ocr_confidence(
+                stripped, mode=mode
+            )
+            out[idx] = OcrPageResult(
+                text=stripped,
+                provider=provider,
+                mode=mode,
+                confidence=confidence,
+                needs_review=needs_review,
+                unclear_count=unclear_count,
+            )
     return out
+
+
+def pages_via_vision(
+    pdf_bytes: bytes,
+    page_indices: Iterable[int],
+    provider: str = "openai",
+) -> dict[int, str]:
+    """Backward-compatible wrapper returning only Markdown text."""
+    return {
+        idx: result.text
+        for idx, result in pages_via_vision_results(
+            pdf_bytes, page_indices, provider=provider
+        ).items()
+    }
 
 
 def _looks_structurally_garbled(text: str) -> bool:
@@ -554,6 +701,56 @@ def select_pages_needing_ocr(
     return sorted(bad)
 
 
+_HANDWRITING_NAME_HINTS = (
+    "handwritten",
+    "handwriting",
+    "handschrift",
+    "handschriftlich",
+    "mitschrift",
+    "notizen",
+    "notes",
+    "scan",
+    "scanned",
+)
+
+
+def select_handwriting_candidates(
+    file_name: str,
+    pages: list[str],
+    bad_idx: Iterable[int],
+    pdf_bytes: bytes | None = None,
+) -> list[int]:
+    """Pick OCR pages that should use the handwriting prompt/preprocess path.
+
+    This is conservative and only considers pages already selected for OCR.
+    Filename hints win. Without a filename hint, we pick sparse or empty pages
+    with visible ink and little equation density; dense formula pages are left
+    for the normal OpenAI/Mathpix path.
+    """
+    indices = [i for i in bad_idx if 0 <= i < len(pages)]
+    if not indices:
+        return []
+
+    name = (file_name or "").lower()
+    if any(hint in name for hint in _HANDWRITING_NAME_HINTS):
+        return sorted(indices)
+
+    candidates: list[int] = []
+    for idx in indices:
+        text = pages[idx] or ""
+        letters = sum(1 for c in text if c.isalpha())
+        if letters < _OCR_SPARSE_LETTERS and text.count("=") < 4:
+            candidates.append(idx)
+
+    if not candidates:
+        return []
+    if pdf_bytes is None:
+        return sorted(candidates)
+
+    ink = _page_ink_coverage(pdf_bytes, candidates)
+    return sorted(i for i in candidates if ink.get(i, 0.0) > _OCR_INK_DENSE_PCT)
+
+
 # Filename markers for the German/English "formula sheet" genre. A doc whose
 # name matches is routed to Mathpix under ``formulasheet_only`` even when its
 # pdfminer text is empty (scanned) — the filename is the only signal we get
@@ -629,4 +826,11 @@ def choose_ocr_provider(file_name: str, pages: list[str], bad_idx: list[int]) ->
     return "openai"
 
 
-__all__ = ("pages_via_vision", "select_pages_needing_ocr", "choose_ocr_provider")
+__all__ = (
+    "OcrPageResult",
+    "choose_ocr_provider",
+    "pages_via_vision",
+    "pages_via_vision_results",
+    "select_handwriting_candidates",
+    "select_pages_needing_ocr",
+)

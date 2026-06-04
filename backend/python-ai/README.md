@@ -96,6 +96,12 @@ $env:OPENAI_API_KEY = "sk-..."
 pytest backend/python-ai/tests/test_vision_ocr_eval.py -v -s
 ```
 
+OCR indexing is still gated by `MINALLO_VISION_OCR_ENABLED=false` by default.
+When enabled, sparse/scanned pages use OpenAI vision, formula-sheet pages can
+route to Mathpix via `MINALLO_MATHPIX_ROUTING`, and likely handwritten pages use
+the `openai_handwriting` path with higher DPI rendering, image preprocessing,
+page-level confidence, and `ocr_needs_review` flags for a correction workflow.
+
 ## Docker
 
 ```bash

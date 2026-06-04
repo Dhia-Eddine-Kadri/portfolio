@@ -26,7 +26,9 @@ class _FakeSettings:
     vision_ocr_model = "gpt-test-vision"
     vision_ocr_max_pages = 20
     vision_ocr_render_dpi = 150
+    vision_ocr_handwriting_dpi = 220
     vision_ocr_mathpix_dpi = 300
+    handwriting_ocr_enabled = True
     openai_api_key = "test"
     # Mathpix routing defaults — overridden per-test below.
     mathpix_routing = "off"
@@ -37,6 +39,8 @@ class _FakeSettings:
 from app.services.vision_ocr import (  # noqa: E402
     choose_ocr_provider,
     pages_via_vision,
+    pages_via_vision_results,
+    select_handwriting_candidates,
     select_pages_needing_ocr,
 )
 
@@ -352,6 +356,40 @@ def test_image_aware_path_does_not_use_garble_heuristic() -> None:
         assert vision_ocr.select_pages_needing_ocr([solution], b"%PDF") == []
 
 
+# ── handwriting OCR selection + confidence ─────────────────────────────────
+
+
+def test_handwriting_candidates_match_filename_hint() -> None:
+    pages = [_page(1200), "", _page(1200)]
+    assert select_handwriting_candidates("Mitschrift_Notizen.pdf", pages, [1]) == [1]
+
+
+def test_handwriting_candidates_use_sparse_inkdense_pages() -> None:
+    from app.services import vision_ocr
+
+    pages = [_page(1200), _page(120), "a = b = c = d = e = f"]
+    with patch.object(
+        vision_ocr, "_page_ink_coverage", lambda b, idx: {1: 4.0, 2: 5.0}
+    ):
+        # Page 1 is sparse + ink-dense. Page 2 is equation-dense and should
+        # stay eligible for the standard/Mathpix formula path.
+        assert select_handwriting_candidates(
+            "lecture.pdf", pages, [1, 2], b"%PDF"
+        ) == [1]
+
+
+def test_handwriting_confidence_flags_review_for_unclear_text() -> None:
+    from app.services.vision_ocr import _estimate_ocr_confidence
+
+    confidence, needs_review, unclear = _estimate_ocr_confidence(
+        "Given: F = [unclear]\n$$ M = F \\cdot l $$",
+        mode="handwriting",
+    )
+    assert confidence < 0.78
+    assert needs_review is True
+    assert unclear == 1
+
+
 # ── choose_ocr_provider (Mathpix routing) ──────────────────────────────────
 
 
@@ -578,3 +616,40 @@ def test_openai_renders_at_default_dpi() -> None:
         pages_via_vision(b"%PDF-fake", [0], provider="openai")
 
     assert captured["dpi"] == 150
+
+
+def test_handwriting_renders_at_handwriting_dpi_and_returns_metadata() -> None:
+    class S(_FakeSettings):
+        vision_ocr_enabled = True
+        vision_ocr_render_dpi = 150
+        vision_ocr_handwriting_dpi = 240
+
+    captured: dict[str, object] = {}
+
+    def fake_render(_pdfium, _pdf_bytes, _idx, dpi):
+        captured["dpi"] = dpi
+        return b"PNG"
+
+    def fake_extract(_client, _model, _png, *, mode="standard"):
+        captured["mode"] = mode
+        return "Given F = 12 N\n[unclear]"
+
+    with patch("app.services.vision_ocr.get_settings", lambda: S()), \
+         patch("app.services.vision_ocr._try_import_pypdfium2", lambda: object()), \
+         patch(
+             "app.services.vision_ocr._try_import_openai",
+             lambda: (lambda **kw: object()),
+         ), \
+         patch("app.services.vision_ocr._render_page_to_png", fake_render), \
+         patch("app.services.vision_ocr._preprocess_handwriting_image", lambda b: b), \
+         patch("app.services.vision_ocr._vision_extract", fake_extract):
+        result = pages_via_vision_results(
+            b"%PDF-fake", [0], provider="openai_handwriting"
+        )
+
+    assert captured["dpi"] == 240
+    assert captured["mode"] == "handwriting"
+    assert result[0].provider == "openai_handwriting"
+    assert result[0].mode == "handwriting"
+    assert result[0].needs_review is True
+    assert result[0].unclear_count == 1

@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     vision_ocr_model: str = Field("gpt-4o-mini", alias="MINALLO_VISION_OCR_MODEL")
     vision_ocr_max_pages: int = Field(20, alias="MINALLO_VISION_OCR_MAX_PAGES")
     vision_ocr_render_dpi: int = Field(150, alias="MINALLO_VISION_OCR_DPI")
+    # Handwritten notes need a little more raster detail than printed pages,
+    # but usually not the full Mathpix/formula-sheet DPI.
+    vision_ocr_handwriting_dpi: int = Field(
+        220, alias="MINALLO_VISION_OCR_HANDWRITING_DPI"
+    )
+    # Kept under the main vision OCR gate; this only chooses the handwriting
+    # prompt/preprocess path for likely handwritten pages.
+    handwriting_ocr_enabled: bool = Field(True, alias="MINALLO_HANDWRITING_OCR_ENABLED")
     # Formula pages need finer rendering — subscripts, indices and the
     # numerator/denominator of small fractions blur at 150 DPI. Mathpix
     # (the formula path) renders at this higher DPI; the OpenAI path keeps

@@ -101,10 +101,12 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         ocr_pages_run = 0
         ocr_pages_recovered = 0
         ocr_provider = "openai"
+        ocr_page_metadata: dict[int, dict[str, Any]] = {}
         try:
             from .vision_ocr import (  # noqa: WPS433
                 choose_ocr_provider,
-                pages_via_vision,
+                pages_via_vision_results,
+                select_handwriting_candidates,
                 select_pages_needing_ocr,
             )
             # Pass pdf_bytes so the selector can use the image-aware path:
@@ -112,12 +114,17 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
             # read) are flagged by rendered ink coverage, not just letter count.
             bad_idx = select_pages_needing_ocr(pages, pdf_bytes)
             if bad_idx:
+                handwriting_idx = select_handwriting_candidates(
+                    doc.get("file_name") or "", pages, bad_idx, pdf_bytes
+                )
+                handwriting_set = set(handwriting_idx)
+                normal_idx = [idx for idx in bad_idx if idx not in handwriting_set]
                 # Phase A: route formula-dense pages to Mathpix when
                 # MINALLO_MATHPIX_ROUTING enables it (off → always OpenAI).
                 # Provider choice sees the full bad-page set for the best
                 # formula-density signal.
                 ocr_provider = choose_ocr_provider(
-                    doc.get("file_name") or "", pages, bad_idx
+                    doc.get("file_name") or "", pages, normal_idx
                 )
                 # pages_via_vision caps the batch at vision_ocr_max_pages.
                 # Mirror that cap here so ocr_pages_run counts what was
@@ -127,26 +134,60 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
                 from ..config import get_settings  # noqa: WPS433
 
                 max_ocr_pages = get_settings().vision_ocr_max_pages
-                attempt_idx = bad_idx[:max_ocr_pages]
+                attempt_idx = [*handwriting_idx, *normal_idx][:max_ocr_pages]
                 if len(bad_idx) > len(attempt_idx):
                     log.info(
                         "indexing.ocr_capped document_id=%s bad_pages=%d cap=%d",
                         document_id, len(bad_idx), max_ocr_pages,
                     )
                 ocr_pages_run = len(attempt_idx)
-                ocr_results = pages_via_vision(pdf_bytes, attempt_idx, provider=ocr_provider)
+                handwriting_attempt = [
+                    idx for idx in attempt_idx if idx in handwriting_set
+                ]
+                normal_attempt = [
+                    idx for idx in attempt_idx if idx not in handwriting_set
+                ]
+                ocr_results = {}
+                if handwriting_attempt:
+                    ocr_results.update(
+                        pages_via_vision_results(
+                            pdf_bytes,
+                            handwriting_attempt,
+                            provider="openai_handwriting",
+                        )
+                    )
+                if normal_attempt:
+                    ocr_results.update(
+                        pages_via_vision_results(
+                            pdf_bytes,
+                            normal_attempt,
+                            provider=ocr_provider,
+                        )
+                    )
                 # Don't blindly trust OCR: only overwrite the page when the
                 # OCR text scores at least as well as the pdfminer original.
                 # A page that scores lower (mostly [unclear], blurred render)
                 # keeps its original text and is NOT counted as recovered.
-                for idx, text in ocr_results.items():
-                    if 0 <= idx < len(pages) and prefer_ocr_text(pages[idx], text):
-                        pages[idx] = text
+                for idx, result in ocr_results.items():
+                    if (
+                        0 <= idx < len(pages)
+                        and prefer_ocr_text(pages[idx], result.text)
+                    ):
+                        pages[idx] = result.text
+                        ocr_page_metadata[idx] = {
+                            "ocr_provider": result.provider,
+                            "ocr_mode": result.mode,
+                            "ocr_confidence": result.confidence,
+                            "ocr_needs_review": result.needs_review,
+                            "ocr_unclear_count": result.unclear_count,
+                        }
                         ocr_pages_recovered += 1
                 if ocr_pages_recovered:
                     log.info(
-                        "vision OCR via %s recovered %d/%d bad pages",
-                        ocr_provider, ocr_pages_recovered, ocr_pages_run,
+                        "vision OCR recovered %d/%d bad pages "
+                        "(provider=%s handwriting_pages=%d)",
+                        ocr_pages_recovered, ocr_pages_run, ocr_provider,
+                        len(handwriting_attempt),
                     )
         except Exception:  # noqa: BLE001
             log.exception("vision OCR pass failed — continuing with pdfminer text only")
@@ -178,6 +219,7 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         _replace_pages(
             sb, document_id, user_id, course_id, pages, page_md,
             raw_pages=pdfminer_pages, page_blocks=page_blocks,
+            ocr_page_metadata=ocr_page_metadata,
         )
 
         # Pass the already-built PageMarkdown rather than the raw pdfminer
@@ -404,6 +446,7 @@ def _replace_pages(
     page_md: list[PageMarkdown] | None = None,
     raw_pages: list[str] | None = None,
     page_blocks: list[list[TextBlock]] | None = None,
+    ocr_page_metadata: dict[int, dict[str, Any]] | None = None,
 ) -> None:
     sb.table("document_pages").delete().eq("document_id", document_id).execute()
     md_by_page = {p.page_number: p for p in (page_md or [])}
@@ -435,6 +478,8 @@ def _replace_pages(
         # These align with raw_text; a page OCR'd from an image has none.
         if page_blocks is not None and idx < len(page_blocks) and page_blocks[idx]:
             row["text_blocks"] = [b.to_json() for b in page_blocks[idx]]
+        if ocr_page_metadata and idx in ocr_page_metadata:
+            row.update(ocr_page_metadata[idx])
         rows.append(row)
     if not rows:
         return
@@ -446,14 +491,25 @@ def _replace_pages(
         # Deploy-order safety: if the text_blocks column isn't present yet
         # (migration 20260604_000001 not applied), retry without it so
         # indexing still succeeds — bbox data is additive, not required.
-        if "text_blocks" not in str(exc):
+        optional_page_cols = {
+            "text_blocks",
+            "ocr_provider",
+            "ocr_mode",
+            "ocr_confidence",
+            "ocr_needs_review",
+            "ocr_unclear_count",
+        }
+        if not any(col in str(exc) for col in optional_page_cols):
             raise
         log.warning(
-            "document_pages.text_blocks column missing; inserting pages without "
-            "bbox blocks (apply migration 20260604_000001_page_text_blocks)"
+            "document_pages optional OCR/text-block columns missing; inserting "
+            "pages without additive metadata"
         )
         sb.table("document_pages").delete().eq("document_id", document_id).execute()
-        stripped = [{k: v for k, v in r.items() if k != "text_blocks"} for r in rows]
+        stripped = [
+            {k: v for k, v in r.items() if k not in optional_page_cols}
+            for r in rows
+        ]
         for start in range(0, len(stripped), 100):
             sb.table("document_pages").insert(stripped[start:start + 100]).execute()
 
