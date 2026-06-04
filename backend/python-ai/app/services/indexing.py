@@ -35,7 +35,7 @@ from .document_intelligence import (
     rollup_extraction_quality,
 )
 from .embeddings import embed_texts
-from .extraction import extract_pages_text
+from .extraction import TextBlock, extract_pages_with_blocks
 from .markdown_indexing import PageMarkdown, page_to_markdown
 from .storage import download_document_bytes
 from .topic_extraction import extract_topics, topic_extraction_summary
@@ -84,7 +84,11 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         ):
             return _status_payload(doc)
 
-        pages = extract_pages_text(pdf_bytes)
+        # One pdfminer pass yields both the page text and the per-block bbox
+        # coordinates (text-layer pages only). page_blocks aligns by page index
+        # and reflects the pdfminer text layer, so it corresponds to raw_text
+        # even when a page's cleaned_text is later replaced by OCR.
+        pages, page_blocks = extract_pages_with_blocks(pdf_bytes)
         # Keep the untouched pdfminer text so we can (a) store it as raw_text
         # for debugging and (b) score it against any OCR result before
         # deciding to overwrite the page.
@@ -173,7 +177,7 @@ def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:
         page_md = [page_to_markdown(text, idx + 1) for idx, text in enumerate(pages)]
         _replace_pages(
             sb, document_id, user_id, course_id, pages, page_md,
-            raw_pages=pdfminer_pages,
+            raw_pages=pdfminer_pages, page_blocks=page_blocks,
         )
 
         # Pass the already-built PageMarkdown rather than the raw pdfminer
@@ -399,6 +403,7 @@ def _replace_pages(
     pages: list[str],
     page_md: list[PageMarkdown] | None = None,
     raw_pages: list[str] | None = None,
+    page_blocks: list[list[TextBlock]] | None = None,
 ) -> None:
     sb.table("document_pages").delete().eq("document_id", document_id).execute()
     md_by_page = {p.page_number: p for p in (page_md or [])}
@@ -426,11 +431,31 @@ def _replace_pages(
         if md is not None:
             row["cleaned_markdown"] = md.markdown
             row["extraction_quality"] = md.quality
+        # Text-layer bbox coordinates (top-left normalised), when present.
+        # These align with raw_text; a page OCR'd from an image has none.
+        if page_blocks is not None and idx < len(page_blocks) and page_blocks[idx]:
+            row["text_blocks"] = [b.to_json() for b in page_blocks[idx]]
         rows.append(row)
-    if rows:
-        # Insert in batches to keep payload size sane on long PDFs.
+    if not rows:
+        return
+    # Insert in batches to keep payload size sane on long PDFs.
+    try:
         for start in range(0, len(rows), 100):
             sb.table("document_pages").insert(rows[start:start + 100]).execute()
+    except Exception as exc:  # noqa: BLE001
+        # Deploy-order safety: if the text_blocks column isn't present yet
+        # (migration 20260604_000001 not applied), retry without it so
+        # indexing still succeeds — bbox data is additive, not required.
+        if "text_blocks" not in str(exc):
+            raise
+        log.warning(
+            "document_pages.text_blocks column missing; inserting pages without "
+            "bbox blocks (apply migration 20260604_000001_page_text_blocks)"
+        )
+        sb.table("document_pages").delete().eq("document_id", document_id).execute()
+        stripped = [{k: v for k, v in r.items() if k != "text_blocks"} for r in rows]
+        for start in range(0, len(stripped), 100):
+            sb.table("document_pages").insert(stripped[start:start + 100]).execute()
 
 
 def _replace_chunks(
