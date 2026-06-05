@@ -26,6 +26,7 @@ interface PyCheatsheetResponse {
   groundedSources?: unknown[];
   settings?: unknown;
   grounding?: unknown;
+  quality?: unknown;
   warning?: string;
   citationWarning?: string;
   error?: string;

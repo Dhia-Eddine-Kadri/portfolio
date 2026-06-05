@@ -394,6 +394,17 @@ export interface CheatsheetResult {
   groundedSources?: Array<{ fileName?: string; pageStart?: number | null }>;
   settings?: CheatsheetResolvedSettings;
   grounding?: { total: number; grounded: number; ratio: number | null };
+  quality?: {
+    evidenceNormalization?: {
+      chunks_in?: number;
+      chunks_out?: number;
+      repaired_chunks?: number;
+      dropped_chunks?: number;
+      dropped_formula_lines?: number;
+    };
+    droppedMalformedFormulas?: number;
+    droppedUnsupportedFormulas?: number;
+  };
   warning?: string;
   citationWarning?: string;
   error?: string;

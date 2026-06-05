@@ -13,6 +13,7 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "stub")
 os.environ.setdefault("OPENAI_API_KEY", "stub")
 
 from app.services import cheatsheet as cs  # noqa: E402
+from app.services import cheatsheet_quality as cq  # noqa: E402
 
 
 # ── topic selection ─────────────────────────────────────────────────────────
@@ -32,6 +33,26 @@ def test_topic_names_uses_map_capped():
 
 def test_topic_names_empty_map():
     assert cs._topic_names([], None) == [None]
+
+
+def test_topic_names_merge_german_english_mechanics_duplicates():
+    tm = [
+        {"name": "Dynamik von K\u00c3\u00b6rpersystemen"},
+        {"name": "Dynamics of Systems of Point Masses"},
+        {"name": "Kinematik"},
+    ]
+    out = cs._topic_names(tm, None)
+    assert out == ["Kinematik eines Punktes", "Dynamik von Punktsystemen"]
+
+
+def test_topic_focus_is_canonicalized_for_mechanics():
+    assert cs._topic_names([], "projectile motion") == ["Wurfbewegung"]
+
+
+def test_topic_query_keeps_aliases_for_retrieval():
+    query = cs._topic_query("Dynamik von Punktsystemen")
+    assert "systems of point masses" in query
+    assert "Dynamik von Punktsystemen" in query
 
 
 # ── sanitizer (Stage 4) ──────────────────────────────────────────────────────
@@ -87,6 +108,43 @@ def test_sanitize_trims_dangling_truncated_formula():
     assert "F = m a" not in out
 
 
+def test_math_normalization_repairs_mojibake_symbols_and_units():
+    assert cq.repair_mojibake("1extJ = 1extNm") == "1 J = 1 N\u00b7m"
+    assert cq.formula_to_latexish("\u00ce\u00bc\u00e2\u201a\u201a N") == r"\mu_2 N"
+    assert cq.formula_to_latexish("v = \u00e2\u02c6\u00ab a(t)dt") == r"v = \int a(t)dt"
+
+
+def test_formula_corruption_rejects_placeholders_and_garbage():
+    assert "fake-citation-placeholder" in cq.formula_corruption_reasons("(filename, p.N)")
+    assert "ocr-garbage" in cq.formula_corruption_reasons("\u00ce\u00b8=90 e xto")
+    assert cq.normalize_formula_text("1extJ = 1extNm") is not None
+
+
+def test_sanitize_normalizes_output_formula_mojibake():
+    out, dropped = cs.sanitize_cheatsheet_markdown("$$F = \u00ce\u00bcm\u00e2\u201a\u20ac N$$")
+    assert dropped == 0
+    assert r"\mu" in out
+    assert "\u00ce\u00bc" not in out
+    assert "\u00e2\u201a\u20ac" not in out
+
+
+def test_evidence_normalization_drops_corrupt_formula_lines():
+    chunks = [
+        {
+            "chunkId": "c1",
+            "documentId": "d1",
+            "pageStart": 2,
+            "text": "good line\n\u00ce\u00b8=90 e xto\n1extJ = 1extNm",
+        }
+    ]
+    out, stats = cq.normalize_evidence_chunks(chunks)
+    assert len(out) == 1
+    assert "good line" in out[0]["text"]
+    assert "e xto" not in out[0]["text"]
+    assert "1 J = 1 N\u00b7m" in out[0]["text"]
+    assert stats.dropped_formula_lines == 1
+
+
 # ── settings (Stage 3) ───────────────────────────────────────────────────────
 
 
@@ -128,6 +186,37 @@ def test_settings_maxtopics_scales_with_pages():
     assert 4 <= one <= 20 and 4 <= four <= 20
 
 
+# ── per-PDF dedup ────────────────────────────────────────────────────────────
+
+
+def test_dedup_removes_exact_repeat_keeps_first():
+    md = "## A.pdf\n$$E = m c^2$$\n## B.pdf\n$$E = m c^2$$"
+    out, removed = cs.dedup_display_formulas(md)
+    assert removed == 1
+    assert out.count("E = m c^2") == 1          # only the first survives
+    assert "see above" in out                    # later one marked
+
+
+def test_dedup_ignores_whitespace_differences():
+    md = "$$F=ma$$\n$$F = m a$$"
+    out, removed = cs.dedup_display_formulas(md)
+    assert removed == 1
+
+
+def test_dedup_keeps_distinct_formulas():
+    md = "$$a^2+b^2=c^2$$\n$$E=mc^2$$"
+    out, removed = cs.dedup_display_formulas(md)
+    assert removed == 0
+
+
+def test_dedup_trims_emptied_bullet():
+    md = "$$x=1$$\n- $$x=1$$"
+    out, removed = cs.dedup_display_formulas(md)
+    assert removed == 1
+    # the bullet that held only the duplicate is gone
+    assert "\n- \n" not in out and not out.rstrip().endswith("-")
+
+
 # ── grounding (Stage 2) ──────────────────────────────────────────────────────
 
 
@@ -159,6 +248,27 @@ def test_grounding_single_symbol_not_penalized():
     # No multi-char token to disprove → treated as grounded (no false alarm).
     g = cs.formula_grounding("$$x$$", [{"text": "nothing relevant"}])
     assert g["grounded"] == 1
+
+
+def test_source_gate_drops_unsupported_display_formula():
+    text = "$$\\zeta_{xyz} = \\alpha_{qrs} + \\beta_{tuv}$$"
+    out, removed = cs.drop_unsupported_display_formulas(
+        text,
+        [{"text": "course source only has F = m a"}],
+    )
+    assert removed == 1
+    assert "\\zeta" not in out
+    assert "not supported" in out
+
+
+def test_source_gate_keeps_supported_display_formula():
+    text = "$$E_{kin} = \\frac{1}{2} m v^2$$"
+    out, removed = cs.drop_unsupported_display_formulas(
+        text,
+        [{"text": "The source states E_kin and m and v for kinetic energy."}],
+    )
+    assert removed == 0
+    assert "E_{kin}" in out
 
 
 # ── generation ──────────────────────────────────────────────────────────────

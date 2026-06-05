@@ -499,6 +499,59 @@
     }).catch(function () { /* non-fatal: saved list is additive */ });
   }
 
+  // Source picker — pick which indexed PDFs to build the cheatsheet from.
+  // All files start checked (one click = whole course); selecting a small
+  // subset triggers the backend's per-PDF sectioned + deduped mode.
+  function _showSourcePicker(docs, onConfirm) {
+    var existing = document.getElementById('csSourcePickerOverlay');
+    if (existing) existing.remove();
+    var items = docs.map(function (d) {
+      return '<label class="cs-sp-item">' +
+        '<input type="checkbox" class="cs-sp-cb" value="' + _esc(d.id) + '" checked>' +
+        '<span class="cs-sp-name">' + _esc(d.file_name || 'Untitled') + '</span>' +
+      '</label>';
+    }).join('');
+    var ov = document.createElement('div');
+    ov.id = 'csSourcePickerOverlay';
+    ov.className = 'cs-sp-overlay';
+    ov.innerHTML =
+      '<div class="cs-sp-modal">' +
+        '<div class="cs-sp-head"><span class="cs-sp-title">Choose source PDFs</span>' +
+          '<button class="cs-sp-close" type="button" aria-label="Close">&times;</button></div>' +
+        '<p class="cs-sp-sub">All files are selected by default. Pick a few PDFs to scope the sheet — each gets its own section and repeats are removed.</p>' +
+        '<div class="cs-sp-list">' + items + '</div>' +
+        '<div class="cs-sp-actions">' +
+          '<button class="cs-sp-ghost" id="csSpAll" type="button">Select all</button>' +
+          '<button class="cs-sp-ghost" id="csSpClear" type="button">Clear</button>' +
+          '<button class="cs-sp-primary" id="csSpConfirm" type="button">Generate from selected</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); }
+    ov.querySelector('.cs-sp-close').onclick = close;
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('#csSpAll').onclick = function () {
+      ov.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = true; });
+    };
+    ov.querySelector('#csSpClear').onclick = function () {
+      ov.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = false; });
+    };
+    ov.querySelector('#csSpConfirm').onclick = function () {
+      var ids = [];
+      ov.querySelectorAll('.cs-sp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+      if (!ids.length) {
+        if (window.showToast) window.showToast('No files selected', 'Select at least one PDF.');
+        return;
+      }
+      close();
+      // Small selection (incl. a small all-checked course) → pass ids so the
+      // backend runs per-PDF mode (≤5 docs). A large all-checked selection →
+      // null = whole-course topic sheet (also avoids the proxy's 25-doc cap).
+      var allChecked = ids.length === docs.length;
+      onConfirm(allChecked && ids.length > 5 ? null : ids);
+    };
+  }
+
   window.mountCheatsheet = function (target, course) {
     if (!target) return;
     target.innerHTML = _HTML;
@@ -556,18 +609,17 @@
 
     _aiService().then(function (svc) { _loadSaved(svc, els, courseId); });
 
-    els.gen.addEventListener('click', function () {
-      if (!courseId) return;
+    function doGenerate(documentIds) {
       var topic = ((els.topic && els.topic.value) || '').trim();
       var settings = _readSettings();
       els.gen.disabled = true;
-      var progress;
       els.result.innerHTML = '<div class="cs-msg cs-loading">Generating cheatsheet… this can take a moment.</div>';
-      progress = _startBuildSteps(els, topic);
+      var progress = _startBuildSteps(els, topic);
       _aiService()
         .then(function (svc) {
           var opts = { settings: settings };
           if (topic) opts.topic = topic;
+          if (documentIds && documentIds.length) opts.documentIds = documentIds;
           return svc.generateCheatsheet(courseId, opts).then(function (res) {
             els.gen.disabled = false;
             progress.stop();
@@ -582,6 +634,26 @@
           progress.stop();
           els.result.innerHTML =
             '<div class="cs-msg cs-error">' + _esc(err && err.message ? err.message : 'Cheatsheet failed. Please try again.') + '</div>';
+        });
+    }
+
+    els.gen.addEventListener('click', function () {
+      if (!courseId) return;
+      els.gen.disabled = true;
+      _aiService()
+        .then(function (svc) { return svc.listCourseDocuments(courseId); })
+        .then(function (docs) {
+          els.gen.disabled = false;
+          var ready = (docs || []).filter(function (d) { return d.processing_status === 'ready'; });
+          if (!ready.length) {
+            els.result.innerHTML = '<div class="cs-msg">No indexed files yet — upload and index a PDF first.</div>';
+            return;
+          }
+          _showSourcePicker(ready, function (documentIds) { doGenerate(documentIds); });
+        })
+        .catch(function () {
+          els.gen.disabled = false;
+          els.result.innerHTML = '<div class="cs-msg cs-error">Could not load your files. Please try again.</div>';
         });
     });
   };

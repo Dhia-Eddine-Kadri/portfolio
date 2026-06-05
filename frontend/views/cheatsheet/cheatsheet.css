@@ -246,6 +246,57 @@
 @media (max-width: 820px)  { .cs-paper-body { column-count: 2; } }
 @media (max-width: 560px)  { .cs-paper-body { column-count: 1; } }
 
+/* Source picker (choose which PDFs to build from) */
+.cs-sp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 20px;
+}
+.cs-sp-modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #0f172a);
+  border: 1px solid var(--border, #1e293b);
+  border-radius: 12px;
+  padding: 18px;
+}
+.cs-sp-head { display: flex; align-items: center; justify-content: space-between; }
+.cs-sp-title { font-weight: 700; font-size: 1rem; }
+.cs-sp-close {
+  background: transparent; border: 0; color: var(--text, #e2e8f0);
+  font-size: 1.4rem; line-height: 1; cursor: pointer; opacity: 0.7;
+}
+.cs-sp-close:hover { opacity: 1; }
+.cs-sp-sub { margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
+.cs-sp-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cs-sp-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  background: var(--card-inner, rgba(255, 255, 255, 0.04));
+}
+.cs-sp-item:hover { background: rgba(255, 255, 255, 0.08); }
+.cs-sp-cb { width: 16px; height: 16px; flex: 0 0 auto; }
+.cs-sp-name { font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-sp-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.cs-sp-ghost {
+  padding: 7px 12px; border-radius: 8px; font-size: 0.82rem; cursor: pointer;
+  border: 1px solid var(--border, #334155); background: transparent; color: var(--text, #e2e8f0);
+}
+.cs-sp-ghost:hover { background: rgba(255, 255, 255, 0.07); }
+.cs-sp-primary {
+  margin-left: auto; padding: 8px 16px; border-radius: 8px; border: 0;
+  background: #6366f1; color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+}
+.cs-sp-primary:hover { background: #5457e6; }
+
 /* Saved cheatsheets */
 .cs-saved-wrap { margin-bottom: 18px; }
 .cs-saved-head {
