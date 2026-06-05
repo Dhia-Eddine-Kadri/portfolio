@@ -200,6 +200,11 @@ _MECHANICS_FORMULA_BANK: dict[str, tuple[str, ...]] = {
         r"a = \frac{dv}{dt}",
         r"v(t) = v_0 + \int a(t)\,dt",
     ),
+    "Kartesische Koordinaten": (
+        r"\vec r = x\,\vec e_x + y\,\vec e_y + z\,\vec e_z",
+        r"\vec v = \dot x\,\vec e_x + \dot y\,\vec e_y + \dot z\,\vec e_z",
+        r"\vec a = \ddot x\,\vec e_x + \ddot y\,\vec e_y + \ddot z\,\vec e_z",
+    ),
     "Geradlinige Bewegung": (
         r"x = x_0 + v_0 t + \frac{1}{2} a t^2",
         r"v^2 = v_0^2 + 2 a (x - x_0)",
@@ -210,6 +215,7 @@ _MECHANICS_FORMULA_BANK: dict[str, tuple[str, ...]] = {
         r"h_{max} = \frac{v_0^2\sin^2\alpha}{2g}",
     ),
     "Polarkoordinaten": (
+        r"\vec r = r\,\vec e_r",
         r"\vec v = \dot r\,\vec e_r + r\dot\varphi\,\vec e_\varphi",
         r"\vec a = (\ddot r-r\dot\varphi^2)\vec e_r + (r\ddot\varphi+2\dot r\dot\varphi)\vec e_\varphi",
     ),
@@ -220,6 +226,10 @@ _MECHANICS_FORMULA_BANK: dict[str, tuple[str, ...]] = {
     "Dynamik von Punktmassen": (
         r"\sum \vec F = m\vec a",
         r"\vec G = m\vec g",
+        r"m\ddot x = \sum F_x",
+        r"m\ddot y = \sum F_y",
+        r"m\ddot s = \sum F_t",
+        r"m\frac{v^2}{\rho} = \sum F_n",
     ),
     "Reibung und Widerstand": (
         r"|H| \le \mu_0 N",
@@ -533,13 +543,15 @@ _PRESET_SECTION_FORMAT = {
     # Formula Reference — densest mode: maximum formulas, minimum prose.
     "formula_reference": (
         "\n\nFORMULA REFERENCE FORMAT — OVERRIDES the section shape. The DENSEST mode: "
-        "maximum formulas, minimum words. Each `## <name>` section:\n"
-        "- **Main formulas:** core + derived formulas, each on its own line.\n"
+        "maximum formulas, minimum words (aim ≥75% formulas/variables/conditions, "
+        "≤25% notes). Each `## <name>` section starts IMMEDIATELY with the formulas — "
+        "do NOT write any opening definition or concept sentence:\n"
+        "- the core + derived formulas FIRST, each on its own line as $...$ / $$...$$.\n"
         "- **Variables:** terse `symbol: meaning` for the non-obvious symbols only.\n"
         "- **Conditions:** assumptions in one line.\n"
         "- **Special cases:** simplified formulas, each `$...$ (case)`.\n"
-        "No explanations, no worked examples, no concept sentences. Always prefer one "
-        "more formula over one more sentence."
+        "No explanations, no worked examples, no concept sentences, no Method Picker. "
+        "Always prefer one more formula over one more sentence."
     ),
     # Balanced Study — ~60% formulas, 25% short explanation, 15% traps.
     "balanced": (
@@ -584,9 +596,9 @@ _PRESET_SECTION_FORMAT = {
 # this. Open-book lookup cards and Deep-Revision blocks take more room (fewer per
 # page); Exam Night and Formula Reference are dense (more per page).
 _TOPICS_PER_PAGE = {
-    "exam_night": 12,
+    "exam_night": 10,
     "open_book_exam": 6,
-    "formula_reference": 10,
+    "formula_reference": 8,
     "balanced": 7,
     "deep_revision": 5,
     "topic_mastery": 12,
@@ -1132,12 +1144,15 @@ def _formula_bank_guidance(topics: list[str | None]) -> str:
         if key in seen:
             continue
         seen.add(key)
-        lines.append(f"- {canonical}: " + "; ".join(formulas[:4]))
+        lines.append(f"- {canonical}: " + "; ".join(formulas[:6]))
     if not lines:
         return ""
     return (
-        "\n\nEXPECTED FORMULA PRIORITIES (retrieval/selection guide only; "
-        "include a formula only when the COURSE CONTEXT supports it):\n"
+        "\n\nCANONICAL FORMULAS PER TOPIC — these formulas BELONG to the named topic. "
+        "Put each in THAT section and nowhere else, and prefer them as the core of the "
+        "section when the COURSE CONTEXT supports them (it normally does). Do NOT fill a "
+        "topic with another topic's formulas (e.g. never put constant-acceleration "
+        "formulas under Kartesische Koordinaten):\n"
         + "\n".join(lines)
     )
 
@@ -1324,7 +1339,9 @@ def _spatial_layout_guidance(topics: list[str | None]) -> str:
 def _method_picker_guidance(topics: list[str | None], cfg: dict[str, Any]) -> str:
     selected = {_canonical_mechanics_topic(t) for t in topics if t}
     mechanics_hits = selected.intersection(set(_MECHANICS_TOPIC_ORDER))
-    if not mechanics_hits or cfg.get("preset") == "topic_mastery":
+    # The Method Picker is a method-SELECTION aid — central to Open-book/Exam-night,
+    # but noise in Formula Reference (pure formulas) and Topic Mastery (one topic).
+    if not mechanics_hits or cfg.get("preset") in ("topic_mastery", "formula_reference"):
         return ""
     return (
         "\n\nMETHOD PICKER — ALWAYS make this the FIRST `## Method Picker` section, "
@@ -1767,8 +1784,10 @@ def _generate_sections_parallel(
     if not shards:
         return "", diag
 
+    _mp_preset = str(cfg.get("preset")) not in ("formula_reference", "topic_mastery")
+
     def _expect_mp(idx: int) -> bool:
-        return idx == 0 and not per_pdf
+        return idx == 0 and not per_pdf and _mp_preset
 
     results: list[Any] = [None] * len(shards)
     with ThreadPoolExecutor(max_workers=len(shards)) as pool:

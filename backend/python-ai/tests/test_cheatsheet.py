@@ -74,8 +74,15 @@ def test_trap_guidance_uses_precise_curated_traps():
 def test_formula_bank_guidance_is_source_support_only():
     guidance = cs._formula_bank_guidance(["Kinematik eines Punktes"])
     assert r"v = \frac{dx}{dt}" in guidance
-    assert "include a formula only when the COURSE CONTEXT supports it" in guidance
+    assert "supports them" in guidance  # still gated on source support
     assert cs._formula_bank_guidance(["Unknown topic"]) == ""
+
+
+def test_formula_bank_anchors_cartesian_coordinates():
+    # Kartesische needs its own formulas so it stops borrowing constant-accel ones
+    guidance = cs._formula_bank_guidance(["Kartesische Koordinaten"])
+    assert r"\vec e_x" in guidance
+    assert "x_0 + v_0 t" not in guidance  # NOT constant-acceleration
 
 
 def test_taxonomy_classifies_and_scores_high_entropy_formula():

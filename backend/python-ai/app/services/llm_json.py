@@ -75,15 +75,17 @@ def _repair_json_backslashes(s: str) -> str:
 
 # Control chars that only appear in a parsed value when JSON decoded an
 # under-escaped LaTeX command (\frac→form-feed, \beta→backspace, \rho→CR).
-# They never legitimately occur in this generated content — newline (\n) and
-# tab (\t, legit in code) are deliberately excluded — so their presence is a
-# reliable signal that the backslash repair is needed.
+# They never legitimately occur in this generated content. Newline (\n) stays
+# excluded — a real line break before a word is common prose — but a TAB GLUED
+# TO A LOWERCASE LETTER is caught below: that is almost always an eaten command
+# (\theta→TAB+heta, \times→TAB+imes, \tau→TAB+au), not a real tab.
 _EATEN_LATEX_CHARS = ("\x0c", "\x08", "\x0b", "\x0d")
+_EATEN_TAB_LATEX_RE = re.compile(r"\t[a-z]")
 
 
 def _has_eaten_latex(obj: Any) -> bool:
     if isinstance(obj, str):
-        return any(c in obj for c in _EATEN_LATEX_CHARS)
+        return any(c in obj for c in _EATEN_LATEX_CHARS) or bool(_EATEN_TAB_LATEX_RE.search(obj))
     if isinstance(obj, dict):
         return any(_has_eaten_latex(v) for v in obj.values())
     if isinstance(obj, list):
