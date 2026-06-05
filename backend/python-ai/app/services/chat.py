@@ -116,6 +116,17 @@ def _build_openai_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def _has_image(messages: list[dict[str, Any]]) -> bool:
+    """True if any message carries an image part (converted to image_url)."""
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "image_url":
+                    return True
+    return False
+
+
 def _last_user_text(messages: list[dict[str, Any]]) -> str:
     """Extract the last user message's text for diagram-intent detection.
     Generic /chat uses Anthropic-shaped content blocks; we concat all text
@@ -164,8 +175,15 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
         else:
             messages = [{"role": "system", "content": overlay}] + messages
 
+    # Cost routing: gpt-4o (~17x mini) is only worth it where it earns its keep —
+    # reading an attached IMAGE (vision) or generating a DIAGRAM/PLOT. Plain-text
+    # general chat goes to the mini model with no meaningful quality loss. Study
+    # answers (answer.py / answer_stream.py) are routed separately and unchanged.
+    needs_strong = _has_image(messages) or diagram_wanted
+    chat_model = "gpt-4o" if needs_strong else settings.openai_generate_model
+
     resp = client.chat.completions.create(
-        model="gpt-4o",
+        model=chat_model,
         max_completion_tokens=max_tokens,
         messages=messages,
     )
