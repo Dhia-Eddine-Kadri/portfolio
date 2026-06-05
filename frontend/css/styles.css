@@ -4104,25 +4104,25 @@ body.pdf-maximized .annotate-popover {
 .qzsp-overlay {
   position: fixed;
   inset: 0;
-  z-index: 900;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(6px);
+  z-index: 4300;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
 }
 .qzsp-modal {
-  background: #1a1330;
-  border: 1px solid rgba(37, 99, 235, 0.35);
-  border-radius: 20px;
-  width: 100%;
-  max-width: 520px;
-  max-height: calc(100vh - 48px);
+  background: var(--card, #0f172a);
+  border: 1px solid var(--border, #1e293b);
+  border-radius: 12px;
+  width: min(640px, calc(100vw - 28px));
+  max-width: min(640px, calc(100vw - 28px));
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
-  padding: 22px 22px 18px;
-  color: rgba(255, 255, 255, 0.9);
+  padding: 18px;
+  color: var(--text, #e2e8f0);
   overflow: hidden;
 }
 .qzsp-head {
@@ -4134,22 +4134,24 @@ body.pdf-maximized .annotate-popover {
 }
 .qzsp-title {
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
+  color: var(--text, #e2e8f0);
 }
 .qzsp-close {
   background: transparent;
   border: 0;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 1rem;
+  color: var(--text, #e2e8f0);
+  opacity: 0.7;
+  font-size: 1.1rem;
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 8px;
 }
-.qzsp-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.qzsp-close:hover { opacity: 1; color: var(--text, #e2e8f0); background: rgba(255,255,255,0.08); }
 .qzsp-sub {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.55);
-  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--muted, #94a3b8);
+  margin: 0 0 12px;
   flex-shrink: 0;
 }
 .qzsp-list {
@@ -4158,56 +4160,63 @@ body.pdf-maximized .annotate-popover {
   gap: 8px;
   flex: 1;
   min-height: 0;
+  max-height: calc(100dvh - 230px);
   overflow-y: auto;
-  padding-right: 6px;
-  margin-bottom: 14px;
+  overflow-x: hidden;
+  padding: 2px 8px 8px 0;
+  margin-bottom: 0;
   scrollbar-width: auto;
-  scrollbar-color: rgba(37,99,235,0.55) rgba(255,255,255,0.06);
+  scrollbar-color: rgba(99, 102, 241, 0.55) rgba(255,255,255,0.04);
 }
 .qzsp-list::-webkit-scrollbar { width: 8px; }
-.qzsp-list::-webkit-scrollbar-thumb { background: rgba(37,99,235,0.55); border-radius: 6px; }
-.qzsp-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 6px; }
+.qzsp-list::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.55); border-radius: 999px; }
+.qzsp-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 999px; }
 .qzsp-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  padding: 12px 14px;
+  gap: 9px;
+  background: var(--card-inner, rgba(255, 255, 255, 0.04));
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
   transition: background 0.1s;
   flex-shrink: 0;
 }
-.qzsp-item:hover { background: rgba(37, 99, 235, 0.1); border-color: rgba(37, 99, 235, 0.3); }
-.qzsp-cb { accent-color: #3b82f6; width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
-.qzsp-name { font-size: 0.84rem; font-weight: 600; }
+.qzsp-item:hover { background: rgba(255, 255, 255, 0.08); border-color: transparent; }
+.qzsp-cb { accent-color: #0ea5e9; width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+.qzsp-name { color: var(--text, #e2e8f0); font-size: 0.86rem; font-weight: 600; }
 .qzsp-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 .qzsp-btn-ghost {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.8rem;
+  background: transparent;
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  color: var(--text, #e2e8f0);
+  font-size: 0.82rem;
   font-weight: 700;
-  padding: 8px 16px;
+  padding: 7px 12px;
   cursor: pointer;
 }
-.qzsp-btn-ghost:hover { background: rgba(255,255,255,0.09); }
+.qzsp-btn-ghost:hover { background: rgba(255,255,255,0.07); }
 .qzsp-btn-primary {
-  flex: 1;
-  background: linear-gradient(135deg, #3b82f6, #93c5fd);
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 230px;
+  background: linear-gradient(135deg, #6366f1, #0ea5e9);
   border: 0;
-  border-radius: 12px;
-  color: #1a1330;
-  font-size: 0.84rem;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
   font-weight: 800;
-  padding: 10px 20px;
+  padding: 8px 16px;
   cursor: pointer;
   text-align: center;
 }
@@ -4229,28 +4238,268 @@ body.pdf-maximized .annotate-popover {
 .qzsp-reset-hint { margin: 0; font-size: 0.72rem; color: #7a7a9a; line-height: 1.4; }
 
 /* Folder-grouped source picker */
-.qzsp-folder { border: 1px solid rgba(37,99,235,0.18); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.qzsp-folder {
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  overflow: visible;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.025);
+}
 .qzsp-folder-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; cursor: pointer;
-  background: rgba(37,99,235,0.08);
+  min-height: 42px;
+  padding: 8px 10px; cursor: pointer;
+  background: transparent;
+  border-radius: 8px 8px 0 0;
   transition: background 0.15s; user-select: none;
 }
-.qzsp-folder-header:hover { background: rgba(37,99,235,0.16); }
-.qzsp-folder-header.open { background: rgba(37,99,235,0.14); }
-.qzsp-folder-toggle { font-size: .75rem; color: rgba(255,255,255,.5); flex-shrink: 0; transition: transform .2s; }
-.qzsp-folder-icon { font-size: 1rem; flex-shrink: 0; }
-.qzsp-folder-name { font-size: .88rem; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qzsp-folder-count { font-size: .72rem; color: rgba(255,255,255,.45); font-weight: 600; flex-shrink: 0; }
+.qzsp-folder-header:hover { background: rgba(255, 255, 255, 0.05); }
+.qzsp-folder-header.open { background: rgba(255, 255, 255, 0.05); }
+.qzsp-folder-toggle { font-size: .75rem; color: var(--muted, #94a3b8); flex-shrink: 0; transition: transform .2s; }
+.qzsp-folder-icon { display: none; font-size: 1rem; flex-shrink: 0; }
+.qzsp-folder-name { color: var(--text, #e2e8f0); font-size: .86rem; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qzsp-folder-count { font-size: .72rem; color: var(--muted, #94a3b8); opacity: 0.75; font-weight: 600; flex-shrink: 0; }
 .qzsp-folder-selall {
-  font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 20px;
-  background: rgba(59,130,246,.12); color: rgba(59,130,246,.85);
-  border: 1px solid rgba(59,130,246,.25); cursor: pointer; flex-shrink: 0;
+  font-size: .72rem; font-weight: 700; padding: 4px 9px; border-radius: 6px;
+  background: transparent; color: var(--text, #e2e8f0);
+  border: 1px solid var(--border, #334155); cursor: pointer; flex-shrink: 0;
   transition: background .15s;
 }
-.qzsp-folder-selall:hover { background: rgba(59,130,246,.22); }
-.qzsp-folder-files { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; }
+.qzsp-folder-selall:hover { background: rgba(255, 255, 255, 0.08); }
+.qzsp-folder-files { display: flex; flex-direction: column; gap: 4px; padding: 0 8px 8px; }
 .qzsp-folder-list { gap: 10px; }
+
+/* Source picker visual sync: Quiz + Flashcards keep their proven scroll layout,
+   but use the same separated folder/card language as Cheatsheet + Deep Learn. */
+.qzsp-overlay {
+  z-index: 4300;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: none;
+}
+
+.qzsp-modal {
+  width: min(640px, calc(100vw - 28px));
+  max-width: min(640px, calc(100vw - 28px));
+  max-height: calc(100dvh - 32px);
+  background: var(--card, #0f172a);
+  border: 1px solid var(--border, #1e293b);
+  border-radius: 12px;
+  padding: 18px;
+  color: var(--text, #e2e8f0);
+}
+
+.qzsp-head {
+  margin-bottom: 6px;
+}
+
+.qzsp-title {
+  color: var(--text, #e2e8f0);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.qzsp-close {
+  color: var(--text, #e2e8f0);
+  opacity: 0.7;
+  font-size: 1.1rem;
+}
+
+.qzsp-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.qzsp-sub {
+  color: var(--muted, #94a3b8);
+  opacity: 1;
+  font-size: 0.82rem;
+  margin: 0 0 12px;
+}
+
+.qzsp-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100dvh - 230px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  gap: 8px;
+  padding: 2px 8px 8px 0;
+  margin-bottom: 0;
+  scrollbar-color: rgba(99, 102, 241, 0.55) rgba(255, 255, 255, 0.04);
+}
+
+.qzsp-list::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.55);
+  border-radius: 999px;
+}
+
+.qzsp-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.qzsp-folder {
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  overflow: visible;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.qzsp-folder-header {
+  min-height: 42px;
+  padding: 8px 10px;
+  background: transparent;
+  border-radius: 8px 8px 0 0;
+}
+
+.qzsp-folder-header:hover,
+.qzsp-folder-header.open {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.qzsp-folder-toggle {
+  color: var(--muted, #94a3b8);
+}
+
+.qzsp-folder-icon {
+  display: none;
+}
+
+.qzsp-folder-name {
+  color: var(--text, #e2e8f0);
+  font-size: 0.86rem;
+}
+
+.qzsp-folder-count {
+  color: var(--muted, #94a3b8);
+  opacity: 0.75;
+}
+
+.qzsp-folder-selall {
+  border: 1px solid var(--border, #334155);
+  background: transparent;
+  color: var(--text, #e2e8f0);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 0.72rem;
+}
+
+.qzsp-folder-selall:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.qzsp-folder-clear {
+  color: var(--text, #e2e8f0);
+}
+
+.qzsp-folder-files {
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+
+.qzsp-item {
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--card-inner, rgba(255, 255, 255, 0.04));
+  border: 1px solid transparent;
+}
+
+.qzsp-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+}
+
+.qzsp-cb {
+  accent-color: #0ea5e9;
+}
+
+.qzsp-name {
+  color: var(--text, #e2e8f0);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.qzsp-actions {
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.qzsp-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  color: var(--text, #e2e8f0);
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+
+.qzsp-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.qzsp-btn-primary {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 230px;
+  background: linear-gradient(135deg, #6366f1, #0ea5e9);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+.qzsp-settings .qzsp-btn-primary {
+  width: 100%;
+  min-width: 0;
+  margin-left: 0;
+}
+
+body:not(.night) .qzsp-modal {
+  background: var(--lm-card-bg) !important;
+  border-color: var(--lm-card-border) !important;
+  box-shadow: var(--lm-card-shadow) !important;
+  color: var(--lm-text) !important;
+}
+
+body:not(.night) .qzsp-title,
+body:not(.night) .qzsp-folder-name,
+body:not(.night) .qzsp-name {
+  color: var(--lm-text) !important;
+}
+
+body:not(.night) .qzsp-sub,
+body:not(.night) .qzsp-folder-toggle,
+body:not(.night) .qzsp-folder-count {
+  color: var(--lm-muted) !important;
+}
+
+body:not(.night) .qzsp-folder,
+body:not(.night) .qzsp-item,
+body:not(.night) .qzsp-btn-ghost,
+body:not(.night) .qzsp-folder-selall {
+  background: var(--lm-nested-bg) !important;
+  border-color: var(--lm-nested-border) !important;
+  color: var(--lm-text) !important;
+  box-shadow: var(--lm-nested-shadow) !important;
+}
+
+body:not(.night) .qzsp-folder-header:hover,
+body:not(.night) .qzsp-folder-header.open,
+body:not(.night) .qzsp-item:hover,
+body:not(.night) .qzsp-btn-ghost:hover,
+body:not(.night) .qzsp-folder-selall:hover {
+  background: rgba(239, 246, 255, 0.96) !important;
+  border-color: var(--lm-card-border-strong) !important;
+}
+
+body:not(.night) .qzsp-btn-primary {
+  color: #fff !important;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9) !important;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.22) !important;
+}
 
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */
 .co-inner.co-inner-wide {

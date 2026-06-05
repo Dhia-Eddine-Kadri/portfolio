@@ -788,7 +788,8 @@
             '<span class="qzsp-folder-icon">' + icon + '</span>' +
             '<span class="qzsp-folder-name">' + _esc(name) + '</span>' +
             '<span class="qzsp-folder-count">' + fdDocs.length + ' file' + (fdDocs.length !== 1 ? 's' : '') + '</span>' +
-            '<button class="qzsp-folder-selall" type="button">Select all</button>' +
+            '<button class="qzsp-folder-selall" data-folder-act="all" type="button">Select all</button>' +
+            '<button class="qzsp-folder-selall qzsp-folder-clear" data-folder-act="none" type="button">Clear</button>' +
           '</div>' +
           '<div class="qzsp-folder-files" style="display:none">' +
             fdDocs.map(itemHtml).join('') +
@@ -808,14 +809,14 @@
       overlay.className = 'qzsp-overlay';
       overlay.innerHTML =
         '<div class="qzsp-modal">' +
-          '<div class="qzsp-head"><span class="qzsp-title">&#x1F4C2; Choose source files</span>' +
+          '<div class="qzsp-head"><span class="qzsp-title">Choose source files</span>' +
             '<button class="qzsp-close" type="button">&#x2715;</button></div>' +
           '<p class="qzsp-sub">Select which indexed files to use for quiz generation.</p>' +
           '<div class="qzsp-list qzsp-folder-list">' + sectionsHtml + '</div>' +
           '<div class="qzsp-actions">' +
             '<button class="qzsp-btn-ghost" id="qzspSelectAll" type="button">Select all</button>' +
             '<button class="qzsp-btn-ghost" id="qzspClearAll" type="button">Clear</button>' +
-            '<button class="qzsp-btn-primary" id="qzspConfirm" type="button">&#x2728; Generate from selected</button>' +
+            '<button class="qzsp-btn-primary" id="qzspConfirm" type="button">Generate from selected</button>' +
           '</div>' +
         '</div>';
 
@@ -830,7 +831,7 @@
       // Toggle expand/collapse
       overlay.querySelectorAll('.qzsp-folder-header').forEach(function (header) {
         header.addEventListener('click', function (e) {
-          if (e.target.classList.contains('qzsp-folder-selall')) return;
+          if (e.target.closest('[data-folder-act]')) return;
           var files = header.nextElementSibling;
           var open = files.style.display !== 'none';
           files.style.display = open ? 'none' : 'flex';
@@ -840,10 +841,11 @@
       });
 
       // Per-folder select all
-      overlay.querySelectorAll('.qzsp-folder-selall').forEach(function (btn) {
+      overlay.querySelectorAll('[data-folder-act]').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
-          btn.closest('.qzsp-folder').querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
+          var checked = btn.getAttribute('data-folder-act') === 'all';
+          btn.closest('.qzsp-folder').querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = checked; });
         });
       });
 

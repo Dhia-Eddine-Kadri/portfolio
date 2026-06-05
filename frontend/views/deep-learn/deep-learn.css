@@ -741,6 +741,49 @@ body:not(.night) .dl-sp-sub,
 body:not(.night) .dl-sp-folder-toggle {
   color: var(--lm-muted) !important;
 }
+
+/* Hard layout contract for the source picker: folders must never be clipped.
+   Header + copy + actions are fixed rows; only the folder list scrolls. */
+.dl-sp-modal {
+  width: min(640px, calc(100vw - 28px)) !important;
+  max-width: min(640px, calc(100vw - 28px)) !important;
+  height: auto !important;
+  max-height: calc(100dvh - 32px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.dl-sp-list {
+  flex: 0 1 auto !important;
+  min-height: 120px !important;
+  max-height: calc(100dvh - 230px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-content: start !important;
+  padding: 2px 8px 8px 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.dl-sp-folder,
+.dl-sp-folder-files,
+.dl-sp-item {
+  flex-shrink: 0 !important;
+}
+
+.dl-sp-folder {
+  margin-bottom: 8px !important;
+  overflow: visible !important;
+}
+
+.dl-sp-folder-head {
+  min-height: 42px !important;
+}
+
+.dl-sp-actions {
+  padding-top: 12px !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.14) !important;
+}
 .dl-progress-visible {
   animation: dlFadeIn 200ms ease-out;
 }

@@ -762,21 +762,21 @@
     if (existing) existing.remove();
     var grouped = _groupDocsByFolder(docs, course);
     function itemHtml(d) {
-      return '<label class="dl-sp-item">' +
-        '<input type="checkbox" class="dl-sp-cb" value="' + _esc(d.id) + '" checked>' +
-        '<span class="dl-sp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
+      return '<label class="qzsp-item">' +
+        '<input type="checkbox" class="qzsp-cb" value="' + _esc(d.id) + '" checked>' +
+        '<span class="qzsp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
       '</label>';
     }
     function folderHtml(name, docsInFolder, idx) {
-      return '<div class="dl-sp-folder" data-folder-idx="' + _esc(idx) + '">' +
-        '<div class="dl-sp-folder-head">' +
-          '<button class="dl-sp-folder-toggle" type="button" aria-label="Toggle folder">&#9662;</button>' +
-          '<span class="dl-sp-folder-name">' + _esc(name) + '</span>' +
-          '<span class="dl-sp-folder-count">' + docsInFolder.length + ' file' + (docsInFolder.length === 1 ? '' : 's') + '</span>' +
-          '<button class="dl-sp-folder-action" data-folder-act="all" type="button">Select all</button>' +
-          '<button class="dl-sp-folder-action" data-folder-act="none" type="button">Clear</button>' +
+      return '<div class="qzsp-folder" data-folder-idx="' + _esc(idx) + '">' +
+        '<div class="qzsp-folder-header open">' +
+          '<span class="qzsp-folder-toggle">&#x25BE;</span>' +
+          '<span class="qzsp-folder-name">' + _esc(name) + '</span>' +
+          '<span class="qzsp-folder-count">' + docsInFolder.length + ' file' + (docsInFolder.length === 1 ? '' : 's') + '</span>' +
+          '<button class="qzsp-folder-selall" data-folder-act="all" type="button">Select all</button>' +
+          '<button class="qzsp-folder-selall qzsp-folder-clear" data-folder-act="none" type="button">Clear</button>' +
         '</div>' +
-        '<div class="dl-sp-folder-files">' + docsInFolder.map(itemHtml).join('') + '</div>' +
+        '<div class="qzsp-folder-files">' + docsInFolder.map(itemHtml).join('') + '</div>' +
       '</div>';
     }
     var sections = grouped.order.map(function (name, i) {
@@ -786,51 +786,52 @@
 
     var ov = document.createElement('div');
     ov.id = 'dlSourcePickerOverlay';
-    ov.className = 'dl-sp-overlay';
+    ov.className = 'qzsp-overlay';
     ov.innerHTML =
-      '<div class="dl-sp-modal">' +
-        '<div class="dl-sp-head"><span class="dl-sp-title">Choose lesson sources</span>' +
-          '<button class="dl-sp-close" type="button" aria-label="Close">&times;</button></div>' +
-        '<p class="dl-sp-sub">Select which indexed files Deep Learn should use. Folder controls affect only files inside that folder.</p>' +
-        '<div class="dl-sp-list dl-sp-folder-list">' + sections + '</div>' +
-        '<div class="dl-sp-actions">' +
-          '<button class="dl-sp-ghost" id="dlSpAll" type="button">Select all</button>' +
-          '<button class="dl-sp-ghost" id="dlSpClear" type="button">Clear</button>' +
-          '<button class="dl-sp-primary" id="dlSpConfirm" type="button">Generate from selected</button>' +
+      '<div class="qzsp-modal">' +
+        '<div class="qzsp-head"><span class="qzsp-title">Choose lesson sources</span>' +
+          '<button class="qzsp-close" type="button" aria-label="Close">&times;</button></div>' +
+        '<p class="qzsp-sub">Select which indexed files Deep Learn should use. Folder controls affect only files inside that folder.</p>' +
+        '<div class="qzsp-list qzsp-folder-list">' + sections + '</div>' +
+        '<div class="qzsp-actions">' +
+          '<button class="qzsp-btn-ghost" id="dlSpAll" type="button">Select all</button>' +
+          '<button class="qzsp-btn-ghost" id="dlSpClear" type="button">Clear</button>' +
+          '<button class="qzsp-btn-primary" id="dlSpConfirm" type="button">Generate from selected</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
     function close() { ov.remove(); }
-    ov.querySelector('.dl-sp-close').onclick = close;
+    ov.querySelector('.qzsp-close').onclick = close;
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-    ov.querySelectorAll('.dl-sp-folder-head').forEach(function (head) {
+    ov.querySelectorAll('.qzsp-folder-header').forEach(function (head) {
       head.addEventListener('click', function (e) {
-        if (e.target.closest('.dl-sp-folder-action')) return;
-        var folder = head.closest('.dl-sp-folder');
-        var files = folder && folder.querySelector('.dl-sp-folder-files');
-        var collapsed = folder && folder.classList.toggle('is-collapsed');
-        if (files) files.style.display = collapsed ? 'none' : 'flex';
-        var toggle = head.querySelector('.dl-sp-folder-toggle');
-        if (toggle) toggle.innerHTML = collapsed ? '&#9656;' : '&#9662;';
+        if (e.target.closest('[data-folder-act]')) return;
+        var folder = head.closest('.qzsp-folder');
+        var files = folder && folder.querySelector('.qzsp-folder-files');
+        var open = files && files.style.display !== 'none';
+        if (files) files.style.display = open ? 'none' : 'flex';
+        var toggle = head.querySelector('.qzsp-folder-toggle');
+        if (toggle) toggle.innerHTML = open ? '&#x25B8;' : '&#x25BE;';
+        head.classList.toggle('open', !open);
       });
     });
-    ov.querySelectorAll('.dl-sp-folder-action').forEach(function (btn) {
+    ov.querySelectorAll('[data-folder-act]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        var folder = btn.closest('.dl-sp-folder');
+        var folder = btn.closest('.qzsp-folder');
         var checked = btn.getAttribute('data-folder-act') === 'all';
-        if (folder) folder.querySelectorAll('.dl-sp-cb').forEach(function (cb) { cb.checked = checked; });
+        if (folder) folder.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = checked; });
       });
     });
     ov.querySelector('#dlSpAll').onclick = function () {
-      ov.querySelectorAll('.dl-sp-cb').forEach(function (cb) { cb.checked = true; });
+      ov.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
     };
     ov.querySelector('#dlSpClear').onclick = function () {
-      ov.querySelectorAll('.dl-sp-cb').forEach(function (cb) { cb.checked = false; });
+      ov.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = false; });
     };
     ov.querySelector('#dlSpConfirm').onclick = function () {
       var ids = [];
-      ov.querySelectorAll('.dl-sp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+      ov.querySelectorAll('.qzsp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
       if (!ids.length) {
         if (window.showToast) window.showToast('No files selected', 'Select at least one indexed file.');
         return;

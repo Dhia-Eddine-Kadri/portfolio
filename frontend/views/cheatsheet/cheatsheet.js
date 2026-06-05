@@ -987,21 +987,21 @@
     if (existing) existing.remove();
     var grouped = _groupDocsByFolder(docs, course);
     function itemHtml(d) {
-      return '<label class="cs-sp-item">' +
-        '<input type="checkbox" class="cs-sp-cb" value="' + _esc(d.id) + '" checked>' +
-        '<span class="cs-sp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
+      return '<label class="qzsp-item">' +
+        '<input type="checkbox" class="qzsp-cb" value="' + _esc(d.id) + '" checked>' +
+        '<span class="qzsp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
       '</label>';
     }
     function folderHtml(name, docsInFolder, idx) {
-      return '<div class="cs-sp-folder" data-folder-idx="' + _esc(idx) + '">' +
-        '<div class="cs-sp-folder-head">' +
-          '<button class="cs-sp-folder-toggle" type="button" aria-label="Toggle folder">&#9662;</button>' +
-          '<span class="cs-sp-folder-name">' + _esc(name) + '</span>' +
-          '<span class="cs-sp-folder-count">' + docsInFolder.length + ' file' + (docsInFolder.length === 1 ? '' : 's') + '</span>' +
-          '<button class="cs-sp-folder-action" data-folder-act="all" type="button">Select all</button>' +
-          '<button class="cs-sp-folder-action" data-folder-act="none" type="button">Clear</button>' +
+      return '<div class="qzsp-folder" data-folder-idx="' + _esc(idx) + '">' +
+        '<div class="qzsp-folder-header open">' +
+          '<span class="qzsp-folder-toggle">&#x25BE;</span>' +
+          '<span class="qzsp-folder-name">' + _esc(name) + '</span>' +
+          '<span class="qzsp-folder-count">' + docsInFolder.length + ' file' + (docsInFolder.length === 1 ? '' : 's') + '</span>' +
+          '<button class="qzsp-folder-selall" data-folder-act="all" type="button">Select all</button>' +
+          '<button class="qzsp-folder-selall qzsp-folder-clear" data-folder-act="none" type="button">Clear</button>' +
         '</div>' +
-        '<div class="cs-sp-folder-files">' + docsInFolder.map(itemHtml).join('') + '</div>' +
+        '<div class="qzsp-folder-files">' + docsInFolder.map(itemHtml).join('') + '</div>' +
       '</div>';
     }
     var sections = grouped.order.map(function (name, i) {
@@ -1013,51 +1013,52 @@
     }, grouped.other.length);
     var ov = document.createElement('div');
     ov.id = 'csSourcePickerOverlay';
-    ov.className = 'cs-sp-overlay';
+    ov.className = 'qzsp-overlay';
     ov.innerHTML =
-      '<div class="cs-sp-modal">' +
-        '<div class="cs-sp-head"><span class="cs-sp-title">Choose source PDFs</span>' +
-          '<button class="cs-sp-close" type="button" aria-label="Close">&times;</button></div>' +
-        '<p class="cs-sp-sub">All files are selected by default. Use each folder\'s controls to select or clear only the files inside that folder.</p>' +
-        '<div class="cs-sp-list cs-sp-folder-list">' + sections + '</div>' +
-        '<div class="cs-sp-actions">' +
-          '<button class="cs-sp-ghost" id="csSpAll" type="button">Select all</button>' +
-          '<button class="cs-sp-ghost" id="csSpClear" type="button">Clear</button>' +
-          '<button class="cs-sp-primary" id="csSpConfirm" type="button">Generate from selected</button>' +
+      '<div class="qzsp-modal">' +
+        '<div class="qzsp-head"><span class="qzsp-title">Choose source PDFs</span>' +
+          '<button class="qzsp-close" type="button" aria-label="Close">&times;</button></div>' +
+        '<p class="qzsp-sub">All files are selected by default. Use each folder\'s controls to select or clear only the files inside that folder.</p>' +
+        '<div class="qzsp-list qzsp-folder-list">' + sections + '</div>' +
+        '<div class="qzsp-actions">' +
+          '<button class="qzsp-btn-ghost" id="csSpAll" type="button">Select all</button>' +
+          '<button class="qzsp-btn-ghost" id="csSpClear" type="button">Clear</button>' +
+          '<button class="qzsp-btn-primary" id="csSpConfirm" type="button">Generate from selected</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
     function close() { ov.remove(); }
-    ov.querySelector('.cs-sp-close').onclick = close;
+    ov.querySelector('.qzsp-close').onclick = close;
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-    ov.querySelectorAll('.cs-sp-folder-head').forEach(function (head) {
+    ov.querySelectorAll('.qzsp-folder-header').forEach(function (head) {
       head.addEventListener('click', function (e) {
-        if (e.target.closest('.cs-sp-folder-action')) return;
-        var folder = head.closest('.cs-sp-folder');
-        var files = folder && folder.querySelector('.cs-sp-folder-files');
-        var collapsed = folder && folder.classList.toggle('is-collapsed');
-        if (files) files.style.display = collapsed ? 'none' : 'flex';
-        var toggle = head.querySelector('.cs-sp-folder-toggle');
-        if (toggle) toggle.innerHTML = collapsed ? '&#9656;' : '&#9662;';
+        if (e.target.closest('[data-folder-act]')) return;
+        var folder = head.closest('.qzsp-folder');
+        var files = folder && folder.querySelector('.qzsp-folder-files');
+        var open = files && files.style.display !== 'none';
+        if (files) files.style.display = open ? 'none' : 'flex';
+        var toggle = head.querySelector('.qzsp-folder-toggle');
+        if (toggle) toggle.innerHTML = open ? '&#x25B8;' : '&#x25BE;';
+        head.classList.toggle('open', !open);
       });
     });
-    ov.querySelectorAll('.cs-sp-folder-action').forEach(function (btn) {
+    ov.querySelectorAll('[data-folder-act]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        var folder = btn.closest('.cs-sp-folder');
+        var folder = btn.closest('.qzsp-folder');
         var checked = btn.getAttribute('data-folder-act') === 'all';
-        if (folder) folder.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = checked; });
+        if (folder) folder.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = checked; });
       });
     });
     ov.querySelector('#csSpAll').onclick = function () {
-      ov.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = true; });
+      ov.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
     };
     ov.querySelector('#csSpClear').onclick = function () {
-      ov.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = false; });
+      ov.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = false; });
     };
     ov.querySelector('#csSpConfirm').onclick = function () {
       var ids = [];
-      ov.querySelectorAll('.cs-sp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+      ov.querySelectorAll('.qzsp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
       if (!ids.length) {
         if (window.showToast) window.showToast('No files selected', 'Select at least one PDF.');
         return;
