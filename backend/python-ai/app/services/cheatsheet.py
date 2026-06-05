@@ -827,10 +827,16 @@ _SECTION_SYSTEM_REFERENCE = (
     "most useful blocks, so include them whenever the context supports them. When "
     "sibling categories are easily confused, add a one-line Abgrenzung contrast "
     "(e.g. 'Urformen schafft Stoffzusammenhalt, Umformen erhält ihn, Trennen "
-    "vermindert ihn, Fügen verbindet Teile'). End most process sections with a "
-    "compact **Merken:** cue that fuses the 2-3 facts a student must recall (e.g. "
-    "'Druckguss = Großserie + hohe Werkzeugkosten + hohe Maßgenauigkeit'; "
-    "'Sandguss = flexibel + günstig + große Teile, aber schlechtere Oberfläche').\n"
+    "vermindert ihn, Fügen verbindet Teile'), or a small 2-column Abgrenzung table "
+    "(Begriff | Bedeutung) for the most-confused pair in the section. End most "
+    "process sections with a compact **Merken:** cue that fuses the 2-3 facts a "
+    "student must recall (e.g. 'Druckguss = Großserie + hohe Werkzeugkosten + hohe "
+    "Maßgenauigkeit'; 'Sandguss = flexibel + günstig + große Teile, aber "
+    "schlechtere Oberfläche').\n"
+    "\n"
+    "PROCESS-SELECTION — for a classification/overview topic, ALSO add a compact "
+    "'Verfahren wählen' selection table (Ziel/Aufgabe | Geeignetes Verfahren) when "
+    "the evidence supports it — it is one of the highest-yield exam aids.\n"
     "\n"
     "HARD RULES:\n"
     "- NEVER write a `Formula cluster` heading/label, and NEVER write `N/A`. Only "
@@ -844,6 +850,8 @@ _SECTION_SYSTEM_REFERENCE = (
     "- Keep each line tight; prefer tables and bullets over paragraphs. Match the "
     "language of the source material consistently — do not mix English structural "
     "labels into German content.\n"
+    "- NEVER use emoji or icon characters (⏳, ✅, ❌, 🔧, 🟢 …) — this is an "
+    "academic PDF; use plain `-` bullets only.\n"
     "\n"
     "OMIT WEAK SECTIONS — if a topic has no grounded definition or facts you can "
     "state cleanly, DROP its `## ` section rather than padding it.\n"
@@ -1130,6 +1138,39 @@ def _repair_highlight_markers(text: str) -> str:
     return "\n".join(out)
 
 
+# Emoji / pictographic icons the model sometimes uses as bullets (⏳ 🟢 ✅ ❌ 🔧
+# 🕐). An academic PDF cheatsheet must be plain, so strip them (+ the emoji
+# variation selector). Conservative ranges: pictographs/dingbats/symbols only —
+# NOT arrows or general punctuation, which can be meaningful in prose.
+_EMOJI_RE = re.compile(
+    "[\U0001F300-\U0001FAFF"   # symbols & pictographs (incl. 🟢 🔧 🕐 supplemental)
+    "\U00002600-\U000026FF"    # misc symbols (☀ ⚠ ⛔)
+    "\U00002700-\U000027BF"    # dingbats (✅ ✂ ❌ ❗)
+    "\U00002B00-\U00002BFF"    # arrows/stars block (⭐ ⬆)
+    "\U000023E9-\U000023FA"    # media/clock controls (⏳ ⏰)
+    "\U0001F1E6-\U0001F1FF"    # regional indicators (flags)
+    "\U0000FE0F]"              # emoji variation selector
+)
+
+
+def _strip_emoji(text: str) -> str:
+    return _EMOJI_RE.sub("", text or "")
+
+
+def _strip_stray_carets(text: str) -> str:
+    """Remove `^` that leaks OUTSIDE math spans (the model sometimes wraps prose
+    as ``^text^`` attempting superscript, which renders as literal carets). A `^`
+    inside a $...$ / $$...$$ span is valid superscript and is left untouched."""
+    parts: list[str] = []
+    last = 0
+    for m in _MATH_SPAN_RE.finditer(text):
+        parts.append(text[last:m.start()].replace("^", ""))
+        parts.append(m.group(0))
+        last = m.end()
+    parts.append(text[last:].replace("^", ""))
+    return "".join(parts)
+
+
 def _formula_body_ok(body: str) -> bool:
     """True if a display-formula body is safe to render: balanced braces, no
     replacement char, non-empty, and actually contains math (not just "(20)")."""
@@ -1213,6 +1254,8 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     # 1) corruption chars (also fixes � inside inline $...$ and headings)
     cleaned = text.replace("�", "").replace("\r", "")
     cleaned = _CTRL_RE.sub("", cleaned)
+    # 1·-1) strip emoji/icon bullets — an academic PDF must look university-clean.
+    cleaned = _strip_emoji(cleaned)
 
     # 1·0) strip any visible source labels. The sheet must stay clean and
     # uncluttered — grounding is internal-only — so a `## Sources` block, a
@@ -1244,6 +1287,10 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     # raw `==` leaks into the rendered text. Fix the mangled closer, then strip any
     # still-unpaired marker so it never renders literally.
     cleaned = _repair_highlight_markers(cleaned)
+
+    # 1a·4) strip `^...^` carets that leak into prose (model attempts superscript
+    # outside math, e.g. `^Hohe Genauigkeit^`); valid `^` inside $...$ is kept.
+    cleaned = _strip_stray_carets(cleaned)
 
     # 1b) a salvaged (token-cap-truncated) sheet can end mid-formula, leaving a
     # dangling unterminated "$$" that would break KaTeX. If the display-delimiter
@@ -1471,11 +1518,39 @@ def _is_generic_nontopic(key: str) -> bool:
     return any(tok in _GENERIC_NONTOPIC_WORDS for tok in key.split())
 
 
+# Manufacturing classification topics the extractor splits into several near-
+# duplicate skeleton entries ("DIN 8580", "Fertigungsverfahren", "Fertigungs-
+# verfahren nach DIN 8580", "Hauptgruppen der Fertigungsverfahren"). They all
+# generate the SAME six-group classification table, so the sheet carried the DIN
+# table 2-3 times and the extra copy stranded a near-empty page. Collapse them to
+# ONE canonical backbone topic, ordered first (DIN 8580 is the spine of the subject).
+_DIN_CLASSIFICATION_CANONICAL = "Fertigungsverfahren nach DIN 8580"
+_DIN_OVERVIEW_KEYS = frozenset({
+    "fertigungsverfahren",
+    "hauptgruppen der fertigungsverfahren",
+    "fertigungsverfahren hauptgruppen",
+    "ueberblick fertigungsverfahren",
+    "fertigungsverfahren nach din 8580",
+})
+
+
+def _canonical_classification_topic(name: str) -> str:
+    key = _topic_key(name)
+    if not key:
+        return name
+    # Any "DIN 8580" topic, or the generic "Fertigungsverfahren" overview — but
+    # NOT a specific family like "Gießverfahren"/"Umformverfahren" (those have a
+    # qualifier and are real, distinct sections).
+    if "din 8580" in key or "din8580" in key or key in _DIN_OVERVIEW_KEYS:
+        return _DIN_CLASSIFICATION_CANONICAL
+    return name
+
+
 def _dedupe_topic_names(names: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
     for name in names:
-        canonical = _canonical_mechanics_topic(name)
+        canonical = _canonical_classification_topic(_canonical_mechanics_topic(name))
         key = _topic_key(canonical)
         if not key or key in seen:
             continue
@@ -1487,8 +1562,15 @@ def _dedupe_topic_names(names: list[str]) -> list[str]:
         seen.add(key)
         out.append(canonical)
     mechanics_rank = {name: i for i, name in enumerate(_MECHANICS_TOPIC_ORDER)}
+
+    def _rank(name: str) -> int:
+        # DIN 8580 classification is the backbone of a manufacturing sheet → first.
+        if name == _DIN_CLASSIFICATION_CANONICAL:
+            return -1
+        return mechanics_rank.get(name, len(mechanics_rank))
+
     indexed = list(enumerate(out))
-    indexed.sort(key=lambda item: (mechanics_rank.get(item[1], len(mechanics_rank)), item[0]))
+    indexed.sort(key=lambda item: (_rank(item[1]), item[0]))
     return [name for _, name in indexed]
 
 

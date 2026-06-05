@@ -481,6 +481,39 @@ def test_open_book_uses_use_when_labels():
     assert "**Watch out:**" in prompt
 
 
+def test_sanitize_strips_emoji_bullets():
+    out, _ = cs.sanitize_cheatsheet_markdown("- ⏳ Lange Nutzungsdauer\n- ✅ Gut\n- 🔧 Werkzeug")
+    for ch in ("⏳", "✅", "🔧"):
+        assert ch not in out
+    assert "Lange Nutzungsdauer" in out
+    assert "- Lange Nutzungsdauer" in out  # bullet kept, double space collapsed
+
+
+def test_sanitize_strips_stray_carets_outside_math():
+    out, _ = cs.sanitize_cheatsheet_markdown("- ^Hohe Approximationsgenauigkeit^\nv = $a^2$")
+    assert "^Hohe" not in out and "genauigkeit^" not in out
+    assert "Hohe Approximationsgenauigkeit" in out
+    assert "$a^2$" in out  # caret inside math preserved
+
+
+def test_din_classification_topics_deduped_and_first():
+    tm = [
+        {"name": "Gießverfahren"},
+        {"name": "DIN 8580"},
+        {"name": "Fertigungsverfahren"},
+        {"name": "Fertigungsverfahren nach DIN 8580"},
+        {"name": "Drehen"},
+    ]
+    names = cs._topic_names(tm, None, limit=10)
+    # The three DIN/Fertigungsverfahren overview topics collapse to one canonical.
+    din = [n for n in names if "DIN 8580" in n]
+    assert din == ["Fertigungsverfahren nach DIN 8580"]
+    # ...and the backbone is ordered first.
+    assert names[0] == "Fertigungsverfahren nach DIN 8580"
+    # a specific family ("Gießverfahren") is NOT merged away
+    assert "Gießverfahren" in names
+
+
 def test_repair_mangled_highlight_closer():
     # `==text!=` (closing == mangled to !=) → `==text==`, observed in real output.
     out, _ = cs.sanitize_cheatsheet_markdown("**Merken:** ==Spritzgießen eignet sich!=")
