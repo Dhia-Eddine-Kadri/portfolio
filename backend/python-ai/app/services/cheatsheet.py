@@ -1070,6 +1070,36 @@ def _wrap_inline_latex_fragments(text: str) -> str:
     return "".join(parts)
 
 
+# A mangled highlight closer: `==text!=` (the model wrote `!=` for the closing
+# `==`). Repaired to `==text==`. Body has no `=`/newline so it can't span markers.
+_BROKEN_HIGHLIGHT_RE = re.compile(r"==([^=\n]+?)!=")
+
+
+def _repair_highlight_markers(text: str) -> str:
+    """Repair/strip broken ==highlight== markers OUTSIDE math spans, per line, so
+    a mangled or unpaired `==` never renders as literal text. Math spans (which
+    may legitimately contain `==`/`!=`) are left untouched."""
+    def _fix_segment(seg: str) -> str:
+        seg = _BROKEN_HIGHLIGHT_RE.sub(r"==\1==", seg)
+        # An odd count means one marker is unpaired → drop the last lone `==`.
+        if seg.count("==") % 2 == 1:
+            idx = seg.rfind("==")
+            seg = seg[:idx] + seg[idx + 2:]
+        return seg
+
+    out: list[str] = []
+    for line in text.split("\n"):
+        parts: list[str] = []
+        last = 0
+        for m in _MATH_SPAN_RE.finditer(line):
+            parts.append(_fix_segment(line[last:m.start()]))
+            parts.append(m.group(0))
+            last = m.end()
+        parts.append(_fix_segment(line[last:]))
+        out.append("".join(parts))
+    return "\n".join(out)
+
+
 def _formula_body_ok(body: str) -> bool:
     """True if a display-formula body is safe to render: balanced braces, no
     replacement char, non-empty, and actually contains math (not just "(20)")."""
@@ -1178,6 +1208,12 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     # into prose sentences (e.g. "\dot r" inside a Trap line).
     cleaned = _wrap_bare_formula_lines(cleaned)
     cleaned = _wrap_inline_latex_fragments(cleaned)
+
+    # 1a·3) repair broken ==highlight== markers. The model intermittently mangles
+    # the closing `==` (seen as `==text!=`) or leaves it unpaired; either way the
+    # raw `==` leaks into the rendered text. Fix the mangled closer, then strip any
+    # still-unpaired marker so it never renders literally.
+    cleaned = _repair_highlight_markers(cleaned)
 
     # 1b) a salvaged (token-cap-truncated) sheet can end mid-formula, leaving a
     # dangling unterminated "$$" that would break KaTeX. If the display-delimiter

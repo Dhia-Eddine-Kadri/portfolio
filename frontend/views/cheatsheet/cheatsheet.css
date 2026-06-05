@@ -281,10 +281,19 @@
 .cs-paper-body li { margin: 1px 0; }
 .cs-paper-body .katex { font-size: 0.95em; }
 .cs-paper-body .katex-display { margin: 4px 0; overflow-x: auto; }
-/* GFM tables — coordinate Method Picker + translation/rotation summary.
-   Kept inside a column (break-inside: avoid) and printer-friendly on white. */
+/* GFM tables — comparison/classification grids (Gießverfahren, DIN 8580, Method
+   Picker). A wide multi-column table CANNOT shrink below its min-content width,
+   so inside a ~1/3-wide CSS column it used to overflow and overlap the next
+   column (the "page 2 broken" bug). Two structural guards make overlap
+   impossible, regardless of render engine (the PDF is html2canvas of the real
+   browser layout):
+     1) table-layout: fixed + word-wrap → the table can never be wider than its
+        container; long cell text wraps instead of forcing the table wider.
+     2) a block that CONTAINS a table spans ALL columns (.cs-block--wide, tagged
+        in JS), so comparison tables get the full landscape width and read well. */
 .md-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin: 5px 0;
   font-size: 0.94em;
@@ -295,6 +304,18 @@
   padding: 2px 6px;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+/* A section that contains a table breaks out of the multi-column flow and spans
+   the full page width, so the table is never crammed into one narrow column. */
+.cs-paper-body .cs-block--wide {
+  column-span: all;
+  -webkit-column-span: all;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin: 6px 0 14px;
 }
 .md-table thead th {
   background: #f1f5f9;
@@ -396,6 +417,57 @@
 .cs-sp-close:hover { opacity: 1; }
 .cs-sp-sub { margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
 .cs-sp-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cs-sp-folder-list { gap: 8px; }
+.cs-sp-folder {
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.025);
+}
+.cs-sp-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.cs-sp-folder-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--text, #e2e8f0);
+  width: 18px;
+  padding: 0;
+  cursor: pointer;
+}
+.cs-sp-folder-name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-sp-folder-count {
+  margin-left: auto;
+  font-size: 0.74rem;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+.cs-sp-folder-action {
+  border: 1px solid var(--border, #334155);
+  background: transparent;
+  color: var(--text, #e2e8f0);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.cs-sp-folder-action:hover { background: rgba(255, 255, 255, 0.08); }
+.cs-sp-folder-files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
 .cs-sp-item {
   display: flex; align-items: center; gap: 9px;
   padding: 8px 10px; border-radius: 8px; cursor: pointer;

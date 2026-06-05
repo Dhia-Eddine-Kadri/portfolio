@@ -481,6 +481,24 @@ def test_open_book_uses_use_when_labels():
     assert "**Watch out:**" in prompt
 
 
+def test_repair_mangled_highlight_closer():
+    # `==text!=` (closing == mangled to !=) → `==text==`, observed in real output.
+    out, _ = cs.sanitize_cheatsheet_markdown("**Merken:** ==Spritzgießen eignet sich!=")
+    assert "==Spritzgießen eignet sich==" in out
+    assert "!=" not in out
+
+
+def test_strip_unpaired_highlight_marker():
+    out, _ = cs.sanitize_cheatsheet_markdown("a ==dangling highlight without close")
+    assert "==" not in out
+    assert "dangling highlight without close" in out
+
+
+def test_valid_highlight_marker_untouched():
+    out, _ = cs.sanitize_cheatsheet_markdown("**Merken:** ==Druckguss lohnt bei Großserie==.")
+    assert "==Druckguss lohnt bei Großserie==" in out
+
+
 def test_sanitize_strips_leaked_scaffold_heading():
     md = "## Work\n- $W = F d$\n### CURATED EXAM TRAPS\n- friction work is negative"
     out, _ = cs.sanitize_cheatsheet_markdown(md)

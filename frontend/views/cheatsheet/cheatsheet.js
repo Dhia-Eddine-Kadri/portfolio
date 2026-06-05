@@ -135,7 +135,14 @@
       cur.appendChild(node);
     });
     body.innerHTML = '';
-    blocks.forEach(function (b) { body.appendChild(b); });
+    blocks.forEach(function (b) {
+      // A section containing a table spans all columns (full page width) so a
+      // wide comparison/classification grid can never overflow into and overlap
+      // the neighbouring column. Tagged here (not via CSS :has) for engine
+      // reliability — html2canvas captures the real browser layout.
+      if (b.querySelector('table')) b.classList.add('cs-block--wide');
+      body.appendChild(b);
+    });
   }
 
   function _renderMarkdown(el, md, paper) {
@@ -615,15 +622,72 @@
   // Source picker — pick which indexed PDFs to build the cheatsheet from.
   // All files start checked (one click = whole course); selecting a small
   // subset triggers the backend's per-PDF sectioned + deduped mode.
-  function _showSourcePicker(docs, onConfirm) {
+  function _courseFileFolderIndex(course) {
+    var fileToFolder = {};
+    var live = {};
+    (course && course.files || []).forEach(function (f) {
+      if (f && f.name) live[f.name] = true;
+    });
+    (course && course.userFolders || []).forEach(function (fd) {
+      (fd.files || []).forEach(function (f) {
+        if (!f || !f.name) return;
+        live[f.name] = true;
+        fileToFolder[f.name] = fd.name || 'Folder';
+      });
+    });
+    return { fileToFolder: fileToFolder, live: live };
+  }
+
+  function _groupDocsByFolder(docs, course) {
+    var idx = _courseFileFolderIndex(course);
+    var liveNames = Object.keys(idx.live);
+    if (liveNames.length) {
+      docs = (docs || []).filter(function (d) {
+        return !!idx.live[d.file_name || d.fileName || ''];
+      });
+    }
+    var map = {};
+    var order = [];
+    var other = [];
+    (docs || []).forEach(function (d) {
+      var name = d.file_name || d.fileName || '';
+      var folder = idx.fileToFolder[name];
+      if (folder) {
+        if (!map[folder]) { map[folder] = []; order.push(folder); }
+        map[folder].push(d);
+      } else {
+        other.push(d);
+      }
+    });
+    return { map: map, order: order, other: other };
+  }
+
+  function _showSourcePicker(docs, course, onConfirm) {
     var existing = document.getElementById('csSourcePickerOverlay');
     if (existing) existing.remove();
-    var items = docs.map(function (d) {
+    var grouped = _groupDocsByFolder(docs, course);
+    function itemHtml(d) {
       return '<label class="cs-sp-item">' +
         '<input type="checkbox" class="cs-sp-cb" value="' + _esc(d.id) + '" checked>' +
-        '<span class="cs-sp-name">' + _esc(d.file_name || 'Untitled') + '</span>' +
+        '<span class="cs-sp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
       '</label>';
+    }
+    function folderHtml(name, docsInFolder, idx) {
+      return '<div class="cs-sp-folder" data-folder-idx="' + _esc(idx) + '">' +
+        '<div class="cs-sp-folder-head">' +
+          '<button class="cs-sp-folder-toggle" type="button" aria-label="Toggle folder">&#9662;</button>' +
+          '<span class="cs-sp-folder-name">' + _esc(name) + '</span>' +
+          '<span class="cs-sp-folder-count">' + docsInFolder.length + ' file' + (docsInFolder.length === 1 ? '' : 's') + '</span>' +
+          '<button class="cs-sp-folder-action" data-folder-act="all" type="button">Select all</button>' +
+          '<button class="cs-sp-folder-action" data-folder-act="none" type="button">Clear</button>' +
+        '</div>' +
+        '<div class="cs-sp-folder-files">' + docsInFolder.map(itemHtml).join('') + '</div>' +
+      '</div>';
+    }
+    var sections = grouped.order.map(function (name, i) {
+      return folderHtml(name, grouped.map[name], i);
     }).join('');
+    if (grouped.other.length) sections += folderHtml('Other files', grouped.other, 'other');
     var ov = document.createElement('div');
     ov.id = 'csSourcePickerOverlay';
     ov.className = 'cs-sp-overlay';
@@ -632,7 +696,7 @@
         '<div class="cs-sp-head"><span class="cs-sp-title">Choose source PDFs</span>' +
           '<button class="cs-sp-close" type="button" aria-label="Close">&times;</button></div>' +
         '<p class="cs-sp-sub">All files are selected by default. Pick a few PDFs to scope the sheet — each gets its own section and repeats are removed.</p>' +
-        '<div class="cs-sp-list">' + items + '</div>' +
+        '<div class="cs-sp-list cs-sp-folder-list">' + sections + '</div>' +
         '<div class="cs-sp-actions">' +
           '<button class="cs-sp-ghost" id="csSpAll" type="button">Select all</button>' +
           '<button class="cs-sp-ghost" id="csSpClear" type="button">Clear</button>' +
@@ -643,6 +707,25 @@
     function close() { ov.remove(); }
     ov.querySelector('.cs-sp-close').onclick = close;
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelectorAll('.cs-sp-folder-head').forEach(function (head) {
+      head.addEventListener('click', function (e) {
+        if (e.target.closest('.cs-sp-folder-action')) return;
+        var folder = head.closest('.cs-sp-folder');
+        var files = folder && folder.querySelector('.cs-sp-folder-files');
+        var collapsed = folder && folder.classList.toggle('is-collapsed');
+        if (files) files.style.display = collapsed ? 'none' : 'flex';
+        var toggle = head.querySelector('.cs-sp-folder-toggle');
+        if (toggle) toggle.innerHTML = collapsed ? '&#9656;' : '&#9662;';
+      });
+    });
+    ov.querySelectorAll('.cs-sp-folder-action').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var folder = btn.closest('.cs-sp-folder');
+        var checked = btn.getAttribute('data-folder-act') === 'all';
+        if (folder) folder.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = checked; });
+      });
+    });
     ov.querySelector('#csSpAll').onclick = function () {
       ov.querySelectorAll('.cs-sp-cb').forEach(function (cb) { cb.checked = true; });
     };
@@ -812,7 +895,7 @@
             els.result.innerHTML = '<div class="cs-msg">No indexed files yet — upload and index a PDF first.</div>';
             return;
           }
-          _showSourcePicker(ready, function (documentIds) { doGenerate(documentIds); });
+          _showSourcePicker(ready, course, function (documentIds) { doGenerate(documentIds); });
         })
         .catch(function () {
           els.gen.disabled = false;
