@@ -2209,6 +2209,224 @@ def _count_renderable_formulas(text: str) -> int:
     return _formula_count(_wrap_inline_latex_fragments(_wrap_bare_formula_lines(text or "")))
 
 
+# ── Formula-bank enforcement + broken-formula gate (Stage 4b) ──────────────────
+#
+# The model intermittently writes a KNOWN formula as broken prose that renders as
+# raw/red LaTeX or as literal italic letters rather than real math:
+#   * the English operator WORD instead of the command — "sumM_A" (\sum),
+#     "integral r^2 dm" (\int);
+#   * a bare LaTeX command left OUTSIDE $...$ — "L_A = \theta" in plain text;
+#   * an accent glued to its letter — "Fdvecr" (\vec F \cdot d\vec r).
+# For the mechanics topics we have a canonical bank for, this is fully
+# recoverable: a gate fails any shard still carrying breakage (so it regenerates
+# first), and a deterministic backstop rewrites the section's formulas to the
+# canonical set. Only known mechanics topics are touched; everything else is left
+# exactly as the model wrote it.
+
+# An English math-operator word glued to a formula ("sumM_A", "integral r"), or an
+# accent glued to a single trailing letter ("vecr"/"dvecr"). NOT preceded by a
+# letter/backslash, so "\sum"/"\vec" (correct) and "vector" (English) never match.
+_PROSE_MATH_WORD_RE = re.compile(
+    r"(?<![A-Za-z\\])(?:sum|integral)(?=[A-Za-z]*[_^=\d²³]|[ ]?[A-Za-z]\b)"
+    r"|(?<![A-Za-z\\])d?vec(?=[a-z](?![a-z]))"
+)
+# A command stripped of its backslash and GLUED into letters — survives even inside
+# a $...$ span (so it renders as italic letters, not the operator): an accent
+# "…vecr" or an operator word "sumM"/"integralr²". Tightened so English words
+# ("vector", "summary", "integration", "Summe") do NOT match.
+_MANGLED_LATEX_RE = re.compile(
+    r"[A-Za-z]vec[a-z](?![a-z])"
+    r"|(?<![A-Za-z\\])(?:sum|integral)(?=[A-Z]|[a-z]*[_^\d²³])"
+)
+# A line "looks like a formula" (so a prose word on it is suspicious) if it carries
+# an equals/sub/superscript or a backslash command.
+_FORMULA_CONTEXT_RE = re.compile(r"[=_^]|\\[a-zA-Z]")
+_GREEK_LETTER_RE = re.compile(r"[Α-ω]")
+_LATEX_CMD_RE = re.compile(r"\\[a-zA-Z]{2,}")
+_FORMULA_LABEL_RE = re.compile(r"(?im)^\s*\*{0,2}\s*(?:formulas?|formeln?|formula\s+cluster)\b.*$")
+_SECTION_SPLIT_RE = re.compile(r"(?m)^(#{1,6}[ \t]+.*)$")
+
+
+def _strip_math_spans(text: str) -> str:
+    return _MATH_SPAN_RE.sub(" ", text or "")
+
+
+def _broken_formula_reasons(text: str) -> list[str]:
+    """Deterministic signs a formula-driven block carries broken formula text that
+    renders as raw/red LaTeX or literal operator words rather than real math."""
+    if not text:
+        return []
+    reasons: list[str] = []
+    for line in text.splitlines():
+        if _FORMULA_CONTEXT_RE.search(line) and _PROSE_MATH_WORD_RE.search(line):
+            reasons.append("prose-math-word")
+            break
+    # Mixed notation on ONE line — a unicode Greek letter AND a raw LaTeX command
+    # (e.g. "θ_Ang \theta") — is a reliable corruption signal: the model duplicated
+    # a symbol in two notations, which renders as garbled math. Per-line so a clean
+    # `\omega` formula next to a prose "angle θ" elsewhere never trips it.
+    for line in text.splitlines():
+        if _GREEK_LETTER_RE.search(line) and _LATEX_CMD_RE.search(line):
+            reasons.append("mixed-notation")
+            break
+    # A glued operator/accent that survives even inside $...$ ("sumM_A", "Fdvecr").
+    if _MANGLED_LATEX_RE.search(text):
+        reasons.append("mangled-latex")
+    # After the sanitizer's wrapping, a real LaTeX command still sitting OUTSIDE any
+    # math span (e.g. a bare "\theta" the wrapper could not pair) renders raw/red.
+    outside = _strip_math_spans(_wrap_inline_latex_fragments(_wrap_bare_formula_lines(text)))
+    if re.search(r"\\[a-zA-Z]{2,}", outside):
+        reasons.append("raw-latex-in-text")
+    return reasons
+
+
+def _norm_formula_key(body: str) -> str:
+    """A whitespace/spacing-insensitive key so a formula already present in any
+    notation isn't re-injected from the bank."""
+    s = formula_to_latexish(body or "").strip().strip("$").strip()
+    s = re.sub(r"\\(?:left|right|,|;|!|quad|qquad|;)", "", s)
+    s = re.sub(r"\s+", "", s)
+    return s.lower()
+
+
+def _iter_sections(text: str) -> list[tuple[str, str]]:
+    """Split markdown into (heading_line, body) pairs. Any preamble before the
+    first heading is returned as ("", preamble)."""
+    parts = _SECTION_SPLIT_RE.split(text or "")
+    out: list[tuple[str, str]] = []
+    if parts and parts[0]:
+        out.append(("", parts[0]))
+    for i in range(1, len(parts), 2):
+        out.append((parts[i], parts[i + 1] if i + 1 < len(parts) else ""))
+    return out
+
+
+def _section_formula_keys(body: str) -> set[str]:
+    keys: set[str] = set()
+    for m in _DISPLAY_FORMULA_RE.finditer(body):
+        keys.add(_norm_formula_key(m.group(1)))
+    for m in _INLINE_FORMULA_RE.finditer(body):
+        keys.add(_norm_formula_key(m.group(1)))
+    return keys
+
+
+def _is_formula_only_line(line: str) -> bool:
+    """True if a line is essentially just a formula (a $...$ span or bare LaTeX),
+    not a prose line that happens to mention math. Used to swap a bank topic's
+    formula lines for the canonical set without touching its prose/conditions."""
+    s = line.strip()
+    if not s:
+        return False
+    s = re.sub(r"^[-*]\s+", "", s)                       # bullet
+    s = re.sub(r"^\*\*[^*\n]+\*\*\s*:?\s*", "", s).strip()  # bold lead-in label
+    if not s:
+        return False
+    if not re.search(r"\$|[=_^]|\\[a-zA-Z]", s):
+        return False
+    rest = _strip_math_spans(s)
+    rest = re.sub(r"\\[a-zA-Z]+", "", rest)              # drop raw LaTeX command words
+    prose = re.findall(r"[A-Za-z]{3,}", rest)
+    return len(prose) <= 1
+
+
+def _bank_section_markdown(canonical: str) -> str:
+    """A minimal, clean section built from the canonical bank — used to inject a
+    Method-Picker target topic that the model dropped."""
+    formulas = _MECHANICS_FORMULA_BANK.get(canonical, ())
+    traps = _MECHANICS_TRAP_BANK.get(canonical, ())
+    lines = [f"## {canonical}", "", "**Formulas:**"]
+    lines += [f"${f}$" for f in formulas]
+    if traps:
+        lines += ["", "**Watch out:**"]
+        lines += [f"- {t}" for t in traps]
+    return "\n".join(lines)
+
+
+def enforce_formula_bank(text: str, topics: "list[str | None]") -> tuple[str, int]:
+    """For sections whose topic has a canonical formula bank: drop the section's
+    BROKEN/mangled formula lines and inject any MISSING canonical formula (clean
+    $...$). Clean, well-formed formulas the model added are KEPT, and prose /
+    conditions / traps are never touched. Sections with no breakage and all bank
+    formulas already present are left exactly as-is. Returns (text, changes)."""
+    if not text:
+        return text, 0
+    changes = 0
+    rebuilt: list[str] = []
+    for head, body in _iter_sections(text):
+        if not head:
+            rebuilt.append(body)
+            continue
+        title = re.sub(r"^#{1,6}[ \t]+", "", head).strip()
+        canonical = _canonical_mechanics_topic(title)
+        bank = _MECHANICS_FORMULA_BANK.get(canonical, ())
+        if not bank:
+            rebuilt.append(head + body)
+            continue
+        # 1) drop only the broken/mangled formula-only lines.
+        kept: list[str] = []
+        insert_at: "int | None" = None
+        dropped = 0
+        for ln in body.split("\n"):
+            if _is_formula_only_line(ln) and _broken_formula_reasons(ln):
+                if insert_at is None:
+                    insert_at = len(kept)
+                dropped += 1
+                continue
+            kept.append(ln)
+        # 2) inject only the canonical formulas not already present (in any notation).
+        present = _section_formula_keys("\n".join(kept))
+        missing = [f for f in bank if _norm_formula_key(f) not in present]
+        if not dropped and not missing:
+            rebuilt.append(head + body)
+            continue
+        if insert_at is None:
+            lbl = next((k for k, l in enumerate(kept) if _FORMULA_LABEL_RE.match(l)), None)
+            insert_at = (lbl + 1) if lbl is not None else (1 if kept and not kept[0].strip() else 0)
+        if missing:
+            kept[insert_at:insert_at] = [f"${f}$" for f in missing]
+        rebuilt.append(head + "\n".join(kept))
+        changes += 1
+    return "".join(rebuilt), changes
+
+
+# Method-Picker "Use" cell phrase → the canonical topic it tells the student to
+# use. If the picker names a method, the sheet must carry that method's section.
+_MP_METHOD_TO_TOPIC: tuple[tuple[str, str], ...] = (
+    ("tangential", "Tangential- und Normalkoordinaten"),
+    ("polar", "Polarkoordinaten"),
+    ("work-energy", "Arbeit, Energie und Leistung"),
+    ("impulse-momentum", "Impuls und Stoß"),
+)
+
+
+def ensure_method_picker_targets(
+    text: str, topics: "list[str | None]", cfg: dict[str, Any]
+) -> tuple[str, int]:
+    """If the Method Picker references a method (Polar/Tangential-normal/…) but the
+    sheet has no section for it, inject a clean bank section so the picker is never
+    a dead end. Returns (text, injected)."""
+    if not cfg.get("formulaDriven", True) or not text:
+        return text, 0
+    if not re.search(r"(?im)^#{1,6}\s+method\s+picker\b", text):
+        return text, 0
+    existing: set[str] = set()
+    for head, _ in _iter_sections(text):
+        if head:
+            existing.add(_canonical_mechanics_topic(re.sub(r"^#{1,6}[ \t]+", "", head).strip()))
+    low = text.lower()
+    additions: list[str] = []
+    for needle, canonical in _MP_METHOD_TO_TOPIC:
+        if needle not in low or canonical in existing:
+            continue
+        if canonical not in _MECHANICS_FORMULA_BANK:
+            continue
+        additions.append(_bank_section_markdown(canonical))
+        existing.add(canonical)
+    if not additions:
+        return text, 0
+    return text.rstrip() + "\n\n" + "\n\n".join(additions) + "\n", len(additions)
+
+
 # Raw-markdown / template-leak artifacts that must NEVER reach a reference sheet
 # (all observed in the bad Fertigungstechnik output): a forced "Formula cluster"
 # label on a non-formula topic, an "N/A" body, or a literal escaped newline.
@@ -2268,6 +2486,8 @@ def _shard_gate_failures(text: str, cfg: dict[str, Any], *, expect_method_picker
         failures.append("no-formulas")
     elif n_topic >= 3 and n_formulas < n_topic // 2:
         failures.append("low-formula-density")
+    if _broken_formula_reasons(text):
+        failures.append("broken-formula")
     label = _PRESET_REQUIRED_LABEL.get(str(cfg.get("preset")))
     if label and n_topic >= 1 and label not in text.lower():
         failures.append(f"missing-label:{label}")
@@ -2289,6 +2509,12 @@ def _corrective_guidance(failures: list[str]) -> str:
             "NEVER write a 'Formula cluster' label or 'N/A' — this is a memorization "
             "subject; use definitions, classification/comparison tables, "
             "Vorteile/Nachteile, Merken and a concrete Prüfungsfalle instead"
+        )
+    if "broken-formula" in failures:
+        fixes.append(
+            "write EVERY formula as valid KaTeX inside $...$ — use \\sum, \\int, "
+            "\\theta, \\omega, \\vec (NEVER the words 'sum'/'integral', a glued "
+            "accent like 'vecr', or a bare \\theta sitting in plain text)"
         )
     if "raw-markdown" in failures:
         fixes.append("emit clean markdown with real line breaks — never a literal '\\n'")
@@ -2523,6 +2749,20 @@ def generate_cheatsheet(
         log.info("cheatsheet source gate removed %d unsupported formula(s)", unsupported_formulas)
     if filler_notes:
         log.info("cheatsheet filler filter removed %d generic note(s)", filler_notes)
+    # Enforce + gate (formula subjects): the gate above regenerates a shard whose
+    # formulas are broken; this is the deterministic backstop — for known mechanics
+    # topics, rewrite any broken/missing formula to the canonical bank version, and
+    # inject any Method-Picker target section the model dropped so the picker is
+    # never a dead end.
+    bank_repairs = 0
+    method_picker_injected = 0
+    if cfg.get("formulaDriven", True):
+        text, bank_repairs = enforce_formula_bank(text, covered_labels)
+        text, method_picker_injected = ensure_method_picker_targets(text, topics, cfg)
+        if bank_repairs:
+            log.info("cheatsheet bank enforcement rewrote %d section(s)", bank_repairs)
+        if method_picker_injected:
+            log.info("cheatsheet injected %d method-picker target section(s)", method_picker_injected)
     grounding = formula_grounding(text, evidence)
     sources = [
         {
@@ -2579,6 +2819,8 @@ def generate_cheatsheet(
                 "failuresBeforeRetry": diag.get("gateFailuresInitial", []),
                 "failuresAfterRetry": diag.get("gateFailuresFinal", []),
                 "shardsRegenerated": diag.get("shardsRegenerated", 0),
+                "bankRepairs": bank_repairs,
+                "methodPickerInjected": method_picker_injected,
             },
         },
         "model": diag.get("model"),
@@ -2617,6 +2859,8 @@ def generate_cheatsheet(
 
 __all__ = (
     "generate_cheatsheet",
+    "enforce_formula_bank",
+    "ensure_method_picker_targets",
     "sanitize_cheatsheet_markdown",
     "dedup_display_formulas",
     "drop_unsupported_display_formulas",
