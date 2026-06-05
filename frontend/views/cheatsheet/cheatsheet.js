@@ -374,7 +374,12 @@
   function _downloadPdf(el, filename) {
     return _ensureHtml2Pdf().then(function (h2p) {
       return h2p().set({
-        margin: [10, 10, 10, 10],
+        // margin MUST be 0: the captured .cs-paper is already a full A4-landscape
+        // page (297mm) with its own 10mm padding for margins. A non-zero html2pdf
+        // margin offsets that page-width element to the right, pushing its right
+        // edge past the page boundary so the last table column / right text column
+        // is clipped on every page ("Druckkontrol…" truncated). 0 maps it 1:1.
+        margin: 0,
         filename: filename,
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
