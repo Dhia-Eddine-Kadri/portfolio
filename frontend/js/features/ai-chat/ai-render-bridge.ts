@@ -1,16 +1,26 @@
-import { renderMarkdown } from './ai-markdown.js';
+type RenderMarkdownFn = (text: string) => string;
 
 export interface RenderBridgeOptions {
   getWelcomeText?: () => string;
 }
 
-export function initAiRenderBridge(options?: RenderBridgeOptions): {
-  renderMarkdown: typeof renderMarkdown;
+export async function initAiRenderBridge(options?: RenderBridgeOptions): Promise<{
+  renderMarkdown: RenderMarkdownFn;
   renderMath: (el: Element | null) => void;
   scheduleKatexRender: () => void;
-} {
+}> {
   const opts = options || {};
   let katexRenderScheduled = false;
+
+  // Cache-bust the renderer with ?v=<assetVersion>: ai-markdown.js is served
+  // immutable for a year, so a static import would pin returning browsers to the
+  // old renderer (no tables / broken math). A versioned dynamic import is the
+  // only way the deployed fixes actually reach them.
+  const _v = window.MinalloConfig?.assetVersion;
+  const _mdUrl = './ai-markdown.js' + (_v ? '?v=' + encodeURIComponent(String(_v)) : '');
+  const { renderMarkdown } = (await import(/* @vite-ignore */ _mdUrl)) as {
+    renderMarkdown: RenderMarkdownFn;
+  };
 
   function renderMathIn(el: Element): void {
     if (!el || !window.renderMathInElement) return;

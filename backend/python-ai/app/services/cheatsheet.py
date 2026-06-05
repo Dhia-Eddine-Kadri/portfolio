@@ -381,15 +381,28 @@ _SECTION_SYSTEM = (
     "evidence under its matching `### TOPIC: <name>` block. If a formula belongs to "
     "a DIFFERENT listed topic, put it in THAT topic's section, never here; the "
     "evidence pool is fuzzy, so judge by what the formula IS, not where it was "
-    "retrieved. Examples: point-kinematics coordinate definitions "
-    "($r = x e_x + y e_y$, component velocities/accelerations) belong to the "
-    "coordinate-system topic, not to rigid-body or general kinematics; the "
-    "instantaneous centre of rotation and $v_P = v_A + \\omega\\times r_{AP}$ belong "
-    "to rigid-body planar motion, NOT to point kinematics or Cartesian coordinates; "
-    "1D constant-acceleration formulas belong to rectilinear motion, not Cartesian "
-    "coordinates; friction/drag laws ($R=\\mu N$) belong to the friction topic, not "
-    "work-energy; angular momentum belongs to its own section, not the equations of "
-    "motion.\n"
+    "retrieved. Hard rules (do NOT violate):\n"
+    "- Friction/resistance (Reibung) = ONLY $R=\\mu N$, $|H|\\le\\mu_0 N$, friction "
+    "direction, static vs sliding, drag. NEVER work-energy, NEVER moment of inertia.\n"
+    "- Work/energy/power (Arbeit, Energie, Leistung) = work, kinetic/potential "
+    "energy, power. The work-energy theorem lives HERE, not under friction.\n"
+    "- Angular momentum (Drehimpuls) = ONLY $L=r\\times mv$ and its theorem. NEVER "
+    "impact/collision impulse formulas.\n"
+    "- Impact/collision (Impuls und Stoß, Zentraler Stoß) = impulse, restitution, "
+    "momentum conservation — its own section, never under Drehimpuls.\n"
+    "- Moment of inertia (Trägheitsmoment) = $\\Theta=\\int r^2 dm$, Steiner. NEVER "
+    "under friction.\n"
+    "- Variable mass / rockets ≠ rigid-body dynamics: rigid-body (Starrkörper) is "
+    "rotation/rolling/planar motion; 'varying mass throughout motion' is the rocket "
+    "topic, do NOT use it to describe rigid bodies.\n"
+    "- Coordinate definitions ($r=x e_x+y e_y$) → coordinate-system topic; "
+    "$v_P=v_A+\\omega\\times r_{AP}$ and the instantaneous centre → rigid-body planar "
+    "motion; 1D constant-acceleration → rectilinear motion.\n"
+    "\n"
+    "OMIT WEAK SECTIONS — fewer clean sections beat many thin or mixed ones. If a "
+    "topic has no grounded formula you can state cleanly, DROP its `## ` section "
+    "entirely rather than emit a definition-only or mixed block. Never write a "
+    "section whose formulas you are unsure of.\n"
     "\n"
     "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
     "- Wrap THE single most important fact/result of a block in ==double equals== "
@@ -567,6 +580,18 @@ _PRESET_SECTION_FORMAT = {
     ),
 }
 
+# Realistic topic density per PAGE for each preset — the scope cap is pages ×
+# this. Open-book lookup cards and Deep-Revision blocks take more room (fewer per
+# page); Exam Night and Formula Reference are dense (more per page).
+_TOPICS_PER_PAGE = {
+    "exam_night": 12,
+    "open_book_exam": 6,
+    "formula_reference": 10,
+    "balanced": 7,
+    "deep_revision": 5,
+    "topic_mastery": 12,
+}
+
 _DETAIL_CONFIG = {
     "general": {"topicDelta": -3, "topK": 4, "evidence": 28, "density": "10-16"},
     "balanced": {"topicDelta": 0, "topK": 5, "evidence": 36, "density": "14-20"},
@@ -617,10 +642,13 @@ def normalize_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     output = str(s.get("output") or "both").lower()
     if output not in _VALID_OUTPUTS:
         output = "both"
-    # More pages → a few more sections; fewer → tighter. A gentle ±delta. The cap
-    # is the skeleton depth (_MAX_TOPICS); parallel section generation means even
-    # the full count fans out into concurrent shards rather than one long call.
-    base["topics"] = max(4, min(_MAX_TOPICS, base["topics"] + (pages - 2) * 2 + detail["topicDelta"]))
+    # Scope is bounded by PAGES, not by the preset's ambition: a 2-page sheet must
+    # show fewer topics done perfectly, not 22 half-broken ones. Each preset has a
+    # realistic topics-per-page density (lookup cards need more room than a dense
+    # formula list); detail level nudges it. The gate then drops any section that
+    # still comes out thin, so the final sheet is "fewer, clean" by construction.
+    per_page = _TOPICS_PER_PAGE.get(preset, 8)
+    base["topics"] = max(4, min(_MAX_TOPICS, pages * per_page + detail["topicDelta"]))
 
     lang = str(s.get("language") or "source").lower()
     if lang not in _VALID_LANGS:
@@ -673,6 +701,14 @@ _HAS_MATH_RE = re.compile(r"[=<>+\-*/^_]|\\frac|\\int|\\sum|\\sqrt|\\partial|\\c
 _BARE_LINE_RE = re.compile(r"^(\s*(?:[-*]\s+)?)(\S.*?)\s*$")
 _MATH_TOKEN_RE = re.compile(r"\\[a-zA-Z]+|[=^_]")
 _PROSE_RUN_RE = re.compile(r"[A-Za-z]{3,}\s+[A-Za-z]{3,}")
+_NUMBERED_RE = re.compile(r"^\d+[.)]")
+# A maximal run of inline LaTeX (a command, then adjacent commands / single
+# letters / digits / operators / braced groups) that leaks into prose without
+# $...$ — e.g. "v is not tangential unless \dot r = 0". Stops at a 2+ letter word.
+_LATEX_FRAG_RE = re.compile(
+    r"\\[a-zA-Z]+(?:[ \t]*(?:\\[a-zA-Z]+|[A-Za-z](?![A-Za-z])|[0-9]|[_^=+\-*/(),.]|\{[^}]*\}))*"
+)
+_MATH_SPAN_RE = re.compile(r"\$\$.+?\$\$|\$[^$\n]+?\$", re.S)
 
 
 def _wrap_bare_formula_lines(text: str) -> str:
@@ -683,10 +719,14 @@ def _wrap_bare_formula_lines(text: str) -> str:
             out.append(line)
             continue
         prefix, body = m.group(1), m.group(2)
+        # Wrap only a CLEAN standalone formula: no existing math, no markdown
+        # lead-in, no number prefix or `label:` (those mix prose + math), not prose.
         if (
             "$" in body
             or body[:2] == "**"
             or body[:1] in "#|>"
+            or ":" in body
+            or _NUMBERED_RE.match(body)
             or not _MATH_TOKEN_RE.search(body)
             or _PROSE_RUN_RE.search(body)
         ):
@@ -694,6 +734,19 @@ def _wrap_bare_formula_lines(text: str) -> str:
             continue
         out.append(f"{prefix}${body}$")
     return "\n".join(out)
+
+
+def _wrap_inline_latex_fragments(text: str) -> str:
+    """Wrap LaTeX command runs that leak into prose (outside any $...$) so they
+    render as math. Existing $...$/$$...$$ spans are left untouched."""
+    parts: list[str] = []
+    last = 0
+    for m in _MATH_SPAN_RE.finditer(text):
+        parts.append(_LATEX_FRAG_RE.sub(lambda g: "$" + g.group(0) + "$", text[last:m.start()]))
+        parts.append(m.group(0))
+        last = m.end()
+    parts.append(_LATEX_FRAG_RE.sub(lambda g: "$" + g.group(0) + "$", text[last:]))
+    return "".join(parts)
 
 
 def _formula_body_ok(body: str) -> bool:
@@ -731,6 +784,26 @@ _SCAFFOLD_HEADING_RE = re.compile(
     r"taxonomy[^\n]*|information architecture[^\n]*|spatial layout[^\n]*|"
     r"settings|course context|emphasis markers)[ \t]*:?[ \t]*$\n?"
 )
+
+
+# Any literal "formula omitted"/"not supported"/"unreadable" failure text that
+# slipped in (from older output, evidence, or a mangled marker like
+# "formulaomitted") — scrubbed so it can never render.
+_OMITTED_TEXT_RE = re.compile(
+    r"\*?\(?\s*formula\s*omitted[^)\n]*\)?\*?|\bformulaomitted\b", re.I
+)
+# A bullet/line left holding only a dropped formula: an empty bullet, or a bullet
+# whose sole content was a bold label (`- **Velocity:**`) now that the formula is
+# gone. Standalone label lines (`**Formulas:**`) are kept — they head real content.
+_EMPTY_BULLET_RE = re.compile(r"(?m)^[ \t]*[-*][ \t]*(?:\*\*[^*\n]+\*\*[ \t]*:?[ \t]*)?$\n?")
+
+
+def _tidy_emptied_lines(text: str) -> str:
+    out = _OMITTED_TEXT_RE.sub("", text or "")
+    out = _EMPTY_BULLET_RE.sub("", out)
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out
 
 
 def _strip_source_labels(text: str) -> str:
@@ -774,8 +847,10 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     cleaned = cleaned.replace("\\(", "$").replace("\\)", "$")
 
     # 1a·2) wrap bare formula lines (model dropped the $...$ under a preset format)
-    # so they render as math, not raw text.
+    # so they render as math, not raw text; then wrap LaTeX fragments that leak
+    # into prose sentences (e.g. "\dot r" inside a Trap line).
     cleaned = _wrap_bare_formula_lines(cleaned)
+    cleaned = _wrap_inline_latex_fragments(cleaned)
 
     # 1b) a salvaged (token-cap-truncated) sheet can end mid-formula, leaving a
     # dangling unterminated "$$" that would break KaTeX. If the display-delimiter
@@ -783,7 +858,8 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     if cleaned.count("$$") % 2 == 1:
         cleaned = cleaned[: cleaned.rfind("$$")].rstrip()
 
-    # 2) malformed display formulas
+    # 2) malformed formulas: DROP them entirely. A failure marker must never reach
+    # the sheet — a missing formula is fine, a printed "(formula omitted)" is not.
     dropped = 0
 
     def _display_repl(m: "re.Match[str]") -> str:
@@ -792,7 +868,7 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
         if normalized and _formula_body_ok(normalized):
             return "$$" + normalized + "$$"
         dropped += 1
-        return "*(formula omitted — unreadable in source)*"
+        return ""
 
     def _inline_repl(m: "re.Match[str]") -> str:
         nonlocal dropped
@@ -800,10 +876,11 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
         if normalized:
             return "$" + normalized + "$"
         dropped += 1
-        return "*(formula omitted - unreadable in source)*"
+        return ""
 
     cleaned = _DISPLAY_FORMULA_RE.sub(_display_repl, cleaned)
     cleaned = _INLINE_FORMULA_RE.sub(_inline_repl, cleaned)
+    cleaned = _tidy_emptied_lines(cleaned)
     return cleaned, dropped
 
 
@@ -905,9 +982,10 @@ def drop_unsupported_display_formulas(
         if _formula_grounded(body, corpus):
             return m.group(0)
         removed += 1
-        return "*(formula omitted - not supported by retrieved source text)*"
+        return ""
 
-    return _DISPLAY_FORMULA_RE.sub(_repl, text or ""), removed
+    out = _DISPLAY_FORMULA_RE.sub(_repl, text or "")
+    return _tidy_emptied_lines(out), removed
 
 
 def remove_generic_filler_notes(text: str) -> tuple[str, int]:
@@ -1571,10 +1649,14 @@ def _run_one_section_shard(
     group: list[SectionGroup],
     doc_names: dict[str, str],
     with_method_picker: bool,
+    corrective: str = "",
 ) -> "LlmResult | None":
-    """Generate the `##` sections for one shard's worth of topics. Thread-safe."""
+    """Generate the `##` sections for one shard's worth of topics. Thread-safe.
+
+    ``corrective`` is the quality-gate feedback appended on a regeneration pass.
+    """
     topics = [label for label, _ in group]
-    system = _shard_system_prompt(cfg, topics, with_method_picker=with_method_picker)
+    system = _shard_system_prompt(cfg, topics, with_method_picker=with_method_picker) + corrective
     user = (
         "COURSE CONTEXT:\n\n"
         + _format_section_evidence(group, doc_names)
@@ -1589,6 +1671,79 @@ def _run_one_section_shard(
     except Exception:  # noqa: BLE001
         log.exception("cheatsheet section shard failed (topics=%s)", topics)
         return None
+
+
+# ── Per-preset quality gate + auto-regeneration ──────────────────────────────
+#
+# After the parallel pass we score each shard's output against the preset's
+# requirements. Only shards that FAIL are regenerated (once, in parallel) with
+# corrective feedback — so the extra cost is ~one more shard round at most, which
+# keeps the sheet inside the upstream timeout. Deterministic defects (broken
+# math, raw-markdown tables, source labels, corrupted symbols) are already
+# repaired by sanitize, so the gate targets CONTENT defects a retry can fix.
+
+# Labels a preset's format makes mandatory in (nearly) every section.
+_PRESET_REQUIRED_LABEL = {
+    "open_book_exam": "use when",
+    "deep_revision": "why it matters",
+}
+
+
+def _count_renderable_formulas(text: str) -> int:
+    """Formula count after the same bare-line / inline-fragment wrapping sanitize
+    applies, so a shard that emitted bare LaTeX isn't scored as formula-free."""
+    return _formula_count(_wrap_inline_latex_fragments(_wrap_bare_formula_lines(text or "")))
+
+
+def _shard_gate_failures(text: str, cfg: dict[str, Any], *, expect_method_picker: bool) -> list[str]:
+    """Return the content checks a shard's output fails (empty list = pass)."""
+    if not (text and text.strip()):
+        return ["empty"]
+    failures: list[str] = []
+    if "formula omitted" in text.lower() or "formulaomitted" in text.lower():
+        failures.append("omitted-marker")
+    if expect_method_picker and not re.search(r"(?im)^#{1,6}\s+method\s+picker\b", text):
+        failures.append("missing-method-picker")
+    titles = re.findall(r"(?im)^#{1,6}\s+(.+?)\s*$", text)
+    topic_sections = [t for t in titles if "method picker" not in t.lower()]
+    n_topic = len(topic_sections)
+    n_formulas = _count_renderable_formulas(text)
+    if n_topic and n_formulas == 0:
+        failures.append("no-formulas")
+    elif n_topic >= 3 and n_formulas < n_topic // 2:
+        failures.append("low-formula-density")
+    label = _PRESET_REQUIRED_LABEL.get(str(cfg.get("preset")))
+    if label and n_topic >= 1 and label not in text.lower():
+        failures.append(f"missing-label:{label}")
+    return failures
+
+
+def _corrective_guidance(failures: list[str]) -> str:
+    fixes: list[str] = []
+    if "missing-method-picker" in failures:
+        fixes.append("include the Method Picker as a markdown table as the FIRST section")
+    if "no-formulas" in failures or "empty" in failures or "low-formula-density" in failures:
+        fixes.append(
+            "every section MUST carry its grounded formulas in $...$ — no prose-only "
+            "sections; mine the evidence for every formula it supports"
+        )
+    for f in failures:
+        if f.startswith("missing-label:"):
+            fixes.append(f"use the required **{f.split(':', 1)[1].title()}:** label in every section")
+    if not fixes:
+        return ""
+    return (
+        "\n\nREGENERATION — your previous attempt FAILED these checks: "
+        + ", ".join(failures) + ". Fix ALL of them: " + "; ".join(fixes)
+        + ". Keep every formula grounded in the COURSE CONTEXT; never invent."
+    )
+
+
+def _shard_text(res: Any) -> str:
+    if res is None:
+        return ""
+    data = res.data if isinstance(res.data, dict) else {}
+    return ((data.get("text") if isinstance(data, dict) else "") or "").strip()
 
 
 def _generate_sections_parallel(
@@ -1612,6 +1767,9 @@ def _generate_sections_parallel(
     if not shards:
         return "", diag
 
+    def _expect_mp(idx: int) -> bool:
+        return idx == 0 and not per_pdf
+
     results: list[Any] = [None] * len(shards)
     with ThreadPoolExecutor(max_workers=len(shards)) as pool:
         futures = {
@@ -1620,12 +1778,53 @@ def _generate_sections_parallel(
                 cfg=cfg,
                 group=shard,
                 doc_names=doc_names,
-                with_method_picker=(idx == 0 and not per_pdf),
+                with_method_picker=_expect_mp(idx),
             ): idx
             for idx, shard in enumerate(shards)
         }
         for fut in as_completed(futures):
             results[futures[fut]] = fut.result()
+
+    # Quality gate: score each shard; regenerate ONLY the failing ones (once, in
+    # parallel) with corrective feedback, and keep the better of the two.
+    failures = [
+        _shard_gate_failures(_shard_text(results[i]), cfg, expect_method_picker=_expect_mp(i))
+        for i in range(len(shards))
+    ]
+    diag["gateFailuresInitial"] = [f for fs in failures for f in fs]
+    retry_idxs = [i for i, fs in enumerate(failures) if fs]
+    diag["shardsRegenerated"] = 0
+    if retry_idxs:
+        with ThreadPoolExecutor(max_workers=len(retry_idxs)) as pool:
+            futures = {
+                pool.submit(
+                    _run_one_section_shard,
+                    cfg=cfg,
+                    group=shards[i],
+                    doc_names=doc_names,
+                    with_method_picker=_expect_mp(i),
+                    corrective=_corrective_guidance(failures[i]),
+                ): i
+                for i in retry_idxs
+            }
+            for fut in as_completed(futures):
+                i = futures[fut]
+                retry_res = fut.result()
+                retry_fail = _shard_gate_failures(
+                    _shard_text(retry_res), cfg, expect_method_picker=_expect_mp(i)
+                )
+                # Keep the retry only if it is strictly better (fewer failures, or
+                # equal failures but more renderable formulas).
+                better = len(retry_fail) < len(failures[i]) or (
+                    len(retry_fail) == len(failures[i])
+                    and _count_renderable_formulas(_shard_text(retry_res))
+                    > _count_renderable_formulas(_shard_text(results[i]))
+                )
+                if retry_res is not None and better:
+                    results[i] = retry_res
+                    failures[i] = retry_fail
+                    diag["shardsRegenerated"] += 1
+    diag["gateFailuresFinal"] = [f for fs in failures for f in fs]
 
     texts: list[str] = []
     for res in results:
@@ -1634,9 +1833,9 @@ def _generate_sections_parallel(
         diag["model"] = res.model
         diag["promptTokens"] += res.prompt_tokens or 0
         diag["completionTokens"] += res.completion_tokens or 0
-        t = (res.data.get("text") if isinstance(res.data, dict) else "") or ""
-        if t.strip():
-            texts.append(t.strip())
+        t = _shard_text(res)
+        if t:
+            texts.append(t)
     return "\n\n".join(texts), diag
 
 
@@ -1785,6 +1984,11 @@ def generate_cheatsheet(
             "droppedUnsupportedFormulas": unsupported_formulas,
             "droppedGenericNotes": filler_notes,
             "metrics": metrics,
+            "gate": {
+                "failuresBeforeRetry": diag.get("gateFailuresInitial", []),
+                "failuresAfterRetry": diag.get("gateFailuresFinal", []),
+                "shardsRegenerated": diag.get("shardsRegenerated", 0),
+            },
         },
         "model": diag.get("model"),
         "promptTokens": diag.get("promptTokens"),

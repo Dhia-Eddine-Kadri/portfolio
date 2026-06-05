@@ -616,12 +616,22 @@ if (typeof window.renderMarkdown !== 'function') {
   window.renderMarkdown = (text: string): string => escapeHtml(text);
 }
 
+// Cache-bust with ?v=<assetVersion> exactly like main.ts's lazyImportEncoded:
+// these feature chunks (and their nested static imports, e.g. ai-markdown.js) are
+// served immutable for a year, so without the version a returning browser keeps
+// the OLD renderer forever and never sees fixes (tables, KaTeX, etc).
+function _versionedImport(encodedPath: string): Promise<Record<string, unknown>> {
+  const path = atob(encodedPath);
+  const v = window.MinalloConfig?.assetVersion;
+  const url = v ? path + (path.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(String(v)) : path;
+  return import(/* @vite-ignore */ url);
+}
+
 let _aiRenderBridgePromise: Promise<unknown> | null = null;
 function _ensureAiRenderBridge(): Promise<unknown> {
   if (_aiRenderBridgePromise) return _aiRenderBridgePromise;
-  _aiRenderBridgePromise = import(
-    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLXJlbmRlci1icmlkZ2UuanM=')
-  ).then((mod) => mod.initAiRenderBridge());
+  _aiRenderBridgePromise = _versionedImport('Li9mZWF0dXJlcy9haS1jaGF0L2FpLXJlbmRlci1icmlkZ2UuanM=')
+    .then((mod) => (mod.initAiRenderBridge as () => unknown)());
   return _aiRenderBridgePromise;
 }
 (window as unknown as { _ensureAiRenderBridge?: () => Promise<unknown> })._ensureAiRenderBridge =
@@ -630,9 +640,8 @@ function _ensureAiRenderBridge(): Promise<unknown> {
 let _aiExportBridgePromise: Promise<unknown> | null = null;
 function _ensureAiExportBridge(): Promise<unknown> {
   if (_aiExportBridgePromise) return _aiExportBridgePromise;
-  _aiExportBridgePromise = import(
-    /* @vite-ignore */ atob('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWV4cG9ydC1icmlkZ2UuanM=')
-  ).then((mod) => mod.initAiExportBridge());
+  _aiExportBridgePromise = _versionedImport('Li9mZWF0dXJlcy9haS1jaGF0L2FpLWV4cG9ydC1icmlkZ2UuanM=')
+    .then((mod) => (mod.initAiExportBridge as () => unknown)());
   return _aiExportBridgePromise;
 }
 

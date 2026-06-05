@@ -128,7 +128,8 @@ def test_sanitize_strips_replacement_char():
 def test_sanitize_drops_unbalanced_brace_formula():
     out, dropped = cs.sanitize_cheatsheet_markdown("$$\\frac{a}{b$$")
     assert dropped == 1
-    assert "omitted" in out
+    # the broken formula is dropped silently — never a printed failure marker
+    assert "omitted" not in out.lower()
     assert "frac" not in out
 
 
@@ -384,6 +385,69 @@ def test_doubled_backslash_repair_keeps_matrix_row_break():
         r"\begin{matrix} a \\ b \end{matrix}"
 
 
+def test_gate_flags_missing_method_picker_and_no_formulas():
+    cfg = cs.normalize_settings({"preset": "balanced"})
+    text = "## Kinematik\nMotion is the study of movement and its effects on bodies."
+    fails = cs._shard_gate_failures(text, cfg, expect_method_picker=True)
+    assert "missing-method-picker" in fails
+    assert "no-formulas" in fails
+
+
+def test_gate_flags_missing_open_book_label():
+    cfg = cs.normalize_settings({"preset": "open_book_exam"})
+    text = "## Work\n**Formulas:**\n$W = F d$"
+    fails = cs._shard_gate_failures(text, cfg, expect_method_picker=False)
+    assert any(f.startswith("missing-label:use when") for f in fails)
+
+
+def test_gate_passes_good_open_book_shard():
+    cfg = cs.normalize_settings({"preset": "open_book_exam"})
+    text = (
+        "## Method Picker\n| a | b |\n|---|---|\n| x | y |\n\n"
+        "## Work\n**Use when:** force over a path\n**Formulas:**\n$W = F d$\n"
+        "**Watch out:** friction work is negative"
+    )
+    fails = cs._shard_gate_failures(text, cfg, expect_method_picker=True)
+    assert fails == []
+
+
+def test_gate_counts_bare_formulas_as_present():
+    cfg = cs.normalize_settings({"preset": "exam_night"})
+    # bare LaTeX (no $) still counts — sanitize would wrap it
+    text = "## Kinematik\nv = \\frac{dx}{dt}\na = \\frac{dv}{dt}"
+    fails = cs._shard_gate_failures(text, cfg, expect_method_picker=False)
+    assert "no-formulas" not in fails
+
+
+def test_gate_regenerates_failing_shard(monkeypatch):
+    calls = {"n": 0}
+
+    def fake_chat(**k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # initial: prose-only, no formula → fails the gate
+            return _FakeChatResult({"text": "## Reibung\nFriction always opposes motion here."})
+        # retry: now carries a grounded formula
+        return _FakeChatResult({"text": "## Reibung\n**Use when:** friction\n$R = \\mu N$"})
+
+    monkeypatch.setattr(cs, "chat_json", fake_chat)
+    cfg = cs.normalize_settings({"preset": "balanced"})
+    groups = [("Reibung und Widerstand", [{"chunkId": "c1", "documentId": "d1", "text": "R = mu N"}])]
+    text, diag = cs._generate_sections_parallel(
+        cfg=cfg, groups=groups, doc_names={"d1": "a.pdf"}, per_pdf=True,  # per_pdf=True → no method-picker requirement
+    )
+    assert diag["shardsRegenerated"] == 1
+    assert "no-formulas" in diag["gateFailuresInitial"]
+    assert "\\mu N" in text
+
+
+def test_corrective_guidance_mentions_failures():
+    g = cs._corrective_guidance(["missing-method-picker", "missing-label:use when"])
+    assert "Method Picker" in g
+    assert "Use When" in g
+    assert cs._corrective_guidance([]) == ""
+
+
 def test_each_preset_injects_distinct_section_format():
     markers = {
         "exam_night": "EXAM NIGHT FORMAT",
@@ -432,6 +496,23 @@ def test_wrap_bare_formula_leaves_prose_alone():
     assert "velocity changes when force acts" in out
 
 
+def test_wrap_inline_latex_fragment_in_prose():
+    out, _ = cs.sanitize_cheatsheet_markdown(
+        "v is not tangential unless \\dot r = 0 here"
+    )
+    assert "$\\dot r = 0$" in out
+    assert "tangential" in out  # prose preserved
+
+
+def test_wrap_skips_numbered_and_colon_lines():
+    # numbered special-case line must NOT be wrapped whole as one formula
+    out, _ = cs.sanitize_cheatsheet_markdown("2. a = a_0 = const: v(t) = v_0 + a_0 t")
+    assert "$2. a" not in out
+    # label: formula line is not wrapped whole either
+    out2, _ = cs.sanitize_cheatsheet_markdown("Velocity: v changes with time")
+    assert "$Velocity" not in out2
+
+
 def test_wrap_bare_formula_skips_existing_math_and_labels():
     out, _ = cs.sanitize_cheatsheet_markdown("**Use when:** task asks for $v$\n## Heading = x")
     assert "$**Use when" not in out
@@ -441,6 +522,12 @@ def test_wrap_bare_formula_skips_existing_math_and_labels():
 def test_sanitize_keeps_method_picker_heading():
     out, _ = cs.sanitize_cheatsheet_markdown("## Method Picker\n| a | b |\n|---|---|\n| x | y |")
     assert "## Method Picker" in out
+
+
+def test_unsupported_latex_env_repaired():
+    out, _ = cs.sanitize_cheatsheet_markdown(r"$\begin{align*} v &= x \end{align*}$")
+    assert "align*" not in out
+    assert "aligned" in out
 
 
 def test_glued_accent_command_gets_a_space():
@@ -455,7 +542,9 @@ def test_glued_accent_command_gets_a_space():
 def test_spaced_letter_ocr_formula_dropped():
     out, dropped = cs.sanitize_cheatsheet_markdown(r"angle $h e t a h e t a = 0$ here")
     assert dropped == 1
-    assert "formula omitted" in out
+    assert "omitted" not in out.lower()
+    assert "h e t a" not in out
+    assert "angle" in out and "here" in out  # surrounding prose preserved
 
 
 def test_strip_source_labels_removes_inline_citation():
@@ -517,7 +606,9 @@ def test_source_gate_drops_unsupported_display_formula():
     )
     assert removed == 1
     assert "\\zeta" not in out
-    assert "not supported" in out
+    # dropped silently — no internal failure text in the sheet
+    assert "not supported" not in out
+    assert "omitted" not in out.lower()
 
 
 def test_source_gate_keeps_supported_display_formula():

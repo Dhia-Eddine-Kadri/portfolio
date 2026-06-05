@@ -136,6 +136,15 @@ _GLUED_ACCENT_RE = re.compile(
 # A run of 4+ single letters separated by spaces (``h e t a``) is OCR that split a
 # word/symbol glyph-by-glyph — unsalvageable, so the formula is dropped.
 _SPACED_LETTERS_RE = re.compile(r"(?:\b[A-Za-z]\b[ \t]+){4,}")
+# KaTeX does not support align*/equation/eqnarray/gather; map them to the
+# supported aligned/gathered so a model that wraps a formula in one still renders.
+_LATEX_ENV_RE = re.compile(r"\\(begin|end)\{(align\*?|alignat\*?|eqnarray\*?|equation\*?|gather\*?)\}")
+
+
+def _fix_latex_env(m: "re.Match[str]") -> str:
+    env = m.group(2)
+    repl = "gathered" if env.startswith("gather") else "aligned"
+    return f"\\{m.group(1)}{{{repl}}}"
 
 
 def repair_mojibake(text: str) -> str:
@@ -157,6 +166,7 @@ def formula_to_latexish(text: str) -> str:
     out = _DOUBLED_BACKSLASH_CMD_RE.sub(r"\\", out)
     out = _TEXT_OPERATOR_RE.sub(r"\\\1", out)
     out = _GLUED_ACCENT_RE.sub(r"\\\1 ", out)
+    out = _LATEX_ENV_RE.sub(_fix_latex_env, out)
     return out
 
 
