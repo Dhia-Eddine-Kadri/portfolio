@@ -324,50 +324,80 @@
     }
     newPage(true);
 
-    st.blocks.forEach(function (b) {
+    // Place a narrow block into the shortest fitting column of the open band.
+    // Returns true if it fit.
+    function tryPlaceNarrow(b) {
+      if (!open) openBand();
+      var best = -1, bestH = Infinity;
+      for (var i = 0; i < nCols; i++) {
+        var c = open.cols[i];
+        var add = (c.els.length ? _BLOCK_GAP : 0) + b.h;
+        if (c.h + add <= open.maxH && c.h < bestH) { best = i; bestH = c.h; }
+      }
+      if (best < 0) return false;
+      var col = open.cols[best];
+      if (col.els.length) col.h += _BLOCK_GAP;
+      col.els.push(b.el);
+      col.h += b.h;
+      return true;
+    }
+
+    // AUTO-FILL packer. Walks blocks in order, but when the next section is too
+    // tall for the leftover column space, it pulls a LATER, shorter section
+    // forward to fill the gap (first one that fits) instead of stranding the empty
+    // band and breaking to a new page. Wide (table) bands and manual page breaks
+    // stay anchored in place — they are never pulled forward. Result: dense pages,
+    // order kept as close to the original as the heights allow.
+    var n = st.blocks.length;
+    var consumed = new Array(n).fill(false);
+    var done = 0, i = 0, guard = 0;
+    while (done < n && guard++ < n * 4 + 50) {
+      while (i < n && consumed[i]) i++;
+      if (i >= n) break;
+      var b = st.blocks[i];
+
       // Manual page break: this section starts a new page (unless the current page
       // holds only the header — never break to a header-only page).
       if (_hasBreak(b.el) && pageHasContent()) { finalizeOpen(); newPage(false); }
+
       if (b.wide) {
         finalizeOpen();
         if (page.used > 0 && b.h + _BAND_GAP > remaining()) newPage(false);
         page.bands.push({ type: 'wide', el: b.el, h: b.h });
         page.used += b.h + _BAND_GAP;
-        return;
+        consumed[i] = true; done++; i++;
+        continue;
       }
-      var placed = false;
-      var guard = 0;
-      while (!placed && guard++ < 1000) {
-        if (!open) openBand();
-        var best = -1, bestH = Infinity;
-        for (var i = 0; i < nCols; i++) {
-          var c = open.cols[i];
-          var add = (c.els.length ? _BLOCK_GAP : 0) + b.h;
-          if (c.h + add <= open.maxH && c.h < bestH) { best = i; bestH = c.h; }
-        }
-        if (best >= 0) {
-          var col = open.cols[best];
-          if (col.els.length) col.h += _BLOCK_GAP;
-          col.els.push(b.el);
-          col.h += b.h;
-          placed = true;
-        } else {
-          var bandEmpty = open.cols.every(function (c) { return !c.els.length; });
-          finalizeOpen();
-          if (bandEmpty) {
-            // Block taller than a fresh full-page column → force-place (can't split
-            // a section). Start a clean page first if the current one has content.
-            if (page.used > 0) newPage(false);
-            openBand();
-            open.cols[0].els.push(b.el);
-            open.cols[0].h += b.h;
-            placed = true;
-          } else {
-            newPage(false);
-          }
-        }
+
+      if (tryPlaceNarrow(b)) { consumed[i] = true; done++; i++; continue; }
+
+      // b doesn't fit the open band. Backfill the band's leftover column space with
+      // the earliest later narrow section that DOES fit (don't reorder across a
+      // table or a manual break).
+      var filled = false;
+      for (var j = i + 1; j < n; j++) {
+        if (consumed[j]) continue;
+        var c2 = st.blocks[j];
+        if (c2.wide || _hasBreak(c2.el)) continue;
+        if (tryPlaceNarrow(c2)) { consumed[j] = true; done++; filled = true; break; }
       }
-    });
+      if (filled) continue; // band got fuller; retry b (still pending) next loop
+
+      // Nothing more fits this band. Close it and place b on fresh space.
+      var bandEmpty = !!open && open.cols.every(function (c) { return !c.els.length; });
+      finalizeOpen();
+      if (bandEmpty) {
+        // b taller than a fresh full-page column → force-place (can't split a
+        // section). Start a clean page first if the current one has content.
+        if (page.used > 0) newPage(false);
+        openBand();
+        open.cols[0].els.push(b.el);
+        open.cols[0].h += b.h;
+        consumed[i] = true; done++; i++;
+      } else {
+        newPage(false); // b retried on the new empty page next loop
+      }
+    }
     finalizeOpen();
 
     // Build the page DOM.
