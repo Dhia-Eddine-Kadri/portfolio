@@ -104,8 +104,11 @@
     }
     targets.forEach(function (node) {
       var t = node.nodeValue || '';
+      // Highlight body may contain a single `=` (e.g. a Merken cue
+      // "==Druckguss = Großserie=="); allow any char except the closing `==`,
+      // so a lone `=` no longer breaks the match and leaks raw `==` to the PDF.
       var html = _esc(t)
-        .replace(/==([^=]+)==/g, '<mark class="cs-hl">$1</mark>')
+        .replace(/==((?:[^=\n]|=(?!=))+)==/g, '<mark class="cs-hl">$1</mark>')
         .replace(/\{\{([^}]+)\}\}/g, '<span class="cs-key">$1</span>');
       if (_LABEL_WARN.test(t)) html = '<span class="cs-warn">' + html + '</span>';
       else if (_LABEL_NOTE.test(t)) html = '<span class="cs-note">' + html + '</span>';
