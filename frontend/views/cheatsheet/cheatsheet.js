@@ -115,34 +115,217 @@
     });
   }
 
-  // Group each `##` section (h2 + following siblings) into a .cs-block so a
-  // section never splits across columns in the multi-column paper.
-  function _wrapBlocks(body) {
-    if (!body) return;
+  // Group each `##` section (h2 + following siblings) into a detached .cs-block.
+  // A section containing a table is tagged wide (it becomes a full-width band).
+  // Returns [{el, wide, h}] WITHOUT re-appending — the paginator places them.
+  function _collectBlocks(body) {
     var kids = Array.prototype.slice.call(body.childNodes);
-    var blocks = [];
+    var groups = [];
     var cur = null;
     kids.forEach(function (node) {
-      if (node.nodeType === 1 && node.tagName === 'H2') {
+      if ((node.nodeType === 1 && node.tagName === 'H2') || !cur) {
         cur = document.createElement('div');
         cur.className = 'cs-block';
-        blocks.push(cur);
-      } else if (!cur) {
-        cur = document.createElement('div');
-        cur.className = 'cs-block';
-        blocks.push(cur);
+        groups.push(cur);
       }
       cur.appendChild(node);
     });
-    body.innerHTML = '';
-    blocks.forEach(function (b) {
-      // A section containing a table spans all columns (full page width) so a
-      // wide comparison/classification grid can never overflow into and overlap
-      // the neighbouring column. Tagged here (not via CSS :has) for engine
-      // reliability — html2canvas captures the real browser layout.
-      if (b.querySelector('table')) b.classList.add('cs-block--wide');
-      body.appendChild(b);
+    return groups.map(function (b) {
+      var wide = !!b.querySelector('table');
+      if (wide) b.classList.add('cs-block--wide');
+      return { el: b, wide: wide, h: 0 };
     });
+  }
+
+  // Fallback (only if the paged engine throws): the old single multi-column flow.
+  function _wrapBlocksFallback(body, blocks) {
+    body.innerHTML = '';
+    blocks.forEach(function (b) { body.appendChild(b.el); });
+  }
+
+  // ── Paged layout engine ────────────────────────────────────────────────────
+  // Measures each section block and PACKS blocks into explicit A4-landscape pages:
+  // a table section becomes a full-width band, runs of cards become multi-column
+  // bands. Pages fill (top-down, column by column) before spilling to the next, so
+  // there are no blank trailing pages, no section cut across a page, and no lonely
+  // block stranded on an empty page. Re-runnable on column/font change.
+  var _COL_GAP = 18, _BLOCK_GAP = 10, _BAND_GAP = 12, _SAFETY = 8;
+
+  function _layoutPages(paper) {
+    var st = paper && paper._csState;
+    if (!st || !st.blocks.length) return;
+    var nCols = parseInt(paper.style.getPropertyValue('--cs-columns'), 10) || 3;
+
+    // Detach header + all blocks from any previous layout, then clear old pages.
+    if (st.header && st.header.parentNode) st.header.parentNode.removeChild(st.header);
+    st.blocks.forEach(function (b) { if (b.el.parentNode) b.el.parentNode.removeChild(b.el); });
+    Array.prototype.slice.call(paper.querySelectorAll('.cs-page, .html2pdf__page-break'))
+      .forEach(function (n) { n.remove(); });
+    paper.classList.add('is-paged');
+
+    // Geometry: measure a real (hidden) page's inner content box in px.
+    var probe = document.createElement('div');
+    probe.className = 'cs-page';
+    probe.style.cssText = 'visibility:hidden;position:absolute;left:-99999px;top:0;margin:0;';
+    var probeInner = document.createElement('div');
+    probeInner.className = 'cs-page-inner';
+    probe.appendChild(probeInner);
+    paper.appendChild(probe);
+    var innerW = probeInner.clientWidth;
+    var innerH = probeInner.clientHeight;
+    paper.removeChild(probe);
+    if (!innerW || !innerH) throw new Error('cs: zero page geometry');
+
+    var colW = Math.floor((innerW - (nCols - 1) * _COL_GAP) / nCols);
+    var budget = innerH - _SAFETY;
+
+    // Measure heights inside the real paper (so fonts/styles apply). flow-root on
+    // .cs-block (CSS) means offsetHeight already contains child margins.
+    var mhost = document.createElement('div');
+    // Match the rendered wrapping so measured heights equal rendered heights
+    // (a long compound word that wraps at render must also wrap when measured).
+    mhost.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;'
+      + 'overflow-wrap:break-word;word-break:break-word;';
+    paper.appendChild(mhost);
+    var headerH = 0;
+    if (st.header) {
+      mhost.style.width = innerW + 'px';
+      mhost.appendChild(st.header);
+      headerH = st.header.offsetHeight;
+      mhost.removeChild(st.header);
+    }
+    var headerGap = st.header ? 14 : 0;
+    st.blocks.forEach(function (b) {
+      mhost.style.width = (b.wide ? innerW : colW) + 'px';
+      mhost.appendChild(b.el);
+      b.h = b.el.offsetHeight;
+      mhost.removeChild(b.el);
+    });
+    paper.removeChild(mhost);
+
+    // Pack into pages.
+    var pages = [];
+    var page = null;
+    var open = null; // open multi-column band on the current page
+    function newPage(first) {
+      page = { first: first, used: first ? headerH + headerGap : 0, bands: [] };
+      pages.push(page);
+    }
+    function remaining() { return budget - page.used; }
+    function openBand() {
+      open = { type: 'cols', maxH: remaining(), cols: [] };
+      for (var i = 0; i < nCols; i++) open.cols.push({ els: [], h: 0 });
+    }
+    function finalizeOpen() {
+      if (!open) return;
+      var maxH = 0, any = false;
+      open.cols.forEach(function (c) { if (c.els.length) any = true; if (c.h > maxH) maxH = c.h; });
+      if (any) { page.bands.push(open); page.used += maxH + _BAND_GAP; }
+      open = null;
+    }
+    newPage(true);
+
+    st.blocks.forEach(function (b) {
+      if (b.wide) {
+        finalizeOpen();
+        if (page.used > 0 && b.h + _BAND_GAP > remaining()) newPage(false);
+        page.bands.push({ type: 'wide', el: b.el, h: b.h });
+        page.used += b.h + _BAND_GAP;
+        return;
+      }
+      var placed = false;
+      var guard = 0;
+      while (!placed && guard++ < 1000) {
+        if (!open) openBand();
+        var best = -1, bestH = Infinity;
+        for (var i = 0; i < nCols; i++) {
+          var c = open.cols[i];
+          var add = (c.els.length ? _BLOCK_GAP : 0) + b.h;
+          if (c.h + add <= open.maxH && c.h < bestH) { best = i; bestH = c.h; }
+        }
+        if (best >= 0) {
+          var col = open.cols[best];
+          if (col.els.length) col.h += _BLOCK_GAP;
+          col.els.push(b.el);
+          col.h += b.h;
+          placed = true;
+        } else {
+          var bandEmpty = open.cols.every(function (c) { return !c.els.length; });
+          finalizeOpen();
+          if (bandEmpty) {
+            // Block taller than a fresh full-page column → force-place (can't split
+            // a section). Start a clean page first if the current one has content.
+            if (page.used > 0) newPage(false);
+            openBand();
+            open.cols[0].els.push(b.el);
+            open.cols[0].h += b.h;
+            placed = true;
+          } else {
+            newPage(false);
+          }
+        }
+      }
+    });
+    finalizeOpen();
+
+    // Build the page DOM.
+    pages.forEach(function (pg, idx) {
+      var pageEl = document.createElement('div');
+      pageEl.className = 'cs-page';
+      var inner = document.createElement('div');
+      inner.className = 'cs-page-inner';
+      if (pg.first && st.header) inner.appendChild(st.header);
+      pg.bands.forEach(function (band) {
+        if (band.type === 'wide') {
+          var w = document.createElement('div');
+          w.className = 'cs-band-wide';
+          w.appendChild(band.el);
+          inner.appendChild(w);
+        } else {
+          var cc = document.createElement('div');
+          cc.className = 'cs-cols';
+          cc.style.gap = _COL_GAP + 'px';
+          band.cols.forEach(function (col) {
+            var colEl = document.createElement('div');
+            colEl.className = 'cs-col';
+            colEl.style.gap = _BLOCK_GAP + 'px';
+            col.els.forEach(function (el) { colEl.appendChild(el); });
+            cc.appendChild(colEl);
+          });
+          inner.appendChild(cc);
+        }
+      });
+      pageEl.appendChild(inner);
+      paper.appendChild(pageEl);
+      if (idx < pages.length - 1) {
+        var pb = document.createElement('div');
+        pb.className = 'html2pdf__page-break';
+        paper.appendChild(pb);
+      }
+    });
+  }
+
+  // Re-pack on column/font change (geometry changed). Keeps the last good layout
+  // if the engine throws.
+  function _repaginate(paper) {
+    if (!paper || !paper._csState) return;
+    try { _layoutPages(paper); } catch (e) { /* keep last good layout */ }
+  }
+
+  function _paginatePaper(body) {
+    var paper = body.closest('.cs-paper');
+    if (!paper) return;
+    var blocks = _collectBlocks(body);
+    var header = paper.querySelector('.cs-paper-head');
+    paper._csState = { blocks: blocks, header: header };
+    try {
+      _layoutPages(paper);
+      if (body.parentNode) body.parentNode.removeChild(body); // old multicol container
+    } catch (e) {
+      // Engine failed → fall back to the original single multi-column flow.
+      paper.classList.remove('is-paged');
+      _wrapBlocksFallback(body, blocks);
+    }
   }
 
   function _renderMarkdown(el, md, paper) {
@@ -151,7 +334,7 @@
       if (typeof window._renderMath === 'function') window._renderMath(el);
       if (typeof window._renderCode === 'function') window._renderCode(el);
       _decorate(el);
-      if (paper) _wrapBlocks(el);
+      if (paper) _paginatePaper(el);
     };
     _ensureRenderers().then(doRender).catch(doRender);
   }
@@ -384,7 +567,13 @@
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.cs-block', '.katex-display', '.md-table'] },
+        // The paged engine inserts explicit .html2pdf__page-break dividers between
+        // pages; legacy mode breaks there. avoid keeps a section/table/page whole.
+        pagebreak: {
+          mode: ['css', 'legacy'],
+          before: '.html2pdf__page-break',
+          avoid: ['.cs-block', '.cs-band-wide', '.katex-display', '.md-table'],
+        },
       }).from(el).save();
     });
   }
@@ -464,10 +653,14 @@
     if (colSel && st.columns) colSel.value = String(st.columns);
     if (fontSel) fontSel.value = ({ xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm']) || '0.78rem';
     if (colSel) colSel.addEventListener('change', function () {
-      if (paper) paper.style.setProperty('--cs-columns', colSel.value);
+      if (!paper) return;
+      paper.style.setProperty('--cs-columns', colSel.value);
+      _repaginate(paper);  // geometry changed → re-pack the pages
     });
     if (fontSel) fontSel.addEventListener('change', function () {
-      if (paper) paper.style.setProperty('--cs-font', fontSel.value);
+      if (!paper) return;
+      paper.style.setProperty('--cs-font', fontSel.value);
+      _repaginate(paper);  // font size changed → re-measure + re-pack
     });
     var body = ov.querySelector('.cs-paper-body');
     if (body) _renderMarkdown(body, opts.markdown || '', true);

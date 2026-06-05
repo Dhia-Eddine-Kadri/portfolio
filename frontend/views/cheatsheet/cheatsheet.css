@@ -266,14 +266,58 @@
   word-break: break-word;
 }
 /* Scanability: never split a section, a formula, a table, or a list item across
-   a column or printed page; keep a heading glued to the content under it. */
-.cs-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 12px; max-width: 100%; }
-.cs-paper-body .katex-display,
-.cs-paper-body .md-table,
-.cs-paper-body li { break-inside: avoid; page-break-inside: avoid; }
-.cs-paper-body h2,
-.cs-paper-body h3 { break-after: avoid; page-break-after: avoid; }
-.cs-paper-body h2 {
+   a column or printed page; keep a heading glued to the content under it.
+   display: flow-root establishes a BFC so child margins are contained in the
+   block's offsetHeight — essential for the JS layout engine to measure heights
+   accurately (otherwise collapsing h2/p margins under-report and pages overflow). */
+.cs-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 12px; max-width: 100%; display: flow-root; }
+
+/* ── JS paged layout (engine in cheatsheet.js _layoutPages) ─────────────────────
+   The paper is split into explicit A4-landscape pages, each packed by measured
+   height: full-width bands for tables, multi-column bands for cards. This replaces
+   the single tall CSS-multicolumn flow (which left blank trailing pages, cut
+   sections mid-block, and stranded lone blocks when html2canvas sliced it). */
+.cs-paper.is-paged { padding: 0; min-height: 0; background: transparent; box-shadow: none; }
+.cs-page {
+  width: 297mm;
+  height: 210mm;
+  box-sizing: border-box;
+  padding: 10mm;
+  margin: 0 auto 14px;
+  background: #fff;
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
+}
+.cs-page:last-child { margin-bottom: 0; }
+.cs-page-inner {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* long German compounds / URLs must wrap, never widen a column past the page. */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+/* A run of normal blocks → a multi-column band; the columns are exact equal
+   widths (flex: 1 + min-width: 0) so nothing overflows the page. */
+.cs-cols { display: flex; align-items: flex-start; margin-bottom: 12px; }
+.cs-cols:last-child { margin-bottom: 0; }
+.cs-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+/* A table section spans the full page width as its own band. (margin matches the
+   engine's _BAND_GAP so measured heights and rendered heights agree.) */
+.cs-band-wide { margin-bottom: 12px; }
+.cs-band-wide:last-child { margin-bottom: 0; }
+.cs-page .cs-block { margin: 0; }
+/* html2pdf recognises this class and starts a fresh PDF page at it. */
+.html2pdf__page-break { page-break-before: always; break-before: page; height: 0; }
+/* Content styling targets `.cs-paper` (not `.cs-paper-body`) so it applies in BOTH
+   the JS paged layout (.cs-page > .cs-page-inner) and the multicol fallback. */
+.cs-paper .katex-display,
+.cs-paper .md-table,
+.cs-paper li { break-inside: avoid; page-break-inside: avoid; }
+.cs-paper h2,
+.cs-paper h3 { break-after: avoid; page-break-after: avoid; }
+.cs-paper h2 {
   font-size: 0.92rem;
   font-weight: 700;
   color: #111827;
@@ -281,15 +325,15 @@
   padding-bottom: 2px;
   border-bottom: 1px solid #d1d5db;
 }
-.cs-paper-body h3 { font-size: 0.82rem; font-weight: 700; margin: 6px 0 2px; }
-.cs-paper-body p { margin: 3px 0; }
-.cs-paper-body ul, .cs-paper-body ol { margin: 3px 0 3px; padding-left: 16px; }
-.cs-paper-body li { margin: 1px 0; }
-.cs-paper-body .katex { font-size: 0.95em; }
+.cs-paper h3 { font-size: 0.82rem; font-weight: 700; margin: 6px 0 2px; }
+.cs-paper p { margin: 3px 0; }
+.cs-paper ul, .cs-paper ol { margin: 3px 0 3px; padding-left: 16px; }
+.cs-paper li { margin: 1px 0; }
+.cs-paper .katex { font-size: 0.95em; }
 /* A wide formula must scroll/clip WITHIN its own box, never push the column
    (and thus the page) wider. max-width caps it to the column. */
-.cs-paper-body .katex-display { margin: 4px 0; max-width: 100%; overflow-x: auto; }
-.cs-paper-body .katex-display > .katex { max-width: 100%; }
+.cs-paper .katex-display { margin: 4px 0; max-width: 100%; overflow-x: auto; }
+.cs-paper .katex-display > .katex { max-width: 100%; }
 /* GFM tables — comparison/classification grids (Gießverfahren, DIN 8580, Method
    Picker). A wide multi-column table CANNOT shrink below its min-content width,
    so inside a ~1/3-wide CSS column it used to overflow and overlap the next
@@ -358,7 +402,7 @@
 .cs-paper[data-style="classic"] .cs-paper-body {
   column-rule-color: #cbd5e1;
 }
-.cs-paper[data-style="modern"] .cs-paper-body h2 {
+.cs-paper[data-style="modern"] h2 {
   border-bottom-color: #2563eb;
 }
 
@@ -366,9 +410,10 @@
 @media (max-width: 820px)  { .cs-paper-body { column-count: 2; } }
 @media (max-width: 560px)  { .cs-paper-body { column-count: 1; } }
 
+/* Pages carry their own 10mm padding, so the print margin is 0 in paged mode. */
 @page {
   size: A4 landscape;
-  margin: 10mm;
+  margin: 0;
 }
 
 @media print {
@@ -393,6 +438,15 @@
     box-shadow: none;
     border-radius: 0;
   }
+  /* Multicol fallback (engine off): restore the page margin via paper padding. */
+  .cs-paper:not(.is-paged) { padding: 10mm; }
+  .cs-page {
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    break-after: page;
+  }
+  .cs-page:last-child { break-after: auto; }
 }
 
 /* Source picker (choose which PDFs to build from) */
