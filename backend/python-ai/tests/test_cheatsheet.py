@@ -254,7 +254,9 @@ def test_settings_maxtopics_scales_with_pages():
     one = cs.normalize_settings({"preset": "deep_revision", "pages": 1})["maxTopics"]
     four = cs.normalize_settings({"preset": "deep_revision", "pages": 4})["maxTopics"]
     assert four > one
-    assert 4 <= one <= 20 and 4 <= four <= 20
+    # Ceiling is the whole-course skeleton depth; parallel section generation
+    # means the full count fans out into shards rather than one long call.
+    assert 4 <= one <= cs._MAX_TOPICS and 4 <= four <= cs._MAX_TOPICS
 
 
 def test_settings_expanded_controls_affect_budget_and_layout():
@@ -462,6 +464,62 @@ def test_generate_cheatsheet_no_evidence_warns(monkeypatch):
     assert out["warning"]
     assert called["chat"] == 0  # no LLM call when there's nothing to ground in
     assert called["save"] == 0
+
+
+def test_generate_cheatsheet_parallel_shards_stitch_and_dedup(monkeypatch):
+    """Whole-course generation fans out into parallel shards, stitches the
+    sections in skeleton order, and removes a formula repeated across shards."""
+    import re as _re
+
+    # Six topics → two shards of three (skeleton order is enforced by _topic_names).
+    tm = [
+        {"name": "Kinematics"}, {"name": "Cartesian"}, {"name": "Rectilinear"},
+        {"name": "Projectile"}, {"name": "Polar"}, {"name": "Friction"},
+    ]
+    monkeypatch.setattr(cs, "get_course_topic_map", lambda u, c: tm)
+
+    counter = 0
+
+    def _fake_retrieve(**k):
+        nonlocal counter
+        counter += 1
+        cid = f"c{counter}"
+        return [{"chunkId": cid, "documentId": "d1", "pageStart": counter, "text": "evidence"}]
+
+    monkeypatch.setattr(cs, "retrieve_learning_context", _fake_retrieve)
+
+    calls: list[int] = []
+
+    def _fake_chat(**k):
+        calls.append(1)
+        topics = _re.findall(r"### TOPIC: (.+)", k["user"])
+        # Every section emits the SAME duplicate display formula plus a unique line.
+        body = "\n".join(
+            f"## {t}\n$$p=q$$\n- {{{{note}}}} for {t}" for t in topics
+        )
+        return _FakeChatResult({"text": body})
+
+    monkeypatch.setattr(cs, "chat_json", _fake_chat)
+    monkeypatch.setattr(cs, "save_note", lambda **k: "n1")
+
+    out = cs.generate_cheatsheet(
+        user_id="u", course_id="c", document_ids=None, topic=None,
+        doc_names={"d1": "a.pdf"}, save=True,
+    )
+
+    # Fanned out into >1 parallel shard.
+    assert len(calls) >= 2
+    text = out["text"]
+    # All six canonical sections present, in skeleton order.
+    order = [
+        "Kinematik eines Punktes", "Kartesische Koordinaten", "Geradlinige Bewegung",
+        "Wurfbewegung", "Polarkoordinaten", "Reibung und Widerstand",
+    ]
+    positions = [text.find("## " + name) for name in order]
+    assert all(p != -1 for p in positions)
+    assert positions == sorted(positions)
+    # The duplicate formula survived exactly once; the rest were deduped.
+    assert text.count("$$p=q$$") == 1
 
 
 def test_generate_cheatsheet_topic_focus_titles(monkeypatch):

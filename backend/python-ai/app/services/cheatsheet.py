@@ -23,10 +23,11 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from .learning_agent import get_course_topic_map, retrieve_learning_context
-from .llm_json import chat_json
+from .llm_json import LlmResult, chat_json
 from .notes import save_note
 from .cheatsheet_quality import (
     EvidenceNormalizationStats,
@@ -40,21 +41,29 @@ from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
 
-# A cheatsheet is dense but bounded. Generation runs ~40 tok/s on this account,
-# so OUTPUT length is the main driver of latency — but INPUT evidence is nearly
-# free by comparison. The Stage 0 diagnostic (scripts/diagnose_cheatsheet_source)
-# showed that on a well-indexed course retrieval returns ~6 clean formula-bearing
-# chunks per topic across 124 topics, yet the old caps (10 topics × top_k 3,
-# 20 evidence) starved the model: it never SAW most of the formulas it was
-# accused of "missing". The fix is to widen the evidence pool the model chooses
-# from — not to make it write more — so the same bounded output is spent on the
-# best real formulas. Output stays capped for the edge proxy's upstream timeout.
-# Evidence (INPUT) is widened hard — that's the Stage 0 fix. Topic/section count
-# (which drives OUTPUT length, hence wall-clock against the 45s proxy timeout) is
-# raised only modestly so a full sheet still finishes in budget.
-_MAX_TOPICS = 14            # importance-ranked sections (was 10)
-_PER_TOPIC_TOP_K = 5        # retrieval supplies ~6 formula chunks/topic (was 3)
-_MAX_EVIDENCE = 36          # richer pool for the model to SELECT from (was 20)
+# COMPREHENSIVE coverage via PARALLEL section generation (mirrors quiz.py).
+#
+# A single bounded LLM call can't be both comprehensive AND fast: at ~40 tok/s a
+# whole-course Hyperknow-style sheet (~22 sections, ~100 formulas) would run far
+# past the edge proxy's upstream timeout and truncate its single JSON string. So
+# instead of ONE big call we fan out many SMALL ones: the ordered topic skeleton
+# is split into shards of a few topics each, every shard is generated
+# concurrently, and the section markdown is stitched back in skeleton order.
+# Wall-clock is the slowest shard (~one bounded call), not the sum — exactly the
+# trick quiz.py uses for 20 questions. That lets the model cover the WHOLE course
+# densely while each shard still finishes well inside the timeout. Cross-shard
+# duplicate formulas (shards can't see each other) are removed deterministically
+# afterwards by dedup_display_formulas, so parallelism costs no visible repeats.
+_MAX_TOPICS = 24            # whole-course skeleton depth (Hyperknow ≈ 22 sections)
+_PER_TOPIC_TOP_K = 6        # retrieval supplies ~6 formula chunks/topic
+_MAX_EVIDENCE = 60          # generous pool; evidence is grouped per topic/shard
+# Each shard covers a few topics and asks for EVERY supported formula, so its
+# output is short enough to finish fast (~1500 tok ≈ 38s at ~40 tok/s) and rarely
+# truncates; a shard that does truncate is salvaged (salvage_key) into a slightly
+# shorter but still-renderable set of sections rather than a JSON parse failure.
+_TOPICS_PER_SHARD = 3
+_PER_SHARD_MAX_TOKENS = 1500
+_MAX_SHARDS = 10            # safety cap on concurrent OpenAI calls per sheet
 
 # Per-PDF mode: when the user picks a small set of PDFs we produce one section
 # per PDF and dedup across them. Above this count it's effectively "whole course"
@@ -336,6 +345,50 @@ _SYSTEM = (
 )
 
 
+# Per-shard prompt for PARALLEL section generation. Each shard writes only the
+# `##` sections for the few topics it is given (no document title / intro /
+# Sources list — those would otherwise be duplicated across shards). The defining
+# instruction is COMPREHENSIVE coverage: every supported item, no cap.
+_SECTION_SYSTEM = (
+    "You are ExamForge by Minallo, writing PART of a DENSE, exam-ready CHEATSHEET "
+    "from a student's own course materials — a compressed, multi-column academic "
+    "reference sheet (Hyperknow style), NOT a study guide or an AI summary.\n"
+    "\n"
+    "Use ONLY the provided COURSE CONTEXT. Never invent or guess a formula.\n"
+    "\n"
+    "OUTPUT: for each `### TOPIC: <name>` block in the context, write EXACTLY one "
+    "`## <name>` section, in the same order. Output ONLY these sections — no "
+    "document title, no introduction, no `## Sources` list, no closing remarks.\n"
+    "\n"
+    "EACH section is a tight, scannable block:\n"
+    "- Lead with a ONE-LINE definition / core idea.\n"
+    "- Bold-lead-in labelled points for the essentials: `- **Term:** meaning` "
+    "(one line each) — directions, dimensions, conditions, critical differences.\n"
+    "- The KEY FORMULAS (KaTeX: $...$ inline, $$...$$ display; name each symbol "
+    "once; state the assumptions/conditions each needs).\n"
+    "- SPECIAL CASES as a numbered list (e.g. `1. Uniform motion (a=0)`), each "
+    "with its formula and the condition it requires.\n"
+    "- Then terse traps / pitfalls. No prose paragraphs, no intros.\n"
+    "\n"
+    "COMPREHENSIVE COVERAGE — THE MOST IMPORTANT RULE: mine the COURSE CONTEXT for "
+    "EVERY distinct, high-value item it actually supports — every formula, derived "
+    "formula, definition, rule, special case, condition, and exam trap. Do NOT cap "
+    "the number; completeness is the goal (this is a reference, not a summary). Keep "
+    "each item to ONE tight line; drop only exact duplicates and generic filler. "
+    "Never pad and never invent — if the context does not support something, leave "
+    "it out. Match the language of the source material.\n"
+    "\n"
+    "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
+    "- Wrap THE single most important fact/result of a block in ==double equals== "
+    "(yellow highlight). At most one per block.\n"
+    "- Begin a hard warning with `Important:` or `Critical:` (red).\n"
+    "- Begin a soft remark with `Note:` (orange).\n"
+    "- Wrap a key concept term in {{double braces}} (blue); use sparingly.\n"
+    "\n"
+    'Return ONLY JSON: {"text":"<markdown for these sections only>"}'
+)
+
+
 # ── Settings (Stage 3) ───────────────────────────────────────────────────────
 #
 # Four presets cover ~90% of the value; only two free overrides (pages, language)
@@ -344,14 +397,18 @@ _SYSTEM = (
 # concrete generation budget (how many topics/sections, how hard to push density)
 # and a layout hint (columns/font) echoed back so the renderer matches.
 
+# Topic counts are now generous: parallel section generation means more topics no
+# longer means a longer single call (and so no longer risks the upstream timeout).
+# A whole-course sheet should be comprehensive — Hyperknow's reference covers ~22
+# sections — so the everyday presets aim for broad coverage, not a thin highlight.
 _PRESETS: dict[str, dict[str, Any]] = {
     # name                 topics  density   columns  font
-    "exam_night":          {"topics": 9,  "density": "max",     "columns": 4, "font": "xs"},
-    "open_book_exam":      {"topics": 11, "density": "high",    "columns": 3, "font": "sm"},
-    "formula_reference":   {"topics": 12, "density": "max",     "columns": 4, "font": "xs"},
-    "balanced":            {"topics": 10, "density": "high",    "columns": 3, "font": "sm"},
-    "deep_revision":       {"topics": 12, "density": "high",    "columns": 3, "font": "md"},
-    "topic_mastery":       {"topics": 5,  "density": "thorough","columns": 2, "font": "md"},
+    "exam_night":          {"topics": 16, "density": "max",     "columns": 4, "font": "xs"},
+    "open_book_exam":      {"topics": 22, "density": "high",    "columns": 3, "font": "sm"},
+    "formula_reference":   {"topics": 24, "density": "max",     "columns": 4, "font": "xs"},
+    "balanced":            {"topics": 20, "density": "high",    "columns": 3, "font": "sm"},
+    "deep_revision":       {"topics": 24, "density": "high",    "columns": 3, "font": "md"},
+    "topic_mastery":       {"topics": 6,  "density": "thorough","columns": 2, "font": "md"},
 }
 _DEFAULT_PRESET = "balanced"
 _VALID_PAGES = (1, 2, 3, 4)
@@ -461,10 +518,10 @@ def normalize_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
     output = str(s.get("output") or "both").lower()
     if output not in _VALID_OUTPUTS:
         output = "both"
-    # More pages → a few more sections; fewer → tighter. A gentle ±delta (NOT a
-    # multiplier — that re-inflated topics to 18-20 and blew the 45s timeout).
-    # Capped at 14 so even "4 pages" stays inside the output budget.
-    base["topics"] = max(4, min(18, base["topics"] + (pages - 2) * 2 + detail["topicDelta"]))
+    # More pages → a few more sections; fewer → tighter. A gentle ±delta. The cap
+    # is the skeleton depth (_MAX_TOPICS); parallel section generation means even
+    # the full count fans out into concurrent shards rather than one long call.
+    base["topics"] = max(4, min(_MAX_TOPICS, base["topics"] + (pages - 2) * 2 + detail["topicDelta"]))
 
     lang = str(s.get("language") or "source").lower()
     if lang not in _VALID_LANGS:
@@ -1179,6 +1236,190 @@ def _settings_system_prompt(cfg: dict[str, Any], *, per_pdf: bool = False) -> st
     return prompt
 
 
+# A "section group" is one cheatsheet section: a label (topic name, or filename
+# in per-PDF mode) plus the evidence chunks that back it.
+SectionGroup = tuple[str, list[dict[str, Any]]]
+
+
+def _pool_evidence_grouped(
+    *,
+    user_id: str,
+    course_id: str,
+    topics: list[str | None],
+    document_ids: list[str] | None,
+    top_k: int,
+) -> list[SectionGroup]:
+    """Retrieve evidence per topic, KEEPING it grouped by topic (in skeleton order).
+
+    Unlike _pool_evidence (which flattens into one pool), this preserves the
+    topic→evidence mapping so each parallel shard is fed only its own topics'
+    chunks. A chunk is assigned to the FIRST topic that retrieves it, so the same
+    formula isn't handed to several sections at once.
+    """
+    seen: set[str] = set()
+    groups: list[SectionGroup] = []
+    for t in topics:
+        if not t:
+            continue
+        try:
+            chunks = retrieve_learning_context(
+                user_id=user_id,
+                course_id=course_id,
+                topic=t,
+                query=_topic_query(t),
+                document_ids=document_ids or None,
+                purpose="cheatsheet",
+                top_k=top_k,
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("cheatsheet grouped retrieval failed (topic=%s)", t)
+            chunks = []
+        fresh: list[dict[str, Any]] = []
+        for c in chunks:
+            cid = c.get("chunkId")
+            if cid:
+                if cid in seen:
+                    continue
+                seen.add(cid)
+            fresh.append(c)
+        if fresh:
+            groups.append((t, fresh))
+    return groups
+
+
+def _normalize_groups(
+    groups: list[SectionGroup],
+) -> tuple[list[SectionGroup], EvidenceNormalizationStats]:
+    """Run normalize_evidence_chunks per group, summing stats; drop empty groups."""
+    out: list[SectionGroup] = []
+    agg = {
+        "chunks_in": 0, "chunks_out": 0,
+        "repaired_chunks": 0, "dropped_chunks": 0, "dropped_formula_lines": 0,
+    }
+    for label, chunks in groups:
+        norm, st = normalize_evidence_chunks(chunks)
+        agg["chunks_in"] += st.chunks_in
+        agg["chunks_out"] += st.chunks_out
+        agg["repaired_chunks"] += st.repaired_chunks
+        agg["dropped_chunks"] += st.dropped_chunks
+        agg["dropped_formula_lines"] += st.dropped_formula_lines
+        if norm:
+            out.append((label, norm))
+    return out, EvidenceNormalizationStats(**agg)
+
+
+def _format_section_evidence(group: list[SectionGroup], doc_names: dict[str, str]) -> str:
+    """Render a shard's topics + their evidence as labelled `### TOPIC:` blocks."""
+    parts: list[str] = []
+    n = 0
+    for label, chunks in group:
+        parts.append(f"### TOPIC: {label}")
+        for c in chunks:
+            n += 1
+            fn = doc_names.get(c.get("documentId") or "", "source")
+            pg = c.get("pageStart")
+            text = (c.get("text") or "").strip().replace("\r", " ")
+            if len(text) > 700:
+                text = text[:700] + " …"
+            head = f"[Source {n}] {fn}" + (f", p.{pg}" if pg else "")
+            parts.append(f"{head}\n{text}")
+    return "\n\n".join(parts)
+
+
+def _shard_system_prompt(
+    cfg: dict[str, Any], topics: list[str], *, with_method_picker: bool
+) -> str:
+    """Per-shard system prompt: the comprehensive section writer + settings."""
+    prompt = (
+        _SECTION_SYSTEM
+        + "\n\nSETTINGS:\n"
+        + f"- {cfg['langInstruction']}\n"
+        + f"- Visual style: {cfg['style']}; keep each line compact for a "
+        f"{cfg['columns']}-column sheet.\n"
+        + f"- {cfg['purposeInstruction']}"
+    )
+    if with_method_picker:
+        prompt += _method_picker_guidance(
+            [str(t) for t in topics], cfg
+        )
+    return prompt
+
+
+def _run_one_section_shard(
+    *,
+    cfg: dict[str, Any],
+    group: list[SectionGroup],
+    doc_names: dict[str, str],
+    with_method_picker: bool,
+) -> "LlmResult | None":
+    """Generate the `##` sections for one shard's worth of topics. Thread-safe."""
+    topics = [label for label, _ in group]
+    system = _shard_system_prompt(cfg, topics, with_method_picker=with_method_picker)
+    user = (
+        "COURSE CONTEXT:\n\n"
+        + _format_section_evidence(group, doc_names)
+        + _formula_bank_guidance([str(t) for t in topics])
+        + _trap_guidance([str(t) for t in topics])
+    )
+    try:
+        return chat_json(
+            system=system, user=user,
+            max_tokens=_PER_SHARD_MAX_TOKENS, salvage_key="text",
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("cheatsheet section shard failed (topics=%s)", topics)
+        return None
+
+
+def _generate_sections_parallel(
+    *,
+    cfg: dict[str, Any],
+    groups: list[SectionGroup],
+    doc_names: dict[str, str],
+    per_pdf: bool,
+) -> tuple[str, dict[str, Any]]:
+    """Fan out section generation across shards, stitch back in skeleton order.
+
+    Returns (combined_markdown, diagnostics). Wall-clock is the slowest shard, so
+    the whole-course sheet stays inside the upstream timeout while covering every
+    topic. The Method Picker is requested only on the first shard (topic mode).
+    """
+    shards = [
+        groups[i:i + _TOPICS_PER_SHARD]
+        for i in range(0, len(groups), _TOPICS_PER_SHARD)
+    ][:_MAX_SHARDS]
+    diag: dict[str, Any] = {"model": None, "promptTokens": 0, "completionTokens": 0}
+    if not shards:
+        return "", diag
+
+    results: list[Any] = [None] * len(shards)
+    with ThreadPoolExecutor(max_workers=len(shards)) as pool:
+        futures = {
+            pool.submit(
+                _run_one_section_shard,
+                cfg=cfg,
+                group=shard,
+                doc_names=doc_names,
+                with_method_picker=(idx == 0 and not per_pdf),
+            ): idx
+            for idx, shard in enumerate(shards)
+        }
+        for fut in as_completed(futures):
+            results[futures[fut]] = fut.result()
+
+    texts: list[str] = []
+    for res in results:
+        if res is None:
+            continue
+        diag["model"] = res.model
+        diag["promptTokens"] += res.prompt_tokens or 0
+        diag["completionTokens"] += res.completion_tokens or 0
+        t = (res.data.get("text") if isinstance(res.data, dict) else "") or ""
+        if t.strip():
+            texts.append(t.strip())
+    return "\n\n".join(texts), diag
+
+
 def generate_cheatsheet(
     *,
     user_id: str,
@@ -1202,33 +1443,38 @@ def generate_cheatsheet(
     # Per-PDF mode: a small explicit multi-PDF selection → one section per PDF,
     # deduped across them. The topic map still ranks the evidence in the
     # background. A single PDF (or a large "whole course" selection) uses the
-    # topic-map-driven sheet instead.
+    # topic-map-driven sheet instead. Both modes build a list of SECTION GROUPS
+    # (label + evidence) that are then generated in parallel and stitched.
     per_pdf = bool(document_ids and 2 <= len(document_ids) <= _MAX_PER_PDF_DOCS)
-    by_doc: dict[str, list[dict[str, Any]]] = {}
     if per_pdf:
-        per_doc_cap = max(4, int(cfg["maxEvidence"]) // max(1, len(document_ids or [])))
+        per_doc_cap = max(6, int(cfg["maxEvidence"]) // max(1, len(document_ids or [])))
         by_doc = _pool_evidence_by_doc(
             user_id=user_id, course_id=course_id,
             document_ids=document_ids or [], topics=topics, per_doc_cap=per_doc_cap,
         )
-        evidence = [c for chunks in by_doc.values() for c in chunks]
+        # Backfill names first so each group's label is the real filename.
+        flat_for_names = [c for chunks in by_doc.values() for c in chunks]
+        merged_names = _backfill_doc_names(flat_for_names, dict(doc_names or {}))
+        raw_groups: list[SectionGroup] = [
+            (merged_names.get(doc_id, "source"), chunks) for doc_id, chunks in by_doc.items()
+        ]
     else:
-        evidence = _pool_evidence(
+        raw_groups = _pool_evidence_grouped(
             user_id=user_id,
             course_id=course_id,
             topics=topics,
             document_ids=document_ids,
             top_k=int(cfg["perTopicTopK"]),
-            max_evidence=int(cfg["maxEvidence"]),
         )
-    evidence, evidence_quality = normalize_evidence_chunks(evidence)
-    if per_pdf:
-        grouped_clean: dict[str, list[dict[str, Any]]] = {doc_id: [] for doc_id in (document_ids or [])}
-        for chunk in evidence:
-            doc_id = chunk.get("documentId")
-            if doc_id:
-                grouped_clean.setdefault(doc_id, []).append(chunk)
-        by_doc = {doc_id: chunks for doc_id, chunks in grouped_clean.items() if chunks}
+        merged_names = _backfill_doc_names(
+            [c for _, chunks in raw_groups for c in chunks], dict(doc_names or {})
+        )
+
+    # Clean evidence per group (keeps the topic→evidence grouping for the shards).
+    groups, evidence_quality = _normalize_groups(raw_groups)
+    evidence = [c for _, chunks in groups for c in chunks]
+    covered_labels = [label for label, _ in groups]
+
     if not evidence:
         return {
             "text": "",
@@ -1239,47 +1485,21 @@ def generate_cheatsheet(
                 "evidenceNormalization": evidence_quality.__dict__,
             },
         }
-    # Caller-supplied names (selected docs) take precedence; backfill the rest
-    # so course-wide sheets still cite real filenames instead of "Unknown".
-    merged_names = _backfill_doc_names(evidence, dict(doc_names or {}))
-    architecture = _architecture_guidance(
-        evidence=evidence,
-        topics=topics,
-        doc_names=merged_names,
-        cfg=cfg,
-    )
 
     if per_pdf:
-        n_pdfs = len(by_doc)
+        n_pdfs = len(groups)
         title = f"Cheatsheet — {n_pdfs} PDF" + ("s" if n_pdfs != 1 else "")
-        user = (
-            "COURSE CONTEXT (grouped by source PDF):\n\n"
-            + _format_evidence_by_doc(by_doc, merged_names)
-            + architecture
-            + _formula_bank_guidance(topics)
-            + _trap_guidance(topics)
-        )
-        system = _settings_system_prompt(cfg, per_pdf=True)
     else:
         title = (topic_query + " — Cheatsheet") if topic_query else "Course Cheatsheet"
-        user = (
-            "COURSE CONTEXT:\n\n"
-            + _format_evidence(evidence, merged_names, topics)
-            + architecture
-            + _formula_bank_guidance(topics)
-            + _trap_guidance(topics)
-        )
-        system = _settings_system_prompt(cfg)
-    try:
-        # Keep output bounded: at ~40 tok/s, output length is wall-clock, and the
-        # edge proxy aborts at 45s. _MAX_TOKENS caps generation so a verbose sheet
-        # can't run past the timeout ("Upstream AI service error").
-        res = chat_json(system=system, user=user, max_tokens=_MAX_TOKENS, salvage_key="text")
-    except Exception as e:  # noqa: BLE001
-        log.exception("cheatsheet LLM call failed")
-        return {"text": "", "error": str(e), "groundedSources": []}
 
-    raw_text = (res.data.get("text") if isinstance(res.data, dict) else "") or ""
+    # Fan out section generation across parallel shards and stitch in order. The
+    # deterministic dedup below removes any formula repeated across shards/PDFs.
+    raw_text, diag = _generate_sections_parallel(
+        cfg=cfg, groups=groups, doc_names=merged_names, per_pdf=per_pdf,
+    )
+    if not raw_text.strip():
+        return {"text": "", "error": "Cheatsheet generation produced no sections.", "groundedSources": []}
+
     text, dropped_formulas = sanitize_cheatsheet_markdown(raw_text)
     text, filler_notes = remove_generic_filler_notes(text)
     # Deterministic backstop so a repeated formula is GUARANTEED removed, even if
@@ -1307,7 +1527,7 @@ def generate_cheatsheet(
     ]
     metrics = _quality_metrics(
         text=text,
-        topics=topics,
+        topics=covered_labels,
         sources=sources,
         grounding=grounding,
         cfg=cfg,
@@ -1336,7 +1556,7 @@ def generate_cheatsheet(
         "noteId": note_id,
         "title": title,
         "text": text,
-        "topicsCovered": [t for t in topics if t],
+        "topicsCovered": covered_labels,
         "groundedSources": sources[:20],
         "settings": cfg,
         "grounding": grounding,
@@ -1347,9 +1567,9 @@ def generate_cheatsheet(
             "droppedGenericNotes": filler_notes,
             "metrics": metrics,
         },
-        "model": res.model,
-        "promptTokens": res.prompt_tokens,
-        "completionTokens": res.completion_tokens,
+        "model": diag.get("model"),
+        "promptTokens": diag.get("promptTokens"),
+        "completionTokens": diag.get("completionTokens"),
     }
     # Build one honest warning from both signals (sanitizer drops + weak grounding).
     warns: list[str] = []
