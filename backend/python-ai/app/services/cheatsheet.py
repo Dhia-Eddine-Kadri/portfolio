@@ -172,6 +172,22 @@ _MECHANICS_TRAP_BANK: dict[str, tuple[str, ...]] = {
         "a_t changes speed; a_n changes direction.",
         "Use the tangential equation for speed changes and the normal equation for direction changes.",
     ),
+    "Dynamik von Punktmassen": (
+        "Draw the free-body diagram first; a missed constraint or friction force changes Sum F.",
+        "Project Sum F = m a onto the right axes (x/y or t/n); do not mix coordinate systems.",
+    ),
+    "Impuls und Stoß": (
+        "Momentum is conserved only when no external impulse acts during the (short) impact.",
+        "For e: e=1 is elastic (energy kept), e=0 is plastic (bodies stick); energy is NOT conserved unless e=1.",
+    ),
+    "Drehimpuls": (
+        "Angular momentum is conserved only about a point with zero resultant moment.",
+        "Always state the reference point; L and M must be taken about the SAME point.",
+    ),
+    "Rotation starrer Körper": (
+        "Take the moment of inertia about the actual rotation axis — use Steiner if it is not through S.",
+        "Sum M = Theta * phi_dotdot holds about a fixed axis or the centre of mass, not an arbitrary point.",
+    ),
     "Reibung und Widerstand": (
         "Static friction is not automatically mu_0 N; only |H| <= mu_0 N.",
         "Friction direction opposes relative motion or tendency of motion.",
@@ -262,6 +278,18 @@ _MECHANICS_FORMULA_BANK: dict[str, tuple[str, ...]] = {
     "Drehimpuls": (
         r"\vec L_A = \Theta_A \vec\omega",
         r"\sum \vec M_A = \frac{d\vec L_A}{dt}",
+    ),
+    "Rotation starrer Körper": (
+        r"\omega = \dot\varphi",
+        r"\alpha = \ddot\varphi",
+        r"\Theta_a\ddot\varphi = \sum M_a",
+        r"E_{kin} = \tfrac{1}{2}\Theta_a\omega^2",
+    ),
+    "Ebene Bewegung starrer Körper": (
+        r"\vec v_P = \vec v_A + \vec\omega\times\vec r_{AP}",
+        r"m\vec a_S = \sum \vec F",
+        r"\Theta_S\ddot\varphi = \sum M_S",
+        r"E_{kin} = \tfrac{1}{2}mv_S^2 + \tfrac{1}{2}\Theta_S\omega^2",
     ),
     "Rollbewegung": (
         r"v_S = r\omega",
@@ -413,6 +441,15 @@ _SECTION_SYSTEM = (
     "topic has no grounded formula you can state cleanly, DROP its `## ` section "
     "entirely rather than emit a definition-only or mixed block. Never write a "
     "section whose formulas you are unsure of.\n"
+    "\n"
+    "GENERAL FORMULAS ONLY — the course evidence is mostly worked EXERCISE "
+    "solutions, so it is full of setup-specific formulas. A general topic section "
+    "must contain only the GENERAL law/relation, never a formula that holds for one "
+    "specific figure or exercise (e.g. $v_A = r_A$, $\\omega = \\omega\\cos\\phi$, a "
+    "numbered numeric result). If a useful formula is exercise-specific, omit it "
+    "(or, only in Topic Mastery, label it **Example-specific**). For rigid bodies "
+    "use the general forms $\\vec v_P = \\vec v_A + \\vec\\omega\\times\\vec r_{AP}$ "
+    "and $\\Theta\\ddot\\varphi = \\sum M$, not a single exercise's $v_A,v_B$.\n"
     "\n"
     "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
     "- Wrap THE single most important fact/result of a block in ==double equals== "
