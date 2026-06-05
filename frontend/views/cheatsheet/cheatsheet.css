@@ -425,7 +425,11 @@
 }
 .cs-sp-close:hover { opacity: 1; }
 .cs-sp-sub { margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
-.cs-sp-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+/* flex:1 + min-height:0 are REQUIRED: in the 80vh flex-column modal a flex child
+   defaults to min-height:auto, so without these the list grows to its full
+   content height (pushing the actions off-screen) instead of shrinking and
+   scrolling — the "can't scroll inside folders" bug. */
+.cs-sp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .cs-sp-folder-list { gap: 8px; }
 .cs-sp-folder {
   border: 1px solid var(--border, #334155);
