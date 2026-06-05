@@ -159,7 +159,7 @@
     // Detach header + all blocks from any previous layout, then clear old pages.
     if (st.header && st.header.parentNode) st.header.parentNode.removeChild(st.header);
     st.blocks.forEach(function (b) { if (b.el.parentNode) b.el.parentNode.removeChild(b.el); });
-    Array.prototype.slice.call(paper.querySelectorAll('.cs-page, .html2pdf__page-break'))
+    Array.prototype.slice.call(paper.querySelectorAll('.cs-page'))
       .forEach(function (n) { n.remove(); });
     paper.classList.add('is-paged');
 
@@ -297,11 +297,6 @@
       });
       pageEl.appendChild(inner);
       paper.appendChild(pageEl);
-      if (idx < pages.length - 1) {
-        var pb = document.createElement('div');
-        pb.className = 'html2pdf__page-break';
-        paper.appendChild(pb);
-      }
     });
   }
 
@@ -567,13 +562,10 @@
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        // The paged engine inserts explicit .html2pdf__page-break dividers between
-        // pages; legacy mode breaks there. avoid keeps a section/table/page whole.
-        pagebreak: {
-          mode: ['css', 'legacy'],
-          before: '.html2pdf__page-break',
-          avoid: ['.cs-block', '.cs-band-wide', '.katex-display', '.md-table'],
-        },
+        // The paged engine lays out exact 210mm .cs-page tiles (margin 0); html2pdf
+        // slices the canvas every 210mm so each tile = one PDF page. No explicit
+        // page-breaks and no `avoid` — those caused drift/blank pages. Pure tiling.
+        pagebreak: { mode: ['css', 'legacy'] },
       }).from(el).save();
     });
   }
