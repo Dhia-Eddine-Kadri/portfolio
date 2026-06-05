@@ -208,16 +208,21 @@
         chosenClass: 'cs-sortable-chosen',
         dragClass: 'cs-sortable-drag',
         onEnd: function () {
-          // Defer so Sortable finishes before we tear down + rebuild the DOM.
-          setTimeout(function () { _reorderFromDom(paper); }, 0);
+          // Defer so Sortable finishes before we read the DOM. We do NOT re-pack:
+          // the section stays exactly where it was dropped (free placement). We
+          // only sync st.blocks to the new visual order so export + later re-packs
+          // (column/font change) respect it.
+          setTimeout(function () { _syncOrderFromDom(paper); }, 0);
         },
       });
     });
   }
 
-  // Rebuild st.blocks to match the post-drag visual order (pages → bands →
-  // columns left-to-right, blocks top-to-bottom = document order), then re-pack.
-  function _reorderFromDom(paper) {
+  // Sync st.blocks to the post-drag visual order (pages → bands → columns
+  // left-to-right, blocks top-to-bottom = document order) WITHOUT re-packing, so
+  // the dropped section keeps its new spot. The order is saved for export and for
+  // any later re-pack (column/font/padding change), which legitimately rebuilds.
+  function _syncOrderFromDom(paper) {
     var st = paper._csState;
     if (!st) return;
     var byEl = new Map();
@@ -228,7 +233,6 @@
       if (b) ordered.push(b);
     });
     if (ordered.length === st.blocks.length) st.blocks = ordered;
-    _repaginate(paper);
   }
 
   // ── Paged layout engine ────────────────────────────────────────────────────
@@ -393,6 +397,22 @@
           inner.appendChild(cc);
         }
       });
+      // If the page ends in a table band (or has no column band at all), it has no
+      // .cs-col to drag a section into. Append an empty, full-height column band as
+      // a visible drop zone (stripped on export).
+      var lastBand = pg.bands[pg.bands.length - 1];
+      if (!lastBand || lastBand.type !== 'cols') {
+        var dz = document.createElement('div');
+        dz.className = 'cs-cols cs-dropzone';
+        dz.style.gap = _COL_GAP + 'px';
+        for (var di = 0; di < nCols; di++) {
+          var dcol = document.createElement('div');
+          dcol.className = 'cs-col';
+          dcol.style.gap = _BLOCK_GAP + 'px';
+          dz.appendChild(dcol);
+        }
+        inner.appendChild(dz);
+      }
       pageEl.appendChild(inner);
       paper.appendChild(pageEl);
     });
