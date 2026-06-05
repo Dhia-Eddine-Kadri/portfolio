@@ -895,6 +895,12 @@ def sanitize_cheatsheet_markdown(text: str) -> tuple[str, int]:
     cleaned = cleaned.replace("\\[", "$$").replace("\\]", "$$")
     cleaned = cleaned.replace("\\(", "$").replace("\\)", "$")
 
+    # 1a·1) drop a lone `$` sitting on its own line. The model sometimes emits a
+    # stray opening `$` (e.g. before a `$$` block); it makes the running `$` count
+    # ODD, so KaTeX mis-pairs every following `$...$` and the whole block renders as
+    # raw text. Removing it is what keeps formula blocks rendering.
+    cleaned = re.sub(r"(?m)^[ \t]*\$[ \t]*$\n?", "", cleaned)
+
     # 1a·2) wrap bare formula lines (model dropped the $...$ under a preset format)
     # so they render as math, not raw text; then wrap LaTeX fragments that leak
     # into prose sentences (e.g. "\dot r" inside a Trap line).

@@ -167,6 +167,11 @@ def formula_to_latexish(text: str) -> str:
     out = _TEXT_OPERATOR_RE.sub(r"\\\1", out)
     out = _GLUED_ACCENT_RE.sub(r"\\\1 ", out)
     out = _LATEX_ENV_RE.sub(_fix_latex_env, out)
+    # A trailing lone backslash (a dangling row break ``\\`` or a stray ``\``) left
+    # at the very end of a body becomes ``\$`` once wrapped — an escaped dollar that
+    # breaks KaTeX delimiter pairing. Drop it. (``\,`` etc. are safe: a command
+    # letter/punct follows the backslash, so the trailing-only match never fires.)
+    out = re.sub(r"\s*\\+\s*$", "", out)
     return out
 
 

@@ -531,6 +531,19 @@ def test_sanitize_keeps_method_picker_heading():
     assert "## Method Picker" in out
 
 
+def test_lone_dollar_line_removed_keeps_formulas_balanced():
+    md = "**Formulas:**\n$\n$\\vec G = m\\vec g$\n$m\\ddot x = \\sum F_x$"
+    out, _ = cs.sanitize_cheatsheet_markdown(md)
+    assert out.count("$") % 2 == 0
+    assert "$\\vec G = m\\vec g$" in out
+
+
+def test_trailing_backslash_stripped_from_formula():
+    out, _ = cs.sanitize_cheatsheet_markdown(r"$\Theta = \int r^2 \, dm \$")
+    assert r"\, dm$" in out  # trailing backslash gone, thin space kept
+    assert " \\$" not in out
+
+
 def test_unsupported_latex_env_repaired():
     out, _ = cs.sanitize_cheatsheet_markdown(r"$\begin{align*} v &= x \end{align*}$")
     assert "align*" not in out
