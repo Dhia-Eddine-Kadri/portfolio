@@ -115,9 +115,70 @@
     });
   }
 
-  // Group each `##` section (h2 + following siblings) into a detached .cs-block.
-  // A section containing a table is tagged wide (it becomes a full-width band).
-  // Returns [{el, wide, h}] WITHOUT re-appending — the paginator places them.
+  var _secSeq = 0;
+
+  // Split a section block into ATOM blocks at safe boundaries so a long section can
+  // continue in the next column/page instead of forcing a blank page. The heading +
+  // everything up to the first labelled group stays together (never split a heading
+  // from its first content); each subsequent **Bold label:** group (Use when /
+  // Formulas / Conditions / Watch out …) becomes its own atom. A section with no
+  // such labels, or a table (wide) section, is never split. Atoms of one section
+  // share data-cs-sec; continuation atoms carry data-cs-cont and the section title
+  // (the paginator adds a "· continued" label only when an atom actually starts a
+  // new column). Returns an array of atom elements (the original element is reused
+  // as the first atom).
+  function _splitSectionAtoms(sectionEl, wide) {
+    if (wide) return [sectionEl];
+    var nodes = Array.prototype.slice.call(sectionEl.childNodes).filter(function (n) {
+      return n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim());
+    });
+    var heading = sectionEl.querySelector('h2, h3');
+    var title = heading ? heading.textContent.trim() : '';
+
+    function startsNewAtom(node) {
+      // A safe split point: a <p>/<div>/list that LEADS with a bold label. Never a
+      // heading, a displayed formula, or a table (those must stay with their group).
+      if (node.nodeType !== 1) return false;
+      if (/^(H2|H3|TABLE)$/.test(node.tagName)) return false;
+      if (node.classList && node.classList.contains('katex-display')) return false;
+      var fe = node.firstElementChild;
+      return !!(fe && /^(STRONG|B)$/.test(fe.tagName));
+    }
+
+    var groups = [];
+    var cur = null;
+    nodes.forEach(function (node) {
+      if (cur === null || (cur.length && startsNewAtom(node))) {
+        cur = [];
+        groups.push(cur);
+      }
+      cur.push(node);
+    });
+    if (groups.length <= 1) return [sectionEl];
+
+    var secId = 'sec' + (++_secSeq);
+    var atoms = [];
+    groups.forEach(function (grp, gi) {
+      var atomEl;
+      if (gi === 0) {
+        atomEl = sectionEl; // group 0 keeps the heading + first labelled group
+      } else {
+        atomEl = document.createElement('div');
+        atomEl.className = 'cs-block';
+        grp.forEach(function (nd) { atomEl.appendChild(nd); }); // MOVES nodes out
+        atomEl.setAttribute('data-cs-cont', '1');
+      }
+      atomEl.setAttribute('data-cs-sec', secId);
+      if (title) atomEl.setAttribute('data-cs-title', title);
+      atoms.push(atomEl);
+    });
+    return atoms;
+  }
+
+  // Group each `##` section (h2 + following siblings) into a detached .cs-block,
+  // then split long sections into atom blocks (see _splitSectionAtoms). A section
+  // containing a table is tagged wide (it becomes a full-width band, never split).
+  // Returns [{el, wide, h, cont, title}] WITHOUT re-appending.
   function _collectBlocks(body) {
     var kids = Array.prototype.slice.call(body.childNodes);
     var groups = [];
@@ -130,12 +191,22 @@
       }
       cur.appendChild(node);
     });
-    return groups.map(function (b) {
+    var out = [];
+    groups.forEach(function (b) {
       var wide = !!b.querySelector('table');
       if (wide) b.classList.add('cs-block--wide');
-      _addBlockTools(b);
-      return { el: b, wide: wide, h: 0 };
+      _splitSectionAtoms(b, wide).forEach(function (atomEl) {
+        _addBlockTools(atomEl);
+        out.push({
+          el: atomEl,
+          wide: wide,
+          h: 0,
+          cont: atomEl.getAttribute('data-cs-cont') === '1',
+          title: atomEl.getAttribute('data-cs-title') || '',
+        });
+      });
     });
+    return out;
   }
 
   // Per-section editor chrome: a drag handle + a "page break before" toggle.
@@ -303,110 +374,119 @@
       });
       paper.removeChild(mhost);
 
-      // Pack into pages.
+      // ── Pack into pages: sequential column flow with atom splitting ──────────
+      // Atoms (split section fragments) flow in document order. Within a band we
+      // fill column 0 up to the page budget, then column 1, then column 2 … so a
+      // long section CONTINUES in the next column instead of forcing a blank page.
+      // When every column on the page is full, a new page opens. The last band is
+      // then re-balanced so the final page never ends with a big blank trailing
+      // column. Tables stay full-width; manual page breaks anchor a new page.
       var pages = [];
       var page = null;
-      var open = null; // open multi-column band on the current page
+      var open = null;
       function newPage(first) {
         page = { first: first, used: first ? headerH + headerGap : 0, bands: [] };
         pages.push(page);
       }
       function remaining() { return budget - page.used; }
       function openBand() {
-        open = { type: 'cols', maxH: remaining(), cols: [] };
-        for (var i = 0; i < nCols; i++) open.cols.push({ els: [], h: 0 });
+        open = { type: 'cols', maxH: remaining(), cur: 0, cols: [] };
+        for (var i = 0; i < nCols; i++) open.cols.push({ items: [], h: 0 });
       }
+      function bandItem(b) { return { el: b.el, h: b.h, cont: !!b.cont, title: b.title || '' }; }
       function finalizeOpen() {
         if (!open) return;
         var maxH = 0, any = false;
-        open.cols.forEach(function (c) { if (c.els.length) any = true; if (c.h > maxH) maxH = c.h; });
+        open.cols.forEach(function (c) { if (c.items.length) any = true; if (c.h > maxH) maxH = c.h; });
         if (any) { page.bands.push(open); page.used += maxH + _BAND_GAP; }
         open = null;
       }
       function pageHasContent() {
         if (page.bands.length) return true;
-        return !!(open && open.cols.some(function (c) { return c.els.length; }));
+        return !!(open && open.cols.some(function (c) { return c.items.length; }));
+      }
+      // Sequential column flow: fill the current column, then advance. Returns false
+      // only when every column on the page is full (caller opens a new page).
+      function placeSeq(b) {
+        if (!open) openBand();
+        while (open.cur < nCols) {
+          var c = open.cols[open.cur];
+          var add = (c.items.length ? _BLOCK_GAP : 0) + b.h;
+          if (!c.items.length || c.h + add <= open.maxH) {
+            if (c.items.length) c.h += _BLOCK_GAP;
+            c.items.push(bandItem(b));
+            c.h += b.h;
+            return true;
+          }
+          open.cur++;
+        }
+        return false;
       }
       newPage(true);
 
-      // Place a narrow block into the shortest fitting column of the open band.
-      // Returns true if it fit.
-      function tryPlaceNarrow(b) {
-        if (!open) openBand();
-        var best = -1, bestH = Infinity;
-        for (var i = 0; i < nCols; i++) {
-          var c = open.cols[i];
-          var add = (c.els.length ? _BLOCK_GAP : 0) + b.h;
-          if (c.h + add <= open.maxH && c.h < bestH) { best = i; bestH = c.h; }
-        }
-        if (best < 0) return false;
-        var col = open.cols[best];
-        if (col.els.length) col.h += _BLOCK_GAP;
-        col.els.push(b.el);
-        col.h += b.h;
-        return true;
-      }
-
-      // AUTO-FILL packer. Walks blocks in order, but when the next section is too
-      // tall for the leftover column space, it pulls a LATER, shorter section
-      // forward to fill the gap (first one that fits) instead of stranding the empty
-      // band and breaking to a new page. Wide (table) bands and manual page breaks
-      // stay anchored in place — they are never pulled forward. Result: dense pages,
-      // order kept as close to the original as the heights allow.
-      var n = st.blocks.length;
-      var consumed = new Array(n).fill(false);
-      var done = 0, i = 0, guard = 0;
-      while (done < n && guard++ < n * 4 + 50) {
-        while (i < n && consumed[i]) i++;
-        if (i >= n) break;
-        var b = st.blocks[i];
-
+      st.blocks.forEach(function (b) {
         // Manual page break: this section starts a new page (unless the current page
         // holds only the header — never break to a header-only page).
         if (_hasBreak(b.el) && pageHasContent()) { finalizeOpen(); newPage(false); }
-
         if (b.wide) {
           finalizeOpen();
           if (page.used > 0 && b.h + _BAND_GAP > remaining()) newPage(false);
           page.bands.push({ type: 'wide', el: b.el, h: b.h });
           page.used += b.h + _BAND_GAP;
-          consumed[i] = true; done++; i++;
-          continue;
+          return;
         }
-
-        if (tryPlaceNarrow(b)) { consumed[i] = true; done++; i++; continue; }
-
-        // b doesn't fit the open band. Backfill the band's leftover column space with
-        // the earliest later narrow section that DOES fit (don't reorder across a
-        // table or a manual break).
-        var filled = false;
-        for (var j = i + 1; j < n; j++) {
-          if (consumed[j]) continue;
-          var c2 = st.blocks[j];
-          if (c2.wide || _hasBreak(c2.el)) continue;
-          if (tryPlaceNarrow(c2)) { consumed[j] = true; done++; filled = true; break; }
-        }
-        if (filled) continue; // band got fuller; retry b (still pending) next loop
-
-        // Nothing more fits this band. Close it and place b on fresh space.
-        var bandEmpty = !!open && open.cols.every(function (c) { return !c.els.length; });
-        finalizeOpen();
-        if (bandEmpty) {
-          // b taller than a fresh full-page column → force-place (can't split a
-          // section). Start a clean page first if the current one has content.
-          if (page.used > 0) newPage(false);
+        if (!placeSeq(b)) {
+          finalizeOpen();
+          newPage(false);
           openBand();
-          open.cols[0].els.push(b.el);
-          open.cols[0].h += b.h;
-          consumed[i] = true; done++; i++;
-        } else {
-          newPage(false); // b retried on the new empty page next loop
+          placeSeq(b);
         }
-      }
+      });
       finalizeOpen();
 
+      // Re-balance the LAST cols-band (target = its content / nCols) so the final
+      // page's columns end roughly even — no lone block beside two blank columns.
+      // Atoms keep document order, so a split section stays contiguous & in order.
+      (function rebalanceLastBand() {
+        var lastPage = pages[pages.length - 1];
+        if (!lastPage) return;
+        var band = null;
+        for (var k = lastPage.bands.length - 1; k >= 0; k--) {
+          if (lastPage.bands[k].type === 'cols') { band = lastPage.bands[k]; break; }
+        }
+        if (!band) return;
+        var items = [];
+        band.cols.forEach(function (c) { items = items.concat(c.items); });
+        if (items.length <= 1) return;
+        var total = 0;
+        items.forEach(function (it, idx) { total += it.h + (idx ? _BLOCK_GAP : 0); });
+        var target = total / nCols;
+        var cols = [];
+        for (var i = 0; i < nCols; i++) cols.push({ items: [], h: 0 });
+        var ci = 0;
+        items.forEach(function (it) {
+          if (ci < nCols - 1 && cols[ci].items.length && cols[ci].h + _BLOCK_GAP + it.h > target) ci++;
+          var c = cols[ci];
+          if (c.items.length) c.h += _BLOCK_GAP;
+          c.items.push(it);
+          c.h += it.h;
+        });
+        band.cols = cols;
+      })();
+
+      // Last-page fill ratio (recomputed post-rebalance) → drives auto-fit.
       var last = pages[pages.length - 1];
-      var lastFill = last ? Math.min(1, last.used / budget) : 1;
+      var lastUsed = 0;
+      if (last) {
+        lastUsed = last.first ? headerH + headerGap : 0;
+        last.bands.forEach(function (band) {
+          if (band.type === 'wide') { lastUsed += band.h + _BAND_GAP; return; }
+          var m = 0;
+          band.cols.forEach(function (c) { if (c.h > m) m = c.h; });
+          lastUsed += m + _BAND_GAP;
+        });
+      }
+      var lastFill = Math.min(1, lastUsed / budget);
       return { pages: pages, pageCount: pages.length, lastFill: lastFill };
     }
 
@@ -449,7 +529,19 @@
             var colEl = document.createElement('div');
             colEl.className = 'cs-col';
             colEl.style.gap = _BLOCK_GAP + 'px';
-            col.els.forEach(function (el) { colEl.appendChild(el); });
+            col.items.forEach(function (it, idx) {
+              // A continuation atom that STARTS a column gets a subtle "· continued"
+              // label; an atom that simply follows its sibling in the same column
+              // flows seamlessly with no label.
+              if (idx === 0 && it.cont && it.title) {
+                var lab = document.createElement('div');
+                lab.className = 'cs-cont';
+                lab.setAttribute('aria-hidden', 'true');
+                lab.textContent = it.title + ' · continued';
+                colEl.appendChild(lab);
+              }
+              colEl.appendChild(it.el);
+            });
             cc.appendChild(colEl);
           });
           inner.appendChild(cc);

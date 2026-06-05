@@ -374,6 +374,18 @@
 .cs-paper.is-exporting .cs-dropzone { display: none; }
 /* A table section spans the full page width as its own band. (margin matches the
    engine's _BAND_GAP so measured heights and rendered heights agree.) */
+/* Continuation label: shown atop a column where a split section resumes. Small,
+   muted, with a hairline rule — clearly a "continued", not a new heading. */
+.cs-cont {
+  font-size: 0.74em;
+  font-weight: 600;
+  font-style: italic;
+  color: #6b7280;
+  border-top: 1px dotted #cbd5e1;
+  padding-top: 3px;
+  margin-bottom: 1px;
+  break-inside: avoid;
+}
 .cs-band-wide { margin-bottom: 12px; }
 .cs-band-wide:last-child { margin-bottom: 0; }
 .cs-page .cs-block { margin: 0; }
