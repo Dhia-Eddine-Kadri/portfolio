@@ -579,6 +579,43 @@ export function renderMarkdown(text: string): string {
       continue;
     }
 
+    // GFM pipe tables: a header row (`| a | b |`) immediately followed by a
+    // separator (`|---|:--:|`), then body rows. Cheatsheets use these for the
+    // coordinate Method Picker and the translation-vs-rotation summary. Anything
+    // not matching this exact shape falls through to paragraph rendering.
+    const nextLine = lines[i + 1] ?? '';
+    if (
+      /\|/.test(line) && /^\s*\|?.*\|.*$/.test(line) &&
+      /\|/.test(nextLine) && /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(nextLine)
+    ) {
+      const splitRow = (row: string): string[] =>
+        row.trim().replace(/^\|/, '').replace(/\|$/, '')
+          .split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, '|').trim());
+      const headers = splitRow(line);
+      const aligns = splitRow(nextLine).map((spec) => {
+        const lft = spec.startsWith(':');
+        const rgt = spec.endsWith(':');
+        return rgt && lft ? 'center' : rgt ? 'right' : lft ? 'left' : '';
+      });
+      i += 2;
+      const bodyRows: string[][] = [];
+      while (i < lines.length && (lines[i] ?? '').trim() !== '' && /\|/.test(lines[i] ?? '')) {
+        bodyRows.push(splitRow(lines[i] ?? ''));
+        i++;
+      }
+      const al = (idx: number): string => (aligns[idx] ? ' style="text-align:' + aligns[idx] + '"' : '');
+      const thead = '<thead><tr>' +
+        headers.map((h, idx) => '<th' + al(idx) + '>' + inline(h) + '</th>').join('') +
+        '</tr></thead>';
+      const tbody = '<tbody>' +
+        bodyRows.map((cells) =>
+          '<tr>' + headers.map((_, idx) => '<td' + al(idx) + '>' + inline(cells[idx] ?? '') + '</td>').join('') + '</tr>'
+        ).join('') +
+        '</tbody>';
+      out.push('<table class="md-table">' + thead + tbody + '</table>');
+      continue;
+    }
+
     if (/^\d+\. /.test(line)) {
       const olItems: string[] = [];
       while (i < lines.length && /^\d+\. /.test(lines[i] ?? '')) {

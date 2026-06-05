@@ -116,6 +116,17 @@ _FORMULAISH_RE = re.compile(
 # artifact \u2014 a real LaTeX line break ``\\`` is only ever followed by whitespace,
 # ``[``, or end-of-line, never a letter.
 _DOUBLED_BACKSLASH_CMD_RE = re.compile(r"\\\\(?=[A-Za-z])")
+# Models often wrap a standard math operator in ``\text{}``/``\mathrm{}`` (e.g.
+# ``\text{cos}\beta``), which loses the operator spacing KaTeX gives ``\cos``.
+# Rewrite the known operators to their proper command.
+_MATH_OPERATORS = (
+    "sin", "cos", "tan", "cot", "sec", "csc",
+    "sinh", "cosh", "tanh", "arcsin", "arccos", "arctan",
+    "log", "ln", "exp", "lim", "min", "max", "det", "dim", "arg", "gcd",
+)
+_TEXT_OPERATOR_RE = re.compile(
+    r"\\(?:text|mathrm|mathop|operatorname)\s*\{\s*(" + "|".join(_MATH_OPERATORS) + r")\s*\}"
+)
 
 
 def repair_mojibake(text: str) -> str:
@@ -135,6 +146,7 @@ def formula_to_latexish(text: str) -> str:
     for sym, latex in _LATEX_SYMBOL_REPAIRS.items():
         out = out.replace(sym, latex)
     out = _DOUBLED_BACKSLASH_CMD_RE.sub(r"\\", out)
+    out = _TEXT_OPERATOR_RE.sub(r"\\\1", out)
     return out
 
 

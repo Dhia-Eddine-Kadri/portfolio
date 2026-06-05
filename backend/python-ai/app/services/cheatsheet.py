@@ -379,7 +379,9 @@ _SECTION_SYSTEM = (
     "\n"
     "EMPHASIS MARKERS (use exactly these; never inside a formula):\n"
     "- Wrap THE single most important fact/result of a block in ==double equals== "
-    "(yellow highlight). At most one per block.\n"
+    "(yellow highlight). Write it as `==text==` with NO spaces between the equals "
+    "and the text, and always TWO equals on each side — never `= text =`. At most "
+    "one per block.\n"
     "- Begin a hard warning with `Important:` or `Critical:` (red).\n"
     "- Begin a soft remark with `Note:` (orange).\n"
     "- Wrap a key concept term in {{double braces}} (blue); use sparingly.\n"
@@ -1073,8 +1075,9 @@ def _method_picker_guidance(topics: list[str | None], cfg: dict[str, Any]) -> st
     if not mechanics_hits or cfg.get("preset") == "topic_mastery":
         return ""
     return (
-        "\n\nMETHOD PICKER (include one tiny `## Method Picker` table near the top "
-        "when supported by the selected topics):\n"
+        "\n\nMETHOD PICKER — ALWAYS make this the FIRST `## Method Picker` section, "
+        "rendered as a real markdown table (keep only the rows whose topics appear "
+        "in the context):\n"
         "| Given / problem type | Use |\n"
         "|---|---|\n"
         "| Forces + acceleration | $\\sum F = ma$ |\n"

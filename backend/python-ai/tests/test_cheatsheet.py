@@ -370,6 +370,14 @@ def test_sanitize_collapses_doubled_backslash_command():
     assert "\\dot{r}" in out
 
 
+def test_sanitize_rewrites_text_wrapped_operators():
+    out, _ = cs.sanitize_cheatsheet_markdown(r"$x = v_0 \text{cos}\beta\, t$")
+    assert r"\text{cos}" not in out
+    assert r"\cos" in out
+    # mathrm-wrapped operators too
+    assert cq.formula_to_latexish(r"\mathrm{sin}^2\alpha") == r"\sin^2\alpha"
+
+
 def test_doubled_backslash_repair_keeps_matrix_row_break():
     # ``\\`` followed by whitespace is a real row break and must survive.
     assert cq.formula_to_latexish(r"\begin{matrix} a \\ b \end{matrix}") == \

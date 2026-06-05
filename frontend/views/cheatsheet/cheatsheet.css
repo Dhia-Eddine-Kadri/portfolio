@@ -274,6 +274,31 @@
 .cs-paper-body li { margin: 1px 0; }
 .cs-paper-body .katex { font-size: 0.95em; }
 .cs-paper-body .katex-display { margin: 4px 0; overflow-x: auto; }
+/* GFM tables — coordinate Method Picker + translation/rotation summary.
+   Kept inside a column (break-inside: avoid) and printer-friendly on white. */
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 5px 0;
+  font-size: 0.94em;
+  break-inside: avoid;
+}
+.md-table th, .md-table td {
+  border: 1px solid #d1d5db;
+  padding: 2px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.md-table thead th {
+  background: #f1f5f9;
+  font-weight: 700;
+  color: #111827;
+}
+.md-table tbody tr:nth-child(even) td { background: #f8fafc; }
+/* Inline (dark card) result view keeps the same shape on a dark surface. */
+.cs-sheet-body .md-table th, .cs-sheet-body .md-table td { border-color: var(--border, #334155); }
+.cs-sheet-body .md-table thead th { background: rgba(255, 255, 255, 0.06); color: var(--text, #e2e8f0); }
+.cs-sheet-body .md-table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
 /* Print-friendly marker colors on white */
 .cs-paper .cs-hl { background: #fef08a; color: #111827; }
 .cs-paper .cs-key { color: #1d4ed8; }
@@ -318,7 +343,10 @@
     padding: 0;
     background: #fff;
   }
-  .cs-paper-bar {
+  .cs-paper-bar,
+  .cs-section-tools,
+  .cs-settings,
+  .cs-controls {
     display: none;
   }
   .cs-paper {
