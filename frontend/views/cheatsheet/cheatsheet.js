@@ -133,14 +133,102 @@
     return groups.map(function (b) {
       var wide = !!b.querySelector('table');
       if (wide) b.classList.add('cs-block--wide');
+      _addBlockTools(b);
       return { el: b, wide: wide, h: 0 };
     });
   }
+
+  // Per-section editor chrome: a drag handle + a "page break before" toggle.
+  // position:absolute so it never affects the measured block height; stripped
+  // from the exported PDF (onclone) and from print. Wired once; survives re-packs.
+  function _addBlockTools(b) {
+    var tools = document.createElement('div');
+    tools.className = 'cs-block-tools';
+    tools.contentEditable = 'false';
+    tools.innerHTML =
+      '<button type="button" class="cs-drag" title="Drag to reorder">⠿</button>' +
+      '<button type="button" class="cs-brk" title="Start a new page before this section">⤓ break</button>';
+    // Don't let a tool click bubble into selection/drag of the section text.
+    tools.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    var brk = tools.querySelector('.cs-brk');
+    brk.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      b.classList.toggle('cs-break-before');
+      var paper = b.closest('.cs-paper');
+      if (paper) _repaginate(paper);
+    });
+    b.insertBefore(tools, b.firstChild);
+  }
+
+  // Break-state lives on the element's class so it survives re-packs.
+  function _hasBreak(el) { return el.classList.contains('cs-break-before'); }
 
   // Fallback (only if the paged engine throws): the old single multi-column flow.
   function _wrapBlocksFallback(body, blocks) {
     body.innerHTML = '';
     blocks.forEach(function (b) { body.appendChild(b.el); });
+  }
+
+  // SortableJS (CDN, like html2pdf) powers cross-column drag-to-reorder.
+  function _ensureSortable() {
+    if (window.Sortable) return Promise.resolve(window.Sortable);
+    if (window._ssSortableP) return window._ssSortableP;
+    window._ssSortableP = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
+      s.onload = function () { resolve(window.Sortable); };
+      s.onerror = function () { reject(new Error('sortable lib failed to load')); };
+      document.head.appendChild(s);
+    });
+    return window._ssSortableP;
+  }
+
+  function _destroySortables(paper) {
+    (paper._csSortables || []).forEach(function (s) { try { s.destroy(); } catch (e) {} });
+    paper._csSortables = [];
+  }
+
+  // Make every column and full-width band a drop target in one shared group, so a
+  // section can be dragged anywhere. On drop we read the new DOM order and re-pack
+  // (engine refills) — so pages stay full and nothing is stranded.
+  function _initSortables(paper) {
+    if (!window.Sortable || !paper._csState) return;
+    _destroySortables(paper);
+    var containers = Array.prototype.slice.call(
+      paper.querySelectorAll('.cs-col, .cs-band-wide')
+    );
+    paper._csSortables = containers.map(function (c) {
+      return window.Sortable.create(c, {
+        group: 'cs-sections',
+        handle: '.cs-drag',
+        draggable: '.cs-block',
+        animation: 130,
+        ghostClass: 'cs-sortable-ghost',
+        chosenClass: 'cs-sortable-chosen',
+        dragClass: 'cs-sortable-drag',
+        onEnd: function () {
+          // Defer so Sortable finishes before we tear down + rebuild the DOM.
+          setTimeout(function () { _reorderFromDom(paper); }, 0);
+        },
+      });
+    });
+  }
+
+  // Rebuild st.blocks to match the post-drag visual order (pages → bands →
+  // columns left-to-right, blocks top-to-bottom = document order), then re-pack.
+  function _reorderFromDom(paper) {
+    var st = paper._csState;
+    if (!st) return;
+    var byEl = new Map();
+    st.blocks.forEach(function (b) { byEl.set(b.el, b); });
+    var ordered = [];
+    Array.prototype.slice.call(paper.querySelectorAll('.cs-page .cs-block')).forEach(function (el) {
+      var b = byEl.get(el);
+      if (b) ordered.push(b);
+    });
+    if (ordered.length === st.blocks.length) st.blocks = ordered;
+    _repaginate(paper);
   }
 
   // ── Paged layout engine ────────────────────────────────────────────────────
@@ -155,6 +243,9 @@
     var st = paper && paper._csState;
     if (!st || !st.blocks.length) return;
     var nCols = parseInt(paper.style.getPropertyValue('--cs-columns'), 10) || 3;
+
+    // Tear down drag instances before we rebuild the DOM they were bound to.
+    _destroySortables(paper);
 
     // Detach header + all blocks from any previous layout, then clear old pages.
     if (st.header && st.header.parentNode) st.header.parentNode.removeChild(st.header);
@@ -223,9 +314,16 @@
       if (any) { page.bands.push(open); page.used += maxH + _BAND_GAP; }
       open = null;
     }
+    function pageHasContent() {
+      if (page.bands.length) return true;
+      return !!(open && open.cols.some(function (c) { return c.els.length; }));
+    }
     newPage(true);
 
     st.blocks.forEach(function (b) {
+      // Manual page break: this section starts a new page (unless the current page
+      // holds only the header — never break to a header-only page).
+      if (_hasBreak(b.el) && pageHasContent()) { finalizeOpen(); newPage(false); }
       if (b.wide) {
         finalizeOpen();
         if (page.used > 0 && b.h + _BAND_GAP > remaining()) newPage(false);
@@ -298,10 +396,13 @@
       pageEl.appendChild(inner);
       paper.appendChild(pageEl);
     });
+
+    // Re-enable drag-to-reorder on the freshly built columns/bands.
+    _initSortables(paper);
   }
 
-  // Re-pack on column/font change (geometry changed). Keeps the last good layout
-  // if the engine throws.
+  // Re-pack on column/font/padding change or after a drag/break edit (geometry or
+  // order changed). Keeps the last good layout if the engine throws.
   function _repaginate(paper) {
     if (!paper || !paper._csState) return;
     try { _layoutPages(paper); } catch (e) { /* keep last good layout */ }
@@ -316,6 +417,8 @@
     try {
       _layoutPages(paper);
       if (body.parentNode) body.parentNode.removeChild(body); // old multicol container
+      // Load the drag library (async); init once it's ready (and on later re-packs).
+      _ensureSortable().then(function () { _initSortables(paper); }).catch(function () {});
     } catch (e) {
       // Engine failed → fall back to the original single multi-column flow.
       paper.classList.remove('is-paged');
@@ -550,6 +653,9 @@
   }
 
   function _downloadPdf(el, filename) {
+    // is-exporting hides the editor chrome via CSS; onclone also strips the tool
+    // nodes from the rendered clone so they can never appear in the PDF.
+    el.classList.add('is-exporting');
     return _ensureHtml2Pdf().then(function (h2p) {
       return h2p().set({
         // margin MUST be 0: the captured .cs-paper is already a full A4-landscape
@@ -560,13 +666,27 @@
         margin: 0,
         filename: filename,
         image: { type: 'jpeg', quality: 0.96 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          onclone: function (doc) {
+            Array.prototype.slice.call(doc.querySelectorAll('.cs-block-tools'))
+              .forEach(function (n) { n.parentNode && n.parentNode.removeChild(n); });
+          },
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
         // The paged engine lays out exact 210mm .cs-page tiles (margin 0); html2pdf
         // slices the canvas every 210mm so each tile = one PDF page. No explicit
         // page-breaks and no `avoid` — those caused drift/blank pages. Pure tiling.
         pagebreak: { mode: ['css', 'legacy'] },
       }).from(el).save();
+    }).then(function (r) {
+      el.classList.remove('is-exporting');
+      return r;
+    }, function (err) {
+      el.classList.remove('is-exporting');
+      throw err;
     });
   }
 
@@ -612,8 +732,10 @@
     ov.innerHTML =
       '<div class="cs-paper-bar">' +
         '<span class="cs-paper-bar-title">' + _esc(opts.title || 'Cheatsheet') + '</span>' +
+        '<span class="cs-paper-hint" title="Drag a section by its ⠿ handle to reorder; ⤓ break starts a new page before a section">Edit: drag ⠿ to move · ⤓ break = new page</span>' +
         '<div class="cs-paper-bar-actions">' +
           '<select class="cs-paper-select" data-act="columns" title="Change columns"><option value="2">2 cols</option><option value="3">3 cols</option><option value="4">4 cols</option></select>' +
+          '<select class="cs-paper-select" data-act="pad" title="Change page padding"><option value="6mm">Tight</option><option value="10mm">Normal</option><option value="16mm">Wide</option></select>' +
           '<select class="cs-paper-select" data-act="font" title="Change font size"><option value="0.72rem">Small</option><option value="0.78rem">Medium</option><option value="0.86rem">Large</option></select>' +
           '<button type="button" class="cs-paper-btn" data-act="download">⤓ Download PDF</button>' +
           '<button type="button" class="cs-paper-btn cs-paper-close" data-act="close">Close</button>' +
@@ -638,12 +760,15 @@
       if (st.columns) paper.style.setProperty('--cs-columns', String(st.columns));
       var fontEm = { xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm'];
       if (fontEm) paper.style.setProperty('--cs-font', fontEm);
+      paper.style.setProperty('--cs-pad', '10mm');
       if (st.style) paper.setAttribute('data-style', st.style);
     }
     var colSel = ov.querySelector('[data-act="columns"]');
     var fontSel = ov.querySelector('[data-act="font"]');
+    var padSel = ov.querySelector('[data-act="pad"]');
     if (colSel && st.columns) colSel.value = String(st.columns);
     if (fontSel) fontSel.value = ({ xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm']) || '0.78rem';
+    if (padSel) padSel.value = '10mm';
     if (colSel) colSel.addEventListener('change', function () {
       if (!paper) return;
       paper.style.setProperty('--cs-columns', colSel.value);
@@ -653,6 +778,11 @@
       if (!paper) return;
       paper.style.setProperty('--cs-font', fontSel.value);
       _repaginate(paper);  // font size changed → re-measure + re-pack
+    });
+    if (padSel) padSel.addEventListener('change', function () {
+      if (!paper) return;
+      paper.style.setProperty('--cs-pad', padSel.value);
+      _repaginate(paper);  // padding changed → inner height changed → re-pack
     });
     var body = ov.querySelector('.cs-paper-body');
     if (body) _renderMarkdown(body, opts.markdown || '', true);

@@ -289,7 +289,7 @@
   width: 297mm;
   height: 210mm;
   box-sizing: border-box;
-  padding: 10mm;
+  padding: var(--cs-pad, 10mm);
   margin: 0 auto;
   background: #fff;
   overflow: hidden;
@@ -303,6 +303,41 @@
   overflow-wrap: break-word;
   word-break: break-word;
 }
+
+/* ── Layout editor (screen only; stripped from the exported PDF in onclone) ──── */
+.cs-block { position: relative; }
+.cs-block-tools {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: none;
+  gap: 3px;
+  z-index: 6;
+}
+.cs-block:hover .cs-block-tools { display: flex; }
+.cs-block-tools button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  padding: 0 5px;
+  cursor: pointer;
+}
+.cs-block-tools button:hover { background: #eef2ff; border-color: #6366f1; }
+.cs-block-tools .cs-drag { cursor: grab; font-size: 0.8rem; padding: 0 4px; }
+/* A section flagged to start a new page: indigo spine + active toggle. */
+.cs-block.cs-break-before { box-shadow: -4px 0 0 0 #6366f1; }
+.cs-block.cs-break-before .cs-brk { background: #6366f1; color: #fff; border-color: #6366f1; }
+/* SortableJS drag states */
+.cs-sortable-ghost { opacity: 0.35; }
+.cs-sortable-chosen { outline: 2px solid #6366f1; outline-offset: 2px; border-radius: 4px; }
+.cs-sortable-drag { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+/* Drop the editor chrome (and break spine) when exporting/printing. */
+.cs-paper.is-exporting .cs-block-tools { display: none !important; }
+.cs-paper.is-exporting .cs-block.cs-break-before { box-shadow: none; }
+@media print { .cs-block-tools { display: none !important; } }
 /* A run of normal blocks → a multi-column band; the columns are exact equal
    widths (flex: 1 + min-width: 0) so nothing overflows the page. */
 .cs-cols { display: flex; align-items: flex-start; margin-bottom: 12px; }
