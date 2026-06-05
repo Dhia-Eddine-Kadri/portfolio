@@ -110,9 +110,12 @@
 .dl-sp-modal {
   width: 100%;
   max-width: 500px;
-  max-height: 80vh;
+  height: min(720px, calc(100vh - 40px));
+  max-height: calc(100vh - 40px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--card, #0f172a);
   border: 1px solid var(--border, #1e293b);
   border-radius: 12px;
@@ -130,13 +133,26 @@
   opacity: 0.7;
 }
 .dl-sp-close:hover { opacity: 1; }
-.dl-sp-sub { margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
+.dl-sp-sub { flex: 0 0 auto; margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
 /* flex:1 + min-height:0 are REQUIRED: in the 80vh flex-column modal a flex child
    defaults to min-height:auto, so without these the list grows to its full
    content height (pushing the actions off-screen) instead of shrinking and
    scrolling — the "can't scroll inside folders" bug. */
-.dl-sp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.dl-sp-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 3px;
+}
+.dl-sp-list::-webkit-scrollbar { width: 8px; }
+.dl-sp-list::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.55); border-radius: 999px; }
+.dl-sp-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); border-radius: 999px; }
 .dl-sp-folder {
+  flex: 0 0 auto;
   border: 1px solid var(--border, #334155);
   border-radius: 8px;
   overflow: hidden;
@@ -183,12 +199,14 @@
 .dl-sp-folder-action:hover,
 .dl-sp-ghost:hover { background: rgba(255, 255, 255, 0.08); }
 .dl-sp-folder-files {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 0 8px 8px;
 }
 .dl-sp-item {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -200,7 +218,7 @@
 .dl-sp-item:hover { background: rgba(255, 255, 255, 0.08); }
 .dl-sp-cb { width: 16px; height: 16px; flex: 0 0 auto; }
 .dl-sp-name { font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dl-sp-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.dl-sp-actions { flex: 0 0 auto; display: flex; gap: 8px; margin-top: 14px; align-items: center; }
 .dl-sp-primary {
   margin-left: auto;
   padding: 8px 16px;

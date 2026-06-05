@@ -703,7 +703,7 @@
       '<div class="cs-sp-modal">' +
         '<div class="cs-sp-head"><span class="cs-sp-title">Choose source PDFs</span>' +
           '<button class="cs-sp-close" type="button" aria-label="Close">&times;</button></div>' +
-        '<p class="cs-sp-sub">All files are selected by default. Pick a few PDFs to scope the sheet — each gets its own section and repeats are removed.</p>' +
+        '<p class="cs-sp-sub">All files are selected by default. Use each folder\'s controls to select or clear only the files inside that folder.</p>' +
         '<div class="cs-sp-list cs-sp-folder-list">' + sections + '</div>' +
         '<div class="cs-sp-actions">' +
           '<button class="cs-sp-ghost" id="csSpAll" type="button">Select all</button>' +

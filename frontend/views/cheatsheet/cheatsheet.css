@@ -409,9 +409,12 @@
 .cs-sp-modal {
   width: 100%;
   max-width: 460px;
-  max-height: 80vh;
+  height: min(720px, calc(100vh - 40px));
+  max-height: calc(100vh - 40px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--card, #0f172a);
   border: 1px solid var(--border, #1e293b);
   border-radius: 12px;
@@ -424,14 +427,27 @@
   font-size: 1.4rem; line-height: 1; cursor: pointer; opacity: 0.7;
 }
 .cs-sp-close:hover { opacity: 1; }
-.cs-sp-sub { margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
+.cs-sp-sub { flex: 0 0 auto; margin: 6px 0 12px; font-size: 0.82rem; opacity: 0.72; }
 /* flex:1 + min-height:0 are REQUIRED: in the 80vh flex-column modal a flex child
    defaults to min-height:auto, so without these the list grows to its full
    content height (pushing the actions off-screen) instead of shrinking and
    scrolling — the "can't scroll inside folders" bug. */
-.cs-sp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cs-sp-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 3px;
+}
+.cs-sp-list::-webkit-scrollbar { width: 8px; }
+.cs-sp-list::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.55); border-radius: 999px; }
+.cs-sp-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); border-radius: 999px; }
 .cs-sp-folder-list { gap: 8px; }
 .cs-sp-folder {
+  flex: 0 0 auto;
   border: 1px solid var(--border, #334155);
   border-radius: 8px;
   overflow: hidden;
@@ -476,12 +492,14 @@
 }
 .cs-sp-folder-action:hover { background: rgba(255, 255, 255, 0.08); }
 .cs-sp-folder-files {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 0 8px 8px;
 }
 .cs-sp-item {
+  flex: 0 0 auto;
   display: flex; align-items: center; gap: 9px;
   padding: 8px 10px; border-radius: 8px; cursor: pointer;
   background: var(--card-inner, rgba(255, 255, 255, 0.04));
@@ -489,7 +507,7 @@
 .cs-sp-item:hover { background: rgba(255, 255, 255, 0.08); }
 .cs-sp-cb { width: 16px; height: 16px; flex: 0 0 auto; }
 .cs-sp-name { font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cs-sp-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.cs-sp-actions { flex: 0 0 auto; display: flex; gap: 8px; margin-top: 14px; align-items: center; }
 .cs-sp-ghost {
   padding: 7px 12px; border-radius: 8px; font-size: 0.82rem; cursor: pointer;
   border: 1px solid var(--border, #334155); background: transparent; color: var(--text, #e2e8f0);
