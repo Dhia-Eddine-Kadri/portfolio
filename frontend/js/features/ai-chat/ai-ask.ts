@@ -12,6 +12,11 @@ import { handleSourceClick, firstPage } from '../pdf-viewer/source-link.js';
 import { getCompareFileName } from '../pdf-viewer/pdf-compare.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
 import { escapeHtml } from '../../utils/escape-html.js';
+import {
+  createAIThinkingStatus,
+  getThinkingContext,
+  type AIThinkingStatus
+} from './ai-thinking-status.js';
 
 /** The subscription gate (HTTP 402 / "subscription required") should read as a
  * calm upgrade prompt, not a raw server error. */
@@ -84,12 +89,6 @@ interface SseStreamEvent extends Partial<SseDoneEvent> {
   meta?: boolean;
   status?: string;
   answerMode?: string;
-}
-
-interface ThinkingStatus {
-  el: HTMLElement;
-  set: (text: string) => void;
-  remove: () => void;
 }
 
 interface PdfPage {
@@ -245,71 +244,6 @@ function _autoScroll(el: HTMLElement | null): void {
   el.scrollTop = el.scrollHeight;
 }
 
-const THINKING_STEPS: Record<'normal' | 'problem' | 'app', string[]> = {
-  normal: [
-    'Collecting course context...',
-    'Reading the current PDF page...',
-    'Searching your lectures and exercises...',
-    'Checking matching sources...',
-    'Preparing a clear answer...'
-  ],
-  problem: [
-    'Reading the problem statement...',
-    'Identifying givens and required values...',
-    'Searching formulas in your course files...',
-    'Preparing step-by-step solution...'
-  ],
-  app: [
-    'Checking Minallo features...',
-    'Finding the right section...',
-    'Preparing instructions...'
-  ]
-};
-
-function createThinkingStatus(
-  type: 'normal' | 'problem' | 'app' = 'normal',
-  aiMsgs?: HTMLElement | null
-): ThinkingStatus | null {
-  const host = aiMsgs || document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
-  if (!host) return null;
-
-  const steps = THINKING_STEPS[type];
-  const wrap = document.createElement('div');
-  wrap.className = 'ai-msg-wrap typing-wrap ai-thinking-status';
-  wrap.innerHTML =
-    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
-    '<div class="ai-thinking-card">' +
-      '<span class="ai-thinking-pulse" aria-hidden="true"></span>' +
-      '<span class="ai-thinking-text">' + escapeHtml(steps[0] || 'Thinking...') + '</span>' +
-    '</div>';
-
-  host.appendChild(wrap);
-  _autoScroll(host);
-
-  let index = 0;
-  const timer = window.setInterval(() => {
-    index = Math.min(index + 1, steps.length - 1);
-    const text = wrap.querySelector<HTMLElement>('.ai-thinking-text');
-    if (text) text.textContent = steps[index] || steps[steps.length - 1] || 'Thinking...';
-    _autoScroll(host);
-  }, 900);
-
-  return {
-    el: wrap,
-    set(text: string): void {
-      const node = wrap.querySelector<HTMLElement>('.ai-thinking-text');
-      if (node && text) node.textContent = text;
-      _autoScroll(host);
-    },
-    remove(): void {
-      clearInterval(timer);
-      if (!wrap.parentNode) return;
-      wrap.classList.add('ai-thinking-status--hide');
-      setTimeout(() => wrap.remove(), 180);
-    }
-  };
-}
-
 const MINALLO_APP_CONTEXT =
   '\n\nMINALLO APP CONTEXT.\n' +
   'You are running inside Minallo at minallo.de — a study platform + AI tutor for university students. ' +
@@ -394,14 +328,14 @@ export function addTyping(): HTMLElement | null {
   const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
   if (!aiMsgs) return null;
   _ensureScrollTracker();
-  const wrap = document.createElement('div');
-  wrap.className = 'ai-msg-wrap typing-wrap';
-  wrap.innerHTML =
-    '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
-    '<div class="typing-bubble"><span></span><span></span><span></span></div>';
-  aiMsgs.appendChild(wrap);
+  const thinking = createAIThinkingStatus({
+    context: 'general',
+    host: aiMsgs,
+    surface: 'panel',
+    compact: true
+  });
   _autoScroll(aiMsgs);
-  return wrap;
+  return thinking?.el || null;
 }
 
 // ── Per-course chat history (localStorage) ──────────────────────────────────
@@ -667,11 +601,21 @@ export function initAskAI(
     _userScrolledUp = false;
     const _isProblemSolver = !!opts?.problemSolver;
 
-    let thinking = createThinkingStatus(_isProblemSolver ? 'problem' : 'normal', aiMsgs);
+    const initialThinkingContext = getThinkingContext({
+      problemSolver: opts?.problemSolver,
+      courseId: window.activeCourseId || window.currentCourseId || '',
+      hasCourseMaterial: !!(window.pdfFullText || window.activeFileName)
+    });
+    let thinking: AIThinkingStatus | null = createAIThinkingStatus({
+      context: initialThinkingContext,
+      host: aiMsgs,
+      surface: 'panel',
+      compact: true
+    });
     const thinkWrap = thinking?.el || document.createElement('div');
-    function removeThinking(): void {
+    function removeThinking(immediate = false): void {
       if (thinking) {
-        thinking.remove();
+        thinking.remove(immediate);
         thinking = null;
       } else if (thinkWrap && thinkWrap.parentNode) {
         thinkWrap.remove();
@@ -959,6 +903,7 @@ export function initAskAI(
             // Both `evt.done` and the reader's `result.done` can race to call
             // finalize() — guard so history/feedback bar aren't doubled.
             let _finalized = false;
+            let _finalizeWaitingForThinking = false;
 
             function updateBlockRender(): void {
               if (!bubble) return;
@@ -1044,7 +989,8 @@ export function initAskAI(
 
             function queueToken(tok: string): void {
               _tokenQueue.push(tok);
-              scheduleDrain();
+              if (ansWrap) scheduleDrain();
+              else beginStreamingWhenReady();
             }
 
             window._activeStreamRender = function (): void {
@@ -1060,7 +1006,7 @@ export function initAskAI(
 
             function ensureBubble(): void {
               if (ansWrap) return;
-              removeThinking();
+              removeThinking(true);
 
               ansWrap = document.createElement('div');
               ansWrap.className = 'ai-msg-wrap';
@@ -1074,6 +1020,22 @@ export function initAskAI(
               // either skip it or persist its data-raw value rather than the
               // partially-rendered DOM contents.
               if (bubble) bubble.setAttribute('data-streaming', 'true');
+            }
+
+            let _streamStartScheduled = false;
+            function beginStreamingWhenReady(): void {
+              if (ansWrap || _streamStartScheduled) return;
+              _streamStartScheduled = true;
+              const ready = thinking ? thinking.waitMinimum() : Promise.resolve();
+              ready.then(() => {
+                _streamStartScheduled = false;
+                if (ansWrap || _finalized) return;
+                if (!_tokenQueue.length && !_streamTextBuffer.length) return;
+                ensureBubble();
+                scheduleDrain();
+              }).catch(() => {
+                _streamStartScheduled = false;
+              });
             }
 
             const _streamController = new AbortController();
@@ -1182,7 +1144,6 @@ export function initAskAI(
                           }
                         }
                         if (evt.t) {
-                          ensureBubble();
                           queueToken(evt.t);
                         }
                         if (evt.done) {
@@ -1221,7 +1182,14 @@ export function initAskAI(
 
             function fallbackToRag(): void {
               if (ansWrap) ansWrap.remove();
-              if (!thinking) thinking = createThinkingStatus(_isProblemSolver ? 'problem' : 'normal', aiMsgs);
+              if (!thinking) {
+                thinking = createAIThinkingStatus({
+                  context: _isProblemSolver ? 'exercise-solver' : 'course-qa',
+                  host: aiMsgs,
+                  surface: 'panel',
+                  compact: true
+                });
+              }
               if (thinking) thinking.set('Preparing answer...');
               sendRagRequest(
                 _courseId,
@@ -1231,8 +1199,9 @@ export function initAskAI(
                 _streamActiveFileName || undefined,
                 _streamOpenFileCtx || undefined
               )
-                .then((data: RagAskResponse) => {
-                  removeThinking();
+                .then(async (data: RagAskResponse) => {
+                  if (thinking) await thinking.waitMinimum();
+                  removeThinking(true);
                   let answer = stripSourceMarkers(data.answer || 'No answer found.');
                   resolve({ content: [{ text: answer }], _ragData: data as unknown as AiResponse['_ragData'] });
                 })
@@ -1245,6 +1214,14 @@ export function initAskAI(
 
             function finalize(meta: SseDoneEvent | null | undefined): void {
               if (_finalized) return;
+              if (!ansWrap && thinking && !_finalizeWaitingForThinking) {
+                _finalizeWaitingForThinking = true;
+                thinking.waitMinimum().then(() => {
+                  if (_tokenQueue.length || _streamTextBuffer.length) ensureBubble();
+                  finalize(meta);
+                }).catch(() => finalize(meta));
+                return;
+              }
               _finalized = true;
               // Flush anything the throttled reveal (STREAM_CHARS_PER_FRAME)
               // hasn't drained into rawText yet. On a fast stream the body
@@ -1335,7 +1312,7 @@ export function initAskAI(
 
         return sendAiRequest({ max_tokens: 1024, system: sysPrompt, messages });
       })
-      .then((data: unknown) => {
+      .then(async (data: unknown) => {
         const d = data as AiResponse;
         if (myGenId !== state.currentGenId) {
           if (!d._streamWrap) removeThinking();
@@ -1375,7 +1352,8 @@ export function initAskAI(
           return;
         }
 
-        removeThinking();
+        if (thinking) await thinking.waitMinimum();
+        removeThinking(true);
 
         const _ragMeta: RagMeta | null = d._ragData
           ? {

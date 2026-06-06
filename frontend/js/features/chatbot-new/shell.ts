@@ -8,6 +8,11 @@
 
 import { renderMarkdown } from '../ai-chat/ai-markdown.js';
 import { handleSourceClick, firstPage } from '../pdf-viewer/source-link.js';
+import {
+  createAIThinkingStatus,
+  getThinkingContext,
+  type AIThinkingStatus
+} from '../ai-chat/ai-thinking-status.js';
 
 /** Tiny i18n wrapper: delegates to window._t (set up by language.ts) and
  * falls back to the English string when the language store isn't ready yet
@@ -434,6 +439,20 @@ function initConversation(root: HTMLElement): void {
     }
   });
 
+  // Interactive missing-value forms (minallo-input) dispatch this event when
+  // the student submits a value. Route the chatbot ones through the normal
+  // send path so the value rides the existing chat history and o4-mini
+  // finishes the calculation. Scoped by detail.surface so the PDF-panel
+  // listener doesn't also fire.
+  document.addEventListener('minallo-ai-input-submit', (ev) => {
+    const ce = ev as CustomEvent<{ text?: string; surface?: string }>;
+    if (!ce.detail || ce.detail.surface !== 'chatbot') return;
+    const text = (ce.detail.text || '').trim();
+    if (!text || state.isSending) return;
+    textarea.value = text;
+    void doSend(state, stage, textarea, sendBtn, pasteRow, msgs);
+  });
+
   // Paste inside textarea
   textarea.addEventListener('paste', (ev) => {
     const files = collectImageFiles(ev.clipboardData);
@@ -587,7 +606,13 @@ async function streamAiReply(
 
   const aiRow = appendAiBubble(msgs);
   const bubble = aiRow.querySelector<HTMLElement>('.ncb-bubble-body');
-  showTyping(bubble);
+  const thinking = createAIThinkingStatus({
+    context: chatbotThinkingContext(state),
+    host: bubble,
+    surface: 'chatbot',
+    compact: true,
+    append: false
+  });
 
   const controller = new AbortController();
   state.controller = controller;
@@ -609,9 +634,9 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      raw = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns);
+      raw = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking);
     } else {
-      raw = await callGenericAi(state.messages, bubble, controller);
+      raw = await callGenericAi(state.messages, bubble, controller, thinking);
     }
 
     state.messages.push({ role: 'assistant', text: raw });
@@ -626,6 +651,7 @@ async function streamAiReply(
       });
     }
   } catch (err) {
+    thinking?.remove(true);
     if (bubble) {
       if ((err as Error)?.name === 'AbortError') {
         bubble.innerHTML =
@@ -656,6 +682,18 @@ async function streamAiReply(
     setSendBtnMode(sendBtn, 'send');
     scrollMsgsToBottom(msgs);
   }
+}
+
+function chatbotThinkingContext(state: ConversationState): ReturnType<typeof getThinkingContext> {
+  const last = state.messages[state.messages.length - 1];
+  const active = chatStore.getActive();
+  return getThinkingContext({
+    question: last?.text || '',
+    tutorMode: getCurrentTutorMode(),
+    selectedSourceCount: active.selectedSourceIds.length,
+    filesCount: (last?.files || []).length,
+    hasCourseMaterial: active.selectedSourceIds.length > 0
+  });
 }
 
 
@@ -702,12 +740,13 @@ async function streamFromAskStream(
   courseId: string,
   bubble: HTMLElement | null,
   controller: AbortController,
-  previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = []
+  previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = [],
+  thinking?: AIThinkingStatus | null
 ): Promise<string> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
     // Misconfigured: graceful fallback to the generic path.
-    return callGenericAi([{ role: 'user', text: question }], bubble, controller);
+    return callGenericAi([{ role: 'user', text: question }], bubble, controller, thinking);
   }
   const token = getSbToken() || '';
 
@@ -727,15 +766,22 @@ async function streamFromAskStream(
     throw new Error('Ask-stream ' + resp.status + ': ' + errText.slice(0, 200));
   }
 
-  // Clear the typing dots once we know the stream is open. Live text is
-  // revealed as soft phrase chunks; full markdown rendering happens at the end.
-  const liveReveal = createSoftStreamReveal(bubble);
-
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let sseBuffer = '';
   let answerBuf = '';
   let doneMeta: Record<string, unknown> | null = null;
+  let liveReveal: ReturnType<typeof createSoftStreamReveal> | null = null;
+  let hasLiveReveal = false;
+
+  const ensureLiveReveal = async (): Promise<ReturnType<typeof createSoftStreamReveal>> => {
+    if (liveReveal) return liveReveal;
+    if (thinking) await thinking.waitMinimum();
+    thinking?.remove(true);
+    liveReveal = createSoftStreamReveal(bubble);
+    hasLiveReveal = true;
+    return liveReveal;
+  };
 
   while (true) {
     const result = await reader.read();
@@ -749,7 +795,8 @@ async function streamFromAskStream(
         const evt = JSON.parse(line.slice(6)) as Record<string, unknown>;
         if (typeof evt.t === 'string') {
           answerBuf += evt.t;
-          liveReveal.push(evt.t);
+          const reveal = await ensureLiveReveal();
+          reveal.push(evt.t);
         }
         if (evt.done) doneMeta = evt;
         if (evt.error) throw new Error(String(evt.error));
@@ -763,7 +810,13 @@ async function streamFromAskStream(
   // [Source N] markers are internal grounding anchors; the user sees sources
   // only in the collapsible footer appended below.
   const displayAnswer = stripSourceMarkers(answerBuf || tStr('cb_no_response', 'No response.'));
-  await liveReveal.finish();
+  const revealToFinish = liveReveal as ReturnType<typeof createSoftStreamReveal> | null;
+  if (hasLiveReveal && revealToFinish) {
+    await revealToFinish.finish();
+  } else {
+    if (thinking) await thinking.waitMinimum();
+    thinking?.remove(true);
+  }
   if (bubble) renderRichBubble(bubble, displayAnswer);
 
   // Append sources if the server included them. Verification stays internal.
@@ -937,7 +990,8 @@ function createSoftStreamReveal(bubble: HTMLElement | null): {
 async function callGenericAi(
   messages: ChatMessage[],
   bubble: HTMLElement | null,
-  controller: AbortController
+  controller: AbortController,
+  thinking?: AIThinkingStatus | null
 ): Promise<string> {
   const apiMessages = buildApiMessages(messages);
   const resp = await fetch('/api/ai', {
@@ -965,6 +1019,8 @@ async function callGenericAi(
       ? data.content.map((b) => b.text || '').join('')
       : tStr('cb_no_response', 'No response.');
   // Type into the bubble for the same UX as before.
+  if (thinking) await thinking.waitMinimum();
+  thinking?.remove(true);
   await typeIntoBubble(bubble, raw, () => controller.signal.aborted);
   return raw;
 }
@@ -1028,12 +1084,6 @@ function appendAiBubble(msgs: HTMLElement): HTMLElement {
   msgs.appendChild(row);
   scrollMsgsToBottom(msgs);
   return row;
-}
-
-function showTyping(bubble: HTMLElement | null): void {
-  if (!bubble) return;
-  bubble.innerHTML =
-    '<span class="ncb-typing"><span class="ncb-typing-dot"></span><span class="ncb-typing-dot"></span><span class="ncb-typing-dot"></span></span>';
 }
 
 function typeIntoBubble(

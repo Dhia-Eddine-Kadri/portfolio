@@ -1,4 +1,9 @@
 import { generateStudyTool, courseHasRagDocs, generateCheatsheet } from '../../services/ai-service.js';
+import {
+  createAIThinkingStatus,
+  type AIThinkingStatus,
+  type ThinkingContext
+} from './ai-thinking-status.js';
 
 export function closeAllOpts(): void {
   document.querySelectorAll('.chip-drawer').forEach((el) => {
@@ -96,6 +101,32 @@ interface SendButton extends HTMLButtonElement {
 }
 
 let _ragAborted = false;
+let _activeRagThinking: AIThinkingStatus | null = null;
+
+function _removeActiveRagThinking(immediate = false): void {
+  if (_activeRagThinking) {
+    _activeRagThinking.remove(immediate);
+    _activeRagThinking = null;
+    return;
+  }
+  document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+}
+
+function _startRagThinking(context: ThinkingContext): void {
+  const host = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
+  _removeActiveRagThinking(true);
+  _activeRagThinking = createAIThinkingStatus({
+    context,
+    host,
+    surface: 'panel',
+    compact: true
+  });
+}
+
+async function _finishRagThinking(): Promise<void> {
+  if (_activeRagThinking) await _activeRagThinking.waitMinimum();
+  _removeActiveRagThinking(true);
+}
 
 function _ragSetGenerating(on: boolean): void {
   const btn = document.getElementById('aiSend') as SendButton | null;
@@ -108,7 +139,7 @@ function _ragSetGenerating(on: boolean): void {
       if (!btn.classList.contains('is-stop')) return;
       _ragAborted = true;
       _ragSetGenerating(false);
-      document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+      _removeActiveRagThinking(true);
     };
     btn.addEventListener('click', btn._ragStopHandler);
   } else {
@@ -132,7 +163,11 @@ async function _generateWithRag(tool: string, level?: string, topic?: string): P
   if (window.addUserMsg) window.addUserMsg(label);
   _ragSetGenerating(true);
 
-  if (window.addTyping) window.addTyping();
+  _startRagThinking(
+    tool === 'summary' || tool === 'quiz' || tool === 'flashcards'
+      ? (tool as ThinkingContext)
+      : 'course-qa'
+  );
 
   try {
     const countMap: Record<string, number> = { easy: 5, medium: 6, hard: 8 };
@@ -149,12 +184,12 @@ async function _generateWithRag(tool: string, level?: string, topic?: string): P
 
     if (result.error) md = '⚠️ ' + result.error;
 
-    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    await _finishRagThinking();
     _ragSetGenerating(false);
     if (!_ragAborted && window.addBotMsg) window.addBotMsg(md);
     return !_ragAborted;
   } catch {
-    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    _removeActiveRagThinking(true);
     _ragSetGenerating(false);
     return false;
   }
@@ -174,7 +209,7 @@ async function _generateCheatsheetChip(): Promise<void> {
 
   if (window.addUserMsg) window.addUserMsg('🧾 Generate cheatsheet');
   _ragSetGenerating(true);
-  if (window.addTyping) window.addTyping();
+  _startRagThinking('summary');
 
   try {
     const result = await generateCheatsheet(courseId);
@@ -188,11 +223,11 @@ async function _generateCheatsheetChip(): Promise<void> {
       if (topics.length) md += '\n\n*Topics covered: ' + topics.join(' · ') + '*';
       if (result.noteId) md += '\n\n*Saved to your notes.*';
     }
-    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    await _finishRagThinking();
     _ragSetGenerating(false);
     if (!_ragAborted && window.addBotMsg) window.addBotMsg(md);
   } catch {
-    document.querySelectorAll('.typing-wrap').forEach((el) => el.remove());
+    _removeActiveRagThinking(true);
     _ragSetGenerating(false);
     if (window.addBotMsg) window.addBotMsg('⚠️ Cheatsheet generation failed. Please try again.');
   }
