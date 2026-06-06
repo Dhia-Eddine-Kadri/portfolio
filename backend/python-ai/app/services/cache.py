@@ -90,7 +90,10 @@ def question_hash(
 # v4 widens the cache key — every existing v3 entry is now reachable only
 # via the bare-question hash and the new composite key won't match, so
 # old rows are effectively invalidated without a manual DELETE.
-_CACHE_SCHEMA_VERSION = "v4-2026-05-21-composite-key"
+# v5 invalidates answers generated before the piecewise-kinematics prompt
+# fix. Without this, stale rows can keep replaying solutions that reset
+# velocity at internal boundaries or apply acceleration outside its region.
+_CACHE_SCHEMA_VERSION = "v5-2026-06-06-piecewise-kinematics"
 
 
 def document_version_hash(document_hashes: list[str | None]) -> str:

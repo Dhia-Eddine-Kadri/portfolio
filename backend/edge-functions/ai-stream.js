@@ -532,7 +532,7 @@ async function getDocVersionHash(userId, courseId, supaUrl, serviceKey) {
 }
 
 async function makeQuestionHash(userId, courseId, question, docVersionHash, mode, openFileName, activeDocId) {
-  const str = 'v3|' + userId + '|' + courseId + '|' +
+  const str = 'v4-piecewise-kinematics|' + userId + '|' + courseId + '|' +
     question.toLowerCase().replace(/\s+/g, ' ').trim() + '|' +
     docVersionHash + '|' + (mode || 'strict') + '|' + (openFileName || '') + '|' + (activeDocId || '');
   return sha256hex(str);
