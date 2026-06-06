@@ -1009,6 +1009,36 @@ async function streamFromAskStream(
 }
 
 
+/** In the standalone chatbot the course is never "opened" in the Courses view,
+ * so its SEMS course object starts with an empty `files` array — which means
+ * source-link.ts has nothing to resolve a clicked citation against (by name OR
+ * id) and shows "Source unavailable". Lazily load the active chat's course
+ * files via the app's `_ufMerge` so the cited file can be located and opened.
+ * Best-effort and idempotent (`_ufMerge` dedupes in-flight loads). */
+async function ensureChatCourseFilesLoaded(): Promise<void> {
+  const active = chatStore.getActive();
+  const selected = sourceLibrary.items.filter((s) => active.selectedSourceIds.includes(s.id));
+  const courseId =
+    selected[0]?.courseId ||
+    String((window as unknown as { activeCourseId?: string | null }).activeCourseId || '');
+  if (!courseId) return;
+  const w = window as unknown as {
+    SEMS?: Record<string, { courses?: Array<{ id?: string; files?: unknown[] }> }>;
+    _SEMS?: Record<string, { courses?: Array<{ id?: string; files?: unknown[] }> }>;
+    _ufMerge?: (course: unknown) => Promise<unknown>;
+  };
+  const sems = w.SEMS || w._SEMS;
+  if (!sems || typeof w._ufMerge !== 'function') return;
+  let course: { id?: string; files?: unknown[] } | undefined;
+  for (const sem of Object.values(sems)) {
+    course = (sem.courses || []).find((c) => c.id === courseId);
+    if (course) break;
+  }
+  if (course && !(Array.isArray(course.files) && course.files.length)) {
+    try { await w._ufMerge(course); } catch { /* best effort — resolution just falls back */ }
+  }
+}
+
 /** Render the `done` event meta into the answer bubble: source list only.
  * Verification/confidence status remains internal and is not shown to users. */
 function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>): void {
@@ -1051,9 +1081,12 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
     footer.className = 'ncb-ask-footer';
     footer.innerHTML = footerHtml;
     footer.querySelectorAll<HTMLElement>('.ncb-ask-sources .src-cite').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', async () => {
         const src = sources[Number(el.dataset.srcI)] as SrcItem | undefined;
         if (!src) return;
+        // Make sure the course's files are loaded before resolving, otherwise
+        // the lookup has nothing to match against in the chatbot context.
+        await ensureChatCourseFilesLoaded();
         handleSourceClick(
           { fileName: src.file_name, documentId: src.documentId, page: src.pageStart ?? firstPage(src.pages) },
           'popup'
