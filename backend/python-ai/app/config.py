@@ -31,6 +31,8 @@ class Settings(BaseSettings):
         "text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL"
     )
     openai_embedding_dim: int = Field(1536, alias="OPENAI_EMBEDDING_DIM")
+    web_search_enabled: bool = Field(True, alias="MINALLO_WEB_SEARCH_ENABLED")
+    web_search_model: str = Field("gpt-4.1-mini", alias="MINALLO_WEB_SEARCH_MODEL")
 
     # --- Supabase Storage bucket holding the uploaded PDFs.
     # Same env var the existing Netlify uploader reads (defaults match).

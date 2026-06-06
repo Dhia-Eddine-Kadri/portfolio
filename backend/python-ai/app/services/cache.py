@@ -38,6 +38,12 @@ def question_hash(
     active_document_id: str | None = None,
     visible_context: str | None = None,
     previous_turns: list[dict[str, str]] | None = None,
+    source_mode: str | None = None,
+    source_scope: str | None = None,
+    course_file_scope: str | None = None,
+    selected_document_ids: list[str] | None = None,
+    retrieved_chunk_ids: list[str] | None = None,
+    web_query: str | None = None,
 ) -> str:
     """Composite cache key for an answer.
 
@@ -80,6 +86,19 @@ def question_hash(
         if serial:
             pt_short = hashlib.sha256(serial.encode("utf-8")).hexdigest()[:16]
             parts.append(f"pt={pt_short}")
+    if source_mode:
+        parts.append(f"sm={source_mode}")
+    if source_scope:
+        parts.append(f"ss={source_scope}")
+    if course_file_scope:
+        parts.append(f"cfs={course_file_scope}")
+    if selected_document_ids:
+        parts.append("docs=" + ",".join(sorted(selected_document_ids)))
+    if retrieved_chunk_ids:
+        serial_chunks = ",".join(sorted(retrieved_chunk_ids))
+        parts.append("chunks=" + hashlib.sha256(serial_chunks.encode("utf-8")).hexdigest()[:16])
+    if web_query:
+        parts.append("web=" + hashlib.sha256(web_query.encode("utf-8")).hexdigest()[:16])
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -140,6 +159,12 @@ def lookup_answer(
     active_document_id: str | None = None,
     visible_context: str | None = None,
     previous_turns: list[dict[str, str]] | None = None,
+    source_mode: str | None = None,
+    source_scope: str | None = None,
+    course_file_scope: str | None = None,
+    selected_document_ids: list[str] | None = None,
+    retrieved_chunk_ids: list[str] | None = None,
+    web_query: str | None = None,
 ) -> dict[str, Any] | None:
     """Return the cached answer JSON, or None on miss. Bumps usage stats on hit.
 
@@ -158,6 +183,12 @@ def lookup_answer(
         active_document_id=active_document_id,
         visible_context=visible_context,
         previous_turns=previous_turns,
+        source_mode=source_mode,
+        source_scope=source_scope,
+        course_file_scope=course_file_scope,
+        selected_document_ids=selected_document_ids,
+        retrieved_chunk_ids=retrieved_chunk_ids,
+        web_query=web_query,
     )
     sb = get_supabase()
     try:
@@ -199,6 +230,12 @@ def save_answer(
     active_document_id: str | None = None,
     visible_context: str | None = None,
     previous_turns: list[dict[str, str]] | None = None,
+    source_mode: str | None = None,
+    source_scope: str | None = None,
+    course_file_scope: str | None = None,
+    selected_document_ids: list[str] | None = None,
+    retrieved_chunk_ids: list[str] | None = None,
+    web_query: str | None = None,
 ) -> None:
     """Upsert the answer for next time. Safe to no-op on errors.
 
@@ -217,6 +254,12 @@ def save_answer(
             active_document_id=active_document_id,
             visible_context=visible_context,
             previous_turns=previous_turns,
+            source_mode=source_mode,
+            source_scope=source_scope,
+            course_file_scope=course_file_scope,
+            selected_document_ids=selected_document_ids,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            web_query=web_query,
         ),
         "normalized_question":   _normalize_question(question),
         "document_version_hash": version_hash,

@@ -828,6 +828,56 @@ body.ncb-fullbleed .ncb-main {
   background: linear-gradient(135deg, rgba(100, 116, 139, 0.95), rgba(71, 85, 105, 0.88));
 }
 
+.ncb-source-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 6px;
+}
+
+.ncb-source-mode-group,
+.ncb-course-scope-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.ncb-source-mode,
+.ncb-course-scope {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ncb-muted, #64748b);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.ncb-source-mode--active,
+.ncb-course-scope--active {
+  background: var(--ncb-panel, #fff);
+  color: var(--ncb-text, #0f172a);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.ncb-source-used {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ncb-muted, #64748b);
+  font-size: 12px;
+}
+
 /* Context panel internals */
 
 .ncb-context {

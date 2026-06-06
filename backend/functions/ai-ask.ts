@@ -22,6 +22,9 @@ interface GroundedSource {
   pageStart?: number | null;
   pageEnd?: number | null;
   sectionTitle?: string | null;
+  title?: string | null;
+  url?: string | null;
+  snippet?: string | null;
 }
 
 interface VerificationBody {
@@ -38,6 +41,10 @@ interface AskResponseBody {
   groundedSources?: GroundedSource[];
   cacheHit?: boolean;
   model?: string | null;
+  selectedSourceMode?: string | null;
+  sourceScope?: string | null;
+  courseFileScope?: string | null;
+  sourceLabel?: string | null;
 }
 
 function _confidenceFromVerification(v?: VerificationBody | null, retrievalMode?: string): string {
@@ -55,6 +62,9 @@ interface MappedSource {
   file_name: string;
   pages: string | null;
   section?: string | null;
+  title?: string | null;
+  url?: string | null;
+  snippet?: string | null;
 }
 
 function _mapSources(groundedSources: GroundedSource[] | undefined): MappedSource[] {
@@ -64,7 +74,14 @@ function _mapSources(groundedSources: GroundedSource[] | undefined): MappedSourc
     let pages: string | null = null;
     if (ps && pe) pages = ps === pe ? String(ps) : `${ps}-${pe}`;
     else if (ps) pages = String(ps);
-    return { file_name: s.fileName || 'Unknown', pages, section: s.sectionTitle ?? null };
+    return {
+      file_name: s.fileName || s.title || s.url || 'Unknown',
+      pages,
+      section: s.sectionTitle ?? null,
+      title: s.title ?? null,
+      url: s.url ?? null,
+      snippet: s.snippet ?? null
+    };
   });
 }
 
@@ -127,6 +144,14 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         : null;
   const activeFileName = typeof body.activeFileName === 'string' ? body.activeFileName : null;
   const openFileContext = typeof body.openFileContext === 'string' ? body.openFileContext.slice(0, 20000) : null;
+  const sourceMode =
+    typeof body.sourceMode === 'string' && ['auto', 'course_files', 'internet'].includes(body.sourceMode)
+      ? body.sourceMode
+      : 'auto';
+  const courseFileScope =
+    typeof body.courseFileScope === 'string' && ['all_course_files', 'specific_files'].includes(body.courseFileScope)
+      ? body.courseFileScope
+      : 'all_course_files';
   await logSecurityEvent(serviceKey, user.id, 'ai_ask', {
     course_id: courseId,
     document_count: documentIds ? documentIds.length : 0,
@@ -140,6 +165,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     activeDocumentId,
     question,
     tutorMode,
+    sourceMode,
+    courseFileScope,
     activeFileName,
     openFileContext,
     // bypassCache is intentionally NOT forwarded from the client — the answer
@@ -164,6 +191,10 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     unsupported: py.retrievalMode !== 'strong',
     sources: _mapSources(py.groundedSources),
     cacheHit: Boolean(py.cacheHit),
-    model: py.model ?? null
+    model: py.model ?? null,
+    selectedSourceMode: py.selectedSourceMode ?? sourceMode,
+    sourceScope: py.sourceScope ?? null,
+    courseFileScope: py.courseFileScope ?? courseFileScope,
+    sourceLabel: py.sourceLabel ?? null
   });
 };

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,12 +25,24 @@ from ..services.access_control import (
     enforce_rate_limit,
     require_active_subscription,
 )
-from ..services.answer import DEFAULT_TUTOR_MODE, normalise_tutor_mode
+from ..services.answer import DEFAULT_TUTOR_MODE, is_app_question, normalise_tutor_mode
 from ..services.answer_stream import stream_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
 from ..services.embeddings import EmbeddingServiceUnavailable
+from ..services.general_answer import generate_general_answer
 from ..services.retrieval import retrieve_chunks, retrieve_exercise_block, retrieve_formula_block
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
+from ..services.source_router import (
+    CourseFileScope,
+    SourceDecision,
+    SourceScope,
+    auto_general_prefix,
+    classify_source_scope,
+    course_not_found_answer,
+    course_relevance_score,
+    effective_document_ids,
+)
+from ..services.web_answer import generate_web_answer
 from ..supabase_client import get_supabase
 
 # Same hourly cap as the Netlify /api/ai/ask path so the two surfaces share
@@ -108,6 +121,8 @@ class AskStreamRequest(BaseModel):
     openFileImages: list[OpenFileImagePayload] | None = None
     # Tutor-mode overlay: explain | solve | quiz. Defaults to 'explain'.
     tutorMode: str | None = None
+    sourceMode: str | None = "auto"
+    courseFileScope: str | None = "all_course_files"
     # Short transcript of the most recent turns in this chat session,
     # newest last. Capped on the server (we trim to ~3 turns / ~2000 chars
     # total) so the prompt size stays predictable even if the client
@@ -122,6 +137,60 @@ class AskStreamRequest(BaseModel):
 
 def _sse_bytes(payload: str) -> bytes:
     return ("data: " + payload + "\n\n").encode("utf-8")
+
+
+def _source_debug_enabled() -> bool:
+    try:
+        from ..config import get_settings  # noqa: WPS433
+        return get_settings().environment.lower() != "production"
+    except Exception:
+        return False
+
+
+def _source_meta(decision: SourceDecision, *, cache_hit: bool | None = None) -> dict[str, Any]:
+    return decision.metadata(include_debug=_source_debug_enabled(), cache_hit=cache_hit)
+
+
+def _stream_static_answer(
+    *,
+    text: str,
+    decision: SourceDecision,
+    answer_mode: str,
+    sources: list[dict[str, Any]] | None = None,
+    model: str | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+):
+    import json
+    sources = sources or []
+
+    def gen():
+        meta = {
+            "meta": True,
+            "retrievalMode": decision.source_scope.value,
+            "answerMode": answer_mode,
+            "confidence": "high",
+            "unsupported": False,
+            **_source_meta(decision, cache_hit=False),
+        }
+        yield _sse_bytes(json.dumps(meta, ensure_ascii=False))
+        for i in range(0, len(text), 48):
+            yield _sse_bytes(json.dumps({"t": text[i:i + 48]}, ensure_ascii=False))
+        yield _sse_bytes(json.dumps({
+            "done": True,
+            "retrievalMode": decision.source_scope.value,
+            "answerMode": answer_mode,
+            "confidence": "high",
+            "unsupported": False,
+            "sources": sources,
+            "cacheHit": False,
+            "model": model,
+            "promptTokens": prompt_tokens,
+            "completionTokens": completion_tokens,
+            **_source_meta(decision, cache_hit=False),
+        }, ensure_ascii=False))
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 def _validate_open_file_images(images: list[OpenFileImagePayload] | None) -> list[dict[str, Any]]:
@@ -197,6 +266,18 @@ def _cached_grounded_sources_to_js(grounded_sources: list[dict[str, Any]] | None
     return sources_js
 
 
+def _web_sources_to_js(sources: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    return [
+        {
+            "file_name": s.get("title") or s.get("url") or "Web source",
+            "title": s.get("title"),
+            "url": s.get("url"),
+            "snippet": s.get("snippet"),
+        }
+        for s in (sources or [])
+    ]
+
+
 @router.post("/ask-stream")
 async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(verify_supabase_jwt)):
     user_id = user["id"]
@@ -232,6 +313,62 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     if payload.openFileContext and len(payload.openFileContext) > _MAX_STREAM_OPEN_FILE_CTX_CHARS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
     open_file_images = _validate_open_file_images(payload.openFileImages)
+    source_decision = classify_source_scope(
+        question=question,
+        source_mode=payload.sourceMode,
+        course_file_scope=payload.courseFileScope,
+        selected_course_id=payload.courseId,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+        open_file_context=payload.openFileContext,
+    )
+
+    app_question = is_app_question(question)
+    if app_question:
+        source_decision = replace(
+            source_decision,
+            source_scope=SourceScope.GENERAL_KNOWLEDGE,
+            source_label="",
+            used_document_ids=[],
+            relevance_score=None,
+            web_search_used=False,
+        )
+
+    if source_decision.source_scope == SourceScope.NEEDS_CLARIFICATION and not app_question:
+        return _stream_static_answer(
+            text=source_decision.needs_clarification_message
+            or "Which file should I use? Please select a PDF or switch to All course files.",
+            decision=source_decision,
+            answer_mode="clarification",
+        )
+
+    if source_decision.source_scope == SourceScope.INTERNET and not app_question:
+        web_answer = generate_web_answer(
+            question,
+            query=source_decision.sanitized_web_query or question,
+        )
+        source_decision = replace(source_decision, web_search_used=bool(web_answer.get("webSources")))
+        return _stream_static_answer(
+            text=web_answer["answer"],
+            decision=source_decision,
+            answer_mode="internet",
+            sources=_web_sources_to_js(web_answer.get("webSources") or []),
+            model=web_answer.get("model"),
+            prompt_tokens=web_answer.get("promptTokens"),
+            completion_tokens=web_answer.get("completionTokens"),
+        )
+
+    if source_decision.source_scope == SourceScope.GENERAL_KNOWLEDGE and not app_question:
+        prefix = auto_general_prefix() if source_decision.selected_source_mode.value == "auto" else ""
+        general = generate_general_answer(question, prefix=prefix)
+        return _stream_static_answer(
+            text=general["answer"],
+            decision=source_decision,
+            answer_mode="general",
+            model=general.get("model"),
+            prompt_tokens=general.get("promptTokens"),
+            completion_tokens=general.get("completionTokens"),
+        )
 
     # ── Cache check (same logic as /ask) ─────────────────────────────────────
     # When the request carries openFileContext (the user is reading a PDF
@@ -277,6 +414,10 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             # caches with open context, the key reflects it.
             visible_context=payload.openFileContext,
             previous_turns=_prev_for_cache,
+            source_mode=source_decision.selected_source_mode.value,
+            source_scope=source_decision.source_scope.value,
+            course_file_scope=source_decision.course_file_scope.value,
+            selected_document_ids=payload.documentIds,
         )
 
     def cached_stream():
@@ -302,6 +443,11 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             "retrievalMode": cached.get("retrievalMode", "strong"),
             "confidence": cached_confidence,
             "unsupported": cached.get("retrievalMode") != "strong",
+            "selectedSourceMode": cached.get("selectedSourceMode"),
+            "sourceScope": cached.get("sourceScope"),
+            "courseFileScope": cached.get("courseFileScope"),
+            "sourceLabel": cached.get("sourceLabel"),
+            "sourceDebug": cached.get("sourceDebug") if _source_debug_enabled() else None,
         }))
         cached_answer = cached.get("answer", "")
         for i in range(0, len(cached_answer), 28):
@@ -317,6 +463,11 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             "sources": sources_js,
             "cacheHit": True,
             "model": cached.get("model"),
+            "selectedSourceMode": cached.get("selectedSourceMode"),
+            "sourceScope": cached.get("sourceScope"),
+            "courseFileScope": cached.get("courseFileScope"),
+            "sourceLabel": cached.get("sourceLabel"),
+            "sourceDebug": cached.get("sourceDebug") if _source_debug_enabled() else None,
         }))
 
     if cached:
@@ -393,6 +544,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         open_file_context=payload.openFileContext,
         has_problem_solver=payload.problemSolver is not None,
     )
+    course_file_scope = CourseFileScope(source_decision.course_file_scope.value)
+    retrieval_document_ids = effective_document_ids(
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+        course_file_scope=course_file_scope,
+    )
 
     # App/product questions ("how do I upload", "where is settings", "what
     # features does Minallo have") should not trigger course-document
@@ -400,8 +557,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # MINALLO_APP_CONTEXT only — sending it empty chunks here saves the
     # retrieval cost AND prevents an accidental [Source N] leakage if the
     # model ever ignored its prompt override.
-    from ..services.answer import is_app_question  # noqa: WPS433
-    if is_app_question(question):
+    if app_question:
         chunks = []
         exercise_hit = None
         formula_hits = []
@@ -409,13 +565,13 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         try:
             exercise_hit = retrieve_exercise_block(
                 user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-                document_ids=payload.documentIds,
+                document_ids=retrieval_document_ids,
                 active_document_id=payload.activeDocumentId,
             )
             chunks = retrieve_chunks(
                 user_id=user_id, course_id=payload.courseId,
-                query=retrieval_query, document_ids=None,
-                preferred_document_ids=payload.documentIds,
+                query=retrieval_query, document_ids=retrieval_document_ids,
+                preferred_document_ids=retrieval_document_ids,
                 active_document_id=payload.activeDocumentId,
                 document_name_query=question,
                 top_k=18,
@@ -429,7 +585,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         try:
             formula_hits = retrieve_formula_block(
                 user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-                document_ids=payload.documentIds,
+                document_ids=retrieval_document_ids,
                 active_document_id=payload.activeDocumentId,
             )
         except EmbeddingServiceUnavailable as exc:
@@ -447,6 +603,35 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                 doc_name_map[row["id"]] = row["file_name"]
         except Exception:
             log.exception("doc_name backfill failed")
+
+    relevance_score = course_relevance_score(question, chunks)
+    source_decision = replace(
+        source_decision,
+        relevance_score=relevance_score,
+        used_document_ids=list(dict.fromkeys(c.document_id for c in chunks if c.document_id)),
+    )
+    has_strong_course_anchor = bool(payload.openFileContext or exercise_hit or formula_hits or relevance_score >= 0.18)
+    if not has_strong_course_anchor:
+        if source_decision.selected_source_mode.value == "course_files":
+            return _stream_static_answer(
+                text=course_not_found_answer(),
+                decision=source_decision,
+                answer_mode="strong",
+            )
+        general_decision = replace(
+            source_decision,
+            source_scope=SourceScope.GENERAL_KNOWLEDGE,
+            source_label="Using: General knowledge",
+        )
+        general = generate_general_answer(question, prefix=auto_general_prefix())
+        return _stream_static_answer(
+            text=general["answer"],
+            decision=general_decision,
+            answer_mode="general",
+            model=general.get("model"),
+            prompt_tokens=general.get("promptTokens"),
+            completion_tokens=general.get("completionTokens"),
+        )
 
     # ── Stream + save to cache on finish ─────────────────────────────────────
     full_text_buf: list[str] = []
@@ -478,6 +663,9 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                 yield chunk_bytes
                 continue
             if isinstance(evt, dict):
+                if evt.get("meta"):
+                    evt.update(_source_meta(source_decision, cache_hit=False))
+                    chunk_bytes = ("data: " + json.dumps(evt, ensure_ascii=False) + "\n\n").encode("utf-8")
                 if evt.get("t"):
                     full_text_buf.append(evt["t"])
                 if evt.get("done"):
@@ -500,6 +688,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                         })
                     evt["sources"] = sources_js
                     evt["cacheHit"] = False
+                    evt.update(_source_meta(source_decision, cache_hit=False))
                     chunk_bytes = ("data: " + json.dumps(evt, ensure_ascii=False) + "\n\n").encode("utf-8")
             yield chunk_bytes
 
@@ -540,7 +729,17 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                         "model": captured_meta.get("model"),
                         "promptTokens": captured_meta.get("promptTokens"),
                         "completionTokens": captured_meta.get("completionTokens"),
+                        "selectedSourceMode": captured_meta.get("selectedSourceMode"),
+                        "sourceScope": captured_meta.get("sourceScope"),
+                        "courseFileScope": captured_meta.get("courseFileScope"),
+                        "sourceLabel": captured_meta.get("sourceLabel"),
+                        "sourceDebug": captured_meta.get("sourceDebug") if _source_debug_enabled() else None,
                     },
+                    source_mode=source_decision.selected_source_mode.value,
+                    source_scope=source_decision.source_scope.value,
+                    course_file_scope=source_decision.course_file_scope.value,
+                    selected_document_ids=retrieval_document_ids,
+                    retrieved_chunk_ids=[c.chunk_id for c in chunks],
                 )
             except Exception:
                 log.exception("cache save after stream failed (non-fatal)")

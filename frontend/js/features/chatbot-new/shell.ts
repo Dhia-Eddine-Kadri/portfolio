@@ -47,6 +47,7 @@ export function initNewChatbotShell(): void {
   initActionCards(newRoot);
   initKeyboardShortcuts(newRoot);
   initTutorModes(newRoot);
+  initSourceControls(newRoot);
   initFullbleed();
 
   renderSidebar(newRoot);
@@ -301,6 +302,8 @@ function bindSearch(sidebar: HTMLElement): void {
 // localStorage so the choice survives reloads but never spans logins.
 
 type TutorMode = 'explain' | 'solve' | 'quiz';
+type SourceMode = 'auto' | 'course_files' | 'internet';
+type CourseFileScope = 'all_course_files' | 'specific_files';
 const TUTOR_MODE_STORAGE_KEY = 'ncb_tutor_mode';
 const TUTOR_MODE_MIGRATION_KEY = 'ncb_tutor_mode_direct_default_v1';
 const TUTOR_MODE_DEFAULT: TutorMode = 'explain';
@@ -369,6 +372,63 @@ function getCurrentTutorMode(): TutorMode {
   return currentTutorMode;
 }
 
+function normaliseSourceMode(v: unknown): SourceMode {
+  return v === 'course_files' || v === 'internet' || v === 'auto' ? v : 'auto';
+}
+
+function normaliseCourseFileScope(v: unknown): CourseFileScope {
+  return v === 'specific_files' || v === 'all_course_files' ? v : 'all_course_files';
+}
+
+function sourceModeForActiveChat(): SourceMode {
+  return normaliseSourceMode(chatStore.getActive().sourceMode);
+}
+
+function courseFileScopeForActiveChat(): CourseFileScope {
+  return normaliseCourseFileScope(chatStore.getActive().courseFileScope);
+}
+
+function updateSourceControls(root: HTMLElement): void {
+  const active = chatStore.getActive();
+  const mode = normaliseSourceMode(active.sourceMode);
+  const scope = normaliseCourseFileScope(active.courseFileScope);
+  root.querySelectorAll<HTMLButtonElement>('.ncb-source-mode').forEach((btn) => {
+    const on = btn.dataset.sourceMode === mode;
+    btn.classList.toggle('ncb-source-mode--active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  root.querySelectorAll<HTMLButtonElement>('.ncb-course-scope').forEach((btn) => {
+    const on = btn.dataset.courseFileScope === scope;
+    btn.classList.toggle('ncb-course-scope--active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function initSourceControls(root: HTMLElement): void {
+  const controls = root.querySelector<HTMLElement>('.ncb-source-controls');
+  if (!controls || controls.dataset.ncbBound === '1') return;
+  controls.dataset.ncbBound = '1';
+  controls.querySelectorAll<HTMLButtonElement>('.ncb-source-mode').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const chat = chatStore.getActive();
+      chat.sourceMode = normaliseSourceMode(btn.dataset.sourceMode);
+      chat.updatedAt = Date.now();
+      saveChatStore();
+      updateSourceControls(root);
+    });
+  });
+  controls.querySelectorAll<HTMLButtonElement>('.ncb-course-scope').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const chat = chatStore.getActive();
+      chat.courseFileScope = normaliseCourseFileScope(btn.dataset.courseFileScope);
+      chat.updatedAt = Date.now();
+      saveChatStore();
+      updateSourceControls(root);
+    });
+  });
+  updateSourceControls(root);
+}
+
 // ============ PR-03: Conversation (input, send, paste, render, abort) ============
 
 interface PastedImage {
@@ -393,6 +453,11 @@ interface ChatMessage {
   text: string;
   images?: PastedImage[];
   files?: PendingFile[];
+  selectedSourceMode?: SourceMode;
+  sourceScope?: string;
+  sourceLabel?: string;
+  courseFileScope?: CourseFileScope;
+  sources?: SrcItem[];
 }
 
 interface ConversationState {
@@ -634,12 +699,21 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      raw = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking);
+      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking);
+      raw = streamed.text;
+      state.messages.push({
+        role: 'assistant',
+        text: raw,
+        selectedSourceMode: streamed.meta?.selectedSourceMode as SourceMode | undefined,
+        sourceScope: streamed.meta?.sourceScope as string | undefined,
+        sourceLabel: streamed.meta?.sourceLabel as string | undefined,
+        courseFileScope: streamed.meta?.courseFileScope as CourseFileScope | undefined,
+        sources: Array.isArray(streamed.meta?.sources) ? streamed.meta.sources as SrcItem[] : undefined,
+      });
     } else {
       raw = await callGenericAi(state.messages, bubble, controller, thinking);
+      state.messages.push({ role: 'assistant', text: raw });
     }
-
-    state.messages.push({ role: 'assistant', text: raw });
     touchActiveChat();
     saveChatStore();
     appendBubbleActions(aiRow, raw);
@@ -714,18 +788,14 @@ function ragEligibility(
   if ((last.images || []).length || (last.files || []).length) return null;
 
   const active = chatStore.getActive();
-  if (!active.selectedSourceIds.length) return null;
-
-  const selected = sourceLibrary.items.filter((s) =>
-    active.selectedSourceIds.includes(s.id)
-  );
-  if (!selected.length) return null;
+  const selected = sourceLibrary.items.filter((s) => active.selectedSourceIds.includes(s.id));
 
   // All selected sources are expected to come from the same course (the
   // import UI scopes by course). Pick the first one's courseId as the
   // request scope. If they ever mix courses we still pick the first —
   // worst case is RAG searches a smaller-than-expected universe.
-  const courseId = selected[0]!.courseId;
+  const fallbackCourseId = String((window as unknown as { activeCourseId?: string | null }).activeCourseId || '');
+  const courseId = selected[0]?.courseId || fallbackCourseId;
   if (!courseId) return null;
 
   return { question: last.text.trim(), courseId };
@@ -742,11 +812,12 @@ async function streamFromAskStream(
   controller: AbortController,
   previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = [],
   thinking?: AIThinkingStatus | null
-): Promise<string> {
+): Promise<{ text: string; meta: Record<string, unknown> | null }> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
     // Misconfigured: graceful fallback to the generic path.
-    return callGenericAi([{ role: 'user', text: question }], bubble, controller, thinking);
+    const text = await callGenericAi([{ role: 'user', text: question }], bubble, controller, thinking);
+    return { text, meta: null };
   }
   const token = getSbToken() || '';
 
@@ -758,6 +829,8 @@ async function streamFromAskStream(
       courseId,
       question,
       tutorMode: getCurrentTutorMode(),
+      sourceMode: sourceModeForActiveChat(),
+      courseFileScope: courseFileScopeForActiveChat(),
       previousTurns,
     }),
   });
@@ -822,7 +895,7 @@ async function streamFromAskStream(
   // Append sources if the server included them. Verification stays internal.
   if (doneMeta && bubble) appendAskStreamMeta(bubble, doneMeta);
 
-  return displayAnswer;
+  return { text: displayAnswer, meta: doneMeta };
 }
 
 
@@ -830,20 +903,23 @@ async function streamFromAskStream(
  * Verification/confidence status remains internal and is not shown to users. */
 function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>): void {
   const sources = Array.isArray(meta.sources) ? meta.sources : [];
+  const sourceLabel = typeof meta.sourceLabel === 'string' ? meta.sourceLabel : '';
 
   let footerHtml = '';
+  if (sourceLabel) footerHtml += '<div class="ncb-source-used">' + escapeHtml(sourceLabel) + '</div>';
   let sourceHtml = '';
   if (sources.length) {
     const items = sources
       .map((s, i) => {
         const src = s as SrcItem;
         const name = src.file_name || 'Unknown';
-        const clickable = !!src.file_name && !/problem solver|visible|^source 0$/i.test(name);
+        const clickable = !!src.file_name && !src.url && !/problem solver|visible|^source 0$/i.test(name);
         let line =
           '<li' + (clickable ? ' class="src-cite" title="Open this source" data-src-i="' + i + '"' : '') + '>' +
           escapeHtml(name);
         if (src.pages) line += ', p.' + escapeHtml(String(src.pages));
         if (src.section) line += ' · <em>' + escapeHtml(src.section) + '</em>';
+        if (src.url) line += ' · <em>' + escapeHtml(src.url) + '</em>';
         line += '</li>';
         return line;
       })
@@ -875,6 +951,9 @@ interface SrcItem {
   section?: string | null;
   documentId?: string | null;
   pageStart?: number | null;
+  title?: string | null;
+  url?: string | null;
+  snippet?: string | null;
 }
 
 function stripSourceMarkers(text: string): string {
@@ -1937,6 +2016,7 @@ function addToSourceLibraryAndSelect(
   saveSourceLibrary();
   saveChatStore();
   renderSourcesCard(root);
+  updateSourceControls(root);
   updateContextPill(root);
 }
 
@@ -2241,6 +2321,8 @@ interface SavedChat {
   attachedFolders: ImportedFolder[];
   /** IDs of sources from the global library that are active for this chat. */
   selectedSourceIds: string[];
+  sourceMode: SourceMode;
+  courseFileScope: CourseFileScope;
   savedReplies: SavedReply[];
   pinned: boolean;
   createdAt: number;
@@ -2303,6 +2385,8 @@ const chatStore: ChatStore = {
       messages: [],
       attachedFolders: [],
       selectedSourceIds: [],
+      sourceMode: 'auto',
+      courseFileScope: 'all_course_files',
       savedReplies: [],
       pinned: false,
       createdAt: now,
@@ -2353,6 +2437,13 @@ function compactMessageForStorage(m: ChatMessage): ChatMessage {
       size: f.size,
     }));
   }
+  if (m.role === 'assistant') {
+    compact.selectedSourceMode = m.selectedSourceMode;
+    compact.sourceScope = m.sourceScope;
+    compact.sourceLabel = m.sourceLabel;
+    compact.courseFileScope = m.courseFileScope;
+    compact.sources = m.sources;
+  }
   return compact;
 }
 
@@ -2364,6 +2455,8 @@ function compactChatForStorage(c: SavedChat): SavedChat {
     messages: messages.map(compactMessageForStorage),
     attachedFolders: [],
     selectedSourceIds: Array.isArray(c.selectedSourceIds) ? c.selectedSourceIds.slice() : [],
+    sourceMode: normaliseSourceMode(c.sourceMode),
+    courseFileScope: normaliseCourseFileScope(c.courseFileScope),
     savedReplies: (c.savedReplies || []).map((r) => ({
       id: r.id,
       text: truncateForStorage(r.text || '', NCB_MAX_STORED_MESSAGE_CHARS),
@@ -2448,6 +2541,8 @@ function loadChatStore(): void {
     if (!Array.isArray(c.attachedFolders)) c.attachedFolders = [];
     if (!Array.isArray(c.selectedSourceIds)) c.selectedSourceIds = [];
     if (!Array.isArray(c.savedReplies)) c.savedReplies = [];
+    c.sourceMode = normaliseSourceMode(c.sourceMode);
+    c.courseFileScope = normaliseCourseFileScope(c.courseFileScope);
     if (typeof c.pinned !== 'boolean') c.pinned = false;
     if (typeof c.createdAt !== 'number') c.createdAt = Date.now();
     if (typeof c.updatedAt !== 'number') c.updatedAt = c.createdAt;
@@ -2714,6 +2809,15 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
   const row = appendAiBubble(msgs);
   const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
   if (bubble) renderRichBubble(bubble, m.text);
+  if (bubble && (m.sourceLabel || m.sources?.length)) {
+    appendAskStreamMeta(bubble, {
+      sourceLabel: m.sourceLabel,
+      selectedSourceMode: m.selectedSourceMode,
+      sourceScope: m.sourceScope,
+      courseFileScope: m.courseFileScope,
+      sources: m.sources || [],
+    });
+  }
   appendBubbleActions(row, m.text);
 }
 

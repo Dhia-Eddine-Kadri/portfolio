@@ -10,14 +10,16 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ..auth import require_internal_token
-from ..services.answer import DEFAULT_TUTOR_MODE, generate_answer, normalise_tutor_mode
+from ..services.answer import DEFAULT_TUTOR_MODE, generate_answer, is_app_question, normalise_tutor_mode
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
+from ..services.general_answer import generate_general_answer
 from ..services.retrieval import (
     ExerciseHit,
     FormulaHit,
@@ -29,6 +31,17 @@ from ..services.retrieval import (
 )
 from ..services.embeddings import EmbeddingServiceUnavailable
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
+from ..services.source_router import (
+    CourseFileScope,
+    SourceDecision,
+    SourceScope,
+    auto_general_prefix,
+    classify_source_scope,
+    course_not_found_answer,
+    course_relevance_score,
+    effective_document_ids,
+)
+from ..services.web_answer import generate_web_answer
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -233,6 +246,8 @@ class AskRequest(BaseModel):
     question: str
     activeFileName: str | None = None
     openFileContext: str | None = None
+    sourceMode: str | None = "auto"
+    courseFileScope: str | None = "all_course_files"
     bypassCache: bool = False
     tutorMode: str | None = Field(
         default=None,
@@ -241,12 +256,15 @@ class AskRequest(BaseModel):
 
 
 class AskSourcePayload(BaseModel):
-    fileName: str
+    fileName: str | None = None
     pageStart: int | None = None
     pageEnd: int | None = None
     sectionTitle: str | None = None
     chunkType: str | None = None
     similarity: float | None = None
+    title: str | None = None
+    url: str | None = None
+    snippet: str | None = None
 
 
 class VerificationPayload(BaseModel):
@@ -266,6 +284,50 @@ class AskResponse(BaseModel):
     model: str | None = None
     promptTokens: int | None = None
     completionTokens: int | None = None
+    selectedSourceMode: str | None = None
+    sourceScope: str | None = None
+    courseFileScope: str | None = None
+    sourceLabel: str | None = None
+    sourceDebug: dict[str, Any] | None = None
+
+
+def _source_debug_enabled() -> bool:
+    try:
+        from ..config import get_settings  # noqa: WPS433
+        return get_settings().environment.lower() != "production"
+    except Exception:
+        return False
+
+
+def _with_source_meta(answer: dict[str, Any], decision: SourceDecision) -> dict[str, Any]:
+    answer.update(decision.metadata(include_debug=_source_debug_enabled(), cache_hit=False))
+    return answer
+
+
+def _web_sources_to_payload(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "fileName": s.get("title") or s.get("url") or "Web source",
+            "title": s.get("title"),
+            "url": s.get("url"),
+            "snippet": s.get("snippet"),
+        }
+        for s in sources
+    ]
+
+
+def _simple_source_answer(text: str, decision: SourceDecision) -> dict[str, Any]:
+    return _with_source_meta({
+        "answer": text,
+        "retrievalMode": "none",
+        "answerMode": "clarification" if decision.source_scope == SourceScope.NEEDS_CLARIFICATION else "strong",
+        "tutorMode": None,
+        "verification": None,
+        "groundedSources": [],
+        "model": None,
+        "promptTokens": None,
+        "completionTokens": None,
+    }, decision)
 
 
 @router.post("/ask", response_model=AskResponse)
@@ -290,6 +352,123 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
 
     tutor_mode = normalise_tutor_mode(payload.tutorMode or DEFAULT_TUTOR_MODE)
+    source_decision = classify_source_scope(
+        question=question,
+        source_mode=payload.sourceMode,
+        course_file_scope=payload.courseFileScope,
+        selected_course_id=payload.courseId,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+        open_file_context=open_file_context,
+    )
+
+    if is_app_question(question):
+        app_decision = replace(
+            source_decision,
+            source_scope=SourceScope.GENERAL_KNOWLEDGE,
+            source_label="",
+            used_document_ids=[],
+            relevance_score=None,
+            web_search_used=False,
+        )
+        try:
+            answer = _with_source_meta(
+                generate_answer(
+                    question=question,
+                    chunks=[],
+                    doc_names={},
+                    tutor_mode=tutor_mode,
+                ),
+                app_decision,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("app-support answer generation failed")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"answer generation failed: {e}")
+        return AskResponse(
+            answer=answer["answer"],
+            retrievalMode=answer["retrievalMode"],
+            answerMode=answer.get("answerMode"),
+            tutorMode=answer.get("tutorMode") or tutor_mode,
+            verification=None,
+            groundedSources=[],
+            cacheHit=False,
+            model=answer.get("model"),
+            promptTokens=answer.get("promptTokens"),
+            completionTokens=answer.get("completionTokens"),
+            selectedSourceMode=answer.get("selectedSourceMode"),
+            sourceScope=answer.get("sourceScope"),
+            courseFileScope=answer.get("courseFileScope"),
+            sourceLabel=answer.get("sourceLabel"),
+            sourceDebug=answer.get("sourceDebug"),
+        )
+
+    if source_decision.source_scope == SourceScope.NEEDS_CLARIFICATION:
+        answer = _simple_source_answer(
+            source_decision.needs_clarification_message
+            or "Which file should I use? Please select a PDF or switch to All course files.",
+            source_decision,
+        )
+        return AskResponse(
+            answer=answer["answer"],
+            retrievalMode=answer["retrievalMode"],
+            answerMode=answer.get("answerMode"),
+            tutorMode=tutor_mode,
+            verification=None,
+            groundedSources=[],
+            cacheHit=False,
+            model=None,
+            selectedSourceMode=answer.get("selectedSourceMode"),
+            sourceScope=answer.get("sourceScope"),
+            courseFileScope=answer.get("courseFileScope"),
+            sourceLabel=answer.get("sourceLabel"),
+            sourceDebug=answer.get("sourceDebug"),
+        )
+
+    if source_decision.source_scope == SourceScope.INTERNET:
+        web_answer = generate_web_answer(
+            question,
+            query=source_decision.sanitized_web_query or question,
+        )
+        source_decision = replace(source_decision, web_search_used=bool(web_answer.get("webSources")))
+        answer = _with_source_meta(web_answer, source_decision)
+        return AskResponse(
+            answer=answer["answer"],
+            retrievalMode=answer["retrievalMode"],
+            answerMode=answer.get("answerMode"),
+            tutorMode=tutor_mode,
+            verification=None,
+            groundedSources=[AskSourcePayload(**s) for s in _web_sources_to_payload(answer.get("webSources") or [])],
+            cacheHit=False,
+            model=answer.get("model"),
+            promptTokens=answer.get("promptTokens"),
+            completionTokens=answer.get("completionTokens"),
+            selectedSourceMode=answer.get("selectedSourceMode"),
+            sourceScope=answer.get("sourceScope"),
+            courseFileScope=answer.get("courseFileScope"),
+            sourceLabel=answer.get("sourceLabel"),
+            sourceDebug=answer.get("sourceDebug"),
+        )
+
+    if source_decision.source_scope == SourceScope.GENERAL_KNOWLEDGE:
+        prefix = auto_general_prefix() if source_decision.selected_source_mode.value == "auto" else ""
+        answer = _with_source_meta(generate_general_answer(question, prefix=prefix), source_decision)
+        return AskResponse(
+            answer=answer["answer"],
+            retrievalMode=answer["retrievalMode"],
+            answerMode=answer.get("answerMode"),
+            tutorMode=tutor_mode,
+            verification=None,
+            groundedSources=[],
+            cacheHit=False,
+            model=answer.get("model"),
+            promptTokens=answer.get("promptTokens"),
+            completionTokens=answer.get("completionTokens"),
+            selectedSourceMode=answer.get("selectedSourceMode"),
+            sourceScope=answer.get("sourceScope"),
+            courseFileScope=answer.get("courseFileScope"),
+            sourceLabel=answer.get("sourceLabel"),
+            sourceDebug=answer.get("sourceDebug"),
+        )
 
     # ── 1. Cache lookup ──────────────────────────────────────────────────────
     # Only the legacy 'explain' mode is cacheable. 'solve' is conversational
@@ -324,6 +503,10 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             # Non-stream /ask doesn't accept a visibleContext payload yet.
             # Streaming does — covered below.
             visible_context=None,
+            source_mode=source_decision.selected_source_mode.value,
+            source_scope=source_decision.source_scope.value,
+            course_file_scope=source_decision.course_file_scope.value,
+            selected_document_ids=payload.documentIds,
         )
         if cached:
             record_retrieval_debug(DebugPayload(
@@ -335,9 +518,9 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
                 retrieval_mode=cached.get("retrievalMode", "strong"),
                 candidate_doc_count=None, exercise_hit=None, chunks=[],
                 model=cached.get("model"), cache_hit=True,
-        prompt_tokens=cached.get("promptTokens"),
-        completion_tokens=cached.get("completionTokens"),
-        doc_names=doc_name_map,
+                prompt_tokens=cached.get("promptTokens"),
+                completion_tokens=cached.get("completionTokens"),
+                doc_names=doc_name_map,
             ))
             cached_verification = cached.get("verification")
             return AskResponse(
@@ -351,6 +534,11 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
                 model=cached.get("model"),
                 promptTokens=cached.get("promptTokens"),
                 completionTokens=cached.get("completionTokens"),
+                selectedSourceMode=cached.get("selectedSourceMode"),
+                sourceScope=cached.get("sourceScope"),
+                courseFileScope=cached.get("courseFileScope"),
+                sourceLabel=cached.get("sourceLabel"),
+                sourceDebug=cached.get("sourceDebug") if _source_debug_enabled() else None,
             )
 
     # ── 2. Retrieve ──────────────────────────────────────────────────────────
@@ -365,13 +553,19 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         open_file_context=open_file_context,
         has_problem_solver=False,
     )
+    course_file_scope = CourseFileScope(source_decision.course_file_scope.value)
+    retrieval_document_ids = effective_document_ids(
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+        course_file_scope=course_file_scope,
+    )
 
     try:
         exercise_hit = retrieve_exercise_block(
             user_id=payload.userId,
             course_id=payload.courseId,
             query=retrieval_query,
-            document_ids=payload.documentIds,
+            document_ids=retrieval_document_ids,
             active_document_id=payload.activeDocumentId,
         )
 
@@ -379,8 +573,8 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             user_id=payload.userId,
             course_id=payload.courseId,
             query=retrieval_query,
-            document_ids=None,
-            preferred_document_ids=payload.documentIds,
+            document_ids=retrieval_document_ids,
+            preferred_document_ids=retrieval_document_ids,
             active_document_id=payload.activeDocumentId,
             document_name_query=question,
             top_k=18,
@@ -399,7 +593,7 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             user_id=payload.userId,
             course_id=payload.courseId,
             query=retrieval_query,
-            document_ids=payload.documentIds,
+            document_ids=retrieval_document_ids,
             active_document_id=payload.activeDocumentId,
         )
     except EmbeddingServiceUnavailable as exc:
@@ -436,6 +630,44 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         except Exception:
             log.exception("doc_name backfill failed")
 
+    relevance_score = course_relevance_score(question, chunks)
+    source_decision = replace(
+        source_decision,
+        relevance_score=relevance_score,
+        used_document_ids=list(dict.fromkeys(c.document_id for c in chunks if c.document_id)),
+    )
+    has_strong_course_anchor = bool(open_file_context or exercise_hit or formula_hits or relevance_score >= 0.18)
+    if not has_strong_course_anchor:
+        if source_decision.selected_source_mode.value == "course_files":
+            answer = _simple_source_answer(course_not_found_answer(), source_decision)
+        else:
+            general_decision = replace(
+                source_decision,
+                source_scope=SourceScope.GENERAL_KNOWLEDGE,
+                source_label="Using: General knowledge",
+            )
+            answer = _with_source_meta(
+                generate_general_answer(question, prefix=auto_general_prefix()),
+                general_decision,
+            )
+        return AskResponse(
+            answer=answer["answer"],
+            retrievalMode=answer["retrievalMode"],
+            answerMode=answer.get("answerMode"),
+            tutorMode=tutor_mode,
+            verification=None,
+            groundedSources=[],
+            cacheHit=False,
+            model=answer.get("model"),
+            promptTokens=answer.get("promptTokens"),
+            completionTokens=answer.get("completionTokens"),
+            selectedSourceMode=answer.get("selectedSourceMode"),
+            sourceScope=answer.get("sourceScope"),
+            courseFileScope=answer.get("courseFileScope"),
+            sourceLabel=answer.get("sourceLabel"),
+            sourceDebug=answer.get("sourceDebug"),
+        )
+
     # ── 3. Generate ──────────────────────────────────────────────────────────
     # Phase 3: surface this student's weak topics for this course so the
     # tutor system prompt can subtly reinforce them when relevant.
@@ -449,6 +681,7 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             tutor_mode=tutor_mode,
             weak_topics=weak_topics,
         )
+        answer = _with_source_meta(answer, source_decision)
     except Exception as e:  # noqa: BLE001
         log.exception("answer generation failed")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"answer generation failed: {e}")
@@ -464,6 +697,11 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
             tutor_mode=tutor_mode,
             active_document_id=payload.activeDocumentId,
             visible_context=None,
+            source_mode=source_decision.selected_source_mode.value,
+            source_scope=source_decision.source_scope.value,
+            course_file_scope=source_decision.course_file_scope.value,
+            selected_document_ids=retrieval_document_ids,
+            retrieved_chunk_ids=[c.chunk_id for c in chunks],
         )
 
     record_retrieval_debug(DebugPayload(
@@ -528,4 +766,9 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         model=answer.get("model"),
         promptTokens=answer.get("promptTokens"),
         completionTokens=answer.get("completionTokens"),
+        selectedSourceMode=answer.get("selectedSourceMode"),
+        sourceScope=answer.get("sourceScope"),
+        courseFileScope=answer.get("courseFileScope"),
+        sourceLabel=answer.get("sourceLabel"),
+        sourceDebug=answer.get("sourceDebug"),
     )
