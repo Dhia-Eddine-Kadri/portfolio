@@ -49,6 +49,35 @@ _MIN_CONTEXT_CHARS = 400    # below this, we treat it as no useful context
 FIGURE_CHUNK_TYPES = frozenset({"exercise", "diagram", "figure", "image", "solution"})
 
 
+# OpenAI reasoning models (o1 / o3 / o3-mini / o4-mini …) take different
+# request params than the chat models: they use `max_completion_tokens`
+# (which ALSO counts internal reasoning tokens, so it needs generous
+# headroom or the visible answer truncates) and reject a non-default
+# `temperature`. We route math/exercise answers to a reasoning model because
+# gpt-4o/gpt-4.1 reliably fail multi-phase kinematics (resetting velocity at
+# an internal boundary) that o4-mini solves correctly.
+def is_reasoning_model(model: str | None) -> bool:
+    return bool(re.match(r"^o\d", (model or "").strip()))
+
+
+def chat_completion_params(
+    model: str | None, max_tokens: int, temperature: float | None = None
+) -> dict[str, Any]:
+    """Build the model-specific token/temperature kwargs for chat.completions.
+
+    Reasoning models: `max_completion_tokens` with a high floor (reasoning
+    tokens are billed against this cap, so a tight value truncates the
+    answer) and NO temperature. Chat models: `max_tokens` + optional
+    temperature, as before.
+    """
+    if is_reasoning_model(model):
+        return {"max_completion_tokens": max(max_tokens, 12000)}
+    params: dict[str, Any] = {"max_tokens": max_tokens}
+    if temperature is not None:
+        params["temperature"] = temperature
+    return params
+
+
 _SYSTEM_PROMPT_STRONG = """You are Minallo's exam-prep tutor for a university student.
 
 IDENTITY. The product / platform / app you are part of is called **Minallo** (minallo.de). If the student asks "what platform is this", "what is your name", "what is this app", "who built you", or any similar identity question, answer with "Minallo" / "Minallo AI" — this is product-level general knowledge and does NOT need a `[Source N]` citation. The "use ONLY the context" rule below applies to *academic* claims, not to your own identity.
@@ -1135,11 +1164,13 @@ def generate_answer(
     client = OpenAI(api_key=settings.openai_api_key)
     completion = client.chat.completions.create(
         model=target_model,
-        max_tokens=effective_max_tokens,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_message},
         ],
+        # Reasoning models (math path → o4-mini) need max_completion_tokens and
+        # no temperature; chat models keep max_tokens.
+        **chat_completion_params(target_model, effective_max_tokens),
     )
     msg = completion.choices[0].message if completion.choices else None
     answer_text = (msg.content if msg else "") or ""

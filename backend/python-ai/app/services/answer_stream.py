@@ -34,6 +34,7 @@ from .answer import (
     _course_material_found_note,
     _cited_indices,
     _context_strength,
+    chat_completion_params,
     is_app_question,
     normalise_tutor_mode,
     pick_system_prompt,
@@ -1141,13 +1142,6 @@ def stream_answer(
     try:
         stream = client.chat.completions.create(
             model=target_model,
-            max_tokens=effective_max_tokens,
-            # Pin low. At the API default (1.0) a worked solution samples a
-            # different structure and different algebra on every regeneration —
-            # that variance is why the same kinematics problem came back with
-            # t_2=sqrt(6H/g) one run and a mangled layout the next. Math/exercise
-            # answers want near-deterministic, reproducible reasoning.
-            temperature=0.2,
             stream=True,
             stream_options={"include_usage": True},
             messages=[
@@ -1155,6 +1149,11 @@ def stream_answer(
                 *history_messages,
                 {"role": "user",   "content": user_content},
             ],
+            # Reasoning models (o4-mini for math) use max_completion_tokens and
+            # reject a custom temperature; chat models keep max_tokens + a low
+            # temperature (0.2) so a worked solution stays near-deterministic
+            # instead of resampling a different structure each regeneration.
+            **chat_completion_params(target_model, effective_max_tokens, temperature=0.2),
         )
         for chunk in stream:
             # Usage chunk arrives at the end when include_usage=True.
