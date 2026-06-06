@@ -764,7 +764,7 @@ async function streamFromAskStream(
   // only in the collapsible footer appended below.
   const displayAnswer = stripSourceMarkers(answerBuf || tStr('cb_no_response', 'No response.'));
   await liveReveal.finish();
-  if (bubble) bubble.innerHTML = renderInlineMarkdown(displayAnswer);
+  if (bubble) renderRichBubble(bubble, displayAnswer);
 
   // Append sources if the server included them. Verification stays internal.
   if (doneMeta && bubble) appendAskStreamMeta(bubble, doneMeta);
@@ -1051,13 +1051,13 @@ function typeIntoBubble(
 
     const tick = (): void => {
       if (isAborted()) {
-        bubble.innerHTML = renderInlineMarkdown(raw.slice(0, index) || raw);
+        renderRichBubble(bubble, raw.slice(0, index) || raw);
         resolve();
         return;
       }
       if (index >= raw.length) {
         liveReveal.finish().then(() => {
-          bubble.innerHTML = renderInlineMarkdown(raw);
+          renderRichBubble(bubble, raw);
           resolve();
         });
         return;
@@ -1243,6 +1243,45 @@ function escapeAttr(s: string | undefined | null): string {
 // code blocks, lists, blockquotes, inline emphasis, and KaTeX math.
 function renderInlineMarkdown(raw: string): string {
   return renderMarkdown(raw);
+}
+
+// Render markdown into a chatbot bubble AND finish the KaTeX pass.
+// `renderMarkdown` only renders math synchronously when `window.katex` is
+// already loaded; otherwise it emits literal `\(…\)` / `\[…\]` fallbacks and
+// asks for a re-render. But the chatbot never preloads KaTeX, and the global
+// re-render (`renderAllMathBubbles`) only targets the course rail's
+// `.ai-bubble`/`.aip-bubble` bots — never `.ncb-bubble--ai`. Without this,
+// chatbot math (e.g. Problem-Solver hint ladders full of `\[ … \]`) stays raw
+// on screen permanently. We ensure KaTeX, then convert the fallback
+// delimiters in THIS bubble. Only `\[ \]` / `\( \)` are processed — those are
+// exactly the forms renderMarkdown leaves behind, so no stray `$` can desync.
+function renderRichBubble(bubble: HTMLElement, raw: string): void {
+  bubble.innerHTML = renderInlineMarkdown(raw);
+  const w = window as Window &
+    typeof globalThis & {
+      _ssEnsureKatex?: () => Promise<unknown>;
+      renderMathInElement?: (el: Element, opts: unknown) => void;
+      _renderCode?: (el: Element) => void;
+    };
+  const runMath = (): void => {
+    if (w.renderMathInElement) {
+      try {
+        w.renderMathInElement(bubble, {
+          delimiters: [
+            { left: '\\[', right: '\\]', display: true },
+            { left: '\\(', right: '\\)', display: false },
+          ],
+          ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+          throwOnError: false,
+        });
+      } catch {
+        /* swallow KaTeX runtime errors — leave the fallback text in place */
+      }
+    }
+    w._renderCode?.(bubble);
+  };
+  if (w._ssEnsureKatex) w._ssEnsureKatex().then(runMath).catch(runMath);
+  else runMath();
 }
 
 // ============ PR-04: AI bubble actions, import modal, context tabs, title gen ============
@@ -2624,7 +2663,7 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
   }
   const row = appendAiBubble(msgs);
   const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
-  if (bubble) bubble.innerHTML = renderInlineMarkdown(m.text);
+  if (bubble) renderRichBubble(bubble, m.text);
   appendBubbleActions(row, m.text);
 }
 
