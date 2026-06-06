@@ -404,18 +404,18 @@ interface LandingTranslation {
     [
       'css/base.css?v=5',
       'css/theme.css?v=5',
-      'css/styles.css?v=31',
+      'css/styles.css?v=32',
       'css/courses-redesign.css?v=37',
       'css/app-design-system.css?v=5',
       'css/layout.css?v=10',
-      'css/document-rail.css?v=16',
+      'css/document-rail.css?v=17',
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',
       'views/toast/toast.css',
       'views/games/games.css',
       // Light-mode polish loads LAST so it wins source-order ties
       // against feature CSS that still hard-codes greys.
-      'css/light-mode.css?v=47',
+      'css/light-mode.css?v=48',
     ].forEach((href) => {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -603,7 +603,7 @@ interface LandingTranslation {
           const lazyCssMap: Record<string, string[]> = {
             dashboard: ['views/dashboard/dashboard.css'],
             chat: ['views/chat/chat.css'],
-            aipage: ['views/chatbot/chatbot.css?v=2'],
+            aipage: ['views/chatbot/chatbot.css?v=3'],
             german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
             notes: ['views/lecturenotes/lecturenotes.css'],
             profile: ['views/profile/profile.css'],
