@@ -779,6 +779,20 @@ async function streamAiReply(
         sources: Array.isArray(streamed.meta?.sources) ? streamed.meta.sources as SrcItem[] : undefined,
       });
       setBubbleSubtitle(aiRow, streamed.meta?.sourceScope as string | undefined);
+    } else if (normaliseSourceMode(chatStore.getActive().sourceMode) === 'course_files') {
+      // Locked to Course Files but no course files are attached to this chat,
+      // so there's nothing to search. Honour the mode's contract — never answer
+      // from general knowledge here — and tell the user how to attach files
+      // instead of silently falling back to the generic model.
+      if (thinking) await thinking.waitMinimum();
+      thinking?.remove(true);
+      raw = tStr(
+        'cb_course_files_none',
+        "You're in **Course Files** mode, but no course files are attached to this chat yet, so there's nothing for me to search. Click the **import** button (the folder icon next to the message box) to add files from one of your courses, then ask again — or switch the source selector to **Auto** or **Internet**."
+      );
+      if (bubble) renderRichBubble(bubble, raw);
+      state.messages.push({ role: 'assistant', text: raw });
+      setBubbleSubtitle(aiRow, 'course_files');
     } else {
       raw = await callGenericAi(state.messages, bubble, controller, thinking);
       state.messages.push({ role: 'assistant', text: raw });
