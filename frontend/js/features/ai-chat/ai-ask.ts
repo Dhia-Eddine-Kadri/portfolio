@@ -1210,6 +1210,22 @@ export function initAskAI(
             function finalize(meta: SseDoneEvent | null | undefined): void {
               if (_finalized) return;
               _finalized = true;
+              // Flush anything the throttled reveal (STREAM_CHARS_PER_FRAME)
+              // hasn't drained into rawText yet. On a fast stream the body
+              // closes and read() calls finalize() while most tokens are still
+              // sitting in _tokenQueue/_streamTextBuffer — without this flush
+              // we'd persist only the slowly-revealed prefix (data-raw + saved
+              // history get truncated mid-answer) even though the bubble keeps
+              // revealing the rest afterward and LOOKS complete on screen.
+              pullQueuedTokens();
+              if (_streamTextBuffer) {
+                rawText += _streamTextBuffer;
+                _streamTextBuffer = '';
+              }
+              if (_renderTimer != null) {
+                cancelAnimationFrame(_renderTimer);
+                _renderTimer = null;
+              }
               window._activeStreamRender = null;
               const sources = (meta && meta.sources) || [];
               const unsupported = !!(meta && meta.unsupported);
