@@ -86,6 +86,32 @@ def _verify_user_owns_documents(user_id: str, course_id: str, document_ids: list
     return {row["id"]: row["file_name"] for row in rows}
 
 
+def _resolve_document_ids_by_name(user_id: str, course_id: str, names: list[str] | None) -> list[str]:
+    """Resolve storage file names → owned document ids in this course.
+
+    The chatbot's "Selected file(s)" scope only knows file names (the document
+    id lives server-side), so it sends names; this maps them to ids for scoped
+    retrieval. Best-effort: returns [] on error or no match (caller then falls
+    back to a whole-course search rather than dead-ending)."""
+    clean = list(dict.fromkeys(n.strip() for n in (names or []) if n and n.strip()))[:50]
+    if not clean:
+        return []
+    sb = get_supabase()
+    try:
+        resp = (
+            sb.table("documents")
+            .select("id, file_name")
+            .eq("user_id", user_id)
+            .eq("course_id", course_id)
+            .in_("file_name", clean)
+            .execute()
+        )
+    except Exception:
+        log.exception("resolve document ids by name failed")
+        return []
+    return [row["id"] for row in (resp.data or []) if row.get("id")]
+
+
 class PreviousTurn(BaseModel):
     """One prior question/answer pair from the same chat session.
     The streaming endpoint accepts a short list of these so the model can
@@ -110,6 +136,9 @@ class OpenFileImagePayload(BaseModel):
 class AskStreamRequest(BaseModel):
     courseId: str
     documentIds: list[str] | None = None
+    # "Selected file(s)" scope from the chatbot, which only knows storage file
+    # NAMES (the document id lives server-side). Resolved to document ids here.
+    documentNames: list[str] | None = None
     activeDocumentId: str | None = None
     question: str
     # The file name + a slice of text from whatever the user is currently
@@ -301,11 +330,6 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             _require_uuid(did, "documentId")
     if payload.activeDocumentId:
         _require_uuid(payload.activeDocumentId, "activeDocumentId")
-    doc_name_map = _verify_user_owns_documents(user_id, payload.courseId, payload.documentIds)
-    if payload.activeDocumentId:
-        doc_name_map.update(_verify_user_owns_documents(
-            user_id, payload.courseId, [payload.activeDocumentId]
-        ))
 
     question = (payload.question or "").strip()
     if not question:
@@ -317,12 +341,33 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     if payload.openFileContext and len(payload.openFileContext) > _MAX_STREAM_OPEN_FILE_CTX_CHARS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
     open_file_images = _validate_open_file_images(payload.openFileImages)
+
+    # "Selected file(s)" scope: the chatbot sends file NAMES (it has no document
+    # ids), so resolve them to ids here. Fall back to ids the client did send.
+    resolved_document_ids = list(payload.documentIds) if payload.documentIds else []
+    if not resolved_document_ids and payload.documentNames:
+        resolved_document_ids = _resolve_document_ids_by_name(
+            user_id, payload.courseId, payload.documentNames
+        )
+    # If the chat asked for specific files but none resolved, don't dead-end on
+    # a "which file?" clarification — search the whole course instead (it still
+    # includes the selected files), so the user always gets a grounded answer.
+    effective_scope = payload.courseFileScope
+    if (payload.courseFileScope or "").strip().lower() == "specific_files" and not resolved_document_ids:
+        effective_scope = "all_course_files"
+
+    doc_name_map = _verify_user_owns_documents(user_id, payload.courseId, resolved_document_ids)
+    if payload.activeDocumentId:
+        doc_name_map.update(_verify_user_owns_documents(
+            user_id, payload.courseId, [payload.activeDocumentId]
+        ))
+
     source_decision = classify_source_scope(
         question=question,
         source_mode=payload.sourceMode,
-        course_file_scope=payload.courseFileScope,
+        course_file_scope=effective_scope,
         selected_course_id=payload.courseId,
-        document_ids=payload.documentIds,
+        document_ids=resolved_document_ids,
         active_document_id=payload.activeDocumentId,
         open_file_context=payload.openFileContext,
     )
@@ -407,7 +452,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # pass identical key args, so both use cache_key_kwargs.
     course_file_scope = CourseFileScope(source_decision.course_file_scope.value)
     retrieval_document_ids = effective_document_ids(
-        document_ids=payload.documentIds,
+        document_ids=resolved_document_ids,
         active_document_id=payload.activeDocumentId,
         course_file_scope=course_file_scope,
     )

@@ -767,7 +767,7 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds);
+      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames);
       raw = streamed.text;
       state.messages.push({
         role: 'assistant',
@@ -864,7 +864,7 @@ function chatbotThinkingContext(state: ConversationState): ReturnType<typeof get
  * eligible, else null. */
 function ragEligibility(
   messages: ChatMessage[]
-): { question: string; courseId: string; documentIds: string[] } | null {
+): { question: string; courseId: string; documentIds: string[]; documentNames: string[] } | null {
   if (!messages.length) return null;
   const last = messages[messages.length - 1]!;
   if (last.role !== 'user') return null;
@@ -875,15 +875,22 @@ function ragEligibility(
   const active = chatStore.getActive();
   const selected = sourceLibrary.items.filter((s) => active.selectedSourceIds.includes(s.id));
 
-  // When the chat is scoped to "Selected file(s)", gather the document UUIDs of
-  // the selected sources so retrieval narrows to exactly those files. Only docs
-  // imported with a known id qualify; "All files" leaves this empty (the
-  // backend then searches the whole course).
+  // When the chat is scoped to "Selected file(s)", narrow retrieval to the
+  // selected sources. The client only knows storage file NAMES (the document
+  // table id lives server-side), so we send names and let the backend resolve
+  // them to document ids. Ids are sent too when known, but in practice the
+  // client never has them. "All files" leaves both empty (whole-course search).
   let documentIds: string[] = [];
+  let documentNames: string[] = [];
   if (normaliseCourseFileScope(active.courseFileScope) === 'specific_files') {
     const ids = new Set<string>();
-    selected.forEach((s) => (s.documents || []).forEach((d) => { if (d.id) ids.add(d.id); }));
+    const names = new Set<string>();
+    selected.forEach((s) => (s.documents || []).forEach((d) => {
+      if (d.id) ids.add(d.id);
+      if (d.name) names.add(d.name);
+    }));
     documentIds = Array.from(ids);
+    documentNames = Array.from(names);
   }
 
   // All selected sources are expected to come from the same course (the
@@ -899,12 +906,12 @@ function ragEligibility(
     // Auto and Course Files stay on the generic chat path when there's no
     // course to ground against.
     if (normaliseSourceMode(active.sourceMode) === 'internet') {
-      return { question: last.text.trim(), courseId: '', documentIds: [] };
+      return { question: last.text.trim(), courseId: '', documentIds: [], documentNames: [] };
     }
     return null;
   }
 
-  return { question: last.text.trim(), courseId, documentIds };
+  return { question: last.text.trim(), courseId, documentIds, documentNames };
 }
 
 
@@ -918,7 +925,8 @@ async function streamFromAskStream(
   controller: AbortController,
   previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = [],
   thinking?: AIThinkingStatus | null,
-  documentIds: string[] = []
+  documentIds: string[] = [],
+  documentNames: string[] = []
 ): Promise<{ text: string; meta: Record<string, unknown> | null }> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
@@ -940,8 +948,11 @@ async function streamFromAskStream(
       courseFileScope: courseFileScopeForActiveChat(),
       previousTurns,
       // Only sent for "Selected file(s)" scope — narrows retrieval to these
-      // exact documents. Omitted (empty) for "All files".
+      // documents. The client knows file names, not document ids, so names are
+      // the working path (backend resolves them); ids are sent when known.
+      // Both omitted for "All files" (whole-course search).
       ...(documentIds.length ? { documentIds } : {}),
+      ...(documentNames.length ? { documentNames } : {}),
     }),
   });
   if (!resp.ok || !resp.body || !resp.body.getReader) {
