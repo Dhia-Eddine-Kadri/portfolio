@@ -224,7 +224,15 @@ def classify_source_scope(
                 relevance_score=rel,
             )
 
-    return SourceDecision(mode, SourceScope.GENERAL_KNOWLEDGE, file_scope, source_label(SourceScope.GENERAL_KNOWLEDGE), used_ids or [])
+    # Auto mode, no explicit internet / file / context / keyword signal. Default
+    # to COURSE_FILES so retrieval actually RUNS — the router's post-retrieval
+    # relevance gate (COURSE_ANCHOR_RELEVANCE_THRESHOLD) then downgrades to
+    # general knowledge only when the course turns up nothing relevant. Deciding
+    # "general" here, before retrieval, was a bug: auto questions without an
+    # obvious course keyword (e.g. "what is urformen?") never consulted the
+    # user's files at all. (No-course chats don't reach here — the frontend
+    # routes those to the generic chat path instead of /ask-stream.)
+    return SourceDecision(mode, SourceScope.COURSE_FILES, file_scope, source_label(SourceScope.COURSE_FILES), used_ids or [])
 
 
 def sanitize_web_query(question: str, selected_text: str | None = None) -> str:
