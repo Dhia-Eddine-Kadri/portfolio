@@ -93,7 +93,11 @@ def question_hash(
 # v5 invalidates answers generated before the piecewise-kinematics prompt
 # fix. Without this, stale rows can keep replaying solutions that reset
 # velocity at internal boundaries or apply acceleration outside its region.
-_CACHE_SCHEMA_VERSION = "v5-2026-06-06-piecewise-kinematics"
+# v6 invalidates the v5-era answers that were still wrong: generated at the
+# API-default temperature (1.0) with the corrupted (formfeed/tab) LaTeX
+# examples and the loose delimiter rule. v6 reflects temperature=0.2, the
+# fixed prompt escapes, and the $-only delimiter rule.
+_CACHE_SCHEMA_VERSION = "v6-2026-06-06-low-temp-delimiters"
 
 
 def document_version_hash(document_hashes: list[str | None]) -> str:
