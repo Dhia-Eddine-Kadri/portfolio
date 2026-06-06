@@ -388,12 +388,36 @@ function courseFileScopeForActiveChat(): CourseFileScope {
   return normaliseCourseFileScope(chatStore.getActive().courseFileScope);
 }
 
+// The popup is position:fixed (so the composer's overflow:hidden can't clip
+// it), which means we place it by hand relative to the trigger: above it,
+// right-aligned, falling back to below when there's no room above.
+function positionSourcePopup(control: HTMLElement): void {
+  const trigger = control.querySelector<HTMLButtonElement>('.ncb-source-trigger');
+  const popup = control.querySelector<HTMLElement>('.ncb-source-popup');
+  if (!trigger || !popup) return;
+  const r = trigger.getBoundingClientRect();
+  const pw = popup.offsetWidth;
+  const ph = popup.offsetHeight;
+  const margin = 8;
+  let left = r.right - pw;
+  if (left < margin) left = margin;
+  const maxLeft = window.innerWidth - pw - margin;
+  if (left > maxLeft) left = Math.max(margin, maxLeft);
+  let top = r.top - ph - margin;
+  if (top < margin) top = r.bottom + margin; // not enough room above → below
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+}
+
 function setSourcePopupOpen(control: HTMLElement, open: boolean): void {
   control.dataset.open = open ? 'true' : 'false';
   const trigger = control.querySelector<HTMLButtonElement>('.ncb-source-trigger');
   const popup = control.querySelector<HTMLElement>('.ncb-source-popup');
   if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (popup) popup.hidden = !open;
+  if (!popup) return;
+  popup.hidden = !open;
+  // Measure-then-place: it must be visible (not [hidden]) to have a size.
+  if (open) positionSourcePopup(control);
 }
 
 function updateSourceControls(root: HTMLElement): void {
@@ -461,6 +485,14 @@ function initSourceControls(root: HTMLElement): void {
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && control.dataset.open === 'true') setSourcePopupOpen(control, false);
   });
+
+  // The popup is position:fixed, so re-place it if the viewport shifts while
+  // it's open (scrolling the message list, resizing the window).
+  const reposition = (): void => {
+    if (control.dataset.open === 'true') positionSourcePopup(control);
+  };
+  window.addEventListener('resize', reposition);
+  window.addEventListener('scroll', reposition, true);
 
   updateSourceControls(root);
 }

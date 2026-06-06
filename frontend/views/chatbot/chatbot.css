@@ -869,10 +869,10 @@ body.ncb-fullbleed .ncb-main {
 }
 
 .ncb-source-popup {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
+  /* Fixed + JS-positioned so it escapes the composer's overflow:hidden frame,
+     which otherwise clips the upward drop-up. Coordinates set in shell.ts. */
+  position: fixed;
+  z-index: 1000;
   min-width: 210px;
   display: flex;
   flex-direction: column;
@@ -2261,6 +2261,84 @@ body:not(.night) .ncb-bubble-body .ai-thinking-card {
   background: transparent;
   padding: 0;
   border-radius: 0;
+}
+
+/* Fenced code blocks render as .md-code-block with a header bar (language tag
+   + copy button). These rules are otherwise only defined for the course-rail
+   .ai-bubble surface — without a copy here, the chatbot's .ncb-bubble-body
+   leaves the header SVGs unsized (the `< >` icon balloons to a huge glyph) and
+   the code box loses its frame. Mirrors styles.css `.ai-bubble .md-code-*`. */
+.ncb-bubble-body .md-code-block {
+  margin: 12px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.65);
+}
+.ncb-bubble-body .md-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ncb-bubble-body .md-code-lang-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(226, 232, 240, 0.85);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ncb-bubble-body .md-code-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+.ncb-bubble-body .md-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(226, 232, 240, 0.75);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ncb-bubble-body .md-code-copy:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.95);
+}
+.ncb-bubble-body .md-code-copy.is-copied {
+  color: #4ade80;
+}
+.ncb-bubble-body .md-code-copy-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* The block already supplies the frame — neutralise the standalone pre styling
+   so there's no double border / outer margin inside the block. */
+.ncb-bubble-body .md-code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .ncb-bubble-body blockquote {
