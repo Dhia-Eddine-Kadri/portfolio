@@ -456,7 +456,13 @@ export function renderMarkdown(text: string): string {
     };
     s = s.replace(/\\\(([^]*?)\\\)/g, (_, m: string) => stash(renderKatex(m, false)));
     s = s.replace(/\$\$([^]*?)\$\$/g, (_, m: string) => stash(renderKatex(m, true)));
-    s = s.replace(/\$([^$\n]+?)\$/g, (_, m: string) => stash(renderKatex(m, false)));
+    // Inline `$…$` is currency-safe: the opener must be followed by a
+    // non-space, the closer preceded by a non-space and NOT followed by a
+    // digit. This stops a stray literal `$` (e.g. "$5") from being treated as
+    // a math opener and greedily pairing with the next real `$`, which used to
+    // desync every inline formula after it (math rendered at the top of the
+    // message, raw `$…$` from that point down).
+    s = s.replace(/\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)/g, (_, m: string) => stash(renderKatex(m, false)));
     s = s.replace(/`([^`]+)`/g, (_, c: string) => stash('<code>' + esc(c) + '</code>'));
 
     // Now everything left is user/AI text. Escape it.
@@ -495,14 +501,24 @@ export function renderMarkdown(text: string): string {
     }
 
     if (/^\s*\$\$/.test(line) && !/\$\$.*\$\$/.test(line)) {
+      // Scan for the closing `$$`, but stop at a blank line: an unclosed `$$`
+      // opener must not swallow the rest of the message into one math block
+      // (which then fails KaTeX and blanks everything below it).
+      let j = i + 1;
       const mathLines2: string[] = [];
-      i++;
-      while (i < lines.length && !/\$\$/.test(lines[i] ?? '')) {
-        mathLines2.push(lines[i] ?? '');
-        i++;
+      while (j < lines.length && !/\$\$/.test(lines[j] ?? '') && (lines[j] ?? '').trim() !== '') {
+        mathLines2.push(lines[j] ?? '');
+        j++;
       }
-      if (i < lines.length) i++;
-      out.push('<div class="md-math-block">' + renderKatex(mathLines2.join('\n'), true) + '</div>');
+      if (j < lines.length && /\$\$/.test(lines[j] ?? '')) {
+        out.push('<div class="md-math-block">' + renderKatex(mathLines2.join('\n'), true) + '</div>');
+        i = j + 1;
+        continue;
+      }
+      // No closer before the blank line / EOF — treat the opener as ordinary
+      // text rather than eating the tail.
+      out.push('<p class="md-p">' + inline(line) + '</p>');
+      i++;
       continue;
     }
 

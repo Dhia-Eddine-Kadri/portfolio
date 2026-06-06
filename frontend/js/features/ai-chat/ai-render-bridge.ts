@@ -51,6 +51,10 @@ export async function initAiRenderBridge(options?: RenderBridgeOptions): Promise
         const raw = (el as HTMLElement).getAttribute('data-raw');
         if (hasRawMath && raw && window.katex) {
           el.innerHTML = renderMarkdown(raw);
+        } else if (hasRawMath) {
+          // No saved source to rebuild from — render the leftover raw
+          // delimiters in place so the tail isn't left as plain `$…$`.
+          renderMathIn(el);
         }
         return;
       }
