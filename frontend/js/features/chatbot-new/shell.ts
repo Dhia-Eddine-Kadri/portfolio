@@ -767,7 +767,7 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking);
+      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds);
       raw = streamed.text;
       state.messages.push({
         role: 'assistant',
@@ -778,9 +778,12 @@ async function streamAiReply(
         courseFileScope: streamed.meta?.courseFileScope as CourseFileScope | undefined,
         sources: Array.isArray(streamed.meta?.sources) ? streamed.meta.sources as SrcItem[] : undefined,
       });
+      setBubbleSubtitle(aiRow, streamed.meta?.sourceScope as string | undefined);
     } else {
       raw = await callGenericAi(state.messages, bubble, controller, thinking);
       state.messages.push({ role: 'assistant', text: raw });
+      // Generic chat path — no course retrieval ran, so don't claim otherwise.
+      setBubbleSubtitle(aiRow, 'general_knowledge');
     }
     touchActiveChat();
     saveChatStore();
@@ -847,7 +850,7 @@ function chatbotThinkingContext(state: ConversationState): ReturnType<typeof get
  * eligible, else null. */
 function ragEligibility(
   messages: ChatMessage[]
-): { question: string; courseId: string } | null {
+): { question: string; courseId: string; documentIds: string[] } | null {
   if (!messages.length) return null;
   const last = messages[messages.length - 1]!;
   if (last.role !== 'user') return null;
@@ -857,6 +860,17 @@ function ragEligibility(
 
   const active = chatStore.getActive();
   const selected = sourceLibrary.items.filter((s) => active.selectedSourceIds.includes(s.id));
+
+  // When the chat is scoped to "Selected file(s)", gather the document UUIDs of
+  // the selected sources so retrieval narrows to exactly those files. Only docs
+  // imported with a known id qualify; "All files" leaves this empty (the
+  // backend then searches the whole course).
+  let documentIds: string[] = [];
+  if (normaliseCourseFileScope(active.courseFileScope) === 'specific_files') {
+    const ids = new Set<string>();
+    selected.forEach((s) => (s.documents || []).forEach((d) => { if (d.id) ids.add(d.id); }));
+    documentIds = Array.from(ids);
+  }
 
   // All selected sources are expected to come from the same course (the
   // import UI scopes by course). Pick the first one's courseId as the
@@ -871,12 +885,12 @@ function ragEligibility(
     // Auto and Course Files stay on the generic chat path when there's no
     // course to ground against.
     if (normaliseSourceMode(active.sourceMode) === 'internet') {
-      return { question: last.text.trim(), courseId: '' };
+      return { question: last.text.trim(), courseId: '', documentIds: [] };
     }
     return null;
   }
 
-  return { question: last.text.trim(), courseId };
+  return { question: last.text.trim(), courseId, documentIds };
 }
 
 
@@ -889,7 +903,8 @@ async function streamFromAskStream(
   bubble: HTMLElement | null,
   controller: AbortController,
   previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = [],
-  thinking?: AIThinkingStatus | null
+  thinking?: AIThinkingStatus | null,
+  documentIds: string[] = []
 ): Promise<{ text: string; meta: Record<string, unknown> | null }> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
@@ -910,6 +925,9 @@ async function streamFromAskStream(
       sourceMode: sourceModeForActiveChat(),
       courseFileScope: courseFileScopeForActiveChat(),
       previousTurns,
+      // Only sent for "Selected file(s)" scope — narrows retrieval to these
+      // exact documents. Omitted (empty) for "All files".
+      ...(documentIds.length ? { documentIds } : {}),
     }),
   });
   if (!resp.ok || !resp.body || !resp.body.getReader) {
@@ -1327,6 +1345,26 @@ function appendAiBubble(msgs: HTMLElement): HTMLElement {
   return row;
 }
 
+// Update the AI bubble's subtitle to reflect the source actually used, so the
+// header never falsely claims "course context" when the answer came from the
+// generic path or general knowledge. Driven by the resolved sourceScope.
+function setBubbleSubtitle(aiRow: HTMLElement, sourceScope: string | undefined): void {
+  const el = aiRow.querySelector<HTMLElement>('.ncb-bubble-subtitle');
+  if (!el) return;
+  let label: string;
+  switch (sourceScope) {
+    case 'course_files':
+      label = tStr('cb_subtitle_course', 'Answered using your course files');
+      break;
+    case 'internet':
+      label = tStr('cb_subtitle_internet', 'Answered from the web');
+      break;
+    default:
+      label = tStr('cb_subtitle_general', 'Answered with general knowledge');
+  }
+  el.textContent = label;
+}
+
 function typeIntoBubble(
   bubble: HTMLElement | null,
   raw: string,
@@ -1659,7 +1697,9 @@ interface ImportedFolder {
   // Extracted text content for each file inside this picked item.
   // PDFs run through pdfjs text extraction; .txt / .md decoded as UTF-8.
   // Stored on the chat so the AI sees the same content for every reply.
-  documents?: Array<{ name: string; text: string }>;
+  // `id` is the document UUID (when known) — used to scope retrieval to
+  // specific files when the chat's source scope is "Selected file(s)".
+  documents?: Array<{ name: string; text: string; id?: string }>;
 }
 
 // Data-driven import modal (PR-08). Pulls real semesters/courses/folders/files
@@ -2103,24 +2143,25 @@ async function loadPickedDocuments(
   const uid = w._currentUser?.id || w._currentUser?.sub;
   const out: ImportedFolder[] = [];
   for (const p of picked.values()) {
-    const docs: Array<{ name: string; text: string }> = [];
+    const docs: Array<{ name: string; text: string; id?: string }> = [];
     if (uid) {
       // Resolve which file(s) this pick maps to. For a folder pick, every
       // file inside; for a file pick, just that one (search root + every
       // subfolder by name).
-      type FileRef = { name: string; folder?: string };
+      type FileRef = { name: string; folder?: string; id?: string };
       const targets: FileRef[] = [];
       if (p.kind === 'folder') {
         const fd = (course.userFolders || []).find((x) => x.name === p.name);
-        if (fd) (fd.files || []).forEach((f) => targets.push({ name: f.name, folder: fd.name }));
+        if (fd) (fd.files || []).forEach((f) => targets.push({ name: f.name, folder: fd.name, id: f.id }));
       } else {
         const inRoot = (course.files || []).find((f) => f.name === p.name);
         if (inRoot) {
-          targets.push({ name: p.name });
+          targets.push({ name: p.name, id: inRoot.id });
         } else {
           for (const fd of course.userFolders || []) {
-            if ((fd.files || []).some((f) => f.name === p.name)) {
-              targets.push({ name: p.name, folder: fd.name });
+            const match = (fd.files || []).find((f) => f.name === p.name);
+            if (match) {
+              targets.push({ name: p.name, folder: fd.name, id: match.id });
               break;
             }
           }
@@ -2131,7 +2172,7 @@ async function loadPickedDocuments(
         targets.map((t) => fetchCourseFileText(uid, course, t.name, t.folder))
       );
       results.forEach((text, i) => {
-        if (text) docs.push({ name: targets[i]!.name, text });
+        if (text) docs.push({ name: targets[i]!.name, text, id: targets[i]!.id });
       });
     }
     out.push({
@@ -2506,7 +2547,7 @@ interface SourceLibraryItem {
   count: string;
   courseId: string;
   courseName: string;
-  documents: Array<{ name: string; text: string }>;
+  documents: Array<{ name: string; text: string; id?: string }>;
   importedAt: number;
 }
 
@@ -2663,6 +2704,7 @@ function compactSourcesForStorage(items: SourceLibraryItem[], selectedIds: Set<s
       documents: (s.documents || []).slice(0, NCB_MAX_SOURCE_DOCS_PER_ITEM).map((d) => ({
         name: d.name,
         text: truncateForStorage(d.text || '', NCB_MAX_SOURCE_DOC_CHARS),
+        id: d.id,
       })),
     }));
 }
