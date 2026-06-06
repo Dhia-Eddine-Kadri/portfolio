@@ -351,6 +351,13 @@ interface HistoryPair {
 function _historyKey(courseId?: string | null): string {
   return _HISTORY_PREFIX + (courseId || 'default');
 }
+// Courses cleared this session. The clear button deletes the chat_history rows
+// asynchronously (fire-and-forget fetch), but the AI panel re-opens ~100ms
+// later and restoreCourseHistory() would read the not-yet-deleted rows and
+// repopulate — so "Clear chat" looked like it did nothing. This tombstone
+// suppresses the restore for a cleared course until a new question is asked
+// (which removes the tombstone via _appendCourseHistory).
+const _clearedCourses = new Set<string>();
 function _loadCourseHistory(courseId?: string | null): HistoryPair[] {
   try { return JSON.parse(localStorage.getItem(_historyKey(courseId)) || '[]'); } catch { return []; }
 }
@@ -362,6 +369,8 @@ function _saveCourseHistory(courseId: string | null | undefined, pairs: HistoryP
   } catch { /* quota */ }
 }
 function _appendCourseHistory(courseId: string | null | undefined, question: string, answer: string): void {
+  // A new turn means this course has live history again — lift any clear tombstone.
+  _clearedCourses.delete(_historyKey(courseId));
   const pairs = _loadCourseHistory(courseId);
   // If the most recent pair has the same question, this is a regenerate —
   // replace its answer instead of appending a duplicate pair. Without this,
@@ -480,6 +489,9 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
 
 export function restoreCourseHistory(courseId: string | null | undefined): void {
   if (!courseId) return;
+  // Just-cleared course: don't repopulate from the DB rows that are still being
+  // deleted. Stays suppressed until the student asks something new.
+  if (_clearedCourses.has(_historyKey(courseId))) return;
   const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
   if (!aiMsgs) return;
   // Only skip restore if a real conversation is already present (a user
@@ -518,6 +530,9 @@ export function restoreCourseHistory(courseId: string | null | undefined): void 
 }
 
 export function clearCourseHistory(courseId: string): void {
+  // Tombstone so the panel's re-open (openAI → restoreCourseHistory) doesn't
+  // race the async DB delete below and bring the chat back.
+  _clearedCourses.add(_historyKey(courseId));
   try { localStorage.removeItem(_historyKey(courseId)); } catch { /* ignore */ }
   // Also delete the rows synced to chat_history — otherwise restoreCourseHistory
   // reads them back from Supabase on the next refresh and the "cleared" chat
