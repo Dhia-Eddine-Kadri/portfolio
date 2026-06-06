@@ -864,7 +864,17 @@ function ragEligibility(
   // worst case is RAG searches a smaller-than-expected universe.
   const fallbackCourseId = String((window as unknown as { activeCourseId?: string | null }).activeCourseId || '');
   const courseId = selected[0]?.courseId || fallbackCourseId;
-  if (!courseId) return null;
+  if (!courseId) {
+    // No course context. Internet mode still works — a web search needs no
+    // course — so route it through /ask-stream with an empty courseId (the
+    // backend's INTERNET branch returns before any course/retrieval logic).
+    // Auto and Course Files stay on the generic chat path when there's no
+    // course to ground against.
+    if (normaliseSourceMode(active.sourceMode) === 'internet') {
+      return { question: last.text.trim(), courseId: '' };
+    }
+    return null;
+  }
 
   return { question: last.text.trim(), courseId };
 }
@@ -1484,7 +1494,8 @@ function buildSystemPrompt(): string {
     'IMAGE POLICY: Any image the user uploads or pastes is part of their course material — a lecture slide, a textbook page, a screenshot of an exercise, a hand-written note, a diagram, a formula, or a chart. ' +
     'Help them understand it: read the text, transcribe equations, explain diagrams, work through the exercise, identify the concept, summarise the slide. Do NOT refuse with "I cannot help with identifying or analyzing the content of images" — that\'s wrong for this product. ' +
     'If the image is unclear, ask what specifically the student wants help with rather than refusing.\n\n' +
-    'DOCUMENT TAGS: When the user\'s message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags.'
+    'DOCUMENT TAGS: When the user\'s message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags.\n\n' +
+    'WEB ACCESS: In this mode you are not browsing the web, so you do not have live or current information (today\'s news, prices, recent releases, latest events). Do not pretend you searched the web. When the user needs current or internet information, tell them Minallo CAN do this: ask them to switch the source selector (the button above the message box) to **Internet** mode, which runs a live web search. Do not claim Minallo has no internet access at all — it does, via Internet mode.'
   );
 }
 
