@@ -988,6 +988,53 @@ function appendSoftChunk(host: HTMLElement, text: string): void {
   host.appendChild(chunk);
 }
 
+/** Length of the longest prefix of `text` that is safe to render as full
+ * markdown+KaTeX mid-stream — i.e. it ends on a paragraph boundary and is not
+ * sitting inside an unclosed `$$…$$` display block, inline `$…$`, or fenced
+ * ```code``` block. The remainder (the in-progress tail) is shown raw until it
+ * completes. This lets finished equations/paragraphs typeset block-by-block
+ * instead of the whole answer flashing from raw LaTeX to rendered at the end. */
+function streamStableLen(text: string): number {
+  let inFence = false;   // inside ```…``` (toggled at line start)
+  let inDisplay = false; // inside $$…$$
+  let inInline = false;  // inside $…$
+  let lastSafe = 0;
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    // Fenced code toggles only when ``` begins a line.
+    if (!inDisplay && !inInline && text.startsWith('```', i) && (i === 0 || text[i - 1] === '\n')) {
+      inFence = !inFence;
+      i += 3;
+      continue;
+    }
+    if (inFence) { i++; continue; }
+    if (text.startsWith('$$', i)) {
+      inDisplay = !inDisplay;
+      i += 2;
+      continue;
+    }
+    if (text[i] === '$' && !inDisplay) {
+      inInline = !inInline;
+      i++;
+      continue;
+    }
+    // Paragraph boundary: a blank line outside any math/code construct. A
+    // closed $$…$$ block is followed by a blank line, so this also captures
+    // completed display equations.
+    if (!inDisplay && text[i] === '\n' && text[i + 1] === '\n') {
+      let j = i;
+      while (j < n && text[j] === '\n') j++;
+      inInline = false; // a stray currency '$' shouldn't poison later blocks
+      lastSafe = j;
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return lastSafe;
+}
+
 function createSoftStreamReveal(bubble: HTMLElement | null): {
   push: (text: string) => void;
   finish: () => Promise<void>;
@@ -996,13 +1043,22 @@ function createSoftStreamReveal(bubble: HTMLElement | null): {
     return { push: () => {}, finish: async () => {} };
   }
 
+  // Two regions: `rendered` holds completed blocks typeset with full
+  // markdown+KaTeX, `live` shows only the in-progress tail as raw plain text
+  // (with the soft-reveal animation). As blocks complete they move from `live`
+  // into `rendered`, so finished equations typeset in place instead of the
+  // whole answer staying raw until the end.
   bubble.innerHTML = '';
-  const live = document.createElement('span');
+  const rendered = document.createElement('div');
+  rendered.className = 'ncb-stream-rendered';
+  const live = document.createElement('div');
   live.className = 'ncb-stream-live';
+  bubble.appendChild(rendered);
   bubble.appendChild(live);
 
-  let rawText = '';
-  let visibleText = '';
+  let rawText = '';        // full raw text revealed so far (incl. source markers)
+  let stableLen = 0;       // chars of rawText already promoted into `rendered`
+  let visibleTail = '';    // stripped tail text currently shown in `live`
   let buffer = '';
   let raf: number | null = null;
   let finishResolve: (() => void) | null = null;
@@ -1012,16 +1068,29 @@ function createSoftStreamReveal(bubble: HTMLElement | null): {
     if (msgs) scrollMsgsToBottom(msgs);
   };
 
-  const renderVisible = (): void => {
-    const display = stripSourceMarkersLive(rawText);
-    if (!display.startsWith(visibleText)) {
+  // Promote any newly-completed blocks out of the raw tail into the rendered
+  // region. Only runs the (costlier) markdown+KaTeX pass when the safe
+  // boundary actually advances — i.e. once per completed block, not per token.
+  const promoteStable = (): void => {
+    const safe = streamStableLen(rawText);
+    if (safe <= stableLen) return;
+    stableLen = safe;
+    renderRichBubble(rendered, stripSourceMarkersLive(rawText.slice(0, stableLen)).trim());
+    live.textContent = '';
+    visibleTail = '';
+    scroll();
+  };
+
+  const renderTail = (): void => {
+    const tail = stripSourceMarkersLive(rawText.slice(stableLen));
+    if (!tail.startsWith(visibleTail)) {
       live.textContent = '';
-      visibleText = '';
+      visibleTail = '';
     }
-    const delta = display.slice(visibleText.length);
+    const delta = tail.slice(visibleTail.length);
     if (delta) {
       appendSoftChunk(live, delta);
-      visibleText = display;
+      visibleTail = tail;
       scroll();
     }
   };
@@ -1039,7 +1108,8 @@ function createSoftStreamReveal(bubble: HTMLElement | null): {
     const added = document.hidden ? buffer : takeSoftStreamChunk(buffer, 18);
     buffer = buffer.slice(added.length);
     rawText += added;
-    renderVisible();
+    promoteStable();
+    renderTail();
     raf = window.requestAnimationFrame(drain);
   };
 

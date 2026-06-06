@@ -1458,8 +1458,19 @@ body.ncb-fullbleed .ncb-main {
   margin-bottom: 0;
 }
 
+/* Completed blocks, typeset in place as they finish streaming. */
+.ncb-stream-rendered:empty {
+  display: none;
+}
+
+/* The in-progress tail still shows raw text until its block closes. Sits
+   directly under the rendered region with no extra gap when both are present. */
 .ncb-stream-live {
   white-space: pre-wrap;
+}
+
+.ncb-stream-rendered:not(:empty) + .ncb-stream-live:not(:empty) {
+  margin-top: 0.5em;
 }
 
 .ncb-stream-chunk {
