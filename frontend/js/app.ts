@@ -841,14 +841,7 @@ function _applyCachedCoursesNow(): void {
     _loadUserCourses(_cpCached.courses);
   }
 }
-function _scheduleCachedCourses(): void {
-  window.setTimeout(_applyCachedCoursesNow, 1200);
-}
-if (document.body && document.body.getAttribute('data-ss-ready') === '1') {
-  _scheduleCachedCourses();
-} else {
-  window.addEventListener('ss-ready', _scheduleCachedCourses, { once: true });
-}
+_applyCachedCoursesNow();
 renderCourses();
 renderTT();
 renderMails();

@@ -28,7 +28,10 @@ function _currentUserIdSync() {
   // but if a session was restored from sb_token before this script ran, we may
   // already have _currentUser on the window.
   var u = window._currentUser;
-  return (u && (u.id || u.sub)) || null;
+  if (u && (u.id || u.sub)) return u.id || u.sub;
+  // Cold start: _currentUser isn't set yet but ss_last_uid was persisted by
+  // the previous session. Use it so SEMS can hydrate before renderCourses().
+  try { return localStorage.getItem('ss_last_uid') || null; } catch (e) { return null; }
 }
 
 function _coursesKeyFor(uid) {
