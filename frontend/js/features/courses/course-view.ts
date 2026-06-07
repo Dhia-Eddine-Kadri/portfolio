@@ -583,8 +583,71 @@ export function openCourse(course: LegacyCourse): void {
     });
 }
 
+function _switchTabOnly(co: HTMLElement, sec: string, course: LegacyCourse): void {
+  co.querySelectorAll<HTMLElement>('[data-course-tab]').forEach((tab) => {
+    const isActive = tab.getAttribute('data-course-tab') === sec;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  co.querySelectorAll<HTMLElement>('[data-course-panel]').forEach((panel) => {
+    panel.classList.toggle('active', panel.getAttribute('data-course-panel') === sec);
+  });
+  const inner = co.querySelector<HTMLElement>('.co-inner');
+  if (inner) {
+    inner.classList.toggle(
+      'co-inner-wide',
+      sec === 'quiz' || sec === 'flashcards' || sec === 'examforge' ||
+      sec === 'cheatsheet' || sec === 'deeplearn'
+    );
+  }
+  if (sec === 'quiz' || sec === 'flashcards' || sec === 'examforge' || sec === 'cheatsheet' || sec === 'deeplearn') {
+    const panelSelector =
+      sec === 'quiz' ? '#coQuizPanel' :
+      sec === 'flashcards' ? '#coFlashPanel' :
+      sec === 'examforge' ? '#coExamForgePanel' :
+      sec === 'cheatsheet' ? '#coCheatsheetPanel' :
+      '#coDeepLearnPanel';
+    const panel = co.querySelector<HTMLElement>(panelSelector);
+    const loadFeature = (window as unknown as {
+      _ssLoadPortalFeature?: (name: string) => Promise<void>;
+    })._ssLoadPortalFeature;
+    if (typeof loadFeature === 'function') void loadFeature(sec);
+    const mountWhenReady = (tries: number): void => {
+      const mountFn =
+        sec === 'quiz' ? window.mountQuiz :
+        sec === 'flashcards' ? window.mountFlashcards :
+        sec === 'examforge' ? window.mountExamForge :
+        sec === 'cheatsheet' ? window.mountCheatsheet :
+        window.mountDeepLearn;
+      if (typeof mountFn === 'function') {
+        if (panel && panel.isConnected) {
+          mountFn(panel, course, { generate: window._generateStudyTool });
+        }
+      } else if (tries > 0) {
+        setTimeout(() => mountWhenReady(tries - 1), 80);
+      }
+    };
+    mountWhenReady(80);
+  }
+}
+
 export function showCourseSection(course: LegacyCourse, section: string): void {
   const sec = ['files', 'quiz', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(section) ? section : 'files';
+
+  // Fast path: switching tabs within the same course — just toggle visibility.
+  // Only when the section actually changes (not a file-list refresh).
+  const co = document.getElementById('courseOverview');
+  if (co && co.style.display === 'block' &&
+      window.activeCourseId === course.id &&
+      !window.activeFileName &&
+      sec !== window.activeCourseSection &&
+      co.querySelector('.co-inner-v2')) {
+    window.activeCourseRef = course;
+    window.activeCourseSection = sec;
+    _switchTabOnly(co, sec, course);
+    return;
+  }
+
   window.activeCourseRef = course;
   window.activeCourseSection = sec;
 
@@ -613,7 +676,6 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
   }).__minalloDocRail?.setRouteVisibility('courses');
   const welcome = document.getElementById('welcomeState');
   if (welcome) welcome.style.display = 'none';
-  const co = document.getElementById('courseOverview');
   if (!co) return;
 
   co.style.display = 'block';
@@ -775,8 +837,6 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
 
   const coInner = co.querySelector<HTMLElement>('.co-inner');
   if (coInner) {
-    coInner.classList.remove('panel-enter');
-    void coInner.offsetWidth;
     coInner.classList.add('panel-enter');
   }
 
