@@ -157,7 +157,7 @@
 
 /* ── Inline split mode: drawer sits in .app-body as a flex sibling ──── */
 .dr-drawer.dr-inline-split {
-  position: static !important;
+  position: relative !important;
   top: auto !important;
   right: auto !important;
   bottom: auto !important;
@@ -166,7 +166,8 @@
   width: var(--dr-drawer-w) !important;
   height: auto;
   border-radius: 0;
-  margin-right: var(--dr-rail-w);
+  border-right: none;
+  padding-right: calc(var(--dr-rail-w) + 12px);
   opacity: 1;
   pointer-events: auto;
   z-index: auto;
