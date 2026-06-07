@@ -363,10 +363,12 @@ window.showCourseSection = function (c, s) {
       view: 'course',
       courseId: c.id || null,
       courseShort: c.short || null,
-      section: s || 'files'
+      section: s || 'files',
+      panel: _ssCurrentPanel()
     },
     _ssCourseHash(c, s || 'files')
   );
+  setTimeout(_ssSyncUrl, 120);
 };
 
 var _savedPortalTab = (function () {
