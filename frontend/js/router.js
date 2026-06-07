@@ -139,6 +139,10 @@ function _finalizeNav(section) {
   try {
     sessionStorage.setItem('ss_portal_tab', section);
     localStorage.setItem('ss_last_section', section);
+    var st = JSON.parse(localStorage.getItem('ss_state') || '{}');
+    st.inApp = false;
+    st.view = '';
+    localStorage.setItem('ss_state', JSON.stringify(st));
   } catch (e) {}
   var urlSection = section === 'studip' ? 'courses' : section;
   try {
@@ -484,7 +488,6 @@ _bindIf('studipBack', 'click', function () {
 });
 
 _bindIf('psbDashboard', 'click', function () {
-  showPortal();
   setNavActive('psbDashboard');
   showPortalSection('dashboard');
   _finalizeNav('dashboard');
@@ -492,7 +495,6 @@ _bindIf('psbDashboard', 'click', function () {
 });
 
 _bindIf('psbGerman', 'click', function () {
-  showPortal();
   setNavActive('psbGerman');
   showPortalSection('german');
   _finalizeNav('german');
@@ -502,7 +504,6 @@ _bindIf('psbGerman', 'click', function () {
 });
 
 _bindIf('psbProfile', 'click', function () {
-  showPortal();
   setNavActive('psbProfile');
   showPortalSection('profile');
   _finalizeNav('profile');
@@ -510,7 +511,6 @@ _bindIf('psbProfile', 'click', function () {
 });
 
 _bindIf('authAvatar', 'click', function () {
-  showPortal();
   setNavActive('psbProfile');
   showPortalSection('profile');
   _finalizeNav('profile');
@@ -518,7 +518,6 @@ _bindIf('authAvatar', 'click', function () {
 });
 
 _bindIf('psbSettings', 'click', function () {
-  showPortal();
   setNavActive('psbSettings');
   showPortalSection('settings');
   _finalizeNav('settings');
@@ -526,7 +525,6 @@ _bindIf('psbSettings', 'click', function () {
 });
 
 _bindIf('psbSubscription', 'click', function () {
-  showPortal();
   setNavActive('psbSubscription');
   showPortalSection('subscription');
   _finalizeNav('subscription');
@@ -538,7 +536,6 @@ _bindIf('psbSubscription', 'click', function () {
 // delayed admin module attaches its listener and do nothing. _finalizeNav is
 // what writes #portal=admin to the URL, matching every other section.
 _bindIf('psbAdmin', 'click', function () {
-  showPortal();
   setNavActive('psbAdmin');
   showPortalSection('admin');
   _finalizeNav('admin');

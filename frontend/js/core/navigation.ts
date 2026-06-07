@@ -51,6 +51,7 @@ export function showPortalSection(sec: string): void {
 
   function revealTarget(): void {
     document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
+      if (el === target) return;
       el.style.display = 'none';
       el.classList.remove('psec-entering', 'psec-leaving');
     });
@@ -58,7 +59,6 @@ export function showPortalSection(sec: string): void {
     target.style.display =
       target.classList.contains('editor-portal-section') || sec === 'chat' ? 'flex' : 'block';
     target.classList.remove('psec-entering');
-    void target.offsetWidth;
     target.classList.add('psec-entering');
     if (ms) ms.classList.toggle('editor-active', sec === 'editor' || sec === 'chat');
     if (tt) {
@@ -97,41 +97,14 @@ export function showPortal(): void {
   if (typeof window._statsStopFile === 'function') window._statsStopFile();
   const portal = document.getElementById('portal');
   if (!portal) return;
-  const app = document.getElementById('app');
-  const studip = document.getElementById('studipDash');
-  const alreadyVisible =
-    portal.classList.contains('show') &&
-    portal.style.display !== 'none' &&
-    !!app &&
-    app.style.display === 'none';
-  const studipVisible = !!studip && studip.style.display !== 'none';
-
-  if (!alreadyVisible || studipVisible) {
-    hideFilesView();
-    portal.style.transition = 'none';
-    portal.style.opacity = '0';
-    portal.style.transform = 'scale(0.97)';
-    portal.style.pointerEvents = 'none';
-    portal.style.zIndex = '220';
-    portal.classList.add('show');
-    void portal.offsetWidth;
-    portal.style.transition =
-      'opacity 180ms cubic-bezier(0.22,1,0.36,1),transform 180ms cubic-bezier(0.22,1,0.36,1)';
-    portal.style.opacity = '1';
-    portal.style.transform = 'scale(1)';
-    portal.style.pointerEvents = 'auto';
-    setTimeout(() => {
-      portal.style.zIndex = '';
-      portal.style.opacity = '';
-      portal.style.transition = '';
-      portal.style.transform = '';
-      portal.style.display = 'block';
-    }, 200);
-  } else {
-    hideFilesView();
-    portal.classList.add('show');
-    portal.style.display = 'block';
-  }
+  hideFilesView();
+  portal.classList.add('show');
+  portal.style.display = 'block';
+  portal.style.opacity = '';
+  portal.style.transition = '';
+  portal.style.transform = '';
+  portal.style.pointerEvents = '';
+  portal.style.zIndex = '';
   try {
     const st = JSON.parse(localStorage.getItem('ss_state') || '{}');
     st.inApp = false;
@@ -275,21 +248,8 @@ export function hideStudip(stRunning?: boolean): void {
 export function navTo(navId: string, section: string): void {
   const appEl = document.getElementById('app');
   const fromFiles = !!(appEl && appEl.style.display !== 'none');
-  const studipEl = document.getElementById('studipDash');
-  const fromStudip = !!(studipEl && studipEl.style.display !== 'none');
 
   if (fromFiles) stashResumeFile();
-  // Hide every portal-section *before* the portal fades in. Otherwise the
-  // previously-active section (typically the courses dashboard, since we're
-  // coming from the PDF view) is still display:block during the shell
-  // fade-in and flashes as a ghost page before showPortalSection swaps in
-  // the target section.
-  if (fromFiles || fromStudip) {
-    document.querySelectorAll<HTMLElement>('.portal-section').forEach((el) => {
-      el.style.display = 'none';
-    });
-    showPortal();
-  }
   setNavActive(navId);
   if (typeof window.showPortalSection === 'function') window.showPortalSection(section);
   else showPortalSection(section);
