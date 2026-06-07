@@ -8,9 +8,12 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --dr-rail-w: 4.35rem;
-  --dr-rail-right: 12px;
-  --dr-drawer-right: calc(var(--dr-rail-w) + var(--dr-rail-right) + 8px);
+  --dr-rail-w: 64px;
+  --dr-gutter-w: 12px;
+  --dr-drawer-w: 390px;
+  --dr-rail-right: 0px;
+  --dr-drawer-right: calc(var(--dr-rail-w) + var(--dr-gutter-w));
+  --dr-reserved-w: calc(var(--dr-drawer-w) + var(--dr-rail-w) + var(--dr-gutter-w));
 }
 
 /* Root container hides everything by default. */
@@ -105,7 +108,7 @@
   right: var(--dr-drawer-right);
   top: 12px;
   bottom: 12px;
-  width: 390px; /* overridden inline by JS */
+  width: var(--dr-drawer-w); /* mirrored inline by JS for legacy resize reads */
   z-index: 9499;
   border-radius: 1.45rem;
   border: 1px solid rgba(125, 211, 252, 0.25);
@@ -438,6 +441,14 @@
     right: 50%;
     transform: translateX(50%);
     width: auto;
+  }
+
+  .dr-root.is-open {
+    --dr-drawer-w: 390px;
+  }
+
+  body.dr-pdf-split-open {
+    --dr-drawer-w: 390px;
   }
 }
 

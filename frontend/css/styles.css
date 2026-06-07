@@ -1462,6 +1462,13 @@ body.night .sb-acc-chev-btn {
   background: var(--dp-solid);
 }
 
+@media (min-width: 769px) {
+  body.dr-pdf-split-open #pdfViewerWrap {
+    margin-right: var(--dr-reserved-w);
+    transition: margin-right 180ms ease;
+  }
+}
+
 /* ── PDF maximize / focus reading mode ────────────────────────────────────
    The viewer fills the window over the left sidebar and the top header, but
    stops short of the document rail on the right (--dr-drawer-right) and sits
@@ -1476,6 +1483,12 @@ body.night .sb-acc-chev-btn {
   right: var(--dr-drawer-right);
   z-index: 9000;
   border-radius: 0;
+}
+@media (min-width: 769px) {
+  body.dr-pdf-split-open #pdfViewerWrap.is-maximized {
+    right: var(--dr-reserved-w, 0px);
+    margin-right: 0;
+  }
 }
 /* Maximize button shows the "expand" glyph by default and the "compress"
    glyph while maximized. */
@@ -1501,6 +1514,12 @@ body.pdf-maximized #pdfToolbar {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   padding: 0;
+}
+@media (min-width: 769px) {
+  body.pdf-maximized.dr-pdf-split-open #pdfToolbar {
+    left: calc((100vw - var(--dr-reserved-w)) / 2);
+    max-width: min(calc(100vw - var(--dr-reserved-w) - 32px), 980px);
+  }
 }
 body.pdf-maximized #pdfToolbar .pdf-toolbar-inner {
   max-width: none;
@@ -2405,6 +2424,10 @@ body.pdf-maximized #pdfMaximize {
 body:has(#aiPanel.visible) .annotate-popover {
   right: calc(var(--ai-w, 340px) + 24px);
 }
+body.dr-pdf-split-open .annotate-popover {
+  right: 170px;
+  max-width: min(calc(100% - 48px), 980px);
+}
 body.pdf-maximized .annotate-popover {
   position: fixed;
   top: 86px;
@@ -2413,6 +2436,12 @@ body.pdf-maximized .annotate-popover {
   transform: translateX(-50%);
   z-index: 9002;
   max-width: min(calc(100vw - 2 * (var(--dr-rail-w) + 28px)), 980px);
+}
+@media (min-width: 769px) {
+  body.pdf-maximized.dr-pdf-split-open .annotate-popover {
+    left: calc((100vw - var(--dr-reserved-w)) / 2);
+    max-width: min(calc(100vw - var(--dr-reserved-w) - 48px), 980px);
+  }
 }
 .annotate-popover::before {
   content: "";

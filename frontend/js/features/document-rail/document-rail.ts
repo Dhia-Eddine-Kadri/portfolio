@@ -49,9 +49,11 @@ const WIDTH_KEY = 'ss_dr_width';
 const WIDTH_MIN = 340;
 const WIDTH_MAX = 520;
 const WIDTH_DEFAULT = 390;
+const SPLIT_CLASS = 'dr-pdf-split-open';
 
 let _initialized = false;
 let _openMode: DocRailMode | null = null;
+let _route: DocRailRoute = 'other';
 let _drawerWidth = WIDTH_DEFAULT;
 
 // Snapshot of the last Problem Solver submission so we can:
@@ -131,6 +133,38 @@ function updateRailActive(mode: DocRailMode | null): void {
 
 function applyWidth(drawer: HTMLElement, w: number): void {
   drawer.style.width = w + 'px';
+}
+
+function setDrawerWidthVar(w: number): void {
+  const value = clampWidth(w) + 'px';
+  const root = $('drRoot');
+  if (root) root.style.setProperty('--dr-drawer-w', value);
+  document.body.style.setProperty('--dr-drawer-w', value);
+}
+
+function clearSplitState(): void {
+  const root = $('drRoot');
+  if (root) {
+    root.classList.remove('is-open');
+    root.style.removeProperty('--dr-drawer-w');
+  }
+  document.body.classList.remove(SPLIT_CLASS);
+  document.body.style.removeProperty('--dr-drawer-w');
+}
+
+function applySplitState(drawer?: HTMLElement | null): void {
+  const root = $('drRoot');
+  if (!root) return;
+  const isSheet = !!drawer?.classList.contains('dr-sheet');
+  const shouldSplit = _route === 'pdf' && _openMode != null && !isSheet;
+  root.classList.toggle('is-open', shouldSplit);
+  document.body.classList.toggle(SPLIT_CLASS, shouldSplit);
+  if (shouldSplit) {
+    setDrawerWidthVar(_drawerWidth);
+  } else {
+    root.style.removeProperty('--dr-drawer-w');
+    document.body.style.removeProperty('--dr-drawer-w');
+  }
 }
 
 function updateDrawerModeClass(drawer: HTMLElement, mode: DocRailMode | null): void {
@@ -597,6 +631,7 @@ function openDrawer(mode: DocRailMode): void {
   if (!drawer.classList.contains('dr-sheet')) {
     applyWidth(drawer, _drawerWidth);
   }
+  applySplitState(drawer);
   updateRailActive(mode);
   // Render after the slide-in starts so we don't pay the cost during the
   // transition; tiny delay also helps the input auto-focus feel natural.
@@ -628,6 +663,7 @@ function closeDrawer(): void {
   }
   updateDrawerModeClass(drawer, null);
   updateRailActive(null);
+  clearSplitState();
   // Tear down hosted content so legacy modules' references stay valid.
   clearDrawerContent();
   const onEnd = (): void => {
@@ -663,6 +699,9 @@ function wireResize(): void {
     const next = clampWidth(startW - dx);
     _drawerWidth = next;
     applyWidth(drawer, next);
+    if (document.body.classList.contains(SPLIT_CLASS)) {
+      setDrawerWidthVar(next);
+    }
   };
 
   const onUp = (): void => {
@@ -715,10 +754,16 @@ function wireClose(): void {
 function setRouteVisibility(route: DocRailRoute): void {
   const root = $('drRoot');
   if (!root) return;
+  _route = route;
   applyUserTypeVisibility();
   root.hidden = false;
   root.classList.toggle('is-pdf', route === 'pdf');
   root.classList.toggle('is-courses', route === 'courses');
+  if (route !== 'pdf') {
+    clearSplitState();
+  } else {
+    applySplitState($('drDrawer'));
+  }
   if (route === 'other' && _openMode != null) {
     closeDrawer();
   }
@@ -750,5 +795,6 @@ export function initDocumentRail(): void {
     close: closeDrawer,
   };
 
-  root.classList.remove('is-pdf', 'is-courses');
+  root.classList.remove('is-pdf', 'is-courses', 'is-open');
+  clearSplitState();
 }
