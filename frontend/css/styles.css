@@ -1482,7 +1482,7 @@ body.night .sb-acc-chev-btn {
   top: 0;
   left: 0;
   bottom: 0;
-  right: var(--dr-drawer-right);
+  right: 0;
   z-index: 9000;
   border-radius: 0;
 }
