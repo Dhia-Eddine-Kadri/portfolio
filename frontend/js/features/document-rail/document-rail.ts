@@ -132,7 +132,9 @@ function updateRailActive(mode: DocRailMode | null): void {
 }
 
 function applyWidth(drawer: HTMLElement, w: number): void {
-  drawer.style.width = w + 'px';
+  const px = w + 'px';
+  drawer.style.setProperty('width', px, 'important');
+  drawer.style.setProperty('flex-basis', px);
 }
 
 function setDrawerWidthVar(w: number): void {
@@ -726,39 +728,48 @@ function wireResize(): void {
   let dragging = false;
   let startX = 0;
   let startW = 0;
+  let rafId = 0;
+  let pendingWidth = 0;
 
   const onMove = (e: MouseEvent): void => {
     if (!dragging) return;
     const dx = e.clientX - startX;
-    const next = clampWidth(startW - dx);
-    _drawerWidth = next;
-    applyWidth(drawer, next);
-    if (document.body.classList.contains(SPLIT_CLASS) || isDesktopDrawerOpen(drawer)) {
-      setDrawerWidthVar(next);
+    pendingWidth = clampWidth(startW - dx);
+    if (!rafId) {
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        _drawerWidth = pendingWidth;
+        applyWidth(drawer, pendingWidth);
+      });
     }
   };
 
   const onUp = (): void => {
     if (!dragging) return;
     dragging = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    _drawerWidth = pendingWidth;
+    applyWidth(drawer, pendingWidth);
+    if (document.body.classList.contains(SPLIT_CLASS) || isDesktopDrawerOpen(drawer)) {
+      setDrawerWidthVar(pendingWidth);
+    }
     handle.classList.remove('is-active');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
     saveWidth(_drawerWidth);
-    // Re-render PDF pages at the new column width.
     if (typeof (window as any).renderPages === 'function') {
       (window as any).renderPages();
     }
   };
 
   handle.addEventListener('mousedown', (e: MouseEvent) => {
-    // Resize is desktop-only — disable in mobile bottom-sheet mode.
     if (drawer.classList.contains('dr-sheet')) return;
     dragging = true;
     startX = e.clientX;
     startW = _drawerWidth;
+    pendingWidth = startW;
     handle.classList.add('is-active');
     document.body.style.cursor = 'ew-resize';
     document.body.style.userSelect = 'none';
