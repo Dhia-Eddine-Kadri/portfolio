@@ -1112,7 +1112,10 @@ def _build_context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]
         if c.section_title:
             header += f"\nSection: {c.section_title}"
         parts.append(f"{header}\n{c.text}")
-    return "\n\n---\n\n".join(parts)
+    body = "\n\n---\n\n".join(parts)
+    n = len(chunks)
+    body += f"\n\n--- END OF SOURCES ---\nOnly [Source 0] through [Source {n}] exist. Do NOT cite any [Source N] with N > {n} — those do not exist and citing them is a hallucination."
+    return body
 
 
 def _course_material_found_note(
