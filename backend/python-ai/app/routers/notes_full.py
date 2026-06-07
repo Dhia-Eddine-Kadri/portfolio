@@ -143,6 +143,69 @@ Rules:
 - Preserve the professor's terminology exactly."""
 
 
+def _standard_section_instructions() -> str:
+    return """Use these sections — ONLY include a section if it has real content. OMIT sections entirely if they would be empty:
+- Simple Overview (always, 2-3 sentences)
+- Key Definitions (if definitions exist)
+- Main Concepts (if explanations exist)
+- Methods / Procedures (if processes are described)
+- Important Formulas / Rules / Theorems (if formulas exist, in KaTeX)
+- Examples from the Course (if examples exist)
+- Comparisons (if comparisons exist, use markdown tables)
+- Exam-Relevant Points (if exam relevance can be inferred from the PDF)
+- Common Mistakes (if traps/pitfalls can be inferred from the material)
+- Mini Recap (always, 2-3 memory-friendly sentences)"""
+
+
+def _exam_section_instructions() -> str:
+    return """## EXAM SUMMARY MODE — COMPLETENESS IS CRITICAL
+
+You must extract ALL exam-relevant concepts from EVERY page in the provided text.
+Do NOT skip pages. Do NOT pick only a few topics. Scan the ENTIRE provided text systematically.
+
+Target length: up to ~4000 words. Be as thorough as needed to cover every exam-relevant concept.
+Only infer exam relevance from emphasis in the PDF, repeated concepts, definitions, formulas,
+examples, or explicitly marked learning goals. Do NOT invent exam questions from outside knowledge.
+
+Use this structure — ONLY include sections that have real content. OMIT sections that would be empty:
+
+## 1. Muss-Definitionen (Must-Know Definitions)
+Every formal definition in the PDF, quoted near-verbatim with page references.
+Include DIN/norm definitions, technical terms, and key distinctions.
+
+## 2. Einteilungen und Klassifikationen (Classifications)
+Every classification scheme, taxonomy, or categorization from the PDF.
+List all categories and subcategories completely.
+
+## 3. Werkstoffverhalten und Grundlagen (Material Behavior / Fundamentals)
+Physical principles, material properties, deformation behavior, crystal structures,
+microstructural phenomena — anything that explains WHY processes work.
+
+## 4. Verfahren und Prozesse (Methods and Processes)
+Every named method or process with: what it is, how it works, advantages, disadvantages, applications.
+
+## 5. Wichtige Formeln (Important Formulas)
+Every formula from the PDF. For each: the formula in KaTeX, meaning of every variable with units,
+and when/how to apply it.
+
+## 6. Kennwerte und Eigenschaften (Properties and Characteristics)
+Key properties, relationships, rules of thumb, and their implications.
+Include properties like Umformgrad properties, Volumenkonstanz, isotropy/anisotropy.
+
+## 7. Diagramme und Kurven (Diagrams and Curves)
+Describe important diagrams, curves, or graphs from the PDF. What they show, axes, key features.
+
+## 8. Vergleiche (Comparisons)
+Any comparisons between methods, materials, processes, or concepts. Use markdown tables.
+
+## 9. Prüfungsrelevanz (Exam Focus)
+The 10-15 most likely exam topics based on definitions, formulas, classifications,
+and concepts emphasized in the PDF. Infer ONLY from the PDF content.
+
+## 10. Typische Fehler (Common Mistakes)
+Typical misunderstandings or traps that can be inferred from the material."""
+
+
 def _summary_prompt(lang: str, detail_level: str) -> str:
     level = _normalize_detail(detail_level)
 
@@ -152,7 +215,7 @@ def _summary_prompt(lang: str, detail_level: str) -> str:
     detail_map = {
         "quick": "Target length: up to ~700 words. Only the most important ideas. Stay shorter if the pages contain limited content.",
         "detailed": "Target length: usually 1000–2000 words for content-rich selections. Stay shorter if the pages contain limited content.",
-        "exam": "Target length: up to ~2500 words. Focus on exam-relevant content: what to memorize, likely questions, common traps. Only infer exam relevance from emphasis in the PDF, repeated concepts, definitions, formulas, examples, or explicitly marked learning goals. Do NOT invent likely exam questions from outside knowledge. Stay shorter if little content.",
+        "exam": None,  # handled separately below
         "beginner": "Target length: up to ~1500 words. Explain in simple language as if to a first-year student. You may add very basic clarifying explanations, but do NOT introduce new facts, formulas, examples, or concepts that are not supported by the PDF.",
     }
     detail_instr = detail_map.get(level, detail_map["detailed"])
@@ -186,30 +249,21 @@ No technical study content is present on these pages.
 Do NOT create empty sections. Keep it to 3-5 lines maximum.
 
 ## IF STUDY-CONTENT OR MIXED-CONTENT:
-{detail_instr}
+{detail_instr if detail_instr else ""}
 
-If mixed-content, begin with one brief "Context" line about the organizational info, then proceed with study content.
+{"" if level == "exam" else "If mixed-content, begin with one brief Context line about the organizational info, then proceed with study content."}
 
-Use these sections — ONLY include a section if it has real content. OMIT sections entirely if they would be empty:
-- Simple Overview (always, 2-3 sentences)
-- Key Definitions (if definitions exist)
-- Main Concepts (if explanations exist)
-- Methods / Procedures (if processes are described)
-- Important Formulas / Rules / Theorems (if formulas exist, in KaTeX)
-- Examples from the Course (if examples exist)
-- Comparisons (if comparisons exist, use markdown tables)
-- Exam-Relevant Points (if exam relevance can be inferred from the PDF)
-- Common Mistakes (if traps/pitfalls can be inferred from the material)
-- Mini Recap (always, 2-3 memory-friendly sentences)
+{_exam_section_instructions() if level == "exam" else _standard_section_instructions()}
 
 ## RULES:
 - Use ONLY the provided PDF content. Do NOT invent definitions, formulas, examples, or exam relevance.
 - Preserve the professor's terminology exactly.
-- Cite page numbers: *(S. X)*.
+- Cite page numbers: *(S. X)*. Be precise — verify each page number matches the [S. X] markers in the provided text. Do NOT guess page numbers.
 - If a section would be empty, OMIT it entirely — never write "keine vorhanden" or similar.
-- Math in KaTeX ($...$ or $$...$$).
+- Math in KaTeX ($...$ or $$...$$). Use proper subscripts and superscripts: write $k_f$, $A_0$, $A_1$, $l_0$, $l_1$, $\\varphi$, $\\varepsilon$ — never write plain kf, A0, A1.
 - Tables with markdown for comparisons.
-- Do NOT force the full template on content-light pages."""
+- Do NOT force the full template on content-light pages.
+- If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content."""
 
 
 def _section_prompt(lang: str, page_start: int | None, page_end: int | None, tool: str) -> str:
@@ -509,7 +563,8 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             else "Merge these section notes into one final study note:\n\n"
         )
         try:
-            merged = _call_openai(_merge_prompt(payload.language, payload.tool), instruction + combined, max_tokens=5000)
+            merge_tokens = 8000 if (payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam") else 5000
+            merged = _call_openai(_merge_prompt(payload.language, payload.tool), instruction + combined, max_tokens=merge_tokens)
         except Exception as e:  # noqa: BLE001
             log.exception("merge LLM failed")
             return {"error": f"Merge failed: {e}"}
@@ -549,8 +604,9 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             else "Erstelle detaillierte Lernnotizen NUR für diesen Abschnitt."
         )
         sys_p = _section_prompt(payload.language, sec_start, sec_end, payload.tool)
+        sec_tokens = 4000 if _normalize_detail(payload.detailLevel) == "exam" else 2500
         try:
-            md = _call_openai(sys_p, f"PDF-INHALT (Seiten {sec_start}–{sec_end}):\n\n{context}\n\n{instr}", max_tokens=2500)
+            md = _call_openai(sys_p, f"PDF-INHALT (Seiten {sec_start}–{sec_end}):\n\n{context}\n\n{instr}", max_tokens=sec_tokens)
         except Exception as e:  # noqa: BLE001
             log.exception("section LLM failed")
             return {"error": f"Section generation failed: {e}"}
@@ -605,16 +661,25 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
         page_hint = "\n\nFOKUS: " + (
             f"Seite {filter_start}" if filter_start == filter_end else f"Seiten {filter_start}–{filter_end}"
         ) + " des PDFs. Verwende NUR Inhalte aus diesem Seitenbereich."
-    instr = (
-        "Erstelle eine studentengerechte Zusammenfassung aus dem obigen Text. "
-        "Halte dich strikt an den Seitenbereich. Erfasse alle wichtigen Definitionen, Formeln, Listen, Prozesse und Vergleiche."
-        if payload.tool == "summary"
-        else "Erstelle detaillierte Lernnotizen aus dem obigen Text. Erfasse ALLE Definitionen, Listen, Formeln und Prozessschritte."
-    )
+    if payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam":
+        instr = (
+            "Erstelle eine vollständige Prüfungszusammenfassung aus dem obigen Text. "
+            "Gehe JEDE Seite systematisch durch. Erfasse ALLE Definitionen, DIN-Klassifikationen, "
+            "Formeln, Verfahren, Werkstoffeigenschaften, Diagramme und Vergleiche. "
+            "Überspringe KEINE Seite und KEIN Konzept."
+        )
+    elif payload.tool == "summary":
+        instr = (
+            "Erstelle eine studentengerechte Zusammenfassung aus dem obigen Text. "
+            "Halte dich strikt an den Seitenbereich. Erfasse alle wichtigen Definitionen, Formeln, Listen, Prozesse und Vergleiche."
+        )
+    else:
+        instr = "Erstelle detaillierte Lernnotizen aus dem obigen Text. Erfasse ALLE Definitionen, Listen, Formeln und Prozessschritte."
     user_message = f"PDF-INHALT:\n\n{context}{page_hint}\n\n{instr}"
 
+    gen_tokens = 8000 if (payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam") else 6000
     try:
-        markdown = _call_openai(system_prompt, user_message, max_tokens=6000)
+        markdown = _call_openai(system_prompt, user_message, max_tokens=gen_tokens)
     except Exception as e:  # noqa: BLE001
         log.exception("notes LLM failed")
         return {"error": f"KI-Generierung fehlgeschlagen: {e}"}
