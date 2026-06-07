@@ -182,11 +182,27 @@ Target length: up to ~4000 words. Be as thorough as needed to cover every exam-r
 Only infer exam relevance from emphasis in the PDF, repeated concepts, definitions, formulas,
 examples, or explicitly marked learning goals. Do NOT invent exam questions from outside knowledge.
 
+## COVERAGE TRANSPARENCY
+After your content-type marker, output a brief coverage line:
+> **Abgedeckte Seiten:** S. X–Y (von Z Seiten im Dokument).
+If the provided text does NOT cover the entire PDF, add:
+> Wichtige Themen ab S. [first uncovered page] (z. B. [topic names if inferable from headings/ToC]) sind in diesem Bereich nicht enthalten.
+Only name topics you can actually see mentioned in a table of contents, chapter heading, or cross-reference within the provided text. Do NOT guess or invent topic names.
+
+## TABULAR DATA PRECISION
+When reproducing tables from the PDF (e.g. crystal structures, material properties):
+- Copy every column header exactly as it appears in the source.
+- Do NOT merge or rename columns. If the PDF has separate columns for "Bevorzugte Gleitebenen",
+  "Gleitrichtungen", and "Gleitsystemanzahl", reproduce all three — do not collapse them into fewer columns.
+- Cross-check each cell value against the [S. X] source page. A number that belongs to one column
+  must not be placed under a different column header.
+
 Use this structure — ONLY include sections that have real content. OMIT sections that would be empty:
 
 ## 1. Muss-Definitionen (Must-Know Definitions)
 Every formal definition in the PDF, quoted near-verbatim with page references.
 Include DIN/norm definitions, technical terms, and key distinctions.
+Start with the most fundamental definition of the chapter topic (e.g. Umformen nach DIN 8580).
 
 ## 2. Einteilungen und Klassifikationen (Classifications)
 Every classification scheme, taxonomy, or categorization from the PDF.
@@ -212,13 +228,16 @@ Describe important diagrams, curves, or graphs from the PDF. What they show, axe
 
 ## 8. Vergleiche (Comparisons)
 Any comparisons between methods, materials, processes, or concepts. Use markdown tables.
+Reproduce table structures faithfully — keep all original columns and values in their correct positions.
 
 ## 9. Prüfungsrelevanz (Exam Focus)
 The 10-15 most likely exam topics based on definitions, formulas, classifications,
 and concepts emphasized in the PDF. Infer ONLY from the PDF content.
 
 ## 10. Typische Fehler (Common Mistakes)
-Typical misunderstandings or traps that can be inferred from the material."""
+Typical misunderstandings or traps that can be inferred from the material.
+Include traps like confusing similar-looking values in tables (e.g. number of slip planes vs. total slip systems),
+mixing up related formulas (e.g. $\\varphi$ vs. $\\varepsilon$), or forgetting conservation laws (e.g. Volumenkonstanz)."""
 
 
 def _summary_prompt(lang: str, detail_level: str) -> str:
@@ -299,6 +318,7 @@ Rules:
 - Quote Muss-Definitionen near-verbatim when the source gives a definition.
 - Capture DIN/norm classifications completely when present.
 - Include material behavior, elastic/plastic deformation, crystal structure, glide, dislocations, recrystallization, Umformgrad properties, flow stress, temperature effects, forming speed, flow curves, and forming limits whenever they appear in this page group.
+- When reproducing tables (e.g. crystal structures, material comparisons): copy every column header exactly as in the source. Do NOT merge columns. If the source has separate columns for e.g. "Bevorzugte Gleitebenen", "Gleitrichtungen", and "Gleitsystemanzahl", reproduce all three with their correct per-row values.
 - Add Typische Fehler only when a trap can be inferred from the source content.
 - Math in KaTeX. Use clean subscripts: $k_f$, $A_1$, $l_1$, $l_0$, $\\varphi$, $\\varepsilon$; never plain kf, A1, l1, l0.
 - Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source discusses logarithmic strain / Umformgrad.
@@ -381,12 +401,21 @@ Coverage rules:
 - Cite pages only when the input already has *(S. X)* or an explicit section page range. Never guess page numbers.
 - Do not move page references between concepts. If examples are on S. 6, keep S. 6.
 - Preserve all formal definitions, DIN classifications, lists, formulas, diagrams, and comparisons.
+- Preserve table structures faithfully — keep all original columns and their correct per-row values. Do NOT merge or rename columns from the source.
 - Keep formulas in clean KaTeX with engineering subscripts: $k_f$, $A_1$, $l_1$, $l_0$, $\\varphi$, $\\varepsilon$.
 - Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source supports it.
-- Add Typische Fehler that follow from the source, for example confusing $\\varphi$ with $\\varepsilon$ or forgetting Volumenkonstanz, but do not invent unrelated traps.
+- Add Typische Fehler that follow from the source, for example confusing $\\varphi$ with $\\varepsilon$, confusing the number of slip planes with total slip systems, or forgetting Volumenkonstanz, but do not invent unrelated traps.
 - Omit a final heading only if no input section contains any real content for it.
 - Remove all partial <!-- minallo-summary-type: ... --> markers and output exactly ONE marker first.
-- Do NOT invent new information."""
+- Do NOT invent new information.
+
+Coverage transparency:
+- After the content-type marker, output a coverage line:
+  > **Abgedeckte Seiten:** S. X–Y (von Z Seiten im Dokument).
+  Use the page ranges from the input section headers to determine X–Y. If total pages is unknown, omit "von Z".
+- If the merged content clearly does not cover the entire PDF (e.g. early pages only, or a table of contents mentions topics not found in any input section), add:
+  > Wichtige Themen ab S. [estimated page] (z. B. [topic names visible in ToC/headings]) sind in diesem Bereich nicht enthalten.
+  Only name topics that appear in a table of contents, chapter heading, or cross-reference within the input. Do NOT guess."""
 
 
 def _merge_prompt(lang: str, tool: str, detail_level: str = "detailed") -> str:
@@ -805,11 +834,15 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             f"Seite {filter_start}" if filter_start == filter_end else f"Seiten {filter_start}–{filter_end}"
         ) + " des PDFs. Verwende NUR Inhalte aus diesem Seitenbereich."
     if payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam":
+        total_hint = ""
+        if payload.effectivePages:
+            total_hint = f" Das Dokument hat insgesamt {payload.effectivePages} Seiten."
         instr = (
             "Erstelle eine vollständige Prüfungszusammenfassung aus dem obigen Text. "
             "Gehe JEDE Seite systematisch durch. Erfasse ALLE Definitionen, DIN-Klassifikationen, "
             "Formeln, Verfahren, Werkstoffeigenschaften, Diagramme und Vergleiche. "
             "Überspringe KEINE Seite und KEIN Konzept."
+            + total_hint
         )
     elif payload.tool == "summary":
         instr = (
