@@ -295,6 +295,7 @@ def _cached_grounded_sources_to_js(grounded_sources: list[dict[str, Any]] | None
             # (robust against mangled file names) at the right page.
             "documentId": s.get("documentId") or s.get("document_id"),
             "pageStart": page_start,
+            "index": s.get("index"),
         })
     return sources_js
 
@@ -770,6 +771,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                                 "pageEnd": s.get("pageEnd"),
                                 "sectionTitle": s.get("section"),
                                 "pages": s.get("pages"),
+                                "index": s.get("index"),
                             }
                             for s in (captured_meta.get("sources") or [])
                         ],
