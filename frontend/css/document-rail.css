@@ -173,6 +173,15 @@
   z-index: auto;
 }
 
+/* Rail becomes transparent and floats over the drawer in split mode */
+body.dr-pdf-split-open .dr-rail {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .dr-drawer[hidden] {
   display: none !important;
 }
@@ -208,10 +217,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 4px 4px 12px;
+  gap: 10px;
+  padding: 2px 2px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .dr-header-l {
@@ -222,9 +231,9 @@
 }
 
 .dr-header-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -252,15 +261,15 @@
 }
 
 .dr-title {
-  font: 800 1.2rem/1.1 var(--font-main);
+  font: 850 1.08rem/1.08 var(--font-main);
   color: #fff;
   margin: 0;
   letter-spacing: -0.01em;
 }
 
 .dr-subtitle {
-  margin-top: 3px;
-  font: 700 0.72rem/1.2 var(--font-main);
+  margin-top: 2px;
+  font: 750 0.68rem/1.2 var(--font-main);
   color: #cbd5e1;
   display: flex;
   align-items: center;
@@ -284,8 +293,8 @@
 .dr-icon-btn {
   appearance: none;
   -webkit-appearance: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1194,17 +1203,20 @@
 
 /* Chat history container */
 .dr-drawer .dr-host-ai .ai-msgs {
-  background: transparent;
-  padding: 14px 12px;
-  gap: 16px;
+  background:
+    linear-gradient(180deg, rgba(8, 21, 45, 0.18), rgba(2, 6, 23, 0)),
+    transparent;
+  padding: 8px 10px 6px;
+  gap: 10px;
+  scroll-padding-bottom: 108px;
 }
 
 /* Assistant + user bubbles */
 .dr-drawer .dr-host-ai .ai-bubble {
-  border-radius: 18px;
-  padding: 12px 14px;
-  font-size: 0.83rem;
-  line-height: 1.6;
+  border-radius: 14px;
+  padding: 9px 11px;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 .dr-drawer .dr-host-ai .ai-bubble.bot {
   /* Bubble-free AI answer in the side rail (open, document-style). Only the
@@ -1215,14 +1227,50 @@
   background: transparent;
   color: var(--dr-text);
   box-shadow: none;
-  padding: 2px 0 4px;
+  padding: 0 2px 2px;
+  max-width: none;
 }
 .dr-drawer .dr-host-ai .ai-bubble.user {
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  background: linear-gradient(135deg, #38bdf8, #3b82f6);
-  color: #f8fafc;
-  border-top-right-radius: 8px;
-  box-shadow: 0 6px 22px rgba(14, 165, 233, 0.22);
+  border: 1px solid rgba(99, 102, 241, 0.32);
+  background:
+    linear-gradient(135deg, rgba(59, 130, 246, 0.26), rgba(14, 165, 233, 0.12)),
+    rgba(15, 23, 42, 0.68);
+  color: #eff6ff;
+  border-top-right-radius: 6px;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.22);
+}
+.dr-drawer .dr-host-ai .ai-msg {
+  gap: 4px;
+}
+.dr-drawer .dr-host-ai .ai-msgs-body,
+.dr-drawer .dr-host-ai .ai-bubble.bot {
+  overflow-wrap: anywhere;
+}
+.dr-drawer .dr-host-ai .ai-bubble.bot h1,
+.dr-drawer .dr-host-ai .ai-bubble.bot h2,
+.dr-drawer .dr-host-ai .ai-bubble.bot h3 {
+  margin: 14px 0 6px;
+  color: var(--dr-sky-100);
+  line-height: 1.18;
+}
+.dr-drawer .dr-host-ai .ai-bubble.bot p,
+.dr-drawer .dr-host-ai .ai-bubble.bot ul,
+.dr-drawer .dr-host-ai .ai-bubble.bot ol {
+  margin-top: 6px;
+  margin-bottom: 8px;
+}
+.dr-drawer .dr-host-ai .ai-bubble.bot code {
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  background: rgba(8, 47, 73, 0.28);
+  color: #bae6fd;
+  border-radius: 6px;
+  padding: 1px 4px;
+}
+.dr-drawer .dr-host-ai .ai-bubble.bot pre,
+.dr-drawer .dr-host-ai .ai-bubble.bot table,
+.dr-drawer .dr-host-ai .ai-bubble.bot .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
 }
 .dr-drawer .dr-host-ai .msg-sender.user-sender {
   color: var(--dr-sky-200);
@@ -1236,11 +1284,11 @@
 
 /* Chip drawers (options) — restyle as glass row */
 .dr-drawer .dr-host-ai .chip-drawer {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--dr-glass-border);
-  background: rgba(2, 6, 23, 0.35);
-  padding: 8px 10px;
-  margin: 6px 10px;
+  background: rgba(2, 6, 23, 0.28);
+  padding: 6px 8px;
+  margin: 4px 6px;
 }
 .dr-drawer .dr-host-ai .chip-drawer-label {
   font: 800 10px/1 var(--font-main);
@@ -1255,7 +1303,7 @@
   border: 1px solid var(--dr-glass-border);
   background: rgba(255, 255, 255, 0.035);
   color: var(--dr-text-dim);
-  padding: 4px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
   font: 800 11px/1 var(--font-main);
   cursor: pointer;
@@ -1270,25 +1318,35 @@
 }
 
 /* Composer (input area) */
+.dr-drawer .dr-host-ai .ai-input-area {
+  padding: 0;
+  border-top: 1px solid rgba(125, 211, 252, 0.12);
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.12), rgba(2, 6, 23, 0.5));
+}
 .dr-drawer .dr-host-ai .ai-input-box {
-  border-radius: 18px;
-  border: 1px solid var(--dr-glass-border-strong);
-  background: rgba(2, 6, 23, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 10px 12px;
-  margin: 8px 10px 12px;
-  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.4);
+  border-radius: 14px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.74), rgba(2, 6, 23, 0.74)),
+    rgba(2, 6, 23, 0.58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 8px 9px;
+  margin: 8px;
+  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.28);
 }
 .dr-drawer .dr-host-ai .ai-textarea {
   background: transparent;
   border: none;
   outline: none;
   color: var(--dr-text-strong);
-  font: 500 0.88rem/1.5 var(--font-main);
+  font: 560 0.82rem/1.42 var(--font-main);
   width: 100%;
   resize: none;
-  padding: 4px 4px 0;
+  padding: 2px 3px 0;
+  min-height: 42px;
+  max-height: 116px;
 }
 .dr-drawer .dr-host-ai .ai-textarea::placeholder {
   color: var(--dr-text-faint);
@@ -1296,9 +1354,9 @@
 .dr-drawer .dr-host-ai .ai-bottom-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  row-gap: 8px;
+  flex-wrap: nowrap;
+  gap: 5px;
+  row-gap: 6px;
   margin-top: 6px;
   min-width: 0;
 }
@@ -1311,12 +1369,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid var(--dr-sky-border-soft);
   background: var(--dr-sky-bg-soft);
   color: var(--dr-sky-100);
-  font: 800 11px/1 var(--font-main);
+  font: 820 10px/1 var(--font-main);
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }
@@ -1329,7 +1387,8 @@
 .dr-drawer .dr-host-ai .ai-char-count {
   color: var(--dr-text-faint);
   font: 700 10px/1 var(--font-main);
-  margin-left: 4px;
+  margin-left: 3px;
+  white-space: nowrap;
 }
 
 /* Attach / snip buttons */
@@ -1337,12 +1396,12 @@
 .dr-drawer .dr-host-ai .ai-snip-btn {
   appearance: none;
   -webkit-appearance: none;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid var(--dr-glass-border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--dr-sky-200);
@@ -1360,29 +1419,46 @@
   appearance: none;
   -webkit-appearance: none;
   margin-left: auto;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 12px;
-  background: #38bdf8;
-  color: #020617;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  color: #eff6ff;
   cursor: pointer;
-  box-shadow: 0 0 24px rgba(56, 189, 248, 0.32);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.32);
   transition: background 140ms ease, transform 120ms ease, box-shadow 140ms ease;
 }
 .dr-drawer .dr-host-ai .ai-send:hover {
-  background: #7dd3fc;
-  box-shadow: 0 0 30px rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, #7dd3fc, #3b82f6);
+  box-shadow: 0 12px 28px rgba(56, 189, 248, 0.38);
 }
 .dr-drawer .dr-host-ai .ai-send:active {
   transform: scale(0.96);
 }
 .dr-drawer .dr-host-ai .ai-send svg {
-  color: #020617;
-  stroke: #020617;
+  color: currentColor;
+  stroke: currentColor;
+}
+
+.dr-drawer .dr-host-ai .ai-export-row,
+.dr-drawer .dr-host-ai .ai-actions,
+.dr-drawer .dr-host-ai .ai-msg-actions {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dr-drawer .dr-host-ai .ai-export-row button,
+.dr-drawer .dr-host-ai .ai-copy,
+.dr-drawer .dr-host-ai .ai-action-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  background: rgba(14, 165, 233, 0.08);
+  color: #bfdbfe;
+  box-shadow: none;
 }
 
 /* ── Problem Solver → AI mode "collapsed" strip ───────────────────────────
