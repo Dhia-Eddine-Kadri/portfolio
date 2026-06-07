@@ -67,7 +67,7 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
       if (typeof window.showToast === 'function') window.showToast(title, sub);
     };
 
-  const SPOTIFY_CLIENT_ID = '';
+  const SPOTIFY_CLIENT_ID = 'b32b0d1e4d3244ef850da67595389b1b';
   const SPOTIFY_SCOPES =
     'user-read-playback-state user-modify-playback-state user-read-currently-playing';
   const SPOTIFY_REDIRECT = window.location.origin + window.location.pathname;
