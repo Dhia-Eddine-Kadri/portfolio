@@ -160,6 +160,16 @@ def _salvage_string_value(raw: str, key: str) -> str | None:
     return salvaged or None
 
 
+_MAX_COMPLETION_TOKENS_PREFIXES = ("o1", "o3", "o4", "gpt-4.1", "gpt-4.5")
+
+
+def _token_limit_param(model: str, limit: int) -> dict:
+    """Return the correct token-limit kwarg for the given model."""
+    if any(model.startswith(p) for p in _MAX_COMPLETION_TOKENS_PREFIXES):
+        return {"max_completion_tokens": limit}
+    return {"max_tokens": limit}
+
+
 @dataclass
 class LlmResult:
     data: Any
@@ -179,9 +189,10 @@ def chat_json(
     settings = get_settings()
     chosen = model or settings.openai_generate_model
     client = OpenAI(api_key=settings.openai_api_key)
+    token_param = _token_limit_param(chosen, max_tokens)
     resp = client.chat.completions.create(
         model=chosen,
-        max_tokens=max_tokens,
+        **token_param,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},

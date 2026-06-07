@@ -66,6 +66,14 @@ def is_reasoning_model(model: str | None) -> bool:
     return bool(re.match(r"^o\d", (model or "").strip()))
 
 
+def _needs_max_completion_tokens(model: str | None) -> bool:
+    """Models that require max_completion_tokens instead of max_tokens."""
+    m = (model or "").strip()
+    if is_reasoning_model(m):
+        return True
+    return m.startswith(("gpt-4.1", "gpt-4.5"))
+
+
 def chat_completion_params(
     model: str | None, max_tokens: int, temperature: float | None = None
 ) -> dict[str, Any]:
@@ -81,7 +89,12 @@ def chat_completion_params(
             "max_completion_tokens": max(max_tokens, 12000),
             "reasoning_effort": get_settings().openai_reasoning_effort,
         }
-    params: dict[str, Any] = {"max_tokens": max_tokens}
+    if _needs_max_completion_tokens(model):
+        params: dict[str, Any] = {"max_completion_tokens": max_tokens}
+        if temperature is not None:
+            params["temperature"] = temperature
+        return params
+    params = {"max_tokens": max_tokens}
     if temperature is not None:
         params["temperature"] = temperature
     return params

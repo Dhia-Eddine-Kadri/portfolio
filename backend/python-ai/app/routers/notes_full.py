@@ -228,9 +228,11 @@ def _build_context(chunks: list[dict[str, Any]], file_name: str | None) -> tuple
 def _call_openai(system_prompt: str, user_message: str, max_tokens: int = 4000) -> str:
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_api_key)
+    from ..services.llm_json import _token_limit_param
+    token_param = _token_limit_param(settings.openai_generate_model_strong, max_tokens)
     resp = client.chat.completions.create(
         model=settings.openai_generate_model_strong,
-        max_tokens=max_tokens,
+        **token_param,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_message},

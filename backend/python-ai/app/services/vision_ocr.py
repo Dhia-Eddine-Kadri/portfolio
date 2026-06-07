@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from ..config import get_settings
+from .llm_json import _token_limit_param
 
 log = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ def _vision_extract(client, model: str, image_bytes: bytes, *, mode: str = "stan
             # long; 2000 truncated the bottom of such pages (and could leave a
             # ``$$`` unclosed, breaking formula detection). 4096 is well within
             # the model's output limit.
-            max_tokens=4096,
+            **_token_limit_param(model, 4096),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {
