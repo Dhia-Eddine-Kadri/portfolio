@@ -150,15 +150,9 @@ function clearSplitState(): void {
   }
   document.body.classList.remove(SPLIT_CLASS);
   document.body.style.removeProperty('--dr-drawer-w');
-  // Move drawer and rail back to #drRoot
   const drawer = $('drDrawer');
   if (drawer && root && drawer.parentElement !== root) {
     drawer.classList.remove('dr-inline-split');
-    // Return rail to #drRoot before the drawer
-    const rail = root.querySelector('.dr-rail') || drawer.querySelector('.dr-rail');
-    if (rail && rail.parentElement === drawer) {
-      root.insertBefore(rail, root.firstChild);
-    }
     root.appendChild(drawer);
   }
 }
@@ -172,25 +166,16 @@ function applySplitState(drawer?: HTMLElement | null): void {
   document.body.classList.toggle(SPLIT_CLASS, shouldSplit);
   if (shouldSplit) {
     setDrawerWidthVar(_drawerWidth);
-    // Move drawer into .app-body as a flex sibling so it participates in flow
     const appBody = document.querySelector('.app-body') as HTMLElement | null;
     if (drawer && appBody && drawer.parentElement !== appBody) {
       drawer.classList.add('dr-inline-split');
       appBody.appendChild(drawer);
     }
-    // Move rail inside the drawer so it floats on top (no gap at right edge)
-    const rail = root.querySelector('.dr-rail') as HTMLElement | null;
-    if (rail && drawer && rail.parentElement !== drawer) {
-      drawer.appendChild(rail);
-    }
   } else {
     root.style.removeProperty('--dr-drawer-w');
     document.body.style.removeProperty('--dr-drawer-w');
-    // Return drawer to #drRoot
     if (drawer && root && drawer.parentElement !== root) {
       drawer.classList.remove('dr-inline-split');
-      const rail = drawer.querySelector('.dr-rail') as HTMLElement | null;
-      if (rail) root.insertBefore(rail, root.firstChild);
       root.appendChild(drawer);
     }
   }
