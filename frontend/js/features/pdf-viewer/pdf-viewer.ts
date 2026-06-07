@@ -110,6 +110,9 @@ export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left
   panelHide(document.getElementById('courseOverview'));
   const pv = document.getElementById('pdfView');
   panelShow(pv, true);
+  (window as unknown as {
+    __minalloDocRail?: { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void };
+  }).__minalloDocRail?.setRouteVisibility('pdf');
   if (typeof window.saveState === 'function') window.saveState();
 
   const pdfFileName = document.getElementById('pdfFileName');

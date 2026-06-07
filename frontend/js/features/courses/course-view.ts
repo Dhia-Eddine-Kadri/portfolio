@@ -411,6 +411,9 @@ export function openCourse(course: LegacyCourse): void {
   selectTopLevelView('file');
   panelHide(document.getElementById('welcomeState'));
   panelHide(document.getElementById('pdfView'));
+  (window as unknown as {
+    __minalloDocRail?: { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void };
+  }).__minalloDocRail?.setRouteVisibility('courses');
   const co = document.getElementById('courseOverview');
   if (co) co.style.display = 'block';
 
@@ -605,6 +608,9 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
 
   const pdfView = document.getElementById('pdfView');
   if (pdfView) pdfView.style.display = 'none';
+  (window as unknown as {
+    __minalloDocRail?: { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void };
+  }).__minalloDocRail?.setRouteVisibility('courses');
   const welcome = document.getElementById('welcomeState');
   if (welcome) welcome.style.display = 'none';
   const co = document.getElementById('courseOverview');
