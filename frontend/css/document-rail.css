@@ -1199,6 +1199,101 @@ body.dr-pdf-split-open .dr-rail {
   }
 }
 
+/* AI rail polish: compact, document-focused rhythm */
+.dr-drawer.dr-mode-ai {
+  background:
+    linear-gradient(180deg, rgba(12, 27, 51, 0.98), rgba(3, 10, 25, 0.98)),
+    #071225;
+}
+
+.dr-drawer.dr-mode-ai .dr-header {
+  min-height: 54px;
+  padding: 0 2px 8px;
+  margin-bottom: 4px;
+}
+
+.dr-drawer.dr-mode-ai .dr-header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+}
+
+.dr-drawer.dr-mode-ai .dr-title {
+  font-size: 1.02rem;
+}
+
+.dr-drawer.dr-mode-ai .dr-subtitle {
+  font-size: 0.66rem;
+}
+
+.dr-drawer.dr-mode-ai .dr-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.dr-drawer.dr-mode-ai .dr-content {
+  background:
+    radial-gradient(circle at 100% 20%, rgba(14, 165, 233, 0.10), transparent 32%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.16), rgba(2, 6, 23, 0.24));
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip-bar {
+  padding: 7px 8px 6px;
+  border-top: 1px solid rgba(125, 211, 252, 0.10);
+  border-bottom: 1px solid rgba(125, 211, 252, 0.12);
+  background: rgba(8, 47, 73, 0.18);
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip {
+  min-height: 28px;
+  border-radius: 10px;
+  border-color: rgba(125, 211, 252, 0.20);
+  background: rgba(15, 23, 42, 0.62);
+  color: #bfdbfe;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-msgs {
+  padding: 8px 14px 4px;
+  gap: 8px;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-input-area {
+  flex: 0 0 auto;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-input-box {
+  margin: 6px 8px 8px;
+  padding: 7px 8px;
+  border-radius: 12px;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-textarea {
+  min-height: 34px;
+  max-height: 92px;
+  font-size: 0.8rem;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-bottom-row {
+  margin-top: 4px;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-mode-pill {
+  height: 27px;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-attach-btn,
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-snip-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.dr-drawer.dr-mode-ai .dr-host-ai .ai-send {
+  width: 32px;
+  height: 32px;
+}
+
 /* ── AI hosted panel ───────────────────────────────────────────────── */
 
 /* Chat history container */
@@ -1512,4 +1607,57 @@ body.dr-pdf-split-open .dr-rail {
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+@media (max-width: 1120px) and (min-width: 769px) {
+  .dr-drawer .dr-host-ai .ai-bottom-row {
+    flex-wrap: wrap;
+  }
+
+  .dr-drawer .dr-host-ai .ai-send {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .dr-drawer.dr-mode-ai .dr-header {
+    padding-bottom: 8px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-title {
+    font-size: 1rem;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-subtitle {
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-msgs {
+    padding: 7px 8px 4px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-input-box {
+    margin: 7px;
+    padding: 7px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bottom-row {
+    flex-wrap: wrap;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-mode-pill {
+    max-width: calc(100% - 104px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
