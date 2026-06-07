@@ -82,24 +82,134 @@ STRUCTURE:
 Cite page numbers throughout. No filler sentences."""
 
 
-def _summary_prompt(lang: str, detail_level: str) -> str:
-    detail_map = {
-        "brief":    "Be concise — keep the summary tight, ~400–700 words.",
-        "balanced": "Be thorough but readable, ~700–1400 words.",
-        "detailed": "Be detailed, ~1400–2400 words — cover every named method and concept.",
-        "exam":     "Be exam-focused — every paragraph must add testable information; ~1600–2600 words.",
-    }
-    detail = detail_map.get(detail_level, detail_map["balanced"])
-    return f"""You are writing a structured study summary from university lecture PDF material.
+_DETAIL_ALIASES: dict[str, str] = {
+    "brief": "quick",
+    "balanced": "detailed",
+    "detailed": "detailed",
+    "exam": "exam",
+    "quick": "quick",
+    "beginner": "beginner",
+    "flashcard": "flashcard",
+}
+
+
+def _normalize_detail(detail_level: str) -> str:
+    return _DETAIL_ALIASES.get(detail_level, "detailed")
+
+
+def _flashcard_prompt(lang: str) -> str:
+    lang_tip = "**Lerntipp:** Der eigentliche Lerninhalt beginnt wahrscheinlich auf den folgenden Seiten." if lang == "de" else "**Study tip:** The actual course content likely starts on the following pages."
+    return f"""You generate flashcards from university lecture PDF content.
 
 {_lang_instr(lang)}
-{detail}
+
+FIRST: Determine if the pages contain real study content (definitions, formulas, methods, examples, explanations).
+
+If the pages are content-light (title page, table of contents, organizational info, cover page, lecturer/institute info, empty):
+Output ONLY:
+<!-- minallo-summary-type: content-light -->
+# Flashcards
+These pages do not contain enough study content to create useful flashcards. Select pages where the technical content starts.
+{lang_tip}
+
+If the pages are mixed-content (some org info + some real content):
+Ignore administrative/title information and generate flashcards ONLY from the real study content.
+Output:
+<!-- minallo-summary-type: mixed-content -->
+# Flashcards: [Topic]
+(then Q/A pairs from the study content only)
+
+If the pages contain study content:
+Output:
+<!-- minallo-summary-type: study-content -->
+# Flashcards: [Topic]
+
+Q: [question]
+A: [answer based ONLY on the PDF content] *(S. X)*
+
+Generate 10-25 Q/A pairs covering:
+- Key definitions
+- Important formulas (with variable meanings)
+- Method steps
+- Comparisons
+- Exam-relevant facts
 
 Rules:
-- Use ONLY material from the provided PDF text. Do NOT invent.
+- Use ONLY the provided PDF content.
+- Do NOT create trivial flashcards about professor names, institute info, or administrative details.
+- Each answer must be concise (1-3 sentences).
+- Include page references in answers.
+- Math in KaTeX ($...$ or $$...$$).
+- Preserve the professor's terminology exactly."""
+
+
+def _summary_prompt(lang: str, detail_level: str) -> str:
+    level = _normalize_detail(detail_level)
+
+    if level == "flashcard":
+        return _flashcard_prompt(lang)
+
+    detail_map = {
+        "quick": "Target length: up to ~700 words. Only the most important ideas. Stay shorter if the pages contain limited content.",
+        "detailed": "Target length: usually 1000–2000 words for content-rich selections. Stay shorter if the pages contain limited content.",
+        "exam": "Target length: up to ~2500 words. Focus on exam-relevant content: what to memorize, likely questions, common traps. Only infer exam relevance from emphasis in the PDF, repeated concepts, definitions, formulas, examples, or explicitly marked learning goals. Do NOT invent likely exam questions from outside knowledge. Stay shorter if little content.",
+        "beginner": "Target length: up to ~1500 words. Explain in simple language as if to a first-year student. You may add very basic clarifying explanations, but do NOT introduce new facts, formulas, examples, or concepts that are not supported by the PDF.",
+    }
+    detail_instr = detail_map.get(level, detail_map["detailed"])
+
+    lang_tip_light = "**Lerntipp:** Der eigentliche Lerninhalt beginnt wahrscheinlich auf den folgenden Seiten." if lang == "de" else "**Study tip:** The actual course content likely starts on the following pages."
+
+    return f"""You are a study assistant generating summaries from university lecture PDF content.
+
+{_lang_instr(lang)}
+
+## OUTPUT FORMAT RULE
+Your FIRST line of output MUST be exactly one of these HTML comments (nothing before it):
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+## CONTENT CLASSIFICATION (internal decision — do NOT output a classification section)
+Determine if the selected pages are:
+- content-light: title page, cover, table of contents, lecturer/institute info, empty page, chapter heading only, organizational page
+- study-content: definitions, formulas, methods, examples, explanations, diagrams, comparisons
+- mixed-content: some organizational info combined with some real technical content
+
+## IF CONTENT-LIGHT:
+Output this compact format only:
+<!-- minallo-summary-type: content-light -->
+# [Document/Chapter Name]
+These pages contain organizational/introductory information: [list what is visible].
+No technical study content is present on these pages.
+{lang_tip_light}
+
+Do NOT create empty sections. Keep it to 3-5 lines maximum.
+
+## IF STUDY-CONTENT OR MIXED-CONTENT:
+{detail_instr}
+
+If mixed-content, begin with one brief "Context" line about the organizational info, then proceed with study content.
+
+Use these sections — ONLY include a section if it has real content. OMIT sections entirely if they would be empty:
+- Simple Overview (always, 2-3 sentences)
+- Key Definitions (if definitions exist)
+- Main Concepts (if explanations exist)
+- Methods / Procedures (if processes are described)
+- Important Formulas / Rules / Theorems (if formulas exist, in KaTeX)
+- Examples from the Course (if examples exist)
+- Comparisons (if comparisons exist, use markdown tables)
+- Exam-Relevant Points (if exam relevance can be inferred from the PDF)
+- Common Mistakes (if traps/pitfalls can be inferred from the material)
+- Mini Recap (always, 2-3 memory-friendly sentences)
+
+## RULES:
+- Use ONLY the provided PDF content. Do NOT invent definitions, formulas, examples, or exam relevance.
+- Preserve the professor's terminology exactly.
 - Cite page numbers: *(S. X)*.
-- Use ## headings: Overview, Definitionen, Verfahren / Methods, Formeln, Vergleiche, Prüfungsrelevanz, Summary.
-- Math in KaTeX. Tables with markdown for comparisons."""
+- If a section would be empty, OMIT it entirely — never write "keine vorhanden" or similar.
+- Math in KaTeX ($...$ or $$...$$).
+- Tables with markdown for comparisons.
+- Do NOT force the full template on content-light pages."""
 
 
 def _section_prompt(lang: str, page_start: int | None, page_end: int | None, tool: str) -> str:
@@ -112,16 +222,34 @@ def _section_prompt(lang: str, page_start: int | None, page_end: int | None, too
 
 {_lang_instr(lang)}
 
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
 Cover what is on {page_ref} only. Do NOT introduce surrounding chapter context.
+
+If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections.
+
+If the pages contain study content:
 - Quote definitions near-verbatim with *(S. X)*.
 - Reproduce every list in full.
 - KaTeX for formulas.
+- OMIT sections that would be empty — never write "keine vorhanden".
 - No filler. Every bullet must add information."""
     return f"""You are generating detailed study notes for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
 
-Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout."""
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note. Do NOT create empty study sections.
+
+If the pages contain study content:
+Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty."""
 
 
 def _merge_prompt(lang: str, tool: str) -> str:
@@ -130,23 +258,50 @@ def _merge_prompt(lang: str, tool: str) -> str:
 
 {_lang_instr(lang)}
 
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+Choose based on the merged result:
+- If ALL partial summaries are content-light → use content-light and output one compact summary.
+- If some are content-light and others contain study content → use mixed-content. Include only a brief context line for the content-light parts and focus on the real study content.
+- If all contain study content → use study-content.
+
 Rules:
+- Remove all partial <!-- minallo-summary-type: ... --> markers from the input sections. Output exactly ONE marker as the first line.
 - Preserve ALL content. Remove only exact duplicates.
-- Keep every page reference (S. X).
+- Keep every page reference *(S. X)*.
+- Preserve ALL formulas and definitions exactly as written.
 - Group related content under ## headings.
-- End with a ## Prüfungsrelevanz section with the 5–10 most exam-relevant points.
+- OMIT sections that would be empty — do NOT create empty headings.
+- End with a ## Prüfungsrelevanz section with the 5–10 most exam-relevant points (only if study content exists).
 - Do NOT invent new information."""
     return f"""You are merging multiple section notes into one final structured study note.
 
 {_lang_instr(lang)}
 
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+Choose based on the merged result:
+- If ALL partial summaries are content-light → use content-light and output one compact note.
+- If some are content-light and others contain study content → use mixed-content.
+- If all contain study content → use study-content.
+
 Rules:
+- Remove all partial <!-- minallo-summary-type: ... --> markers from the input sections. Output exactly ONE marker as the first line.
 - Preserve ALL content from ALL sections — do not aggressively shorten.
 - Remove exact duplicates only.
 - Keep every page reference *(S. X)*.
+- Preserve ALL formulas and definitions exactly as written.
 - Group by topic under ## headings.
 - Every method/process keeps its own ### subsection.
-- End with ## Prüfungsrelevanz."""
+- OMIT sections that would be empty.
+- End with ## Prüfungsrelevanz (only if study content exists).
+- Do NOT invent new information."""
 
 
 # ── DB helpers ───────────────────────────────────────────────────────────────

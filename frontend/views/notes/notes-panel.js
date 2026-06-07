@@ -13,7 +13,7 @@
   var _saveTimer   = null;
   var _scope       = 'section';         // page | section | range | document
   var _language    = 'same_as_source';
-  var _detailLevel = 'balanced';        // brief | balanced | detailed | exam
+  var _detailLevel = 'detailed';         // quick | detailed | exam | beginner | flashcard
   var _rangeFrom   = 1;
   var _rangeTo     = 1;
 
@@ -145,10 +145,11 @@
       '<div class="np-options-row" id="npDetailRow" style="display:none">',
         '<div class="np-option-group">',
           '<span class="np-option-label">Detail:</span>',
-          '<button class="np-opt" data-detail="brief">Brief</button>',
-          '<button class="np-opt active" data-detail="balanced">Balanced</button>',
-          '<button class="np-opt" data-detail="detailed">Detailed</button>',
+          '<button class="np-opt" data-detail="quick">Quick</button>',
+          '<button class="np-opt active" data-detail="detailed">Detailed</button>',
           '<button class="np-opt" data-detail="exam">Exam</button>',
+          '<button class="np-opt" data-detail="beginner">Beginner</button>',
+          '<button class="np-opt" data-detail="flashcard">Flashcard</button>',
         '</div>',
       '</div>',
 
@@ -255,6 +256,18 @@
     }
   }
 
+  // ── Summary type marker detection ─────────────────────────────────────────
+  var _MARKER_RE = /^<!--\s*minallo-summary-type:\s*([\w-]+)\s*-->\s*/;
+
+  function _stripMarker(md) {
+    return (md || '').replace(_MARKER_RE, '');
+  }
+
+  function _detectSummaryType(md) {
+    var m = (md || '').match(_MARKER_RE);
+    return m ? m[1] : 'study-content';
+  }
+
   // ── Render editor state ───────────────────────────────────────────────────
   function _renderCurrentTab() {
     var empty   = $id('npEmpty');
@@ -282,8 +295,22 @@
     if (regen) regen.style.display = '';
     if (save)  save.style.display = '';
     if (title)   title.value = _currentNote.title || '';
-    if (editor)  editor.value = _currentNote.content_markdown || '';
-    if (preview) preview.innerHTML = _md2html(_currentNote.content_markdown || '');
+
+    var rawMd = _currentNote.content_markdown || '';
+    var summaryType = _currentNote._summaryType || _detectSummaryType(rawMd);
+    var cleanMd = _stripMarker(rawMd);
+
+    if (editor)  editor.value = cleanMd;
+    if (preview) {
+      var bannerHtml = '';
+      if (summaryType === 'content-light') {
+        bannerHtml = '<div class="np-content-light-banner">' +
+          '<strong>ℹ️</strong> These pages are mostly organizational. ' +
+          'For a useful study summary, select the next pages where the technical content begins.' +
+          '</div>';
+      }
+      preview.innerHTML = bannerHtml + _md2html(cleanMd);
+    }
     _setStatus('');
   }
 
@@ -493,7 +520,8 @@
       if (data.error) throw new Error(data.error);
       if (!data.empty && data.markdown) {
         // Prefer the heading the AI generated (e.g. "## Sandguss") over the metadata title
-        var mdHeading = data.markdown.match(/^##\s+(.+)/m);
+        var cleanSectionMd = _stripMarker(data.markdown);
+        var mdHeading = cleanSectionMd.match(/^##\s+(.+)/m);
         var realTitle = mdHeading ? mdHeading[1].replace(/[*_`]/g, '').trim() : (g.title || null);
         sections.push({ markdown: data.markdown, pageStart: g.start, pageEnd: g.end, title: realTitle });
       }
@@ -581,6 +609,8 @@
           _setStatus(data.error, 'err');
         }
       } else if (data.note) {
+        data.note._summaryType = _detectSummaryType(data.note.content_markdown);
+        data.note.content_markdown = _stripMarker(data.note.content_markdown);
         _notesByType[_activeTab] = data.note;
         _currentNote = data.note;
         _savedNotes.unshift({
