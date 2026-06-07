@@ -47,6 +47,7 @@ interface DocRailWindow extends Window {
 
 const WIDTH_KEY = 'ss_dr_width';
 const WIDTH_MIN = 340;
+const WIDTH_MIN_MAXIMIZED = 390;
 const WIDTH_MAX = 900;
 const WIDTH_DEFAULT = 520;
 const SPLIT_CLASS = 'dr-pdf-split-open';
@@ -81,7 +82,8 @@ let _notesHomeParent: HTMLElement | null = null;
 
 function clampWidth(w: number): number {
   if (!Number.isFinite(w)) return WIDTH_DEFAULT;
-  return Math.max(WIDTH_MIN, Math.min(WIDTH_MAX, Math.round(w)));
+  const min = document.body.classList.contains('pdf-maximized') ? WIDTH_MIN_MAXIMIZED : WIDTH_MIN;
+  return Math.max(min, Math.min(WIDTH_MAX, Math.round(w)));
 }
 
 function loadWidth(): number {
