@@ -34,11 +34,26 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["notes"], dependencies=[Depends(require_internal_token)])
 
 _MAX_CONTEXT_CHARS = 28_000
+_EXAM_MERGE_CONTEXT_CHARS = 56_000
 _UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 _METADATA_NOISE = (
     "institut für", "technische universität", "prof.", "dr.-ing.", "wintersemester",
     "sommersemester", "lehrstuhl", "fachgebiet", "vorlesung", "folien", "slides",
     "copyright", "©", "all rights reserved",
+)
+
+_EXAM_FINAL_SECTIONS = (
+    "Muss-Definitionen",
+    "DIN-Einteilungen",
+    "Werkstoffverhalten",
+    "Kristallstruktur, Gleiten und Versetzungen",
+    "Rekristallisation",
+    "Wichtige Formeln",
+    "Eigenschaften des Umformgrads",
+    "Fließspannung, Temperatur und Umformgeschwindigkeit",
+    "Fließkurven und Grenzformänderung",
+    "Typische Prüfungsfragen",
+    "Typische Fehler",
 )
 
 
@@ -261,17 +276,52 @@ Do NOT create empty sections. Keep it to 3-5 lines maximum.
 - Cite page numbers: *(S. X)*. Be precise — verify each page number matches the [S. X] markers in the provided text. Do NOT guess page numbers.
 - If a section would be empty, OMIT it entirely — never write "keine vorhanden" or similar.
 - Math in KaTeX ($...$ or $$...$$). Use proper subscripts and superscripts: write $k_f$, $A_0$, $A_1$, $l_0$, $l_1$, $\\varphi$, $\\varepsilon$ — never write plain kf, A0, A1.
+- Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source discusses logarithmic strain / Umformgrad.
 - Tables with markdown for comparisons.
 - Do NOT force the full template on content-light pages.
 - If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content."""
 
 
-def _section_prompt(lang: str, page_start: int | None, page_end: int | None, tool: str) -> str:
+def _exam_page_group_instructions(page_ref: str) -> str:
+    sections = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(_EXAM_FINAL_SECTIONS))
+    return f"""You are generating an EXAM summary for ONE specific page group from a university lecture PDF.
+
+{page_ref} is the full allowed source range for this section. Cover ONLY this range, but cover it completely.
+
+Scan every provided [S. X] marker. Do not skip central theory pages in favor of examples.
+
+Extract page-local exam material for these final merge categories:
+{sections}
+
+Rules:
+- Cite pages only from explicit [S. X] markers in the provided text. Never guess or shift page references.
+- Preserve exact page references for examples, definitions, formulas, diagrams, and classifications.
+- Quote Muss-Definitionen near-verbatim when the source gives a definition.
+- Capture DIN/norm classifications completely when present.
+- Include material behavior, elastic/plastic deformation, crystal structure, glide, dislocations, recrystallization, Umformgrad properties, flow stress, temperature effects, forming speed, flow curves, and forming limits whenever they appear in this page group.
+- Add Typische Fehler only when a trap can be inferred from the source content.
+- Math in KaTeX. Use clean subscripts: $k_f$, $A_1$, $l_1$, $l_0$, $\\varphi$, $\\varepsilon$; never plain kf, A1, l1, l0.
+- Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source discusses logarithmic strain / Umformgrad.
+- Omit empty headings, but do not omit real content."""
+
+
+def _section_prompt(lang: str, page_start: int | None, page_end: int | None, tool: str, detail_level: str = "detailed") -> str:
     if page_start is not None:
         page_ref = f"Seite {page_start}" if page_start == page_end else f"Seiten {page_start}–{page_end}"
     else:
         page_ref = "diesem Abschnitt"
     if tool == "summary":
+        if _normalize_detail(detail_level) == "exam":
+            return f"""{_lang_instr(lang)}
+
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+{_exam_page_group_instructions(page_ref)}
+
+If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections."""
         return f"""You are generating a study summary for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
@@ -306,8 +356,43 @@ If the pages contain study content:
 Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty."""
 
 
-def _merge_prompt(lang: str, tool: str) -> str:
+def _exam_merge_prompt(lang: str) -> str:
+    sections = "\n".join(f"## {i + 1}. {name}" for i, name in enumerate(_EXAM_FINAL_SECTIONS))
+    return f"""You are merging multiple page-group EXAM summaries into one complete final exam summary.
+
+{_lang_instr(lang)}
+
+Your FIRST line of output MUST be exactly one of:
+<!-- minallo-summary-type: content-light -->
+<!-- minallo-summary-type: study-content -->
+<!-- minallo-summary-type: mixed-content -->
+
+Choose based on the merged result:
+- If ALL partial summaries are content-light, use content-light and output one compact summary.
+- If some are content-light and others contain study content, use mixed-content. Include only brief context for content-light parts and focus on study content.
+- If all contain study content, use study-content.
+
+Final structure for study-content or mixed-content:
+{sections}
+
+Coverage rules:
+- Preserve exam-relevant content from EVERY input section. Do not drop middle pages or later page ranges.
+- Remove exact duplicates only. Consolidate repeated ideas, but keep unique details and page refs.
+- Cite pages only when the input already has *(S. X)* or an explicit section page range. Never guess page numbers.
+- Do not move page references between concepts. If examples are on S. 6, keep S. 6.
+- Preserve all formal definitions, DIN classifications, lists, formulas, diagrams, and comparisons.
+- Keep formulas in clean KaTeX with engineering subscripts: $k_f$, $A_1$, $l_1$, $l_0$, $\\varphi$, $\\varepsilon$.
+- Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source supports it.
+- Add Typische Fehler that follow from the source, for example confusing $\\varphi$ with $\\varepsilon$ or forgetting Volumenkonstanz, but do not invent unrelated traps.
+- Omit a final heading only if no input section contains any real content for it.
+- Remove all partial <!-- minallo-summary-type: ... --> markers and output exactly ONE marker first.
+- Do NOT invent new information."""
+
+
+def _merge_prompt(lang: str, tool: str, detail_level: str = "detailed") -> str:
     if tool == "summary":
+        if _normalize_detail(detail_level) == "exam":
+            return _exam_merge_prompt(lang)
         return f"""You are merging multiple section summaries into one final study summary.
 
 {_lang_instr(lang)}
@@ -451,6 +536,52 @@ def _call_openai(system_prompt: str, user_message: str, max_tokens: int = 4000) 
     return text.strip()
 
 
+def _batch_texts(parts: list[str], max_chars: int) -> list[str]:
+    batches: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for part in parts:
+        part_len = len(part) + 2
+        if current and current_len + part_len > max_chars:
+            batches.append("\n\n".join(current))
+            current = []
+            current_len = 0
+        current.append(part)
+        current_len += part_len
+    if current:
+        batches.append("\n\n".join(current))
+    return batches
+
+
+def _merge_with_staging(
+    system_prompt: str,
+    instruction: str,
+    parts: list[str],
+    max_chars: int,
+    max_tokens: int,
+    depth: int = 0,
+) -> str:
+    batches = _batch_texts(parts, max_chars)
+    if len(batches) <= 1 or depth >= 3:
+        return _call_openai(system_prompt, instruction + "\n\n".join(batches), max_tokens=max_tokens)
+
+    intermediate_parts: list[str] = []
+    for i, batch in enumerate(batches):
+        intermediate = _call_openai(
+            system_prompt,
+            (
+                "Intermediate merge pass. Preserve all unique exam-relevant content and page references "
+                f"from batch {i + 1} of {len(batches)}.\n\n"
+                + instruction
+                + batch
+            ),
+            max_tokens=max_tokens,
+        )
+        intermediate_parts.append(f"=== INTERMEDIATE MERGE {i + 1} ===\n\n{intermediate}")
+
+    return _merge_with_staging(system_prompt, instruction, intermediate_parts, max_chars, max_tokens, depth + 1)
+
+
 _TITLE_RE = re.compile(r"^#\s+(.+)", re.MULTILINE)
 
 
@@ -556,15 +687,27 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             if s.get("title"):
                 hdr += f" — {s['title']}"
             combined_parts.append(hdr + "\n\n" + (s.get("markdown") or ""))
-        combined = "\n\n".join(combined_parts)[:_MAX_CONTEXT_CHARS]
+        combined = "\n\n".join(combined_parts)
         instruction = (
             "Merge these section summaries into one final structured study summary:\n\n"
             if payload.tool == "summary"
             else "Merge these section notes into one final study note:\n\n"
         )
         try:
-            merge_tokens = 8000 if (payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam") else 5000
-            merged = _call_openai(_merge_prompt(payload.language, payload.tool), instruction + combined, max_tokens=merge_tokens)
+            is_exam_summary = payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam"
+            merge_tokens = 8000 if is_exam_summary else 5000
+            system_prompt = _merge_prompt(payload.language, payload.tool, payload.detailLevel)
+            max_chars = _EXAM_MERGE_CONTEXT_CHARS if is_exam_summary else _MAX_CONTEXT_CHARS
+            if len(combined) > max_chars:
+                merged = _merge_with_staging(
+                    system_prompt,
+                    instruction,
+                    combined_parts,
+                    max_chars,
+                    merge_tokens,
+                )
+            else:
+                merged = _call_openai(system_prompt, instruction + combined, max_tokens=merge_tokens)
         except Exception as e:  # noqa: BLE001
             log.exception("merge LLM failed")
             return {"error": f"Merge failed: {e}"}
@@ -603,7 +746,7 @@ async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             if payload.tool == "summary"
             else "Erstelle detaillierte Lernnotizen NUR für diesen Abschnitt."
         )
-        sys_p = _section_prompt(payload.language, sec_start, sec_end, payload.tool)
+        sys_p = _section_prompt(payload.language, sec_start, sec_end, payload.tool, payload.detailLevel)
         sec_tokens = 4000 if _normalize_detail(payload.detailLevel) == "exam" else 2500
         try:
             md = _call_openai(sys_p, f"PDF-INHALT (Seiten {sec_start}–{sec_end}):\n\n{context}\n\n{instr}", max_tokens=sec_tokens)
