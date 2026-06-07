@@ -1,8 +1,8 @@
 /* ── Notes Panel — split-screen AI notes inside PDF viewer ──────────────────── */
 
-/* Split layout */
-#pdfView.pdf-split {
-  flex: 0 0 55%;
+/* Split layout — centreContent is the flex child of pdfViewerWrap */
+#centreContent.pdf-split {
+  flex: 0 0 55% !important;
   min-width: 0;
 }
 

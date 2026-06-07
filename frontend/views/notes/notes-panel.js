@@ -216,22 +216,22 @@
   // ── Open / Close ──────────────────────────────────────────────────────────
   function _openPanel() {
     var panel = $id('pdfNotesPanel');
-    var pdfView = $id('pdfView');
-    if (!panel || !pdfView) return;
+    var centre = $id('centreContent');
+    if (!panel || !centre) return;
     _panelOpen = true;
     panel.style.display = 'flex';
-    pdfView.classList.add('pdf-split');
+    centre.classList.add('pdf-split');
     _renderCurrentTab();
     _loadNotes();
   }
 
   function _closePanel() {
     var panel = $id('pdfNotesPanel');
-    var pdfView = $id('pdfView');
-    if (!panel || !pdfView) return;
+    var centre = $id('centreContent');
+    if (!panel || !centre) return;
     _panelOpen = false;
     panel.style.display = 'none';
-    pdfView.classList.remove('pdf-split');
+    centre.classList.remove('pdf-split');
     var toggleBtn = $id('pdfNotesToggle');
     if (toggleBtn) toggleBtn.classList.remove('active');
   }
