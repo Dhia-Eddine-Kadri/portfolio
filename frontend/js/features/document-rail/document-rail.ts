@@ -713,8 +713,11 @@ function closeDrawer(): void {
 }
 
 function toggleMode(mode: DocRailMode): void {
-  if (_openMode === mode) return;
-  openDrawer(mode);
+  if (_openMode === mode) {
+    closeDrawer();
+  } else {
+    openDrawer(mode);
+  }
 }
 
 function wireResize(): void {
@@ -789,7 +792,12 @@ function wireRailButtons(): void {
 
 function wireClose(): void {
   const btn = $('drClose');
-  if (btn) btn.style.display = 'none';
+  if (btn) btn.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && _openMode != null) {
+      closeDrawer();
+    }
+  });
 }
 
 function setRouteVisibility(route: DocRailRoute): void {

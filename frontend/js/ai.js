@@ -671,7 +671,6 @@ function _captureSnipRegion(x1, y1, x2, y2) {
   if (!btn) return;
 
   btn.addEventListener('click', function () {
-    if (typeof forceCloseAI === 'function') forceCloseAI();
     var overlay = document.createElement('div');
     overlay.id = 'snipOverlay';
     var hint = document.createElement('div');
