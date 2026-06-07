@@ -162,7 +162,7 @@ function applySplitState(drawer?: HTMLElement | null): void {
   const root = $('drRoot');
   if (!root) return;
   const isSheet = !!drawer?.classList.contains('dr-sheet');
-  const shouldSplit = _route === 'pdf' && _openMode != null && !isSheet;
+  const shouldSplit = (_route === 'pdf' || _route === 'courses') && _openMode != null && !isSheet;
   root.classList.toggle('is-open', shouldSplit);
   document.body.classList.toggle(SPLIT_CLASS, shouldSplit);
   if (shouldSplit) {
@@ -800,7 +800,7 @@ function setRouteVisibility(route: DocRailRoute): void {
   root.hidden = false;
   root.classList.toggle('is-pdf', route === 'pdf');
   root.classList.toggle('is-courses', route === 'courses');
-  if (route !== 'pdf') {
+  if (route === 'other') {
     clearSplitState();
   } else {
     applySplitState($('drDrawer'));
