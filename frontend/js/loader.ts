@@ -404,11 +404,11 @@ interface LandingTranslation {
     [
       'css/base.css?v=5',
       'css/theme.css?v=5',
-      'css/styles.css?v=32',
+      'css/styles.css?v=33',
       'css/courses-redesign.css?v=37',
       'css/app-design-system.css?v=5',
       'css/layout.css?v=10',
-      'css/document-rail.css?v=17',
+      'css/document-rail.css?v=18',
       'css/auth.css?v=4',
       'css/onboarding.css?v=1',
       'views/toast/toast.css',

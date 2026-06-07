@@ -1463,7 +1463,10 @@ body.night .sb-acc-chev-btn {
 }
 
 @media (min-width: 769px) {
-  body.dr-pdf-split-open #pdfViewerWrap {
+  body.dr-pdf-split-open #pdfViewerWrap,
+  body:has(#drDrawer.is-open:not(.dr-sheet)) #pdfViewerWrap {
+    flex: 0 1 calc(100% - var(--dr-reserved-w));
+    max-width: calc(100% - var(--dr-reserved-w));
     margin-right: var(--dr-reserved-w);
     transition: margin-right 180ms ease;
   }
@@ -1485,9 +1488,11 @@ body.night .sb-acc-chev-btn {
   border-radius: 0;
 }
 @media (min-width: 769px) {
-  body.dr-pdf-split-open #pdfViewerWrap.is-maximized {
+  body.dr-pdf-split-open #pdfViewerWrap.is-maximized,
+  body:has(#drDrawer.is-open:not(.dr-sheet)) #pdfViewerWrap.is-maximized {
     right: var(--dr-reserved-w, 0px);
     margin-right: 0;
+    max-width: none;
   }
 }
 /* Maximize button shows the "expand" glyph by default and the "compress"
@@ -1516,7 +1521,8 @@ body.pdf-maximized #pdfToolbar {
   padding: 0;
 }
 @media (min-width: 769px) {
-  body.pdf-maximized.dr-pdf-split-open #pdfToolbar {
+  body.pdf-maximized.dr-pdf-split-open #pdfToolbar,
+  body.pdf-maximized:has(#drDrawer.is-open:not(.dr-sheet)) #pdfToolbar {
     left: calc((100vw - var(--dr-reserved-w)) / 2);
     max-width: min(calc(100vw - var(--dr-reserved-w) - 32px), 980px);
   }
@@ -2424,7 +2430,8 @@ body.pdf-maximized #pdfMaximize {
 body:has(#aiPanel.visible) .annotate-popover {
   right: calc(var(--ai-w, 340px) + 24px);
 }
-body.dr-pdf-split-open .annotate-popover {
+body.dr-pdf-split-open .annotate-popover,
+body:has(#drDrawer.is-open:not(.dr-sheet)) .annotate-popover {
   right: 170px;
   max-width: min(calc(100% - 48px), 980px);
 }
@@ -2438,7 +2445,8 @@ body.pdf-maximized .annotate-popover {
   max-width: min(calc(100vw - 2 * (var(--dr-rail-w) + 28px)), 980px);
 }
 @media (min-width: 769px) {
-  body.pdf-maximized.dr-pdf-split-open .annotate-popover {
+  body.pdf-maximized.dr-pdf-split-open .annotate-popover,
+  body.pdf-maximized:has(#drDrawer.is-open:not(.dr-sheet)) .annotate-popover {
     left: calc((100vw - var(--dr-reserved-w)) / 2);
     max-width: min(calc(100vw - var(--dr-reserved-w) - 48px), 980px);
   }
