@@ -104,7 +104,18 @@ function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
       }
       window.setTimeout(tryStart, 120);
     };
-    tryStart();
+    // Wait for the auth session token before listing files.
+    // Without this, _ufMerge can fire while _sbToken is still null
+    // and the storage list returns 401 → first open shows 0 files.
+    const ready = window._sbSessionReady as Promise<unknown> | undefined;
+    if (ready) {
+      Promise.race([
+        ready.catch(() => {}),
+        new Promise<void>((r) => setTimeout(r, TIMEOUT_MS)),
+      ]).then(tryStart);
+    } else {
+      tryStart();
+    }
   });
 }
 

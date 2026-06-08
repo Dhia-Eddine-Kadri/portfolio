@@ -261,22 +261,31 @@ async function _ufList(uid, course) {
   await _ufEnsureFreshToken();
 
   var prefix = uid + '/' + _ufKey(course) + '/';
-  var items = await _ufFetchJsonWithTimeout(SUPA_URL + '/storage/v1/object/list/' + _UF_BUCKET, {
-    method: 'POST',
-    headers: {
-      apikey: SUPA_KEY,
-      Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
-      'Content-Type': 'application/json'
-    },
-    // sortBy is required by current Supabase Storage validation — older
-    // versions accepted just { prefix, limit, offset }, newer ones 400.
-    body: JSON.stringify({
-      prefix: prefix,
-      limit: 200,
-      offset: 0,
-      sortBy: { column: 'name', order: 'asc' }
-    })
-  }, 10000);
+  function _doList() {
+    return _ufFetchJsonWithTimeout(SUPA_URL + '/storage/v1/object/list/' + _UF_BUCKET, {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
+        'Content-Type': 'application/json'
+      },
+      // sortBy is required by current Supabase Storage validation — older
+      // versions accepted just { prefix, limit, offset }, newer ones 400.
+      body: JSON.stringify({
+        prefix: prefix,
+        limit: 200,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' }
+      })
+    }, 10000);
+  }
+  var items = await _doList();
+  // Retry once if the first attempt used an anon/stale token (null result
+  // means the storage endpoint returned non-200, typically 401).
+  if (items === null && window._sbSessionReady) {
+    try { await window._sbSessionReady; } catch (e) {}
+    items = await _doList();
+  }
   return Array.isArray(items) ? items : [];
 }
 
