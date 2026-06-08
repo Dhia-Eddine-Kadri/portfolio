@@ -94,8 +94,8 @@ _EXAMFORGE_SYSTEM = (
     "Use ONLY the provided COURSE CONTEXT. Do not use outside knowledge.\n"
     "\n"
     "Rules:\n"
-    "- Follow the per-question plan (type, topic, difficulty) as closely as the "
-    "context allows.\n"
+    "- Follow the per-question plan (type, topic, difficulty, language) as closely "
+    "as the context allows.\n"
     "- Every question MUST be answerable from the context and MUST cite the chunk "
     "id(s) it is based on in \"source_chunk_ids\" (copy the <id> from the "
     "[chunk:<id> ...] tags) and the page number(s) in \"source_pages\".\n"
@@ -105,9 +105,27 @@ _EXAMFORGE_SYSTEM = (
     "- mcq: exactly 4 options; \"answer\" is the correct option LETTER (A-D). "
     "Wrong options must be plausible (common student mistakes), never jokes.\n"
     "- true_false: \"answer\" is \"true\" or \"false\".\n"
-    "- short_answer: no options; \"answer\" is a concise model answer and "
-    "\"explanation\" is the grading rubric.\n"
+    "- short_answer: no options; \"answer\" is a concise model answer, "
+    "\"explanation\" is the grading rubric with expected keywords and common "
+    "mistakes.\n"
     "- Match the course/professor style when exercise-style context is present.\n"
+    "\n"
+    "DIFFICULTY GUIDELINES:\n"
+    "- easy: recall / definition — \"What is X?\", \"Name the theorem that…\"\n"
+    "- medium: comprehension / straightforward application — apply a formula to a "
+    "simple scenario, explain why a concept works.\n"
+    "- hard: NEVER just a definition or naming question. Hard questions MUST "
+    "require multi-step reasoning, applying theorems/formulas to non-trivial "
+    "scenarios, combining multiple concepts, or identifying subtle conditions. "
+    "Use professor-style exam traps: plausible wrong answers that test common "
+    "misconceptions, edge cases, or conditions under which a theorem fails. "
+    "For MCQ, distractors should reflect real student errors (sign mistakes, "
+    "wrong formula, missing condition). For written, require derivation or "
+    "justified reasoning, not just a one-word answer.\n"
+    "\n"
+    "LANGUAGE: generate all question text, options, answers, and explanations in "
+    "the language specified in the plan. If \"auto\", use the same language as the "
+    "source material.\n"
     "\n"
     "Return ONLY JSON:\n"
     '{"questions":[{"question_type":"mcq|true_false|short_answer","topic":"",'
@@ -123,6 +141,7 @@ def _build_blueprint(
     types: list[str],
     difficulty: str,
     topic_focus: str | None,
+    language: str = "auto",
 ) -> list[dict[str, Any]]:
     """Distribute the requested questions across topics + types.
 
@@ -140,6 +159,7 @@ def _build_blueprint(
             "topic": topics[i % len(topics)],
             "question_type": types[i % len(types)],
             "difficulty": diff_cycle[i % len(diff_cycle)],
+            "language": language,
         }
         for i in range(requested)
     ]
@@ -216,7 +236,7 @@ def _grounded_questions(
             cid_meta[cid] = (doc_names.get(c.get("documentId") or "") or None, c.get("pageStart"))
 
     plan = "\n".join(
-        f"{i + 1}. type={b['question_type']} topic={b.get('topic') or 'any'} difficulty={b['difficulty']}"
+        f"{i + 1}. type={b['question_type']} topic={b.get('topic') or 'any'} difficulty={b['difficulty']} language={b.get('language') or 'auto'}"
         for i, b in enumerate(blueprint)
     )
     user = (
@@ -278,10 +298,14 @@ def generate_examforge(
     topic: str | None,
     question_types: list[str] | None,
     doc_names: dict[str, str],
+    language: str | None = None,
 ) -> dict[str, Any]:
     requested = max(1, min(int(requested_count or 6), 20))
     diff = difficulty if difficulty in ("easy", "medium", "hard", "mixed") else "medium"
     topic_query = (topic or "").strip()
+    lang = (language or "auto").strip().lower()
+    if lang not in ("auto", "de", "en"):
+        lang = "auto"
     types = [t for t in (question_types or ["mcq", "true_false", "short_answer"]) if t in _VALID_TYPES]
     if not types:
         types = ["mcq", "true_false", "short_answer"]
@@ -300,7 +324,7 @@ def generate_examforge(
         topic_map = []
     blueprint = _build_blueprint(
         topic_map=topic_map, requested=requested, types=types, difficulty=diff,
-        topic_focus=topic_query or None,
+        topic_focus=topic_query or None, language=lang,
     )
     evidence = _pool_evidence(
         user_id=user_id, course_id=course_id, blueprint=blueprint, document_ids=document_ids,

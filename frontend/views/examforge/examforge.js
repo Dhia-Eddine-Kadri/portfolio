@@ -28,9 +28,12 @@
         answers: {},
         grades: {},
         submitted: false,
+        marked: {},
+        mode: 'exam',
         docs: [],
         loaded: false,
         collapsedFolders: {},
+        topicSearch: '',
       };
     }
     return _state[courseId];
@@ -46,11 +49,6 @@
     return out;
   }
 
-  // Normalise question options to an array of strings, for any question type.
-  // Module-scoped so _normaliseSession (also module-scoped) can call it — this
-  // used to live inside _init, which left it out of scope here and made every
-  // generate/load throw "ReferenceError: normalizeOptions is not defined"
-  // before a single exam could render.
   function normalizeOptions(type, options) {
     if (type === 'true_false') return ['True', 'False'];
     if (Array.isArray(options)) return options;
@@ -108,13 +106,18 @@
         '<button class="ef-btn ef-btn-primary" id="efGenerateBtn" type="button">Generate exam</button>' +
         '<div class="ef-field"><label>Questions</label><select id="efCount"><option>6</option><option>8</option><option>10</option><option>12</option></select></div>' +
         '<div class="ef-field"><label>Difficulty</label><select id="efDifficulty"><option value="medium">Medium</option><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="hard">Hard</option></select></div>' +
-        '<div class="ef-search"><input id="efTopic" type="text" placeholder="Optional topic focus" autocomplete="off"></div>' +
+        '<div class="ef-field"><label>Language</label><select id="efLanguage"><option value="auto">Same as course</option><option value="de">Deutsch</option><option value="en">English</option></select></div>' +
       '</div>' +
       '<div class="ef-type-row" aria-label="Question types">' +
         '<label><input type="checkbox" name="efType" value="mcq" checked> MCQ</label>' +
         '<label><input type="checkbox" name="efType" value="true_false" checked> True/False</label>' +
         '<label><input type="checkbox" name="efType" value="short_answer" checked> Written</label>' +
+        '<div class="ef-mode-toggle">' +
+          '<button type="button" class="ef-mode-btn is-active" data-mode="exam">Exam mode</button>' +
+          '<button type="button" class="ef-mode-btn" data-mode="practice">Practice mode</button>' +
+        '</div>' +
       '</div>' +
+      '<div class="ef-search"><input id="efTopic" type="text" placeholder="Optional topic focus" autocomplete="off"></div>' +
       '<div class="ef-layout">' +
         '<aside class="ef-side">' +
           '<div class="ef-side-head">' +
@@ -129,6 +132,7 @@
             '<div><h3>Topics</h3><p id="efTopicStatus">Loading topic map...</p></div>' +
             '<button class="ef-link" id="efBuildTopics" type="button">Rebuild</button>' +
           '</div>' +
+          '<div class="ef-topic-search"><input id="efTopicSearch" type="text" placeholder="Search topics..." autocomplete="off"></div>' +
           '<div class="ef-topics" id="efTopicMap"></div>' +
           '<div class="ef-side-head ef-history-head">' +
             '<div><h3>Exam runs</h3><p>Latest generated practice exams</p></div>' +
@@ -160,6 +164,7 @@
       gen: root.querySelector('#efGenerateBtn'),
       count: root.querySelector('#efCount'),
       difficulty: root.querySelector('#efDifficulty'),
+      language: root.querySelector('#efLanguage'),
       topic: root.querySelector('#efTopic'),
       docs: root.querySelector('#efDocs'),
       docStatus: root.querySelector('#efDocStatus'),
@@ -170,36 +175,99 @@
       exam: root.querySelector('#efExam'),
       topicMap: root.querySelector('#efTopicMap'),
       topicStatus: root.querySelector('#efTopicStatus'),
+      topicSearch: root.querySelector('#efTopicSearch'),
       buildTopics: root.querySelector('#efBuildTopics'),
     };
 
+    // ── Mode toggle (Exam / Practice) ──────────────────────────────────────
+    root.querySelectorAll('.ef-mode-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        st.mode = btn.getAttribute('data-mode') || 'exam';
+        root.querySelectorAll('.ef-mode-btn').forEach(function (b) {
+          b.classList.toggle('is-active', b.getAttribute('data-mode') === st.mode);
+        });
+        renderExam();
+      });
+    });
+
     // ── Course Topic Map (Learning Agent Core) ──────────────────────────────
-    // Renders the aggregated topic map as chips; clicking one fills the
-    // "topic focus" the exam generator already understands.
+    var _allTopics = [];
+
+    function groupTopics(topics) {
+      var groups = {};
+      var order = [];
+      topics.forEach(function (t) {
+        var category = t.category || 'Other';
+        if (!groups[category]) {
+          groups[category] = [];
+          order.push(category);
+        }
+        groups[category].push(t);
+      });
+      return { groups: groups, order: order };
+    }
+
     function renderTopicMap(topics) {
+      _allTopics = topics || [];
       if (!els.topicMap) return;
-      if (!topics || !topics.length) {
+      if (!_allTopics.length) {
         els.topicMap.innerHTML =
           '<p class="ef-topics-empty">No topic map yet — click Rebuild to generate one from your indexed files.</p>';
         if (els.topicStatus) els.topicStatus.textContent = 'Not built';
         return;
       }
-      if (els.topicStatus) els.topicStatus.textContent = topics.length + ' topics';
+      if (els.topicStatus) els.topicStatus.textContent = _allTopics.length + ' topics';
+      filterAndRenderTopics();
+    }
+
+    function filterAndRenderTopics() {
+      if (!els.topicMap) return;
+      var search = st.topicSearch.toLowerCase();
+      var filtered = _allTopics.filter(function (t) {
+        return !search || (t.name || '').toLowerCase().indexOf(search) !== -1;
+      });
       var active = (els.topic && els.topic.value || '').trim().toLowerCase();
-      els.topicMap.innerHTML = topics.map(function (t) {
-        var imp = t.importance || 'medium';
-        var pages = (t.source_pages && t.source_pages.length) ? (' · ' + t.source_pages.length + 'p') : '';
-        var title = (t.chunk_count || 0) + ' chunks · ' + imp + pages;
-        var cls = 'ef-topic-chip' + (String(t.name || '').toLowerCase() === active ? ' is-active' : '');
-        return '<button type="button" class="' + cls + '" data-imp="' + _esc(imp) +
-          '" data-topic="' + _esc(t.name) + '" title="' + _esc(title) + '">' + _esc(t.name) + '</button>';
-      }).join('');
+      var grouped = groupTopics(filtered);
+      var html = '';
+      grouped.order.forEach(function (category) {
+        var chips = grouped.groups[category];
+        html += '<div class="ef-topic-group">';
+        if (grouped.order.length > 1) {
+          html += '<div class="ef-topic-group-label">' + _esc(category) + '</div>';
+        }
+        html += '<div class="ef-topic-group-chips">';
+        chips.forEach(function (t) {
+          var imp = t.importance || 'medium';
+          var pages = (t.source_pages && t.source_pages.length) ? (' · ' + t.source_pages.length + 'p') : '';
+          var title = (t.chunk_count || 0) + ' chunks · ' + imp + pages;
+          var cls = 'ef-topic-chip' + (String(t.name || '').toLowerCase() === active ? ' is-active' : '');
+          html += '<button type="button" class="' + cls + '" data-imp="' + _esc(imp) +
+            '" data-topic="' + _esc(t.name) + '" title="' + _esc(title) + '">' + _esc(t.name) + '</button>';
+        });
+        html += '</div></div>';
+      });
+      if (!html) {
+        html = '<p class="ef-topics-empty">No topics match your search.</p>';
+      }
+      els.topicMap.innerHTML = html;
       els.topicMap.querySelectorAll('.ef-topic-chip').forEach(function (chip) {
         chip.addEventListener('click', function () {
-          if (els.topic) els.topic.value = chip.getAttribute('data-topic') || '';
-          els.topicMap.querySelectorAll('.ef-topic-chip').forEach(function (c) { c.classList.remove('is-active'); });
-          chip.classList.add('is-active');
+          var current = (els.topic && els.topic.value || '').trim();
+          var clicked = chip.getAttribute('data-topic') || '';
+          if (current === clicked) {
+            if (els.topic) els.topic.value = '';
+          } else {
+            if (els.topic) els.topic.value = clicked;
+          }
+          filterAndRenderTopics();
         });
+      });
+    }
+
+    if (els.topicSearch) {
+      els.topicSearch.addEventListener('input', function () {
+        st.topicSearch = els.topicSearch.value || '';
+        filterAndRenderTopics();
       });
     }
 
@@ -209,9 +277,6 @@
       _service().then(function (svc) {
         return svc.getCourseTopicMap ? svc.getCourseTopicMap(courseId) : [];
       }).then(function (topics) {
-        // The map is derived from indexed files but nothing builds it until
-        // asked. On first sight of an empty map, build it once automatically
-        // so topics appear without the user having to find "Rebuild".
         if ((!topics || !topics.length) && !_autoBuiltTopics) {
           _autoBuiltTopics = true;
           autoBuildTopicMap();
@@ -231,7 +296,7 @@
         return svc.generateCourseTopicMap ? svc.generateCourseTopicMap(courseId) : [];
       }).then(function (topics) {
         if (topics && topics.length) { renderTopicMap(topics); return; }
-        pollTopicMap(0);  // /generate builds in the background — poll for it.
+        pollTopicMap(0);
       }).catch(function () { renderTopicMap([]); });
     }
 
@@ -242,7 +307,7 @@
         }).then(function (topics) {
           if (topics && topics.length) { renderTopicMap(topics); return; }
           if (tries < 3) { pollTopicMap(tries + 1); return; }
-          renderTopicMap([]);  // give up → shows the empty/Rebuild message
+          renderTopicMap([]);
         }).catch(function () { renderTopicMap([]); });
       }, 3000);
     }
@@ -321,9 +386,6 @@
           '</section>'
         );
       }).join('');
-      // Expand/collapse a folder on header click. Toggling a class (rather than
-      // re-rendering) keeps the checkbox selections inside untouched — and a
-      // collapsed folder's checked boxes still count toward selectedDocIds().
       els.docs.querySelectorAll('.ef-doc-group-head').forEach(function (head) {
         head.addEventListener('click', function () {
           var name = head.getAttribute('data-folder');
@@ -357,6 +419,7 @@
           st.submitted = false;
           st.answers = {};
           st.grades = {};
+          st.marked = {};
           renderAll();
         });
       });
@@ -395,64 +458,117 @@
       return String(val || '').toLowerCase() === String(q.answer || '').toLowerCase();
     }
 
+    function questionStatus(q, idx) {
+      if (st.marked[idx]) return 'marked';
+      if (answerIsComplete(q, idx)) return 'answered';
+      return 'unanswered';
+    }
+
+    function computeResults(s) {
+      var correct = 0;
+      var earned = 0;
+      var totalPoints = 0;
+      var answered = 0;
+      var markedCount = 0;
+      var byType = { mcq: { correct: 0, total: 0 }, true_false: { correct: 0, total: 0 }, short_answer: { correct: 0, total: 0 } };
+      var byTopic = {};
+      s.questions.forEach(function (q, idx) {
+        totalPoints += Number(q.points || 1);
+        byType[q.type] = byType[q.type] || { correct: 0, total: 0 };
+        byType[q.type].total++;
+        var topic = q.topic || 'General';
+        byTopic[topic] = byTopic[topic] || { correct: 0, total: 0 };
+        byTopic[topic].total++;
+        if (answerIsComplete(q, idx)) answered++;
+        if (st.marked[idx]) markedCount++;
+        var isCorrectQ = false;
+        if (q.type === 'short_answer' && st.grades[idx]) {
+          earned += Number(st.grades[idx].score || 0);
+          if (st.grades[idx].isCorrect) { correct++; isCorrectQ = true; }
+        } else if (objectiveCorrect(q, idx)) {
+          earned += Number(q.points || 1);
+          correct++;
+          isCorrectQ = true;
+        }
+        if (isCorrectQ) {
+          byType[q.type].correct++;
+          byTopic[topic].correct++;
+        }
+      });
+      return {
+        correct: correct,
+        earned: earned,
+        totalPoints: totalPoints,
+        answered: answered,
+        markedCount: markedCount,
+        total: s.questions.length,
+        score: totalPoints ? Math.round(earned / totalPoints * 100) : 0,
+        byType: byType,
+        byTopic: byTopic,
+      };
+    }
+
     function renderExam() {
       var s = activeSession();
       if (!els.empty || !els.exam) return;
       els.empty.hidden = !!s;
       els.exam.hidden = !s;
       if (!s) return;
-      var correct = 0;
-      var earned = 0;
-      var totalPoints = 0;
-      s.questions.forEach(function (q, idx) {
-        totalPoints += Number(q.points || 1);
-        if (q.type === 'short_answer' && st.grades[idx]) {
-          earned += Number(st.grades[idx].score || 0);
-          if (st.grades[idx].isCorrect) correct++;
-        } else if (objectiveCorrect(q, idx)) {
-          earned += Number(q.points || 1);
-          correct++;
-        }
-      });
-      var score = totalPoints ? Math.round(earned / totalPoints * 100) : 0;
+      var r = computeResults(s);
+      var isExamMode = st.mode === 'exam';
+
+      // ── Progress bar ──────────────────────────────────────────────────────
+      var progressHtml =
+        '<div class="ef-progress">' +
+          '<span class="ef-progress-item">Answered: <b>' + r.answered + ' / ' + r.total + '</b></span>' +
+          '<span class="ef-progress-item">Unanswered: <b>' + (r.total - r.answered) + '</b></span>' +
+          (r.markedCount ? '<span class="ef-progress-item ef-progress-marked">Marked: <b>' + r.markedCount + '</b></span>' : '') +
+        '</div>';
+
       els.exam.innerHTML =
         '<div class="ef-exam-head">' +
           '<div><h2>' + _esc(s.title || 'ExamForge') + '</h2><p>' + s.questions.length + ' source-grounded questions</p></div>' +
-          '<div class="ef-score">' + (st.submitted ? score + '%' : correct + ' / ' + s.questions.length) + '</div>' +
+          '<div class="ef-score">' + (st.submitted ? r.score + '%' : r.answered + ' / ' + r.total) + '</div>' +
         '</div>' +
+        progressHtml +
         (s.warning ? '<div class="ef-warning">' + _esc(s.warning) + '</div>' : '') +
         '<div class="ef-question-list">' +
           s.questions.map(function (q, idx) {
             var chosen = st.answers[idx] || '';
-            var isCorrect = st.submitted && chosen === q.answer;
-            var isWrong = st.submitted && chosen && chosen !== q.answer;
+            var status = questionStatus(q, idx);
+            var statusCls = ' ef-q-' + status;
             return (
-              '<article class="ef-question">' +
+              '<article class="ef-question' + statusCls + '" id="efQ' + idx + '">' +
                 '<div class="ef-question-top">' +
-                  '<span>Question ' + (idx + 1) + '</span>' +
+                  '<span class="ef-q-number">Q' + (idx + 1) + '</span>' +
                   '<span>' + _esc(questionTypeLabel(q.type)) + '</span>' +
-                  '<span>' + _esc(q.topic || q.difficulty || 'medium') + '</span>' +
+                  '<span class="ef-q-diff ef-q-diff-' + _esc(q.difficulty || 'medium') + '">' + _esc(q.difficulty || 'medium') + '</span>' +
+                  (q.topic ? '<span>' + _esc(q.topic) + '</span>' : '') +
+                  '<span class="ef-q-status-badge ef-q-status-' + status + '">' +
+                    (status === 'answered' ? '✓ Answered' : status === 'marked' ? '⚑ Review' : '○ Unanswered') +
+                  '</span>' +
+                  (!st.submitted ? '<button type="button" class="ef-mark-btn' + (st.marked[idx] ? ' is-marked' : '') + '" data-mark="' + idx + '" title="Mark for review">⚑</button>' : '') +
                 '</div>' +
                 '<h3>' + _esc(q.question) + '</h3>' +
                 renderAnswerControl(q, idx, chosen) +
                 (st.submitted
-                  ? renderFeedback(q, idx, isCorrect, isWrong)
+                  ? renderFeedback(q, idx)
                   : '') +
-                ((q.sources || []).length
-                  ? '<div class="ef-sources">' + q.sources.map(function (src) {
-                      return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(src.fileName || '') + '" data-src-page="' + _esc(src.pages == null ? '' : src.pages) + '">' + _esc(src.fileName || 'Source') + (src.pages ? ', ' + _esc(src.pages) : '') + '</span>';
-                    }).join('') + '</div>'
-                  : '') +
+                renderSources(q, isExamMode) +
               '</article>'
             );
           }).join('') +
         '</div>' +
+        (st.submitted ? renderResultSummary(s, r) : '') +
         '<div class="ef-submit-row">' +
           '<button class="ef-btn ef-btn-secondary" id="efResetAnswers" type="button">Reset answers</button>' +
           '<button class="ef-btn ef-btn-primary" id="efSubmitAnswers" type="button"' + (st.submitted ? ' disabled' : '') + '>Submit exam</button>' +
         '</div>';
+
+      // ── Event listeners ───────────────────────────────────────────────────
       els.exam.querySelectorAll('.ef-option').forEach(function (btn) {
         btn.addEventListener('click', function () {
+          if (st.submitted) return;
           st.answers[Number(btn.getAttribute('data-q'))] = btn.getAttribute('data-a') || '';
           renderExam();
         });
@@ -460,6 +576,13 @@
       els.exam.querySelectorAll('.ef-written').forEach(function (input) {
         input.addEventListener('input', function () {
           st.answers[Number(input.getAttribute('data-q'))] = input.value || '';
+        });
+      });
+      els.exam.querySelectorAll('.ef-mark-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var idx = Number(btn.getAttribute('data-mark'));
+          st.marked[idx] = !st.marked[idx];
+          renderExam();
         });
       });
       els.exam.querySelectorAll('.ef-sources .src-cite').forEach(function (el) {
@@ -474,6 +597,7 @@
         st.answers = {};
         st.grades = {};
         st.submitted = false;
+        st.marked = {};
         renderExam();
       });
       var submit = els.exam.querySelector('#efSubmitAnswers');
@@ -502,22 +626,69 @@
           var cls = chosenHit ? ' selected' : '';
           if (st.submitted && answerHit) cls += ' correct';
           if (st.submitted && chosenHit && !answerHit) cls += ' wrong';
-          return '<button class="ef-option' + cls + '" type="button" data-q="' + idx + '" data-a="' + _esc(value) + '"' + (st.submitted ? ' disabled' : '') + '><b>' + _esc(label) + '</b><span>' + _esc(opt) + '</span></button>';
+          var icon = '';
+          if (st.submitted && answerHit) icon = '<span class="ef-icon-check">✓</span>';
+          if (st.submitted && chosenHit && !answerHit) icon = '<span class="ef-icon-x">✗</span>';
+          return '<button class="ef-option' + cls + '" type="button" data-q="' + idx + '" data-a="' + _esc(value) + '"' + (st.submitted ? ' disabled' : '') + '><b>' + _esc(label) + '</b><span>' + _esc(opt) + '</span>' + icon + '</button>';
         }).join('') +
       '</div>';
     }
 
-    function renderFeedback(q, idx, isCorrect, isWrong) {
+    function renderFeedback(q, idx) {
+      var chosen = st.answers[idx] || '';
       if (q.type === 'short_answer') {
         var grade = st.grades[idx];
         if (!grade) {
           return '<div class="ef-feedback"><strong>Grading...</strong><span>Your written answer is being checked against the rubric.</span></div>';
         }
-        return '<div class="ef-feedback ' + (grade.isCorrect ? 'ok' : 'bad') + '"><strong>' + _esc(String(grade.score || 0)) + ' pt</strong><span>' + _esc(grade.feedback || q.explanation || '') + '</span></div>';
+        return '<div class="ef-feedback ' + (grade.isCorrect ? 'ok' : 'bad') + '">' +
+          '<div class="ef-grade-header"><strong>' + (grade.isCorrect ? '✓ ' : '✗ ') + _esc(String(grade.score || 0)) + ' / ' + _esc(String(q.points || 1)) + ' pt</strong></div>' +
+          '<div class="ef-grade-feedback">' + _esc(grade.feedback || '') + '</div>' +
+          (q.explanation ? '<div class="ef-grade-rubric"><strong>Rubric:</strong> ' + _esc(q.explanation) + '</div>' : '') +
+          (q.answer ? '<div class="ef-grade-model"><strong>Model answer:</strong> ' + _esc(q.answer) + '</div>' : '') +
+        '</div>';
       }
+      var isCorrect = String(chosen || '').toLowerCase() === String(q.answer || '').toLowerCase();
+      var isWrong = chosen && !isCorrect;
       return '<div class="ef-feedback ' + (isCorrect ? 'ok' : isWrong ? 'bad' : '') + '">' +
-        '<strong>' + (isCorrect ? 'Correct' : 'Answer: ' + _esc(String(q.answer || '').toUpperCase())) + '</strong>' +
+        '<strong>' + (isCorrect ? '✓ Correct' : '✗ Answer: ' + _esc(String(q.answer || '').toUpperCase())) + '</strong>' +
         '<span>' + _esc(q.explanation || '') + '</span>' +
+      '</div>';
+    }
+
+    function renderSources(q, isExamMode) {
+      if (!(q.sources || []).length) return '';
+      if (isExamMode && !st.submitted) {
+        return '<div class="ef-sources ef-sources-hidden"><span class="ef-source-placeholder">Source available after submission</span></div>';
+      }
+      return '<div class="ef-sources">' + q.sources.map(function (src) {
+        return '<span class="src-cite" title="Open this source" data-src-file="' + _esc(src.fileName || '') + '" data-src-page="' + _esc(src.pages == null ? '' : src.pages) + '">' + _esc(src.fileName || 'Source') + (src.pages ? ', p.' + _esc(src.pages) : '') + '</span>';
+      }).join('') + '</div>';
+    }
+
+    function renderResultSummary(s, r) {
+      var typeLabels = { mcq: 'MCQ', true_false: 'True/False', short_answer: 'Written' };
+      var typeHtml = '';
+      ['mcq', 'true_false', 'short_answer'].forEach(function (t) {
+        if (r.byType[t] && r.byType[t].total) {
+          typeHtml += '<div class="ef-result-type"><span>' + typeLabels[t] + '</span><b>' + r.byType[t].correct + ' / ' + r.byType[t].total + '</b></div>';
+        }
+      });
+      var strongTopics = [];
+      var weakTopics = [];
+      Object.keys(r.byTopic).forEach(function (topic) {
+        var t = r.byTopic[topic];
+        var pct = t.total ? (t.correct / t.total) : 0;
+        if (pct >= 0.7) strongTopics.push(topic);
+        else weakTopics.push(topic);
+      });
+      return '<div class="ef-result-summary">' +
+        '<h3>Results</h3>' +
+        '<div class="ef-result-score"><span>Score</span><b>' + r.score + '%</b></div>' +
+        '<div class="ef-result-score"><span>Correct</span><b>' + r.correct + ' / ' + r.total + '</b></div>' +
+        (typeHtml ? '<div class="ef-result-types">' + typeHtml + '</div>' : '') +
+        (strongTopics.length ? '<div class="ef-result-topics"><strong>Strong topics:</strong> ' + strongTopics.map(_esc).join(', ') + '</div>' : '') +
+        (weakTopics.length ? '<div class="ef-result-topics ef-result-weak"><strong>Weak topics:</strong> ' + weakTopics.map(_esc).join(', ') + '</div>' : '') +
       '</div>';
     }
 
@@ -542,7 +713,6 @@
           return svc.generateCourseTopicMap ? svc.generateCourseTopicMap(courseId) : [];
         }).then(function (topics) {
           renderTopicMap(topics);
-          // /generate rebuilds in the background; re-read to pick up the refresh.
           setTimeout(loadTopicMap, 4000);
         }).catch(function () { /* ignore */ }).then(function () {
           els.buildTopics.disabled = false;
@@ -612,6 +782,7 @@
             difficulty: els.difficulty && els.difficulty.value || 'medium',
             questionTypes: selectedQuestionTypes(),
             topic: els.topic && els.topic.value || '',
+            language: els.language && els.language.value || 'auto',
           });
         }).then(function (res) {
           var session = _normaliseSession(res || {});
@@ -624,6 +795,7 @@
           st.answers = {};
           st.grades = {};
           st.submitted = false;
+          st.marked = {};
           renderAll();
         }).catch(function (err) {
           _toast('ExamForge failed', err && err.message ? err.message : 'Please try again.');

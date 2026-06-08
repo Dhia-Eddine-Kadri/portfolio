@@ -611,7 +611,7 @@ interface LandingTranslation {
             subscription: ['views/subscription/subscription.css'],
             flashcards: ['views/flashcards/flashcards.css'],
             quiz: ['views/quiz/quiz.css'],
-            examforge: ['views/examforge/examforge.css'],
+            examforge: ['views/examforge/examforge.css?v=2'],
             cheatsheet: ['views/cheatsheet/cheatsheet.css'],
             deeplearn: ['views/deep-learn/deep-learn.css'],
             notesPanel: ['views/notes/notes-panel.css'],

@@ -116,6 +116,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     document_count: docIds ? docIds.length : 0,
   });
 
+  const language = body.language;
   const upstream = await forwardToPython<PyExamForgeResponse>('generate-examforge', {
     userId: user.id,
     courseId,
@@ -124,6 +125,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     difficulty: typeof difficulty === 'string' ? difficulty : 'medium',
     questionTypes,
     topic: typeof topic === 'string' ? topic : null,
+    language: typeof language === 'string' ? language : null,
     save: true,
   });
   if (!upstream.ok) {

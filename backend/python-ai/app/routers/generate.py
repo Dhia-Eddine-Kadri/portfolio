@@ -83,6 +83,7 @@ class GenerateExamForgeRequest(BaseModel):
     difficulty: str = "medium"
     questionTypes: list[str] | None = None
     topic: str | None = None
+    language: str | None = None
     save: bool = True
 
 
@@ -243,6 +244,7 @@ async def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> Gene
         topic=payload.topic,
         question_types=payload.questionTypes,
         doc_names=doc_names,
+        language=payload.language,
     )
 
     return GenerateExamForgeResponse(
