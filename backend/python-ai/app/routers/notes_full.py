@@ -156,17 +156,75 @@ Rules:
 
 
 def _standard_section_instructions() -> str:
-    return """Use these sections — ONLY include a section if it has real content. OMIT sections entirely if they would be empty:
-- Simple Overview (always, 2-3 sentences)
-- Key Definitions (if definitions exist)
-- Main Concepts (if explanations exist)
-- Methods / Procedures (if processes are described)
-- Important Formulas / Rules / Theorems (if formulas exist, in KaTeX)
-- Examples from the Course (if examples exist)
-- Comparisons (if comparisons exist, use markdown tables)
-- Exam-Relevant Points (if exam relevance can be inferred from the PDF)
-- Common Mistakes (if traps/pitfalls can be inferred from the material)
-- Mini Recap (always, 2-3 memory-friendly sentences)"""
+    return """## CONTENT-TYPE DETECTION (internal — do NOT output the classification)
+
+Before choosing sections, silently classify the material as one of:
+
+- **math-heavy**: formulas, derivations, solved examples, calculation methods dominate.
+  Examples: Mathematics, Mechanics, Statistics, Physics calculations, Circuits, Thermodynamics.
+- **concept-light-math**: definitions, classifications, process descriptions, but small
+  calculations or parameters may appear.
+  Examples: Fertigungstechnik, Materials Science, Manufacturing, Chemistry theory, Economics concepts.
+- **no-math**: purely conceptual — no formulas. Understanding, comparing, arguing, explaining.
+  Examples: History, Law, Political Science, Literature, Philosophy, Management, Languages.
+- **balanced**: both conceptual theory AND formulas/calculations are central.
+  Examples: Physics, Economics, Chemistry, Engineering Science, Finance, Data Science.
+
+## SECTION TEMPLATES — use the one matching the detected type
+
+### IF math-heavy:
+OMIT sections that would be empty:
+- Topic Overview (1-2 sentences: what this is about)
+- Core Definitions (key terms, cited)
+- Main Formulas / Theorems (KaTeX, meaning of each, conditions for use)
+- When to Use Which Formula (decision guide: "If … → use …")
+- Important Derivation Idea (if relevant — the intuition, not the full proof)
+- Common Traps (sign errors, unit confusion, wrong formula choice)
+- Mini Solved Example (one compact worked example showing the method)
+- Exam-Style Checklist (what to know cold)
+- Source Pages
+
+### IF concept-light-math:
+OMIT sections that would be empty:
+- Simple Definition (core term defined clearly)
+- Course Classification (where this fits in the broader topic)
+- Main Categories (all groups, subcategories — list completely)
+- Important Details from Sources (key facts, properties, DIN norms, parameters)
+- Comparison Table (markdown table: Type | Principle | Application | Advantage | Disadvantage)
+- Selection Criteria (how to choose the right method/process for a scenario)
+- Typical Applications (real-world use cases from the material)
+- Exam Traps (confusing similar terms, wrong classifications)
+- Quick Revision List (the key points to memorize)
+
+Do NOT write "No formula found". Use the concept sections above instead.
+
+### IF no-math:
+OMIT sections that would be empty:
+- Main Point (one sentence capturing the core idea)
+- Key Terms (term + definition pairs, cited)
+- Background / Context (historical, legal, social, theoretical context)
+- Main Arguments or Ideas (the 3-6 most important ideas)
+- Important Relationships (cause-effect, comparisons, connections)
+- Comparison Table (if useful — viewpoints, theories, rules side by side)
+- Typical Exam Question (a realistic question inferred from the material)
+- Short Model Answer (how to structure the answer)
+- What to Memorize (key terms, dates, names, rules)
+
+For no-math subjects, the summary should help the student explain and write, not calculate.
+
+### IF balanced:
+OMIT sections that would be empty:
+- Concept Overview (what the topic is about and why it matters)
+- Key Definitions (core terms, cited)
+- Important Formulas (KaTeX, with meaning of each variable)
+- When Formulas Apply (conditions and decision guide)
+- Concept-to-Formula Connection (how the theory leads to the formula)
+- Example Calculation (one compact worked example)
+- Interpretation (what the result means, typical values, edge cases)
+- Common Mistakes (both conceptual and calculation errors)
+- Exam Checklist (concepts + formulas + interpretation patterns)
+
+The key for balanced summaries: Meaning → Formula → Calculation → Interpretation."""
 
 
 def _exam_section_instructions() -> str:
