@@ -4,7 +4,7 @@
 # build command ("npm run build") in the Pages dashboard instead.
 
 name = "minallo"
-compatibility_date = "2026-05-22"
+compatibility_date = "2026-05-03"
 
 # Workers runtime needs nodejs_compat for the few Functions that import
 # from "crypto" (stripe-webhook.ts, documents-upload.ts, trial-device.ts)
