@@ -36,9 +36,6 @@ create table if not exists public.weekly_study_plans (
   regenerated_at    timestamptz,
   generation_params jsonb                 default '{}',
   created_at        timestamptz not null default now(),
-  -- coalesce so that (user, week, scope, NULL) and (user, week, scope, 'x') are
-  -- each unique without having to deal with NULL != NULL in the index.
-  unique (user_id, week_start_date, plan_scope, coalesce(course_id, ''))
 );
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -205,6 +202,10 @@ create table public.study_events (
 -- ────────────────────────────────────────────────────────────────────────────
 -- 9. Indexes
 -- ────────────────────────────────────────────────────────────────────────────
+
+-- Unique plan per (user, week, scope, course) — coalesce handles NULL course_id
+create unique index if not exists idx_weekly_study_plans_unique
+  on public.weekly_study_plans (user_id, week_start_date, plan_scope, coalesce(course_id, ''));
 
 create index if not exists idx_weekly_study_tasks_user_date
   on public.weekly_study_tasks (user_id, plan_date);
