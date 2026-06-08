@@ -1,6 +1,7 @@
 # Cloudflare Pages config. Most settings live in the Pages dashboard,
-# but a wrangler.toml lets us pin compatibility flags and the pages_build_output_dir
-# so the build is reproducible from a fresh clone / preview deploy.
+# but a wrangler.toml lets us pin compatibility flags and the
+# pages_build_output_dir. Pages does not support a [build] block here; keep the
+# build command ("npm run build") in the Pages dashboard instead.
 
 name = "minallo"
 compatibility_date = "2026-05-22"
@@ -16,6 +17,3 @@ compatibility_flags = ["nodejs_compat"]
 # as Pages Functions on top of them.
 # Production uses dist/ (stripped of .ts, .map, and dev config files).
 pages_build_output_dir = "dist"
-
-[build]
-command = "npm run build"
