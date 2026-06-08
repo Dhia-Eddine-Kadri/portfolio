@@ -1113,43 +1113,89 @@ async function handleIntentRoute(
     genThinking?.set('Opening paper view');
     await finishIntentSkillLoading(skillStatus, genThinking);
 
-    // 4. Build paper opts once — reused for both initial open and the reopen button
-    const paperOpts: Record<string, unknown> | null = result && result.text ? {
+    // 4. Build paper opts — reused for the initial open and the reopen button
+    const csLayoutSettings = {
+      columns: chatSettings.columns,
+      font: fontCsMap[chatSettings.fontSize] || 'sm',
+      pad: padMap[chatSettings.padding] || '10mm',
+      style: (result.settings && result.settings.style) || 'academic',
+    };
+    let paperOpts: Record<string, unknown> | null = result && result.text ? {
       course: route.target.courseId,
       title: result.title || 'Cheatsheet',
       scope: result.title || 'Course cheatsheet',
       meta: '',
       markdown: result.text,
-      settings: {
-        columns: chatSettings.columns,
-        font: fontCsMap[chatSettings.fontSize] || 'sm',
-        pad: padMap[chatSettings.padding] || '10mm',
-        style: (result.settings && result.settings.style) || 'academic',
-      },
+      settings: csLayoutSettings,
     } : null;
 
-    const callOpenPaper = (): void => {
-      const fn = (window as unknown as {
+    // Persist to localStorage so the reopen button survives a page refresh.
+    // Keyed per course so multiple courses don't overwrite each other.
+    const lsKey = 'minallo_cs_last_' + route.target.courseId;
+    if (paperOpts && result.noteId) {
+      try {
+        localStorage.setItem(lsKey, JSON.stringify({
+          noteId: result.noteId,
+          title: result.title || 'Cheatsheet',
+          settings: csLayoutSettings,
+        }));
+      } catch { /* storage full — non-fatal */ }
+    }
+
+    const openFn = (): (opts: Record<string, unknown>) => void => {
+      return (window as unknown as {
         openCheatsheetPaper?: (opts: Record<string, unknown>) => void
-      }).openCheatsheetPaper;
-      if (fn && paperOpts) fn(paperOpts);
+      }).openCheatsheetPaper ?? (() => { /* not loaded yet */ });
     };
+
+    const callOpenPaper = (): void => { if (paperOpts) openFn()(paperOpts); };
 
     if (paperOpts) callOpenPaper();
 
+    const savedNote = !!result.noteId;
     const text = paperOpts
-      ? 'Your cheatsheet is ready. Use the button below to open the PDF viewer and download it.'
+      ? 'Your cheatsheet is ready.' +
+        (savedNote ? ' It\'s also **saved to your notes** — you can find it in the Cheatsheet tab of this course.' : '')
       : 'No cheatsheet content was returned. Please try again.';
     if (bubble) renderRichBubble(bubble, text);
 
-    // Add a persistent "Open PDF viewer" button so the user can reopen after closing
-    if (bubble && paperOpts) {
+    // Reopen button: uses in-memory opts if available, otherwise fetches from
+    // the saved note (works after a page refresh as long as the note was saved).
+    if (bubble && (paperOpts || result.noteId)) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'ncb-cs-reopen-btn';
       btn.textContent = '⤓ Open PDF viewer';
       btn.addEventListener('click', () => {
-        ensureCheatsheetScripts().then(callOpenPaper).catch(() => callOpenPaper());
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+        const restore = (): Promise<void> => {
+          if (paperOpts) return Promise.resolve();
+          // In-memory opts were lost (page refresh) — reload from localStorage/API
+          const stored = (() => {
+            try { return JSON.parse(localStorage.getItem(lsKey) || 'null'); } catch { return null; }
+          })() as { noteId: string; title: string; settings: Record<string, unknown> } | null;
+          const noteId = stored?.noteId ?? result.noteId;
+          if (!noteId) return Promise.reject(new Error('no noteId'));
+          return import('../../services/ai-service.js').then(svc =>
+            svc.getNoteById(noteId)
+          ).then(note => {
+            if (!note) throw new Error('note not found');
+            paperOpts = {
+              course: route.target.courseId,
+              title: note.title || stored?.title || 'Cheatsheet',
+              scope: note.title || 'Course cheatsheet',
+              meta: '',
+              markdown: note.content_markdown,
+              settings: stored?.settings ?? csLayoutSettings,
+            };
+          });
+        };
+        ensureCheatsheetScripts()
+          .then(restore)
+          .then(() => { callOpenPaper(); })
+          .catch(() => { /* silently ignore — openFn will no-op */ })
+          .finally(() => { btn.disabled = false; btn.textContent = '⤓ Open PDF viewer'; });
       });
       bubble.appendChild(btn);
     }
