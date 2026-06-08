@@ -177,28 +177,40 @@ function fileRowHtml(f: CourseFileLike, inFolder: string | null, courseId?: stri
   );
 }
 
-function buildFilesContent(course: LegacyCourse): string {
-  const folderIconSvg =
-    '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>';
-  const chevronSvg =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>';
+const _folderIconSvg =
+  '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>';
+const _chevronSvg =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>';
+const _folderTints = ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#22d3ee'];
 
-  // Folder accent palette — cycle through tints so consecutive folders read
-  // distinctly. Used to color the icon-in-square + a subtle border tint.
-  const folderTints = ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#22d3ee'];
+interface FileStats {
+  totalFiles: number;
+  studiedTotal: number;
+  unreadTotal: number;
+}
 
+function _computeFileStats(course: LegacyCourse): FileStats {
+  const allFiles: CourseFileLike[] = ((course.files || []) as unknown as CourseFileLike[]).slice();
+  (course.userFolders || []).forEach((fd) => {
+    (fd.files as unknown as CourseFileLike[]).forEach((f) => allFiles.push(f));
+  });
+  const totalFiles = allFiles.length;
+  const studiedTotal = allFiles.reduce(
+    (acc, f) => acc + (_isFileStudied(course.id, f.name) ? 1 : 0), 0
+  );
+  return { totalFiles, studiedTotal, unreadTotal: Math.max(0, totalFiles - studiedTotal) };
+}
+
+function _buildFilesListHtml(course: LegacyCourse): string {
   const foldersHtml = (course.userFolders || [])
     .map((fd, fi) => {
       const eFdName = escapeHtml(fd.name);
       const fileCount = fd.files.length;
-      const tint = folderTints[fi % folderTints.length];
-      // Files marked studied vs total — uses the same opened-files signal
-      // surfaced on the courses grid so the two views stay consistent.
+      const tint = _folderTints[fi % _folderTints.length];
       const studiedInFolder = fd.files.reduce((acc, ff) => {
         return acc + (_isFileStudied(course.id, (ff as { name?: string }).name || '') ? 1 : 0);
       }, 0);
       const unreadInFolder = Math.max(0, fileCount - studiedInFolder);
-      // No real mtime tracked yet — surface a soft "Updated recently".
       const updatedLabel = 'Updated recently';
       const metaBits = [
         fileCount + ' file' + (fileCount !== 1 ? 's' : ''),
@@ -209,8 +221,8 @@ function buildFilesContent(course: LegacyCourse): string {
       return (
         '<div class="co-folder-section co-folder-v2 collapsed" data-folder="' + eFdName + '" style="--co-folder-accent:' + tint + '">' +
         '<div class="co-folder-header">' +
-          '<span class="co-folder-toggle-icon">' + chevronSvg + '</span>' +
-          '<span class="co-folder-icon-wrap">' + folderIconSvg + '</span>' +
+          '<span class="co-folder-toggle-icon">' + _chevronSvg + '</span>' +
+          '<span class="co-folder-icon-wrap">' + _folderIconSvg + '</span>' +
           '<div class="co-folder-text">' +
             '<div class="co-folder-name-label">' + eFdName + '</div>' +
             '<div class="co-folder-sub">' + metaBits.join(' &middot; ') + '</div>' +
@@ -225,9 +237,6 @@ function buildFilesContent(course: LegacyCourse): string {
             '<span>Reindex folder</span>' +
           '</button>' +
           '<button class="co-folder-open-btn" data-folder="' + eFdName + '">Open folder</button>' +
-          /* Delete moved into the ⋯ menu so it can\'t be hit accidentally.
-             The menu hosts the existing co-folder-del-btn so its handlers
-             keep working without any JS changes. */
           '<div class="co-folder-more">' +
             '<button class="co-folder-more-btn" data-folder="' + eFdName + '" type="button" aria-haspopup="menu" aria-label="More actions">' +
               '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>' +
@@ -276,24 +285,27 @@ function buildFilesContent(course: LegacyCourse): string {
     filesHtml = '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
   }
 
-  // "refreshing" pill removed per design — taking too much horizontal space
-  // in the secondary toolbar. The pill is suppressed regardless of
-  // course._filesRefreshing state; refresh state can be wired to a different
-  // surface later if needed.
-  const refreshingPill = '';
-
-  // Header stats — pull from real data we already have. studiedTotal / unread
-  // use the same _isFileStudied signal the folder rows use, summed across
-  // loose files + folder files so the header reflects the whole course.
-  const allCourseFiles: CourseFileLike[] = ((course.files || []) as unknown as CourseFileLike[]).slice();
-  (course.userFolders || []).forEach((fd) => {
-    (fd.files as unknown as CourseFileLike[]).forEach((f) => allCourseFiles.push(f));
-  });
-  const totalFiles = allCourseFiles.length;
-  const studiedTotal = allCourseFiles.reduce(
-    (acc, f) => acc + (_isFileStudied(course.id, f.name) ? 1 : 0), 0
+  return (
+    (courseFiles.length || (!hasFolders && filesHtml)
+      ? '<div class="co-separate-files">' +
+          '<div class="co-separate-files-head">' +
+            '<div>' +
+              '<div class="co-separate-files-title">Separate files</div>' +
+              '<div class="co-separate-files-sub">Files that are not inside a folder</div>' +
+            '</div>' +
+            (courseFiles.length
+              ? '<span class="co-folder-count-label">' + courseFiles.length + ' file' + (courseFiles.length !== 1 ? 's' : '') + '</span>'
+              : '') +
+          '</div>' +
+          '<div id="coFilesList">' + filesHtml + '</div>' +
+        '</div>'
+      : '<div id="coFilesList" style="display:none">' + filesHtml + '</div>') +
+    foldersHtml
   );
-  const unreadTotal = Math.max(0, totalFiles - studiedTotal);
+}
+
+function buildFilesContent(course: LegacyCourse): string {
+  const { totalFiles, studiedTotal, unreadTotal } = _computeFileStats(course);
 
   return (
     '<div class="co-course-tabs" role="tablist" aria-label="Course sections">' +
@@ -324,7 +336,6 @@ function buildFilesContent(course: LegacyCourse): string {
     '</div>' +
     '<div class="co-course-panel active" id="coFilesPanel" data-course-panel="files">' +
       '<div class="co-files-inner-card">' +
-      // Header: title+stats on the left, all 4 actions on the right.
       '<div class="co-panel-header co-panel-header-v2">' +
         '<div class="co-panel-header-text">' +
           '<h2 class="co-panel-title">Files</h2>' +
@@ -354,10 +365,8 @@ function buildFilesContent(course: LegacyCourse): string {
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>' +
             '<span>Update AI index</span>' +
           '</button>' +
-          refreshingPill +
         '</div>' +
       '</div>' +
-      // Search bar inside the inner files card, sits between header and list.
       '<div class="co-files-search-row">' +
         '<div class="co-files-search-wrap">' +
           '<svg class="co-files-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>' +
@@ -365,25 +374,9 @@ function buildFilesContent(course: LegacyCourse): string {
         '</div>' +
       '</div>' +
       '<div class="co-files-list">' +
-      // Separate files sub-card (loose files not inside any folder). Hidden
-      // when the course has folders but no loose files.
-      (courseFiles.length || (!hasFolders && filesHtml)
-        ? '<div class="co-separate-files">' +
-            '<div class="co-separate-files-head">' +
-              '<div>' +
-                '<div class="co-separate-files-title">Separate files</div>' +
-                '<div class="co-separate-files-sub">Files that are not inside a folder</div>' +
-              '</div>' +
-              (courseFiles.length
-                ? '<span class="co-folder-count-label">' + courseFiles.length + ' file' + (courseFiles.length !== 1 ? 's' : '') + '</span>'
-                : '') +
-            '</div>' +
-            '<div id="coFilesList">' + filesHtml + '</div>' +
-          '</div>'
-        : '<div id="coFilesList" style="display:none">' + filesHtml + '</div>') +
-      foldersHtml +
-      '</div>' +  /* /co-files-list */
-      '</div>' +  /* /co-files-inner-card */
+      _buildFilesListHtml(course) +
+      '</div>' +
+      '</div>' +
       '<div class="co-multi-bar" id="coMultiBar">' +
         '<span class="co-multi-count"><b id="coSelCount">0</b> files selected</span>' +
         '<span class="co-multi-clear" id="coMultiClear">Clear</span>' +
@@ -482,10 +475,6 @@ export function openCourse(course: LegacyCourse): void {
 
   if (typeof window._courseOpenSeq !== 'number') window._courseOpenSeq = 0;
   const myCourseSeq = ++window._courseOpenSeq;
-  const currentCourseSection = (): string =>
-    window.activeCourseRef === course && window.activeCourseSection
-      ? window.activeCourseSection
-      : 'files';
 
   // Render the root-level files the moment they arrive — folder listings keep
   // running in the background. Without this, the spinner persists until the
@@ -495,10 +484,8 @@ export function openCourse(course: LegacyCourse): void {
     if (!detail || detail.courseId !== course.id) return;
     if (myCourseSeq !== window._courseOpenSeq) return;
     course._filesLoading = false;
-    // Keep _filesRefreshing true — folders are still loading. Toolbar pill stays.
-    window._ssRestoring = true;
-    showCourseSection(course, currentCourseSection());
-    window._ssRestoring = false;
+    const co2 = document.getElementById('courseOverview');
+    if (co2) _refreshFilesPanel(co2, course);
   };
   window.addEventListener('uf-merge-root-done', onRootDone);
 
@@ -509,22 +496,18 @@ export function openCourse(course: LegacyCourse): void {
     if (nextCount <= 0 || nextCount === lastSeenFileCount) return;
     lastSeenFileCount = nextCount;
     course._filesLoading = false;
-    window._ssRestoring = true;
-    showCourseSection(course, currentCourseSection());
-    window._ssRestoring = false;
+    const co2 = document.getElementById('courseOverview');
+    if (co2) _refreshFilesPanel(co2, course);
   };
   const repaintTimer = window.setInterval(repaintIfFilesArrive, 150);
 
-  // 10-second timeout fallback — if _ufMerge hangs entirely (auth race / network
-  // dead), don't leave the user staring at the spinner forever.
   const fallbackTimer = window.setTimeout(() => {
     if (myCourseSeq !== window._courseOpenSeq) return;
-    if (!course._filesLoading) return; // already cleared
+    if (!course._filesLoading) return;
     course._filesLoading = false;
     course._filesRefreshing = false;
-    window._ssRestoring = true;
-    showCourseSection(course, currentCourseSection());
-    window._ssRestoring = false;
+    const co2 = document.getElementById('courseOverview');
+    if (co2) _refreshFilesPanel(co2, course);
   }, 10000);
 
   const cleanup = (): void => {
@@ -540,9 +523,8 @@ export function openCourse(course: LegacyCourse): void {
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
       if (stillOnThisCourse) {
-        window._ssRestoring = true;
-        showCourseSection(course, currentCourseSection());
-        window._ssRestoring = false;
+        const co2 = document.getElementById('courseOverview');
+        if (co2) _refreshFilesPanel(co2, course);
       }
       try {
         const courseFilesArr = (course.files || []) as unknown as CourseFileLike[];
@@ -577,11 +559,82 @@ export function openCourse(course: LegacyCourse): void {
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
       if (stillOnThisCourse) {
-        window._ssRestoring = true;
-        showCourseSection(course, currentCourseSection());
-        window._ssRestoring = false;
+        const co2 = document.getElementById('courseOverview');
+        if (co2) _refreshFilesPanel(co2, course);
       }
     });
+
+  // Preload study-tool modules so tab switches are instant
+  const preload = (window as unknown as {
+    _ssLoadPortalFeature?: (name: string) => Promise<void>;
+  })._ssLoadPortalFeature;
+  if (typeof preload === 'function') {
+    void preload('quiz');
+    void preload('flashcards');
+    void preload('examforge');
+    void preload('cheatsheet');
+    void preload('deeplearn');
+  }
+}
+
+function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {
+  const { totalFiles, studiedTotal, unreadTotal } = _computeFileStats(course);
+  const sub = co.querySelector<HTMLElement>('#coFilesPanel .co-panel-sub');
+  if (sub) {
+    sub.innerHTML =
+      'Folders and course documents · ' +
+      '<b>' + totalFiles + '</b> total · ' +
+      '<b>' + studiedTotal + '</b> studied · ' +
+      '<b>' + unreadTotal + '</b> unread';
+  }
+  const filesList = co.querySelector<HTMLElement>('#coFilesPanel .co-files-list');
+  if (filesList) {
+    filesList.innerHTML = _buildFilesListHtml(course);
+    bindFileEvents(co, course);
+    bindFolderEvents(co, course);
+    co.querySelectorAll<HTMLButtonElement>('.co-folder-more-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menu = btn.parentElement?.querySelector<HTMLElement>('.co-folder-more-menu');
+        if (!menu) return;
+        const wasOpen = menu.classList.contains('open');
+        co.querySelectorAll<HTMLElement>('.co-folder-more-menu.open').forEach((m) => m.classList.remove('open'));
+        if (!wasOpen) menu.classList.add('open');
+      });
+    });
+  }
+}
+
+function _mountFeaturePanel(co: HTMLElement, sec: string, course: LegacyCourse): void {
+  const panelSelector =
+    sec === 'quiz' ? '#coQuizPanel' :
+    sec === 'flashcards' ? '#coFlashPanel' :
+    sec === 'examforge' ? '#coExamForgePanel' :
+    sec === 'cheatsheet' ? '#coCheatsheetPanel' :
+    '#coDeepLearnPanel';
+  const panel = co.querySelector<HTMLElement>(panelSelector);
+  if (panel && panel.getAttribute('data-mounted-course') === course.id) return;
+  const loadFeature = (window as unknown as {
+    _ssLoadPortalFeature?: (name: string) => Promise<void>;
+  })._ssLoadPortalFeature;
+  if (typeof loadFeature === 'function') void loadFeature(sec);
+  const mountWhenReady = (tries: number): void => {
+    const mountFn =
+      sec === 'quiz' ? window.mountQuiz :
+      sec === 'flashcards' ? window.mountFlashcards :
+      sec === 'examforge' ? window.mountExamForge :
+      sec === 'cheatsheet' ? window.mountCheatsheet :
+      window.mountDeepLearn;
+    if (typeof mountFn === 'function') {
+      if (panel && panel.isConnected) {
+        mountFn(panel, course, { generate: window._generateStudyTool });
+        panel.setAttribute('data-mounted-course', course.id);
+      }
+    } else if (tries > 0) {
+      setTimeout(() => mountWhenReady(tries - 1), 80);
+    }
+  };
+  mountWhenReady(80);
 }
 
 function _switchTabOnly(co: HTMLElement, sec: string, course: LegacyCourse): void {
@@ -602,50 +655,31 @@ function _switchTabOnly(co: HTMLElement, sec: string, course: LegacyCourse): voi
     );
   }
   if (sec === 'quiz' || sec === 'flashcards' || sec === 'examforge' || sec === 'cheatsheet' || sec === 'deeplearn') {
-    const panelSelector =
-      sec === 'quiz' ? '#coQuizPanel' :
-      sec === 'flashcards' ? '#coFlashPanel' :
-      sec === 'examforge' ? '#coExamForgePanel' :
-      sec === 'cheatsheet' ? '#coCheatsheetPanel' :
-      '#coDeepLearnPanel';
-    const panel = co.querySelector<HTMLElement>(panelSelector);
-    const loadFeature = (window as unknown as {
-      _ssLoadPortalFeature?: (name: string) => Promise<void>;
-    })._ssLoadPortalFeature;
-    if (typeof loadFeature === 'function') void loadFeature(sec);
-    const mountWhenReady = (tries: number): void => {
-      const mountFn =
-        sec === 'quiz' ? window.mountQuiz :
-        sec === 'flashcards' ? window.mountFlashcards :
-        sec === 'examforge' ? window.mountExamForge :
-        sec === 'cheatsheet' ? window.mountCheatsheet :
-        window.mountDeepLearn;
-      if (typeof mountFn === 'function') {
-        if (panel && panel.isConnected) {
-          mountFn(panel, course, { generate: window._generateStudyTool });
-        }
-      } else if (tries > 0) {
-        setTimeout(() => mountWhenReady(tries - 1), 80);
-      }
-    };
-    mountWhenReady(80);
+    _mountFeaturePanel(co, sec, course);
   }
 }
 
 export function showCourseSection(course: LegacyCourse, section: string): void {
   const sec = ['files', 'quiz', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(section) ? section : 'files';
 
-  // Fast path: switching tabs within the same course — just toggle visibility.
-  // Only when the section actually changes (not a file-list refresh).
   const co = document.getElementById('courseOverview');
-  if (co && co.style.display === 'block' &&
+  const alreadyRendered = co && co.style.display === 'block' &&
       window.activeCourseId === course.id &&
       !window.activeFileName &&
-      sec !== window.activeCourseSection &&
-      co.querySelector('.co-inner-v2')) {
+      co.querySelector('.co-inner-v2');
+
+  // Fast path 1: switching tabs within the same course — just toggle visibility.
+  if (alreadyRendered && sec !== window.activeCourseSection) {
     window.activeCourseRef = course;
     window.activeCourseSection = sec;
     _switchTabOnly(co, sec, course);
+    return;
+  }
+
+  // Fast path 2: same course, same section — data refresh only (files arrived).
+  if (alreadyRendered && sec === window.activeCourseSection) {
+    window.activeCourseRef = course;
+    _refreshFilesPanel(co, course);
     return;
   }
 
@@ -897,38 +931,7 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
       panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
     });
     if (targetTab === 'quiz' || targetTab === 'flashcards' || targetTab === 'examforge' || targetTab === 'cheatsheet' || targetTab === 'deeplearn') {
-      // The quiz/flashcards scripts are lazy-loaded on demand. On the FIRST
-      // visit the module isn't on `window` yet, so a one-shot mount check
-      // silently no-ops and the panel stays empty until a second click. Kick
-      // off the lazy load and poll for the mount fn so the first click works.
-      const panelSelector =
-        targetTab === 'quiz' ? '#coQuizPanel' :
-        targetTab === 'flashcards' ? '#coFlashPanel' :
-        targetTab === 'examforge' ? '#coExamForgePanel' :
-        targetTab === 'cheatsheet' ? '#coCheatsheetPanel' :
-        '#coDeepLearnPanel';
-      const panel = co.querySelector<HTMLElement>(panelSelector);
-      const loadFeature = (window as unknown as {
-        _ssLoadPortalFeature?: (name: string) => Promise<void>;
-      })._ssLoadPortalFeature;
-      if (typeof loadFeature === 'function') void loadFeature(targetTab);
-      const mountWhenReady = (tries: number): void => {
-        const mountFn =
-          targetTab === 'quiz' ? window.mountQuiz :
-          targetTab === 'flashcards' ? window.mountFlashcards :
-          targetTab === 'examforge' ? window.mountExamForge :
-          targetTab === 'cheatsheet' ? window.mountCheatsheet :
-          window.mountDeepLearn;
-        if (typeof mountFn === 'function') {
-          // Guard against a later tab switch having replaced/detached the panel.
-          if (panel && panel.isConnected) {
-            mountFn(panel, course, { generate: window._generateStudyTool });
-          }
-        } else if (tries > 0) {
-          setTimeout(() => mountWhenReady(tries - 1), 80);
-        }
-      };
-      mountWhenReady(80);
+      _mountFeaturePanel(co, targetTab, course);
     }
   }
 }
