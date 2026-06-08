@@ -1,4 +1,9 @@
 import { panelHide } from '../../core/panels.js';
+import {
+  applyCoursesLayoutPrefs,
+  getCoursesLayoutPrefs,
+  sortCoursesByLayout
+} from './courses-layout.js';
 import type { LegacyCourse } from '../../../globals.js';
 
 interface CoursesRenderState {
@@ -204,6 +209,7 @@ export function sdRenderCourses(state: CoursesRenderState): void {
   if (!cl) return;
   _renderDailyMissionPreview(state, cl);
   cl.innerHTML = '';
+  applyCoursesLayoutPrefs();
   const sem = state.SEMS[state.sdActiveSemId];
   if (!sem) {
     _renderNextStepsBelowGrid(null);
@@ -224,8 +230,10 @@ export function sdRenderCourses(state: CoursesRenderState): void {
   }
 
   const progressByCourse: Array<{ course: LegacyCourse; progress: CourseProgress }> = [];
+  const layoutPrefs = getCoursesLayoutPrefs();
+  const courses = sortCoursesByLayout(sem.courses, layoutPrefs.sort);
 
-  sem.courses.forEach((c, i) => {
+  courses.forEach((c, i) => {
     const col = state.COLORS[i % state.COLORS.length] || '#2563EB';
     const card = document.createElement('article');
     card.className = 'sd-course-card';
@@ -255,6 +263,7 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       liveCount || cachedCount || parseInt(localStorage.getItem('ss_fc_' + c.id) || '0', 10);
 
     const progress = _computeProgress(c.id, count);
+    try { localStorage.setItem('ss_progress_total_' + c.id, String(progress.total)); } catch { /* quota */ }
     progressByCourse.push({ course: c, progress });
 
     const safeName = (c.name || '').replace(/[<>&"]/g, (s) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[s] || s));
@@ -311,6 +320,15 @@ export function sdRenderCourses(state: CoursesRenderState): void {
         '<span>' + progress.lastOpened + '</span>' +
       '</span>';
 
+    const actionsHtml =
+      '<div class="sd-course-actions">' +
+        '<button type="button" class="sd-course-summary-btn" data-course-summary>' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>' +
+          '<span>Summary</span>' +
+        '</button>' +
+        '<button type="button" class="sd-course-open-btn" data-open-course>Open course</button>' +
+      '</div>';
+
     card.innerHTML =
       '<div class="sd-course-bar"></div>' +
       '<button type="button" class="sd-del-btn" aria-label="Remove course" title="Remove">' +
@@ -328,7 +346,7 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       '</header>' +
       progressBlock +
       statsHtml +
-      '<button type="button" class="sd-course-open-btn" data-open-course>Open course</button>';
+      actionsHtml;
 
     const badgeEl = card.querySelector<HTMLElement>('[data-file-badge]');
     if (!liveCount && badgeEl) {
@@ -347,7 +365,9 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       delBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
         if (!window.confirm('Delete ' + c.name + '?\n\nThis will remove the course from your list. Uploaded files in Supabase storage are not deleted by this action.')) return;
-        state.SEMS[state.sdActiveSemId]?.courses.splice(i, 1);
+        const list = state.SEMS[state.sdActiveSemId]?.courses;
+        const removeIndex = list?.findIndex((item) => item.id === c.id) ?? -1;
+        if (list && removeIndex >= 0) list.splice(removeIndex, 1);
         if (typeof window._saveUserCourses === 'function') window._saveUserCourses();
         sdRenderCourses(state);
       });
@@ -360,6 +380,15 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       renderCourses(state);
       if (typeof window.openCourse === 'function') window.openCourse(c);
     }
+
+    card.querySelector<HTMLButtonElement>('[data-course-summary]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _openCourseAiPrompt(c, 'summary');
+    });
+    card.querySelector<HTMLButtonElement>('[data-open-course]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _open();
+    });
 
     card.addEventListener('click', _open);
     card.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -374,6 +403,29 @@ export function sdRenderCourses(state: CoursesRenderState): void {
 
   _renderNextStepsBelowGrid(progressByCourse);
   _updateHeroStats(state, progressByCourse);
+  applyCoursesLayoutPrefs();
+}
+
+function _openCourseAiPrompt(course: LegacyCourse, prompt: string): void {
+  const w = window as unknown as {
+    activeCourseRef?: LegacyCourse | null;
+    activeCourseId?: string | null;
+    showPortalSection?: (section: string) => void;
+    _navigatePortal?: (section: string) => void;
+  };
+  w.activeCourseRef = course;
+  w.activeCourseId = course.id || null;
+  try { sessionStorage.setItem('ss_ai_target_course', course.id || ''); } catch { /* ignore */ }
+  // Bug 2 fix: use _navigatePortal so URL hash and sidebar highlight are updated.
+  if (typeof w._navigatePortal === 'function') w._navigatePortal('aipage');
+  else if (typeof w.showPortalSection === 'function') w.showPortalSection('aipage');
+  window.setTimeout(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+    if (!ta) return;
+    ta.value = prompt;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.focus();
+  }, 350);
 }
 
 function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLElement): void {
@@ -391,7 +443,10 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
 
   const openAi = (): void => {
     try { sessionStorage.setItem('ss_daily_mission_seed', 'to-do'); } catch { /* ignore */ }
-    if (typeof window.showPortalSection === 'function') window.showPortalSection('aipage');
+    // Bug 2 fix: use _navigatePortal so URL hash and sidebar highlight are updated.
+    const _wp2 = window as unknown as { _navigatePortal?: (s: string) => void; showPortalSection?: (s: string) => void };
+    if (typeof _wp2._navigatePortal === 'function') _wp2._navigatePortal('aipage');
+    else if (typeof _wp2.showPortalSection === 'function') _wp2.showPortalSection('aipage');
     window.setTimeout(() => {
       const ta = document.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
       if (!ta) return;
@@ -405,25 +460,52 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
     title: string,
     text: string,
     cta: string,
-    active: boolean
+    active: boolean,
+    meta?: { tasks?: number; minutes?: number; focus?: string; state?: string }
   ): void => {
     if (!host) return;
+    const focus = meta?.focus || courseName;
+    const taskLabel = typeof meta?.tasks === 'number'
+      ? meta.tasks + ' task' + (meta.tasks !== 1 ? 's' : '')
+      : 'Course sources';
+    const minuteLabel = typeof meta?.minutes === 'number'
+      ? meta.minutes + ' min left'
+      : 'Trusted plan';
+    const stateLabel = meta?.state || (active ? 'Ready today' : 'Setup needed');
     host.innerHTML =
+      '<div class="sd-dm-orb" aria-hidden="true">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>' +
+      '</div>' +
       '<div class="sd-dm-left">' +
         '<div class="sd-dm-kicker"><span class="sd-dm-dot' + (active ? ' is-active' : '') + '"></span>Daily Study Mission</div>' +
         '<h2>' + title + '</h2>' +
         '<p>' + text + '</p>' +
       '</div>' +
-      '<button type="button" class="sd-dm-cta">' + cta + '</button>';
+      '<div class="sd-dm-meta" aria-label="Mission status">' +
+        '<span>' + stateLabel + '</span>' +
+        '<span>' + taskLabel + '</span>' +
+        '<span>' + minuteLabel + '</span>' +
+        '<span>' + focus + '</span>' +
+      '</div>' +
+      '<button type="button" class="sd-dm-cta">' +
+        '<span>' + cta + '</span>' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>' +
+      '</button>';
     host.querySelector<HTMLButtonElement>('.sd-dm-cta')?.addEventListener('click', openAi);
   };
 
   if (!courseId) {
-    paint('Daily Study Mission', 'Turn your uploaded course files into a daily study plan.', 'Set Up Mission', false);
+    paint('Daily Study Mission', 'Turn your uploaded course files into a daily study plan.', 'Set Up Mission', false, { state: 'Choose a subject' });
     return;
   }
 
-  paint('Daily Study Mission', 'Checking today\'s trusted study plan for ' + courseName + '...', 'Open in AI', false);
+  paint(
+    'Daily Study Mission',
+    'Checking today\'s trusted study plan for ' + courseName + '...',
+    'Open in AI',
+    false,
+    { focus: courseName, state: 'Checking sources' }
+  );
   import('../../services/study-service.js')
     .then((mod) => mod.getDailyMissionSummary(courseId))
     .then((summary) => {
@@ -432,16 +514,29 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
           'Daily Study Mission',
           'Minallo needs confirmed course sources before it can build trusted tasks for ' + courseName + '.',
           'Review Course Map',
-          false
+          false,
+          { focus: courseName, state: 'Needs sources' }
         );
         return;
       }
       if (!summary.hasPlan) {
-        paint('Daily Study Mission', 'Turn your uploaded course files into a daily study plan.', 'Set Up Mission', false);
+        paint(
+          'Daily Study Mission',
+          'Turn your uploaded course files into a daily study plan for ' + courseName + '.',
+          'Set Up Mission',
+          false,
+          { focus: courseName, state: 'Ready to set up' }
+        );
         return;
       }
       if (summary.totalTasks > 0 && summary.completedTasks >= summary.totalTasks) {
-        paint('Mission complete for today', 'Good work. You finished today\'s trusted study plan.', 'View Today\'s Mission', true);
+        paint(
+          'Mission complete for today',
+          'Good work. You finished today\'s trusted study plan.',
+          'View Mission',
+          true,
+          { tasks: summary.totalTasks, minutes: 0, focus: courseName, state: 'Complete' }
+        );
         return;
       }
       if (summary.hasUnavailableSources) {
@@ -449,19 +544,21 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
           'Daily Study Mission',
           'Some of today\'s tasks lost their source file. Open the mission in AI to fix or replace them.',
           'Fix in AI',
-          true
+          true,
+          { tasks: summary.totalTasks, minutes: summary.minutesRemaining, focus: courseName, state: 'Needs attention' }
         );
         return;
       }
       paint(
         'Daily Study Mission',
-        'Today: ' + summary.totalTasks + ' tasks · ' + summary.minutesRemaining + ' min left',
+        'Today\'s trusted plan is ready from your real course sources.',
         'Open in AI',
-        true
+        true,
+        { tasks: summary.totalTasks, minutes: summary.minutesRemaining, focus: courseName, state: 'Active today' }
       );
     })
     .catch(() => {
-      paint('Daily Study Mission', 'Confirm your course sources to generate trusted tasks.', 'Review Course Map', false);
+      paint('Daily Study Mission', 'Confirm your course sources to generate trusted tasks.', 'Review Course Map', false, { focus: courseName, state: 'Needs sources' });
     });
 }
 
@@ -602,3 +699,4 @@ function _renderNextStepsBelowGrid(
   }
   host.appendChild(wrap);
 }
+

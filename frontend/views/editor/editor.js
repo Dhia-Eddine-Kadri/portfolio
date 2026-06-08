@@ -63,7 +63,7 @@
         history.replaceState(
           { view: 'portal', section: 'editor', sub: 'writer' },
           '',
-          '#portal=editor:writer'
+          '#portal=editor&mode=writer'
         );
         localStorage.setItem('ss_last_section', 'editor');
         localStorage.setItem('ss_editor_sub', 'writer');
@@ -80,7 +80,7 @@
         history.replaceState(
           { view: 'portal', section: 'editor', sub: 'pdf' },
           '',
-          '#portal=editor:pdf'
+          '#portal=editor&mode=pdf'
         );
         localStorage.setItem('ss_last_section', 'editor');
         localStorage.setItem('ss_editor_sub', 'pdf');
@@ -97,7 +97,7 @@
         history.replaceState(
           { view: 'portal', section: 'editor', sub: 'merger' },
           '',
-          '#portal=editor:merger'
+          '#portal=editor&mode=merger'
         );
         localStorage.setItem('ss_last_section', 'editor');
         localStorage.setItem('ss_editor_sub', 'merger');

@@ -828,7 +828,11 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
         if (stored && stored !== 'dashboard') backSection = stored;
       } catch { /* storage unavailable */ }
       if (backSection === 'courses') backSection = 'studip';
-      if (typeof window.showPortalSection === 'function') {
+      // Bug 1 fix: use _navigatePortal so the URL hash and sidebar highlight
+      // are updated together, keeping browser back/forward in sync.
+      if (typeof (window as unknown as { _navigatePortal?: (s: string) => void })._navigatePortal === 'function') {
+        (window as unknown as { _navigatePortal: (s: string) => void })._navigatePortal(backSection);
+      } else if (typeof window.showPortalSection === 'function') {
         window.showPortalSection(backSection);
       } else {
         window.history.back();

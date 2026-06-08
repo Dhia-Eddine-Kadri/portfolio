@@ -97,6 +97,19 @@ function _ssStateFromHash(hash) {
   return null;
 }
 
+// Central portal navigation helper. Updates hash, calls showPortalSection,
+// calls setNavActive with the correct sidebar ID, and commits URL + storage
+// via _finalizeNav. Use this instead of calling showPortalSection directly.
+function _navigatePortal(section) {
+  if (!section) return;
+  var navId = _ssPortalNavId(section);
+  if (typeof setNavActive === 'function') setNavActive(navId);
+  if (typeof showPortalSection === 'function') showPortalSection(section);
+  _finalizeNav(section);
+  _ssAfterFeature(section);
+}
+window._navigatePortal = _navigatePortal;
+
 // Sync the URL to match the actual visible app state. Uses replaceState so it
 // doesn't create extra history entries — just corrects the hash if it drifted.
 // Called after file open/close, drawer open/close, and section switches.
@@ -285,8 +298,13 @@ function _ssApplyHistoryState(state) {
     if (course) {
       setNavActive('pcStudip');
       if (typeof window.openCourse === 'function') window.openCourse(course);
-      if (state.section && typeof window.showCourseSection === 'function')
-        window.showCourseSection(course, state.section);
+      // Bug 4 fix: defer showCourseSection so it runs after openCourse has
+      // finished mounting the course view, preventing the Files tab flash.
+      if (state.section && state.section !== 'files' && typeof window.showCourseSection === 'function') {
+        setTimeout(function () {
+          window.showCourseSection(course, state.section);
+        }, 0);
+      }
       _ssRestorePanel(state.panel);
     }
     return;
