@@ -165,6 +165,8 @@ class GenerateDeepLearnRequest(BaseModel):
     documentIds: list[str] | None = None
     lessonMode: str | None = None
     lessonLanguage: str | None = None
+    courseName: str | None = None
+    studentMajor: str | None = None
 
 
 class GenerateDeepLearnResponse(BaseModel):
@@ -337,6 +339,8 @@ async def generate_deep_learn_endpoint(payload: GenerateDeepLearnRequest) -> Gen
         doc_names=doc_names,
         lesson_mode=payload.lessonMode,
         lesson_language=payload.lessonLanguage,
+        course_name=payload.courseName,
+        student_major=payload.studentMajor,
     )
     return GenerateDeepLearnResponse(
         noteId=out.get("noteId"),

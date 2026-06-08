@@ -1178,6 +1178,9 @@
           if (documentIds && documentIds.length) opts.documentIds = documentIds;
           if (els.mode && els.mode.value) opts.lessonMode = els.mode.value;
           if (els.language && els.language.value) opts.lessonLanguage = els.language.value;
+          if (els.courseName) opts.courseName = els.courseName;
+          var major = (typeof _userMajor !== 'undefined' && _userMajor) || localStorage.getItem('ss_major') || '';
+          if (major) opts.studentMajor = major;
           return svc.generateDeepLearn(courseId, topic, opts).then(function (res) {
             els.gen.disabled = false;
             progress.stop();

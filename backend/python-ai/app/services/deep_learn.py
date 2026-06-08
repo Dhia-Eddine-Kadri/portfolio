@@ -115,7 +115,11 @@ _SYSTEM = (
     "from the student's specific course material, not from general AI knowledge. "
     "The RAW COURSE EVIDENCE is provided for source labels and additional context.\n\n"
     "Deep Learn has four lesson engines. Your FIRST task is to detect which engine fits "
-    "the topic, then follow that engine's structure exactly.\n\n"
+    "the topic, then follow that engine's structure exactly.\n"
+    "Use the COURSE name and STUDENT MAJOR (if provided) as secondary signals for engine "
+    "detection — e.g. a topic from 'Fertigungstechnik' or 'Werkstoffkunde' should almost "
+    "always be concept-light-math, not no-math. But the uploaded course evidence is always "
+    "the primary source of truth.\n\n"
     "STEP 1 — Detect lesson engine. Set contentType to one of:\n"
     "- \"math-heavy\" — the main goal is solving problems with formulas, proofs, calculations, "
     "or derivations. Examples: mathematics, physics calculations, mechanics, statistics, "
@@ -295,6 +299,22 @@ _SYSTEM = (
     '"citationWarning":""'
     "}"
 )
+
+
+def _student_context_prompt(course_name: str | None, student_major: str | None) -> str:
+    parts: list[str] = []
+    if course_name:
+        parts.append(f"COURSE: {course_name.strip()}")
+    if student_major:
+        parts.append(f"STUDENT MAJOR: {student_major.strip()}")
+    if not parts:
+        return ""
+    return (
+        "STUDENT CONTEXT (use as personalization — adapt terminology, examples, and "
+        "difficulty to this student's background, but NEVER let it override what the "
+        "actual course evidence says):\n"
+        + "\n".join(parts)
+    )
 
 
 def _lesson_mode(value: str | None) -> str:
@@ -1188,6 +1208,8 @@ def generate_deep_learn(
     doc_names: dict[str, str],
     lesson_mode: str | None = None,
     lesson_language: str | None = None,
+    course_name: str | None = None,
+    student_major: str | None = None,
     save: bool = True,
 ) -> dict[str, Any]:
     topic = (topic or "").strip()
@@ -1226,10 +1248,12 @@ def generate_deep_learn(
     extracted_facts = _extract_source_facts(topic, evidence)
     facts_text = _format_extracted_facts(extracted_facts)
 
+    student_ctx = _student_context_prompt(course_name, student_major)
     user = (
         "TOPIC TO TEACH: " + topic + "\n\n"
         + _mode_prompt(mode) + "\n\n"
         + _language_prompt(language) + "\n\n"
+        + (student_ctx + "\n\n" if student_ctx else "")
     )
     if facts_text:
         user += (
@@ -1254,6 +1278,10 @@ def generate_deep_learn(
     data = res.data if isinstance(res.data, dict) else {}
     structured = _normalize_lesson(data, topic, mode)
     structured["lessonLanguage"] = effective_language
+    if course_name:
+        structured["courseName"] = course_name.strip()
+    if student_major:
+        structured["studentMajor"] = student_major.strip()
     _validate_lesson_content(
         structured,
         topic=topic,
