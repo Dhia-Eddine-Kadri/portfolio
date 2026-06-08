@@ -853,15 +853,27 @@ body:not(.night) #psec-studip .sd-skel-bar {
   flex: 0 1 auto;
   padding: 10px 22px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: rgba(255, 255, 255, 0.78);
   font-size: 0.92rem;
   font-weight: 700;
-  color: rgba(226, 232, 240, 0.95);
+  color: #172033;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: #172033;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 50vw;
+}
+body.night .co-inner-v2 .co-topnav-title,
+.night .co-inner-v2 .co-topnav-title {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(226, 232, 240, 0.95);
+  -webkit-text-fill-color: rgba(226, 232, 240, 0.95);
+  box-shadow: none;
 }
 .co-inner-v2 .co-study-btn {
   margin-left: auto;
