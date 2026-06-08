@@ -192,11 +192,13 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
 
     # Same refusal-recovery as answer_stream.py: model often refuses with
     # "Ich kann keine Bilder zeichnen" — structured outputs can't refuse.
-    print(
-        f"[DIAGRAM_DEBUG /chat] wants_diagram={diagram_wanted} wants_plot={plot_wanted} "
-        f"has_diag_fence={'```minallo-diagram' in text} "
-        f"has_plot_fence={'```minallo-plot' in text} text_len={len(text)}",
-        flush=True,
+    log.debug(
+        "[DIAGRAM_DEBUG /chat] wants_diagram=%s wants_plot=%s "
+        "has_diag_fence=%s has_plot_fence=%s text_len=%d",
+        diagram_wanted, plot_wanted,
+        "```minallo-diagram" in text,
+        "```minallo-plot" in text,
+        len(text),
     )
     # Plot-shape requests: fire the plot fallback whenever no plot fence is
     # present — even if a diagram fence slipped through (wrong shape for a

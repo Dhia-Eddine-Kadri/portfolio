@@ -425,7 +425,7 @@ def _force_render_diagram(
     Returns the fenced markdown to append (with leading newlines), or
     None if the fallback itself errored.
     """
-    print(f"[DIAGRAM_DEBUG] _force_render_diagram entered model={model}", flush=True)
+    log.debug("[DIAGRAM_DEBUG] _force_render_diagram entered model=%s", model)
     try:
         ctx_lines: list[str] = []
         if open_ctx:
@@ -457,18 +457,17 @@ def _force_render_diagram(
             ],
         )
         raw = (completion.choices[0].message.content or "").strip()
-        print(f"[DIAGRAM_DEBUG] structured call returned raw_len={len(raw)}", flush=True)
+        log.debug("[DIAGRAM_DEBUG] structured call returned raw_len=%d", len(raw))
         if not raw:
-            print("[DIAGRAM_DEBUG] empty content -> None", flush=True)
+            log.debug("[DIAGRAM_DEBUG] empty content -> None")
             return None
         parsed = json.loads(raw)
         node_count = len(parsed.get("nodes", [])) if isinstance(parsed, dict) else 0
-        print(f"[DIAGRAM_DEBUG] parsed nodes={node_count}", flush=True)
+        log.debug("[DIAGRAM_DEBUG] parsed nodes=%d", node_count)
         if not isinstance(parsed, dict) or not parsed.get("nodes"):
             return None
         return "\n\n```minallo-diagram\n" + raw + "\n```\n"
     except Exception as e:  # noqa: BLE001
-        print(f"[DIAGRAM_DEBUG] exception {type(e).__name__}: {e}", flush=True)
         log.exception("force_render_diagram fallback failed")
         return None
 
@@ -555,7 +554,7 @@ def _force_render_plot(
     ``_force_render_diagram`` but targeting continuous curves. The
     structured-output schema forces the model to produce series of
     (x, y) points it can sample from the canonical curve shape."""
-    print(f"[PLOT_DEBUG] _force_render_plot entered model={model}", flush=True)
+    log.debug("[PLOT_DEBUG] _force_render_plot entered model=%s", model)
     try:
         ctx_lines: list[str] = []
         if open_ctx:
@@ -590,18 +589,17 @@ def _force_render_plot(
             ],
         )
         raw = (completion.choices[0].message.content or "").strip()
-        print(f"[PLOT_DEBUG] structured call returned raw_len={len(raw)}", flush=True)
+        log.debug("[PLOT_DEBUG] structured call returned raw_len=%d", len(raw))
         if not raw:
             return None
         parsed = json.loads(raw)
         series = parsed.get("series", []) if isinstance(parsed, dict) else []
         valid_series = sum(1 for s in series if isinstance(s, dict) and len(s.get("points", [])) >= 2)
-        print(f"[PLOT_DEBUG] series_count={len(series)} valid={valid_series}", flush=True)
+        log.debug("[PLOT_DEBUG] series_count=%d valid=%d", len(series), valid_series)
         if valid_series == 0:
             return None
         return "\n\n```minallo-plot\n" + raw + "\n```\n"
     except Exception as e:  # noqa: BLE001
-        print(f"[PLOT_DEBUG] exception {type(e).__name__}: {e}", flush=True)
         log.exception("force_render_plot fallback failed")
         return None
 
@@ -1204,12 +1202,13 @@ def stream_answer(
     # response_format=json_schema. Structured outputs can't refuse — the
     # response shape is constrained — so this is the reliable backstop.
     plot_wanted = _wants_plot(question, problem_solver) and not app_question
-    print(
-        f"[DIAGRAM_DEBUG] check wants_diagram={wants_diagram} wants_plot={plot_wanted} "
-        f"has_diag_fence={'```minallo-diagram' in full_answer} "
-        f"has_plot_fence={'```minallo-plot' in full_answer} "
-        f"answer_len={len(full_answer)}",
-        flush=True,
+    log.debug(
+        "[DIAGRAM_DEBUG] check wants_diagram=%s wants_plot=%s "
+        "has_diag_fence=%s has_plot_fence=%s answer_len=%d",
+        wants_diagram, plot_wanted,
+        "```minallo-diagram" in full_answer,
+        "```minallo-plot" in full_answer,
+        len(full_answer),
     )
     # Plot-shape requests: a ``minallo-diagram`` fence is the WRONG fence
     # (a curve encoded as node-chain). Fire the plot fallback whenever no
