@@ -1155,22 +1155,31 @@
           var btn = root.querySelector('.dmw-btn');
           if (btn) btn.addEventListener('click', _openAi);
         }
-        function _paint(data) {
-          if (!data || !data.hasPlan) { _paintEmpty(); return; }
+        function _paint(data, renderProgressHeaderHtml) {
+          if (!data || !data.hasPlan || !data.tasks.length) { _paintEmpty(); return; }
+          var mainFocus = data.tasks.find(function (t) {
+            return t.status !== 'completed' && t.status !== 'unavailable' && t.status !== 'replaced';
+          });
           root.innerHTML =
             '<div class="dmw-head"><span class="dmw-dot"></span><strong>Daily Study Mission</strong></div>' +
-            '<div class="dmw-progress">' + data.completedTasks + '/' + data.totalTasks + ' done &middot; ' + data.minutesRemaining + ' min left</div>' +
-            '<div class="dmw-focus">' + (data.mainFocus || 'Today&rsquo;s mission is ready') + '</div>' +
-            '<button class="dmw-btn" type="button">' + (data.totalTasks ? 'Open in AI' : 'Set Up Mission') + '</button>';
+            renderProgressHeaderHtml(data) +
+            '<div class="dmw-focus">' + (mainFocus ? mainFocus.title : 'Today&rsquo;s mission is ready') + '</div>' +
+            '<button class="dmw-btn" type="button">Open in AI</button>';
           var btn = root.querySelector('.dmw-btn');
           if (btn) btn.addEventListener('click', _openAi);
         }
         var cid = _courseId();
         if (!cid) { _paintEmpty(); return; }
         _paintLoading();
-        import('js/services/study-service.js')
-          .then(function (mod) { return mod.getDailyMissionSummary(cid); })
-          .then(_paint)
+        Promise.all([
+          import('js/services/study-service.js'),
+          import('js/features/daily-mission/daily-mission-ui.js')
+        ])
+          .then(function (mods) {
+            return mods[0].getDailyMission(cid).then(function (data) {
+              _paint(data, mods[1].renderProgressHeaderHtml);
+            });
+          })
           .catch(_paintEmpty);
       });
       updateCards();

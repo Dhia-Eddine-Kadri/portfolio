@@ -14,6 +14,7 @@ import {
   type AIThinkingStatus
 } from '../ai-chat/ai-thinking-status.js';
 import { routeStudyIntent } from '../ai-chat/intent-router.js';
+import type { DailyMissionPanelHandlers } from '../daily-mission/daily-mission-ui.js';
 import {
   findPrimaryCourseId,
   generateDailyMission,
@@ -882,10 +883,17 @@ async function handleIntentRoute(
   }
 
   if (route.intent === 'daily_mission') {
-    let data = await getDailyMission(route.target.courseId);
-    if (!data.hasPlan) data = await generateDailyMission(route.target.courseId);
+    const targetCourseId = route.target.courseId;
+    let data = await getDailyMission(targetCourseId);
+    if (!data.hasPlan) data = await generateDailyMission(targetCourseId);
     const text = renderDailyMissionText(data);
-    if (bubble) renderRichBubble(bubble, text);
+    if (bubble) {
+      bubble.innerHTML = '';
+      const mod = await import('../daily-mission/daily-mission-ui.js');
+      void mod.mountDailyMissionPanel(bubble, targetCourseId, {
+        handlers: buildDailyMissionHandlers(targetCourseId)
+      });
+    }
     return text;
   }
 
@@ -905,9 +913,111 @@ async function handleIntentRoute(
     return text;
   }
 
-  const text = 'I can make notes from a selected file or course source. Open the source you want, then ask "make notes from this lecture".';
-  if (bubble) renderRichBubble(bubble, text);
-  return text;
+  if (route.intent === 'notes') {
+    return handleNotesIntent(route.target.courseId, bubble);
+  }
+
+  return null;
+}
+
+/** Notes need a single, concrete source — unlike summary/cheatsheet which can
+ *  pull from "current course sources" broadly. This resolves a target file
+ *  (the one the student has open, or the course's only file), asks a
+ *  clarifying question when the choice is ambiguous, then grounds generation
+ *  on that file's extracted text via the same single-shot `/api/notes/generate`
+ *  call the Notes panel uses for short documents. */
+async function handleNotesIntent(courseId: string, bubble: HTMLElement | null): Promise<string> {
+  const w = window as unknown as {
+    activeFileName?: string | null;
+    activeCourseRef?: { id?: string; files?: Array<{ name?: string }> } | null;
+    SEMS?: Record<string, { courses?: Array<{ id?: string; files?: Array<{ name?: string }> }> }>;
+    sdActiveSemId?: string;
+  };
+
+  const course =
+    (w.activeCourseRef?.id === courseId ? w.activeCourseRef : null) ||
+    w.SEMS?.[w.sdActiveSemId || '']?.courses?.find((c) => c.id === courseId) ||
+    null;
+  const files = (course?.files || [])
+    .map((f) => (typeof f.name === 'string' ? f.name : null))
+    .filter((name): name is string => !!name && /\.pdf$/i.test(name));
+
+  let fileName: string | null = null;
+  if (w.activeFileName && files.includes(w.activeFileName)) fileName = w.activeFileName;
+  else if (files.length === 1) fileName = files[0] ?? null;
+
+  if (!fileName) {
+    const text = files.length
+      ? 'Which file should I make notes from?\n\n' +
+        files.slice(0, 8).map((n) => '• ' + n).join('\n') +
+        '\n\nOpen the file you want, then ask me again — e.g. "make notes from this lecture".'
+      : 'I can make notes from a course file. Open the source you want, then ask "make notes from this lecture".';
+    if (bubble) renderRichBubble(bubble, text);
+    return text;
+  }
+
+  if (bubble) renderRichBubble(bubble, 'Reading **' + fileName + '** and writing your notes…');
+  try {
+    const [extraction, ai] = await Promise.all([
+      import('../pdf-viewer/pdf-text-extraction.js'),
+      import('../../services/ai-service.js')
+    ]);
+    const [rawText] = await extraction.extractMultiplePdfs([fileName], 20);
+    const pdfText = (rawText || '').replace(/^=== .*? ===\n/, '');
+    const result = await ai.generateNotes(courseId, { fileName, pdfText });
+    if (result.error || !result.note?.content_markdown) {
+      const text = 'I could not generate notes from ' + fileName + ' right now. Please try again from the Notes tab.';
+      if (bubble) renderRichBubble(bubble, text);
+      return text;
+    }
+    const text =
+      'Notes from ' + fileName + ' (saved to your Notes tab):\n\n' + result.note.content_markdown;
+    if (bubble) renderRichBubble(bubble, text);
+    return text;
+  } catch {
+    const text = 'I could not generate notes from ' + fileName + ' right now. Please try again from the Notes tab.';
+    if (bubble) renderRichBubble(bubble, text);
+    return text;
+  }
+}
+
+/** Resolves the matching course object from global app state, then jumps the
+ *  user into My Courses on the right tab — mirrors the dashboard widget's
+ *  "open course" wiring (see dashboard-widget.js `cw-pill` handler) so a tap
+ *  on a Daily Mission task button lands exactly where the work lives. */
+function buildDailyMissionHandlers(courseId: string): DailyMissionPanelHandlers {
+  const w = window as unknown as {
+    activeCourseRef?: { id?: string } | null;
+    sdActiveSemId?: string;
+    SEMS?: Record<string, { courses?: Array<{ id?: string; name?: string }> }>;
+    setNavActive?: (id: string) => void;
+    showPortalSection?: (section: string) => void;
+    openCourse?: (course: unknown) => void;
+    showCourseSection?: (course: unknown, section: string) => void;
+  };
+
+  const findCourse = (): unknown | null => {
+    if (w.activeCourseRef?.id === courseId) return w.activeCourseRef;
+    const sem = w.SEMS?.[w.sdActiveSemId || ''];
+    return sem?.courses?.find((c) => c.id === courseId) || null;
+  };
+
+  const goToSection = (section: string): void => {
+    const course = findCourse();
+    if (!course) return;
+    w.setNavActive?.('pcStudip');
+    w.showPortalSection?.('studip');
+    w.openCourse?.(course);
+    if (section !== 'files') w.showCourseSection?.(course, section);
+  };
+
+  return {
+    onOpenSource: () => goToSection('files'),
+    onOpenDeepLearn: () => goToSection('deeplearn'),
+    onOpenExamForge: () => goToSection('examforge'),
+    onGenerateQuiz: () => goToSection('quiz'),
+    onCreateFlashcards: () => goToSection('flashcards')
+  };
 }
 
 function renderDailyMissionText(data: DailyMissionResponse): string {

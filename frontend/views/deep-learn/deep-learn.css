@@ -297,8 +297,32 @@
 .ss-print-body .dl-c-muted { color: #6b7280; }
 .ss-print-body .dl-c-key { color: #1d4ed8; }
 
-/* Saved lessons */
-.dl-saved { margin-bottom: 18px; }
+/* Saved lessons — fade/slide in instead of popping in via [hidden] toggle,
+   which causes a jarring layout jump that feels like a page refresh. */
+.dl-saved {
+  margin-bottom: 18px;
+  overflow: hidden;
+  max-height: 600px;
+  opacity: 1;
+  transition: opacity 0.18s ease, max-height 0.22s ease, margin 0.22s ease;
+}
+.dl-saved[hidden] {
+  display: block;
+  margin-bottom: 0;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.dl-result {
+  animation: dl-fade-in 0.16s ease;
+}
+@keyframes dl-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-saved, .dl-result { transition: none; animation: none; }
+}
 .dl-saved-head {
   font-size: 0.78rem;
   text-transform: uppercase;

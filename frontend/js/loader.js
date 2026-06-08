@@ -365,6 +365,7 @@
             'css/theme.css?v=5',
             'css/styles.css?v=37',
             'css/courses-redesign.css?v=38',
+            'views/daily-mission/daily-mission.css?v=1',
             'css/app-design-system.css?v=5',
             'css/layout.css?v=10',
             'css/document-rail.css?v=28',

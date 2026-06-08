@@ -25,6 +25,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const remaining = activeTasks
     .filter((t) => t.status !== 'completed')
     .reduce((sum, t) => sum + (t.estimated_minutes || 0), 0);
+  const noValidCandidates = data.plan?.generated_reason === 'no_valid_candidates' && !data.tasks.length;
+  const hasUnavailable = activeTasks.some((t) => t.status === 'unavailable');
   return jsonResponse(200, {
     hasPlan: !!data.plan,
     courseId,
@@ -32,7 +34,9 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     completedTasks: completed,
     totalTasks: activeTasks.length,
     minutesRemaining: remaining,
-    mainFocus: activeTasks[0]?.title || null,
-    status: data.plan?.status || 'none'
+    mainFocus: activeTasks.find((t) => t.status !== 'completed' && t.status !== 'unavailable')?.title || null,
+    status: data.plan?.status || 'none',
+    noValidCandidates,
+    hasUnavailableSources: hasUnavailable
   });
 };

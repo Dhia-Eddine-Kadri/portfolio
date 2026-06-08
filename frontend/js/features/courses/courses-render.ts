@@ -427,12 +427,30 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
   import('../../services/study-service.js')
     .then((mod) => mod.getDailyMissionSummary(courseId))
     .then((summary) => {
+      if (summary.noValidCandidates) {
+        paint(
+          'Daily Study Mission',
+          'Minallo needs confirmed course sources before it can build trusted tasks for ' + courseName + '.',
+          'Review Course Map',
+          false
+        );
+        return;
+      }
       if (!summary.hasPlan) {
         paint('Daily Study Mission', 'Turn your uploaded course files into a daily study plan.', 'Set Up Mission', false);
         return;
       }
       if (summary.totalTasks > 0 && summary.completedTasks >= summary.totalTasks) {
         paint('Mission complete for today', 'Good work. You finished today\'s trusted study plan.', 'View Today\'s Mission', true);
+        return;
+      }
+      if (summary.hasUnavailableSources) {
+        paint(
+          'Daily Study Mission',
+          'Some of today\'s tasks lost their source file. Open the mission in AI to fix or replace them.',
+          'Fix in AI',
+          true
+        );
         return;
       }
       paint(

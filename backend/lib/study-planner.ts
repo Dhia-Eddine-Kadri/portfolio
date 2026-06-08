@@ -26,6 +26,23 @@ interface CandidateRow {
   documents?: { file_name?: string; processing_status?: string } | null;
 }
 
+interface TopicStateRow {
+  topic_id: string;
+  state: string;
+}
+
+const STATE_RANK: Record<string, number> = {
+  weak: 0,
+  not_started: 1,
+  started: 2,
+  reviewed: 3,
+  practiced: 4,
+  good: 5,
+  exam_ready: 6
+};
+
+const IMPORTANCE_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
 interface PlanRow {
   id: string;
   user_id: string;
@@ -45,6 +62,8 @@ interface TaskRow {
   user_id: string;
   course_id: string;
   topic_id?: string | null;
+  valid_task_candidate_id?: string | null;
+  source_file_id?: string | null;
   status: TaskStatus;
   estimated_minutes: number;
   priority_group: string;
@@ -162,50 +181,126 @@ export async function generateDailyPlan(
   courseId: string,
   planDate: string,
   userTimezone: string,
-  availableMinutes?: number
+  availableMinutes?: number,
+  regenerate?: boolean
 ): Promise<{ plan: PlanRow | null; tasks: TaskRow[]; setupRequired?: boolean; noValidCandidates?: boolean }> {
   const existing = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-  if (existing.plan && existing.tasks.length) return existing;
+  if (existing.plan && existing.tasks.length && !regenerate) return existing;
 
   const plan = existing.plan || await ensurePlan(serviceKey, userId, courseId, planDate, userTimezone);
   const prefsMinutes = Number.isFinite(availableMinutes) && availableMinutes && availableMinutes > 0
     ? Math.min(180, Math.max(15, Math.round(availableMinutes)))
     : 45;
 
-  const candidatesRes = await supaRequest<CandidateRow[]>(
-    'GET',
-    'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
-      '&course_id=eq.' + encodeURIComponent(courseId) +
-      '&is_valid=eq.true' +
-      '&source_confidence=in.(high,confirmed)' +
-      '&select=*,course_topics(name,importance),documents(file_name,processing_status)' +
-      '&order=created_at.asc' +
-      '&limit=20',
-    null,
-    serviceKey
-  );
+  const [candidatesRes, statesRes] = await Promise.all([
+    supaRequest<CandidateRow[]>(
+      'GET',
+      'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
+        '&course_id=eq.' + encodeURIComponent(courseId) +
+        '&is_valid=eq.true' +
+        '&source_confidence=in.(high,confirmed)' +
+        '&select=*,course_topics(name,importance),documents(file_name,processing_status)' +
+        '&order=created_at.asc' +
+        '&limit=40',
+      null,
+      serviceKey
+    ),
+    supaRequest<TopicStateRow[]>(
+      'GET',
+      'student_topic_state?user_id=eq.' + encodeURIComponent(userId) +
+        '&course_id=eq.' + encodeURIComponent(courseId) +
+        '&select=topic_id,state',
+      null,
+      serviceKey
+    )
+  ]);
   const candidates = Array.isArray(candidatesRes.body)
     ? candidatesRes.body.filter((c) => c.documents?.processing_status === 'ready')
     : [];
+  const candidateIds = new Set(candidates.map((c) => c.id));
+  const stateByTopic = new Map<string, string>();
+  if (Array.isArray(statesRes.body)) {
+    for (const row of statesRes.body) stateByTopic.set(row.topic_id, row.state);
+  }
 
-  if (!candidates.length) {
-    await markPlanGenerated(serviceKey, plan.id, 0, 'no_valid_candidates');
+  // Idempotent regeneration: never delete or reset completed tasks; mark
+  // unfinished tasks whose candidate is gone/invalid as replaced or unavailable,
+  // then top up remaining time budget with fresh candidates.
+  let keptMinutes = 0;
+  let nextOrder = 1;
+  const usedCandidateIds = new Set<string>();
+  if (regenerate && existing.plan && existing.tasks.length) {
+    for (const task of existing.tasks) {
+      if (task.status === 'completed' || task.status === 'in_progress') {
+        keptMinutes += task.estimated_minutes || 0;
+        if (task.valid_task_candidate_id) usedCandidateIds.add(task.valid_task_candidate_id);
+        nextOrder = Math.max(nextOrder, task.order_index + 1);
+        continue;
+      }
+      if (task.status === 'todo' || task.status === 'skipped') {
+        const candidateId = task.valid_task_candidate_id || null;
+        const candidateStillValid = !!candidateId && candidateIds.has(candidateId);
+        const sourceGone = !!task.source_file_id && candidates.every((c) => c.source_file_id !== task.source_file_id);
+        const nextStatus = sourceGone ? 'unavailable' : (candidateStillValid ? null : 'replaced');
+        if (nextStatus) {
+          await supaRequest(
+            'PATCH',
+            'daily_study_tasks?id=eq.' + encodeURIComponent(task.id),
+            { status: nextStatus, updated_at: new Date().toISOString() },
+            serviceKey,
+            { Prefer: 'return=minimal' }
+          );
+          await writeStudyEvent(serviceKey, {
+            user_id: userId,
+            course_id: courseId,
+            topic_id: task.topic_id || null,
+            task_id: task.id,
+            event_type: 'task_' + nextStatus,
+            value: nextStatus,
+            metadata: { reason: sourceGone ? 'source_unavailable' : 'candidate_invalidated', regenerated: true }
+          });
+        } else {
+          keptMinutes += task.estimated_minutes || 0;
+          if (candidateId) usedCandidateIds.add(candidateId);
+          nextOrder = Math.max(nextOrder, task.order_index + 1);
+        }
+        continue;
+      }
+      // moved / replaced / unavailable: leave untouched
+      nextOrder = Math.max(nextOrder, task.order_index + 1);
+    }
+  }
+
+  const remainingMinutes = Math.max(0, prefsMinutes - keptMinutes);
+  const freshCandidates = candidates.filter((c) => !usedCandidateIds.has(c.id));
+
+  if (!freshCandidates.length && !remainingMinutes) {
+    await markPlanGenerated(serviceKey, plan.id, prefsMinutes, regenerate ? 'regenerated_no_remaining_time' : 'no_valid_candidates');
+    const after = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
+    return { ...after, noValidCandidates: !regenerate && !after.tasks.length };
+  }
+
+  if (!freshCandidates.length) {
+    await markPlanGenerated(serviceKey, plan.id, keptMinutes, regenerate ? 'regenerated_from_existing' : 'no_valid_candidates');
     await writeStudyEvent(serviceKey, {
       user_id: userId,
       course_id: courseId,
       event_type: 'plan_generated',
-      value: 'no_valid_candidates',
+      value: regenerate ? 'regenerated_from_existing' : 'no_valid_candidates',
       metadata: { planDate }
     });
     const after = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-    return { ...after, noValidCandidates: true };
+    return { ...after, noValidCandidates: !regenerate && !after.tasks.length };
   }
 
-  const selected = selectCandidates(candidates, prefsMinutes);
+  const ranked = rankCandidates(freshCandidates, stateByTopic);
+  const selected = selectCandidates(ranked, remainingMinutes || prefsMinutes);
+  const startIdx = nextOrder - 1;
   const taskRows = selected.map((c, idx) => {
     const topicName = c.course_topics?.name || 'course topic';
     const fileName = c.documents?.file_name || 'course source';
-    const group = idx === 0 ? 'must_do' : idx < 3 ? 'should_do' : 'optional';
+    const overallIdx = startIdx + idx;
+    const group = overallIdx === 0 ? 'must_do' : overallIdx < 3 ? 'should_do' : 'optional';
     return {
       daily_plan_id: plan.id,
       user_id: userId,
@@ -216,38 +311,40 @@ export async function generateDailyPlan(
       priority_group: group,
       title: taskTitle(c.task_type, topicName),
       description: 'Use ' + fileName + pageLabel(c.page_start, c.page_end) + '.',
-      reason: templateReason(group),
+      reason: templateReason(group, stateByTopic.get(c.topic_id)),
       reason_code: group === 'must_do' ? 'next_in_course_map' : 'source_grounded_candidate',
       reason_metadata: {
         sourceConfidence: 'high_or_confirmed',
-        topicImportance: c.course_topics?.importance || 'medium'
+        topicImportance: c.course_topics?.importance || 'medium',
+        topicState: stateByTopic.get(c.topic_id) || 'not_started'
       },
       source_file_id: c.source_file_id,
       page_start: c.page_start,
       page_end: c.page_end,
       estimated_minutes: c.estimated_minutes,
       status: 'todo',
-      order_index: idx + 1
+      order_index: nextOrder + idx
     };
   });
-  const insert = await supaRequest<TaskRow[]>(
+  await supaRequest(
     'POST',
     'daily_study_tasks',
     taskRows,
     serviceKey,
-    { Prefer: 'return=representation' }
+    { Prefer: 'return=minimal' }
   );
-  const total = taskRows.reduce((sum, t) => sum + t.estimated_minutes, 0);
-  await markPlanGenerated(serviceKey, plan.id, total, 'generated_from_valid_candidates');
+  const total = keptMinutes + taskRows.reduce((sum, t) => sum + t.estimated_minutes, 0);
+  const reason = regenerate ? 'regenerated_from_valid_candidates' : 'generated_from_valid_candidates';
+  await markPlanGenerated(serviceKey, plan.id, total, reason);
   await writeStudyEvent(serviceKey, {
     user_id: userId,
     course_id: courseId,
-    event_type: 'plan_generated',
-    value: 'generated_from_valid_candidates',
-    metadata: { planDate, taskCount: taskRows.length }
+    event_type: regenerate ? 'plan_regenerated' : 'plan_generated',
+    value: reason,
+    metadata: { planDate, taskCount: taskRows.length, keptMinutes }
   });
   const fresh = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-  return { plan: fresh.plan || plan, tasks: Array.isArray(insert.body) ? insert.body : fresh.tasks };
+  return { plan: fresh.plan || plan, tasks: fresh.tasks };
 }
 
 export async function writeStudyEvent(serviceKey: string, row: Record<string, unknown>): Promise<void> {
@@ -286,6 +383,18 @@ async function markPlanGenerated(serviceKey: string, planId: string, total: numb
   );
 }
 
+function rankCandidates(candidates: CandidateRow[], stateByTopic: Map<string, string>): CandidateRow[] {
+  return [...candidates].sort((a, b) => {
+    const stateA = STATE_RANK[stateByTopic.get(a.topic_id) || 'not_started'] ?? 1;
+    const stateB = STATE_RANK[stateByTopic.get(b.topic_id) || 'not_started'] ?? 1;
+    if (stateA !== stateB) return stateA - stateB;
+    const impA = IMPORTANCE_RANK[a.course_topics?.importance || 'medium'] ?? 1;
+    const impB = IMPORTANCE_RANK[b.course_topics?.importance || 'medium'] ?? 1;
+    if (impA !== impB) return impA - impB;
+    return 0;
+  });
+}
+
 function selectCandidates(candidates: CandidateRow[], minutes: number): CandidateRow[] {
   const maxTasks = minutes <= 15 ? 1 : minutes <= 30 ? 2 : minutes <= 60 ? 3 : 5;
   const seen = new Set<string>();
@@ -320,8 +429,12 @@ function pageLabel(start: number | null, end: number | null): string {
   return ', pages ' + start + '-' + end;
 }
 
-function templateReason(group: string): string {
-  if (group === 'must_do') return 'This is the next source-confirmed topic in your course map.';
+function templateReason(group: string, topicState?: string): string {
+  if (group === 'must_do') {
+    if (topicState === 'weak') return 'You marked this topic as weak — it is the top priority today.';
+    if (topicState === 'not_started' || !topicState) return 'This is the next source-confirmed topic in your course map.';
+    return 'This keeps your progress moving on a confirmed course topic.';
+  }
   if (group === 'should_do') return 'This task is grounded in a confirmed course source.';
   return 'Optional extra practice if you have more time today.';
 }

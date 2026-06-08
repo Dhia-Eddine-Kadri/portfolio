@@ -2876,6 +2876,14 @@ body.pdf-maximized .annotate-popover {
 }
 .co-course-panel.active {
   display: block;
+  animation: co-panel-fade-in 0.16s ease;
+}
+@keyframes co-panel-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .co-course-panel.active { animation: none; }
 }
 .co-study-tools {
   margin: 0 0 14px;
@@ -3983,6 +3991,7 @@ body.pdf-maximized .annotate-popover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: max-width 0.22s ease;
 }
 /* Quiz and flashcards panels need much more horizontal room for their two-pane layout */
 .co-inner:has(#coQuizPanel.active),

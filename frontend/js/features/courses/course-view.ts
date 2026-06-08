@@ -575,6 +575,16 @@ export function openCourse(course: LegacyCourse): void {
     void preload('cheatsheet');
     void preload('deeplearn');
   }
+
+  // Warm the topic-map / saved-notes cache in the background so the first
+  // visit to Deep Learn or Cheatsheet doesn't show a "Loading…" flash —
+  // the data is usually already resolved by the time the tab mounts.
+  void import('../../services/ai-service.js')
+    .then((svc) => {
+      void svc.getCourseTopicMap?.(course.id);
+      void svc.listCourseNotes?.(course.id);
+    })
+    .catch(() => undefined);
 }
 
 function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {

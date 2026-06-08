@@ -328,17 +328,30 @@ export interface CourseTopic {
   related_exercise_ids?: string[];
 }
 
-/** Read the stored per-course Topic Map (Learning Agent Core). */
+const _topicMapCache = new Map<string, { at: number; promise: Promise<CourseTopic[]> }>();
+const TOPIC_MAP_CACHE_MS = 60_000;
+
+/** Read the stored per-course Topic Map (Learning Agent Core).
+ *  Short-lived cache so switching to Deep Learn/Cheatsheet right after a
+ *  preload (or revisiting the tab) reuses the in-flight/recent result instead
+ *  of re-fetching and re-showing a "Loading topics…" flash. */
 export async function getCourseTopicMap(courseId: string): Promise<CourseTopic[]> {
-  const response = await fetch(_backendUrl() + '/api/learning/topic-map', {
-    method: 'POST',
-    headers: _authJsonHeaders(),
-    body: JSON.stringify({ courseId }),
-  });
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
-  if (!response.ok) return [];
-  const data = (await response.json()) as { topics?: CourseTopic[] };
-  return data.topics || [];
+  const cached = _topicMapCache.get(courseId);
+  if (cached && Date.now() - cached.at < TOPIC_MAP_CACHE_MS) return cached.promise;
+  const promise = (async () => {
+    const response = await fetch(_backendUrl() + '/api/learning/topic-map', {
+      method: 'POST',
+      headers: _authJsonHeaders(),
+      body: JSON.stringify({ courseId }),
+    });
+    if (response.status === 401) throw new Error('SESSION_EXPIRED');
+    if (!response.ok) return [];
+    const data = (await response.json()) as { topics?: CourseTopic[] };
+    return data.topics || [];
+  })();
+  _topicMapCache.set(courseId, { at: Date.now(), promise });
+  promise.catch(() => _topicMapCache.delete(courseId));
+  return promise;
 }
 
 /** Trigger a (background) rebuild of the course Topic Map; returns the current
@@ -458,6 +471,45 @@ export async function generateCheatsheet(
   return response.json();
 }
 
+export interface NotesResult {
+  note?: {
+    id: string;
+    title?: string | null;
+    content_markdown?: string;
+    type?: string;
+    source_page_start?: number | null;
+    source_page_end?: number | null;
+  };
+  error?: unknown;
+  indexing?: boolean;
+}
+
+/** Generates notes from a single document's extracted text — the same
+ *  single-shot `/api/notes/generate` call the Notes panel uses for short
+ *  documents (`mode: 'generate'`), grounded on `pdfText` so the chatbot
+ *  never invents content beyond what the student's file contains. */
+export async function generateNotes(
+  courseId: string,
+  opts: { fileName: string; pdfText: string; documentId?: string | null; language?: string }
+): Promise<NotesResult> {
+  const response = await fetch(_backendUrl() + '/api/notes/generate', {
+    method: 'POST',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify({
+      tool: 'notes',
+      mode: 'generate',
+      scope: 'document',
+      courseId,
+      documentId: opts.documentId ?? null,
+      fileName: opts.fileName,
+      pdfText: opts.pdfText,
+      language: opts.language || 'same_as_source'
+    }),
+  });
+  await _detectAiCapError(response);
+  return response.json();
+}
+
 export interface DeepLearnResult {
   noteId?: string | null;
   topic: string;
@@ -549,15 +601,33 @@ export interface SavedNote {
 }
 
 /** List the user's saved notes for a course (all types). */
+const _courseNotesCache = new Map<string, { at: number; promise: Promise<SavedNote[]> }>();
+const COURSE_NOTES_CACHE_MS = 30_000;
+
+/** List saved notes/lessons for a course. Cached briefly so a background
+ *  prefetch (course view preload) is reused by the Deep Learn / Notes panels
+ *  instead of triggering a second "Loading…" round-trip. */
 export async function listCourseNotes(courseId: string): Promise<SavedNote[]> {
-  const response = await fetch(
-    _backendUrl() + '/api/notes?courseId=' + encodeURIComponent(courseId),
-    { headers: _authJsonHeaders() }
-  );
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
-  if (!response.ok) return [];
-  const data = (await response.json()) as { notes?: SavedNote[] };
-  return data.notes || [];
+  const cached = _courseNotesCache.get(courseId);
+  if (cached && Date.now() - cached.at < COURSE_NOTES_CACHE_MS) return cached.promise;
+  const promise = (async () => {
+    const response = await fetch(
+      _backendUrl() + '/api/notes?courseId=' + encodeURIComponent(courseId),
+      { headers: _authJsonHeaders() }
+    );
+    if (response.status === 401) throw new Error('SESSION_EXPIRED');
+    if (!response.ok) return [];
+    const data = (await response.json()) as { notes?: SavedNote[] };
+    return data.notes || [];
+  })();
+  _courseNotesCache.set(courseId, { at: Date.now(), promise });
+  promise.catch(() => _courseNotesCache.delete(courseId));
+  return promise;
+}
+
+/** Drop the cached notes list for a course (call after creating/deleting a note). */
+export function invalidateCourseNotesCache(courseId: string): void {
+  _courseNotesCache.delete(courseId);
 }
 
 /** Fetch one saved note (with full content_markdown). */
@@ -582,6 +652,7 @@ export async function deleteNote(id: string): Promise<boolean> {
     method: 'DELETE',
     headers: _authJsonHeaders(),
   });
+  if (response.ok) _courseNotesCache.clear();
   return response.ok;
 }
 

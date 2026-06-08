@@ -10,6 +10,7 @@ export interface DailyMissionTask {
   page_end?: number | null;
   reason?: string | null;
   reason_code?: string | null;
+  source_file_id?: string | null;
 }
 
 export interface DailyMissionResponse {
@@ -34,6 +35,8 @@ export interface DailyMissionSummary {
   minutesRemaining: number;
   mainFocus: string | null;
   status: string;
+  noValidCandidates?: boolean;
+  hasUnavailableSources?: boolean;
 }
 
 function authHeaders(): HeadersInit {
@@ -63,7 +66,7 @@ export async function getDailyMission(courseId: string): Promise<DailyMissionRes
   return res.json() as Promise<DailyMissionResponse>;
 }
 
-export async function generateDailyMission(courseId: string, availableMinutes?: number): Promise<DailyMissionResponse> {
+export async function generateDailyMission(courseId: string, availableMinutes?: number, regenerate?: boolean): Promise<DailyMissionResponse> {
   const res = await fetch('/api/study/daily-plan/generate', {
     method: 'POST',
     headers: authHeaders(),
@@ -71,11 +74,16 @@ export async function generateDailyMission(courseId: string, availableMinutes?: 
       courseId,
       date: todayLocalDate(),
       timezone: timezone(),
-      availableMinutes
+      availableMinutes,
+      regenerate: !!regenerate
     })
   });
   if (!res.ok) throw new Error('Daily Mission could not be generated');
   return res.json() as Promise<DailyMissionResponse>;
+}
+
+export async function regenerateDailyMission(courseId: string, availableMinutes?: number): Promise<DailyMissionResponse> {
+  return generateDailyMission(courseId, availableMinutes, true);
 }
 
 export async function getDailyMissionSummary(courseId: string): Promise<DailyMissionSummary> {

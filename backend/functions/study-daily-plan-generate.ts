@@ -24,6 +24,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (typeof courseId !== 'string') return courseId;
   const { planDate, userTimezone } = localPlanDate(payload.date, payload.timezone);
   const minutes = typeof payload.availableMinutes === 'number' ? payload.availableMinutes : undefined;
-  const data = await generateDailyPlan(auth.serviceKey, auth.user.id, courseId, planDate, userTimezone, minutes);
+  const regenerate = payload.regenerate === true;
+  const data = await generateDailyPlan(auth.serviceKey, auth.user.id, courseId, planDate, userTimezone, minutes, regenerate);
   return studyPlanResponse(data);
 };
