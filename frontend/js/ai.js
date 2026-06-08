@@ -6,6 +6,7 @@
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
 var AI_CFG = (window.MinalloConfig && window.MinalloConfig.ai) || {};
+function _escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 var _aiUserScrolled = false; // true when user has manually scrolled up during generation
 var _attachedImages = []; // array of { data: base64string, mediaType: string }, max AI_IMG_MAX
 var AI_IMG_MAX = AI_CFG.imageMax || 5; // max images per message (keeps token budget sane)
@@ -78,7 +79,9 @@ let askAI = function (question, skipUserBubble) {
       userWrap.className = 'ai-msg-wrap user';
       var _t = typeof getTime === 'function' ? getTime() : '';
       var _safe = question.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      var _allowedMedia = {'image/png':1,'image/jpeg':1,'image/gif':1,'image/webp':1};
       var _imgsHtml = _imgs
+        .filter(function (img) { return _allowedMedia[img.mediaType]; })
         .map(function (img) {
           return (
             '<img class="ai-msg-img" src="data:' +
@@ -397,7 +400,7 @@ async function runMultiSummary(fnames, course) {
     '<div class="msm-files-list">' +
     fnames
       .map(function (n) {
-        return '<span class="msm-file-tag">\uD83D\uDCC4 ' + n + '</span>';
+        return '<span class="msm-file-tag">\uD83D\uDCC4 ' + _escHtml(n) + '</span>';
       })
       .join('') +
     '</div>';
@@ -516,7 +519,7 @@ async function runMultiSummary(fnames, course) {
           body.innerHTML =
             tagsHtml +
             '<p style="color:#ff6b35">\u274C ' +
-            (data.error.message || 'API error') +
+            _escHtml(data.error.message || 'API error') +
             '</p>';
           return;
         }
@@ -531,7 +534,7 @@ async function runMultiSummary(fnames, course) {
         document.getElementById('msmSaveBtn').style.display = '';
       })
       .catch(function (e) {
-        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">\u274C ' + e.message + '</p>';
+        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">\u274C ' + _escHtml(e.message) + '</p>';
       });
   });
 }

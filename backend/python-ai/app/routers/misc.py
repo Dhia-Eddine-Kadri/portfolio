@@ -63,7 +63,7 @@ async def feedback_endpoint(payload: FeedbackRequest) -> dict[str, Any]:
         sb.table("ai_feedback").insert(row).execute()
     except Exception as e:  # noqa: BLE001
         log.exception("feedback insert failed")
-        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
     return {"ok": True}
 
 
