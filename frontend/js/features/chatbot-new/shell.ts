@@ -927,8 +927,11 @@ async function handleIntentRoute(
 
   if (route.intent === 'summary') {
     const skillStatus = showIntentSkillLoading(bubble, thinking, 'summary');
+    thinking?.set('Finding source context');
     const mod = await import('../../services/ai-service.js');
+    thinking?.set('Reading course sources');
     const result = await mod.generateStudyTool(route.target.courseId, 'summary') as { text?: string };
+    thinking?.set('Formatting summary');
     const text = 'Summary created from your current course sources.\n\n' + ((result && result.text) || 'No summary was returned.');
     await finishIntentSkillLoading(skillStatus, thinking);
     if (bubble) renderRichBubble(bubble, text);
@@ -937,8 +940,11 @@ async function handleIntentRoute(
 
   if (route.intent === 'cheatsheet') {
     const skillStatus = showIntentSkillLoading(bubble, thinking, 'cheatsheet');
+    thinking?.set('Finding formulas and facts');
     const mod = await import('../../services/ai-service.js');
+    thinking?.set('Reading course sources');
     const result = await mod.generateCheatsheet(route.target.courseId, {});
+    thinking?.set('Formatting cheatsheet');
     const text = 'Cheatsheet created from your current course sources.\n\n' + ((result && result.text) || 'No cheatsheet was returned.');
     await finishIntentSkillLoading(skillStatus, thinking);
     if (bubble) renderRichBubble(bubble, text);
@@ -1014,7 +1020,6 @@ function showIntentSkillLoading(
 
   el.innerHTML =
     '<div class="ncb-skill-loading-top">' +
-      '<span class="ncb-skill-orb" aria-hidden="true"><span></span></span>' +
       '<div class="ncb-skill-loading-copy">' +
         '<div class="ncb-skill-loading-line">' +
           '<span class="ncb-skill-loading-word">Loading</span>' +

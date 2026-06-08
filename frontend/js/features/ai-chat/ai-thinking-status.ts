@@ -148,8 +148,10 @@ export function createAIThinkingStatus(options: CreateThinkingStatusOptions): AI
 
   let index = 0;
   let removed = false;
+  let manualUntil = 0;
   const timer = window.setInterval(() => {
     if (removed) return;
+    if (Date.now() < manualUntil) return;
     index = (index + 1) % messages.length;
     const text = wrap.querySelector<HTMLElement>('.ai-thinking-text');
     if (text) text.textContent = messages[index] || FIRST_THINKING_MESSAGE;
@@ -165,7 +167,10 @@ export function createAIThinkingStatus(options: CreateThinkingStatusOptions): AI
     el: wrap,
     set(text: string): void {
       const node = wrap.querySelector<HTMLElement>('.ai-thinking-text');
-      if (node && text) node.textContent = displayThinkingText(text);
+      if (node && text) {
+        node.textContent = displayThinkingText(text);
+        manualUntil = Date.now() + Math.max(rotateMs + 450, 1200);
+      }
     },
     remove(immediate = false): void {
       if (removed) return;

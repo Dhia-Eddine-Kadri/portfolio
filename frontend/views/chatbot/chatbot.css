@@ -1669,48 +1669,6 @@ body:not(.night) .ncb-skill-thinking-note strong {
   gap: 12px;
 }
 
-.ncb-skill-orb {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), rgba(147, 197, 253, 0.82) 24%, rgba(37, 99, 235, 0.62) 62%, rgba(30, 64, 175, 0.76));
-  box-shadow:
-    0 0 0 1px rgba(191, 219, 254, 0.32),
-    0 0 24px rgba(96, 165, 250, 0.34);
-  overflow: hidden;
-}
-
-.ncb-skill-orb::before,
-.ncb-skill-orb::after {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: inherit;
-  border: 1px solid rgba(191, 219, 254, 0.42);
-  animation: ncb-skill-orbit 1.6s linear infinite;
-}
-
-.ncb-skill-orb::after {
-  inset: 7px;
-  border-color: rgba(255, 255, 255, 0.48);
-  animation-duration: 1.05s;
-  animation-direction: reverse;
-}
-
-.ncb-skill-orb span {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.95);
-  animation: ncb-skill-core 900ms ease-in-out infinite;
-}
-
 .ncb-skill-loading-copy {
   min-width: 0;
   display: grid;
@@ -1769,14 +1727,6 @@ body:not(.night) .ncb-skill-thinking-note strong {
   display: none;
 }
 
-body:not(.night) .ncb-skill-orb {
-  background:
-    radial-gradient(circle at 35% 30%, #ffffff, #bfdbfe 24%, #60a5fa 62%, #2563eb);
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.18),
-    0 0 22px rgba(37, 99, 235, 0.18);
-}
-
 body:not(.night) .ncb-skill-progress {
   background: #e2e8f0;
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.24);
@@ -1802,16 +1752,6 @@ body:not(.night) .ncb-skill-live-note {
 @keyframes ncb-skill-check {
   0%, 100% { opacity: 0.72; transform: scale(0.96); }
   50% { opacity: 1; transform: scale(1.06); }
-}
-
-@keyframes ncb-skill-orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes ncb-skill-core {
-  0%, 100% { transform: scale(0.78); opacity: 0.78; }
-  50% { transform: scale(1.18); opacity: 1; }
 }
 
 @keyframes ncb-stream-reveal {
