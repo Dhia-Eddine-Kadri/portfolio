@@ -309,10 +309,15 @@ publishLegacyGlobals({
 
 // ── COURSES DASHBOARD ─────────────────────────────────────────────────────
 let sdActiveSemId = 'ss2526';
+try {
+  const saved = sessionStorage.getItem('ss_sd_sem');
+  if (saved && SEMS[saved]) sdActiveSemId = saved;
+} catch { /* storage unavailable */ }
 (window as unknown as { sdActiveSemId: string }).sdActiveSemId = sdActiveSemId;
 exposeLegacyVar('sdActiveSemId', () => sdActiveSemId, (v: string) => {
   sdActiveSemId = v;
   (window as unknown as { sdActiveSemId: string }).sdActiveSemId = v;
+  try { sessionStorage.setItem('ss_sd_sem', v); } catch { /* */ }
 });
 
 initCourseSearch({
@@ -342,7 +347,10 @@ sdSemBtn?.addEventListener('click', (e: Event) => {
 sdSemDD?.querySelectorAll<HTMLElement>('.sem-opt').forEach((o) => {
   o.addEventListener('click', () => {
     const sid = o.getAttribute('data-sid');
-    if (sid) sdActiveSemId = sid;
+    if (sid) {
+      sdActiveSemId = sid;
+      try { sessionStorage.setItem('ss_sd_sem', sid); } catch { /* */ }
+    }
     if (sdSemLabel) sdSemLabel.textContent = (o.textContent || '').trim();
     const col = o.getAttribute('data-col');
     if (sdSemDot && col) sdSemDot.style.background = col;
