@@ -1,79 +1,34 @@
+// Multi-subject weekly study planner.
+// Replaces the old single-course daily-mission scheduler.
+
 import { requireEnv } from './env';
 import { fail, jsonResponse } from './responses';
 import { supaRequest } from './supabase-admin';
 import { extractBearerToken, verifySupabaseToken } from './supabase-auth';
 import { isSafeCourseId } from './validation';
 import type { LambdaResponse, NetlifyEvent, SupabaseUser } from './types';
+import type {
+  DayAllocation,
+  PlanScope,
+  ProgressState,
+  ScoredSubject,
+  SequencedTask,
+  StudyPreferences,
+  SubjectState,
+  TaskCandidate,
+  TopicState,
+  WeeklyStudyPlan,
+  WeeklyStudyTask,
+} from './study-planner-types';
 
-type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'skipped' | 'moved' | 'unavailable' | 'replaced';
+// Re-export types that external modules need.
+export type { WeeklyStudyTask };
+
+// ── Auth helpers (preserved from old planner) ────────────────────────────────
 
 interface StudyAuth {
   user: SupabaseUser;
   serviceKey: string;
-}
-
-interface CandidateRow {
-  id: string;
-  course_id: string;
-  topic_id: string;
-  task_type: string;
-  source_file_id: string;
-  page_start: number | null;
-  page_end: number | null;
-  estimated_minutes: number;
-  candidate_reason: string | null;
-  course_topics?: { name?: string; importance?: string } | null;
-  documents?: { file_name?: string; processing_status?: string } | null;
-}
-
-interface TopicStateRow {
-  topic_id: string;
-  state: string;
-}
-
-const STATE_RANK: Record<string, number> = {
-  weak: 0,
-  not_started: 1,
-  started: 2,
-  reviewed: 3,
-  practiced: 4,
-  good: 5,
-  exam_ready: 6
-};
-
-const IMPORTANCE_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-// Learn first, then review, then reinforce — keeps study before quiz in every plan
-const TASK_TYPE_RANK: Record<string, number> = {
-  learn: 0, review: 1, practice: 2, quiz: 3, flashcards: 4, deeplearn: 5, examforge: 6
-};
-
-interface PlanRow {
-  id: string;
-  user_id: string;
-  plan_date: string;
-  user_timezone: string;
-  plan_scope: string;
-  course_id: string;
-  status: string;
-  generation_status: string;
-  total_estimated_minutes: number;
-  generated_reason?: string | null;
-}
-
-interface TaskRow {
-  id: string;
-  daily_plan_id: string;
-  user_id: string;
-  course_id: string;
-  topic_id?: string | null;
-  valid_task_candidate_id?: string | null;
-  source_file_id?: string | null;
-  status: TaskStatus;
-  estimated_minutes: number;
-  priority_group: string;
-  title: string;
-  order_index: number;
 }
 
 export async function requireStudyAuth(event: NetlifyEvent): Promise<StudyAuth | LambdaResponse> {
@@ -99,8 +54,12 @@ export function validateCourseId(courseId: unknown): string | LambdaResponse {
   return courseId;
 }
 
-export function localPlanDate(inputDate: unknown, timezone: unknown): { planDate: string; userTimezone: string } {
-  const userTimezone = typeof timezone === 'string' && timezone.trim() ? timezone.trim() : 'UTC';
+export function localPlanDate(
+  inputDate: unknown,
+  timezone: unknown
+): { planDate: string; userTimezone: string } {
+  const userTimezone =
+    typeof timezone === 'string' && timezone.trim() ? timezone.trim() : 'UTC';
   if (typeof inputDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inputDate)) {
     return { planDate: inputDate, userTimezone };
   }
@@ -109,407 +68,756 @@ export function localPlanDate(inputDate: unknown, timezone: unknown): { planDate
       timeZone: userTimezone,
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     }).formatToParts(new Date());
-    const y = parts.find((p) => p.type === 'year')?.value || '1970';
-    const m = parts.find((p) => p.type === 'month')?.value || '01';
-    const d = parts.find((p) => p.type === 'day')?.value || '01';
-    return { planDate: y + '-' + m + '-' + d, userTimezone };
+    const y = parts.find((p) => p.type === 'year')?.value ?? '1970';
+    const m = parts.find((p) => p.type === 'month')?.value ?? '01';
+    const d = parts.find((p) => p.type === 'day')?.value ?? '01';
+    return { planDate: `${y}-${m}-${d}`, userTimezone };
   } catch {
     return { planDate: new Date().toISOString().slice(0, 10), userTimezone: 'UTC' };
   }
 }
 
-export async function fetchPlanWithTasks(
+// ── Study events ─────────────────────────────────────────────────────────────
+
+export async function writeStudyEvent(
   serviceKey: string,
-  userId: string,
-  courseId: string,
-  planDate: string
-): Promise<{ plan: PlanRow | null; tasks: TaskRow[] }> {
-  const planRes = await supaRequest<PlanRow[]>(
-    'GET',
-    'daily_study_plans?user_id=eq.' + encodeURIComponent(userId) +
-      '&course_id=eq.' + encodeURIComponent(courseId) +
-      '&plan_scope=eq.course' +
-      '&plan_date=eq.' + encodeURIComponent(planDate) +
-      '&select=*' +
-      '&limit=1',
-    null,
-    serviceKey
-  );
-  const plan = Array.isArray(planRes.body) ? planRes.body[0] || null : null;
-  if (!plan) return { plan: null, tasks: [] };
-  const taskRes = await supaRequest<TaskRow[]>(
-    'GET',
-    'daily_study_tasks?daily_plan_id=eq.' + encodeURIComponent(plan.id) +
-      '&select=*' +
-      '&order=order_index.asc',
-    null,
-    serviceKey
-  );
-  return { plan, tasks: Array.isArray(taskRes.body) ? taskRes.body : [] };
+  row: Record<string, unknown>
+): Promise<void> {
+  // Map old "value / metadata" fields to new "event_data" shape if needed.
+  const { value, metadata, ...rest } = row as {
+    value?: unknown;
+    metadata?: unknown;
+    [k: string]: unknown;
+  };
+  const eventData: Record<string, unknown> =
+    typeof metadata === 'object' && metadata !== null
+      ? (metadata as Record<string, unknown>)
+      : {};
+  if (value !== undefined) eventData['value'] = value;
+  await supaRequest('POST', 'study_events', { ...rest, event_data: eventData }, serviceKey, {
+    Prefer: 'return=minimal',
+  });
 }
 
-export async function ensurePlan(
-  serviceKey: string,
-  userId: string,
-  courseId: string,
-  planDate: string,
-  userTimezone: string
-): Promise<PlanRow> {
-  const existing = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-  if (existing.plan) return existing.plan;
-  const created = await supaRequest<PlanRow[]>(
-    'POST',
-    'daily_study_plans',
-    {
-      user_id: userId,
-      course_id: courseId,
-      plan_scope: 'course',
-      plan_date: planDate,
-      user_timezone: userTimezone,
-      generation_status: 'generating',
-      generation_attempts: 1
-    },
-    serviceKey,
-    { Prefer: 'return=representation' }
+// ── Week utilities ────────────────────────────────────────────────────────────
+
+/** Returns the Monday of the ISO week containing `date`. */
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getUTCDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + diff);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+function dateToString(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setUTCDate(r.getUTCDate() + n);
+  return r;
+}
+
+/** Days between two ISO date strings (positive if b is after a). */
+function daysBetween(a: string, b: string): number {
+  return Math.round(
+    (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24)
   );
-  if (!Array.isArray(created.body) || !created.body[0]) {
-    throw new Error('Could not create daily study plan');
+}
+
+// ── A. Candidate collection ───────────────────────────────────────────────────
+
+export async function collectCandidates(
+  userId: string,
+  serviceKey: string,
+  courseId?: string
+): Promise<TaskCandidate[]> {
+  let url =
+    'valid_task_candidates?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&is_valid=eq.true' +
+    '&source_confidence=in.(high,confirmed)' +
+    '&select=*,course_topics(name,importance),documents(file_name,processing_status,source_type)' +
+    '&order=created_at.asc' +
+    '&limit=200';
+  if (courseId) url += '&course_id=eq.' + encodeURIComponent(courseId);
+
+  const res = await supaRequest<TaskCandidate[]>('GET', url, null, serviceKey);
+  const all = Array.isArray(res.body) ? res.body : [];
+
+  // Filter out candidates whose source document is not ready yet.
+  return all.filter((c) => !c.documents || c.documents.processing_status === 'ready');
+}
+
+// ── B. Subject priority scoring ───────────────────────────────────────────────
+
+export function scoreSubject(
+  state: SubjectState | null,
+  candidates: TaskCandidate[]
+): number {
+  let score = 0;
+  if (!state) {
+    // No state row yet — treat as moderate priority.
+    return 20;
   }
-  return created.body[0];
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Exam proximity
+  if (state.exam_date) {
+    const days = daysBetween(today, state.exam_date);
+    if (days >= 0 && days <= 14) score += 50;
+    else if (days >= 0 && days <= 30) score += 30;
+  }
+
+  // Deadline proximity
+  if (state.deadline) {
+    const days = daysBetween(today, state.deadline);
+    if (days >= 0 && days <= 7) score += 40;
+    else if (days >= 0 && days <= 14) score += 20;
+  }
+
+  // User priority override (1 = highest → 10 = lowest)
+  if (state.user_priority_override !== null) {
+    score += Math.max(0, 11 - state.user_priority_override) * 3;
+  } else {
+    // Fallback to the general priority field (lower = more important)
+    score += Math.max(0, 11 - state.priority) * 1;
+  }
+
+  // Unstudied topic ratio
+  const total = Math.max(1, state.total_topics);
+  const unstudied = total - state.studied_topics;
+  score += Math.round((unstudied / total) * 20);
+
+  // Weak topic count
+  score += state.weak_topics * 5;
+
+  // Staleness boost (days since last studied, capped at 30)
+  if (state.last_studied_at) {
+    const staleDays = Math.min(30, daysBetween(state.last_studied_at.slice(0, 10), today));
+    score += Math.round(staleDays * 0.5);
+  } else {
+    // Never studied — strong boost
+    score += 15;
+  }
+
+  // Has exercise papers
+  const hasExercises = candidates.some((c) => c.exercise_available);
+  if (hasExercises) score += 5;
+
+  return score;
 }
 
-export async function generateDailyPlan(
-  serviceKey: string,
-  userId: string,
-  courseId: string,
-  planDate: string,
-  userTimezone: string,
-  availableMinutes?: number,
-  regenerate?: boolean
-): Promise<{ plan: PlanRow | null; tasks: TaskRow[]; setupRequired?: boolean; noValidCandidates?: boolean }> {
-  const existing = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-  if (existing.plan && existing.tasks.length && !regenerate) return existing;
+// ── C. Workload distribution ──────────────────────────────────────────────────
 
-  const plan = existing.plan || await ensurePlan(serviceKey, userId, courseId, planDate, userTimezone);
-  const prefsMinutes = Number.isFinite(availableMinutes) && availableMinutes && availableMinutes > 0
-    ? Math.min(180, Math.max(15, Math.round(availableMinutes)))
-    : 45;
+export function distributeAcrossWeek(
+  subjects: ScoredSubject[],
+  preferences: StudyPreferences,
+  weekStartDate: Date
+): DayAllocation[] {
+  const studyDays = preferences.study_days.length > 0 ? preferences.study_days : [1, 2, 3, 4, 5];
+  const dailyMinutes = Math.max(15, preferences.daily_study_minutes);
 
-  const [candidatesRes, statesRes] = await Promise.all([
-    supaRequest<CandidateRow[]>(
-      'GET',
-      'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
-        '&course_id=eq.' + encodeURIComponent(courseId) +
-        '&is_valid=eq.true' +
-        '&source_confidence=in.(high,confirmed)' +
-        '&select=*,course_topics(name,importance),documents(file_name,processing_status)' +
-        '&order=created_at.asc' +
-        '&limit=40',
-      null,
-      serviceKey
-    ),
-    supaRequest<TopicStateRow[]>(
-      'GET',
-      'student_topic_state?user_id=eq.' + encodeURIComponent(userId) +
-        '&course_id=eq.' + encodeURIComponent(courseId) +
-        '&select=topic_id,state',
-      null,
-      serviceKey
-    )
-  ]);
-  let candidates = Array.isArray(candidatesRes.body)
-    ? candidatesRes.body.filter((c) => c.documents?.processing_status === 'ready')
-    : [];
-
-  // Auto-seed valid_task_candidates from course_topics. Runs when the table is
-  // empty OR when no learn/practice tasks exist (handles first run and migration
-  // from the old review-only seeding — seedCandidatesFromTopics deletes stale
-  // auto-seeded rows first so the re-seed always uses the latest source_type logic).
-  const needsSeed = !candidates.length ||
-    !candidates.some((c) => c.task_type === 'learn' || c.task_type === 'practice');
-  if (needsSeed) {
-    const seeded = await seedCandidatesFromTopics(serviceKey, userId, courseId);
-    if (seeded > 0) {
-      const refetchRes = await supaRequest<CandidateRow[]>(
-        'GET',
-        'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
-          '&course_id=eq.' + encodeURIComponent(courseId) +
-          '&is_valid=eq.true' +
-          '&source_confidence=in.(high,confirmed)' +
-          '&select=*,course_topics(name,importance),documents(file_name,processing_status)' +
-          '&order=created_at.asc' +
-          '&limit=40',
-        null,
-        serviceKey
-      );
-      candidates = Array.isArray(refetchRes.body)
-        ? refetchRes.body.filter((c) => c.documents?.processing_status === 'ready')
-        : [];
+  // Build list of study dates in this week.
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStartDate, i);
+    const dow = d.getUTCDay(); // 0=Sun
+    if (studyDays.includes(dow)) {
+      dates.push(dateToString(d));
     }
   }
-  const candidateIds = new Set(candidates.map((c) => c.id));
-  const stateByTopic = new Map<string, string>();
-  if (Array.isArray(statesRes.body)) {
-    for (const row of statesRes.body) stateByTopic.set(row.topic_id, row.state);
+  if (!dates.length) return [];
+  if (!subjects.length) return [];
+
+  // Sort subjects by score descending.
+  const sorted = [...subjects].sort((a, b) => b.score - a.score);
+
+  // How many subjects to feature daily: max 3 unless only 1 or 2 exist.
+  const subjectsPerDay = Math.min(sorted.length, 3);
+
+  // Cap single-subject share at 50% unless it's the only subject or score >> others.
+  const maxSharePerSubject = sorted.length === 1 ? 1.0 : 0.5;
+
+  const result: DayAllocation[] = dates.map((date) => ({ date, allocations: [] }));
+
+  // Round-robin top subjects across days so every day gets variety.
+  dates.forEach((_date, dayIdx) => {
+    const alloc = result[dayIdx]!;
+    // Rotate so different subjects lead on different days.
+    const startIdx = dayIdx % sorted.length;
+    const todaySubjects: ScoredSubject[] = [];
+    for (let i = 0; i < subjectsPerDay; i++) {
+      todaySubjects.push(sorted[(startIdx + i) % sorted.length]!);
+    }
+
+    const minutesLeft = dailyMinutes;
+    const perSubject = Math.floor(minutesLeft / todaySubjects.length);
+
+    for (const subj of todaySubjects) {
+      const cappedMinutes = Math.min(perSubject, Math.floor(dailyMinutes * maxSharePerSubject));
+      alloc.allocations.push({
+        courseId: subj.courseId,
+        subjectName: subj.subjectName,
+        minutesAllocated: cappedMinutes,
+        candidates: subj.candidates,
+        topicStates: subj.topicStates,
+      });
+    }
+  });
+
+  return result;
+}
+
+// ── D. Task sequencing per subject per day ────────────────────────────────────
+
+// Study-state rank: lower index = higher priority for study tasks.
+const STATE_PRIORITY: Record<string, number> = {
+  not_started: 0,
+  in_progress: 1,
+  weak: 2,
+  studied: 3,
+  practiced: 4,
+  mastered: 5,
+};
+
+// Task type ordering within a plan: study before practice/quiz.
+const TASK_TYPE_PLAN_RANK: Record<string, number> = {
+  study_topic: 0,
+  read_pages: 0,
+  review_weak_topic: 1,
+  solve_exercise_sheet: 2,
+  practice_problem_set: 2,
+  generate_quiz_if_no_exercises: 3,
+  exam_style_practice: 4,
+  review_topic: 5,
+};
+
+export function sequenceTasksForSubject(
+  candidates: TaskCandidate[],
+  topicStates: Map<string, TopicState>,
+  targetMinutes: number
+): SequencedTask[] {
+  // Group candidates by topic to enforce study-before-practice ordering.
+  const byTopic = new Map<string, TaskCandidate[]>();
+  const noTopic: TaskCandidate[] = [];
+  for (const c of candidates) {
+    if (!c.topic_id) {
+      noTopic.push(c);
+      continue;
+    }
+    const arr = byTopic.get(c.topic_id) ?? [];
+    arr.push(c);
+    byTopic.set(c.topic_id, arr);
   }
 
-  // Idempotent regeneration: never delete or reset completed tasks; mark
-  // unfinished tasks whose candidate is gone/invalid as replaced or unavailable,
-  // then top up remaining time budget with fresh candidates.
-  let keptMinutes = 0;
-  let nextOrder = 1;
-  const usedCandidateIds = new Set<string>();
-  if (regenerate && existing.plan && existing.tasks.length) {
-    for (const task of existing.tasks) {
-      if (task.status === 'completed' || task.status === 'in_progress') {
-        keptMinutes += task.estimated_minutes || 0;
-        if (task.valid_task_candidate_id) usedCandidateIds.add(task.valid_task_candidate_id);
-        nextOrder = Math.max(nextOrder, task.order_index + 1);
+  const eligible: TaskCandidate[] = [];
+
+  // Process each topic's candidates according to the STRICT ordering rules.
+  for (const [topicId, topicCandidates] of byTopic) {
+    const ts = topicStates.get(topicId);
+    const state: ProgressState = ts?.progress_state ?? 'not_started';
+
+    for (const c of topicCandidates) {
+      const tt = c.task_type;
+
+      if (tt === 'study_topic' || tt === 'read_pages') {
+        // Always schedulable if not mastered.
+        if (state !== 'mastered') eligible.push(c);
         continue;
       }
-      if (task.status === 'todo' || task.status === 'skipped') {
-        const candidateId = task.valid_task_candidate_id || null;
-        const candidateStillValid = !!candidateId && candidateIds.has(candidateId);
-        const sourceGone = !!task.source_file_id && candidates.every((c) => c.source_file_id !== task.source_file_id);
-        const nextStatus = sourceGone ? 'unavailable' : (candidateStillValid ? null : 'replaced');
-        if (nextStatus) {
-          await supaRequest(
-            'PATCH',
-            'daily_study_tasks?id=eq.' + encodeURIComponent(task.id),
-            { status: nextStatus, updated_at: new Date().toISOString() },
-            serviceKey,
-            { Prefer: 'return=minimal' }
-          );
-          await writeStudyEvent(serviceKey, {
-            user_id: userId,
-            course_id: courseId,
-            topic_id: task.topic_id || null,
-            task_id: task.id,
-            event_type: 'task_' + nextStatus,
-            value: nextStatus,
-            metadata: { reason: sourceGone ? 'source_unavailable' : 'candidate_invalidated', regenerated: true }
-          });
-        } else {
-          keptMinutes += task.estimated_minutes || 0;
-          if (candidateId) usedCandidateIds.add(candidateId);
-          nextOrder = Math.max(nextOrder, task.order_index + 1);
+
+      if (tt === 'solve_exercise_sheet' || tt === 'practice_problem_set') {
+        // Only if topic is studied or better.
+        if (
+          state === 'studied' ||
+          state === 'practiced' ||
+          state === 'mastered'
+        ) {
+          eligible.push(c);
         }
         continue;
       }
-      // moved / replaced / unavailable: leave untouched
-      nextOrder = Math.max(nextOrder, task.order_index + 1);
+
+      if (tt === 'generate_quiz_if_no_exercises') {
+        if ((state === 'studied' || state === 'practiced') && !c.exercise_available) {
+          eligible.push(c);
+        }
+        continue;
+      }
+
+      if (tt === 'review_weak_topic') {
+        if (state === 'weak') eligible.push(c);
+        continue;
+      }
+
+      if (tt === 'exam_style_practice') {
+        if (state === 'practiced' || state === 'mastered') eligible.push(c);
+        continue;
+      }
+
+      // Default — include unless mastered.
+      if (state !== 'mastered') eligible.push(c);
     }
   }
 
-  const remainingMinutes = Math.max(0, prefsMinutes - keptMinutes);
-  const freshCandidates = candidates.filter((c) => !usedCandidateIds.has(c.id));
+  // Add no-topic candidates.
+  for (const c of noTopic) eligible.push(c);
 
-  if (!freshCandidates.length && !remainingMinutes) {
-    await markPlanGenerated(serviceKey, plan.id, prefsMinutes, regenerate ? 'regenerated_no_remaining_time' : 'no_valid_candidates');
-    const after = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-    return { ...after, noValidCandidates: !regenerate && !after.tasks.length };
-  }
+  // Sort eligible tasks: by topic state urgency, then task type plan rank.
+  eligible.sort((a, b) => {
+    const stA = a.topic_id
+      ? (STATE_PRIORITY[topicStates.get(a.topic_id)?.progress_state ?? 'not_started'] ?? 0)
+      : 3;
+    const stB = b.topic_id
+      ? (STATE_PRIORITY[topicStates.get(b.topic_id)?.progress_state ?? 'not_started'] ?? 0)
+      : 3;
+    if (stA !== stB) return stA - stB;
 
-  if (!freshCandidates.length) {
-    await markPlanGenerated(serviceKey, plan.id, keptMinutes, regenerate ? 'regenerated_from_existing' : 'no_valid_candidates');
-    await writeStudyEvent(serviceKey, {
-      user_id: userId,
-      course_id: courseId,
-      event_type: 'plan_generated',
-      value: regenerate ? 'regenerated_from_existing' : 'no_valid_candidates',
-      metadata: { planDate }
-    });
-    const after = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-    return { ...after, noValidCandidates: !regenerate && !after.tasks.length };
-  }
+    // Within same state: study before practice.
+    const rankA = TASK_TYPE_PLAN_RANK[a.task_type] ?? 5;
+    const rankB = TASK_TYPE_PLAN_RANK[b.task_type] ?? 5;
+    if (rankA !== rankB) return rankA - rankB;
 
-  const ranked = rankCandidates(freshCandidates, stateByTopic);
-  const selected = selectCandidates(ranked, remainingMinutes || prefsMinutes);
-  const startIdx = nextOrder - 1;
-  const taskRows = selected.map((c, idx) => {
-    const topicName = c.course_topics?.name || 'course topic';
-    const fileName = c.documents?.file_name || 'course source';
-    const overallIdx = startIdx + idx;
-    const group = overallIdx === 0 ? 'must_do' : overallIdx < 3 ? 'should_do' : 'optional';
-    return {
-      daily_plan_id: plan.id,
-      user_id: userId,
-      course_id: courseId,
-      topic_id: c.topic_id,
-      valid_task_candidate_id: c.id,
-      task_type: c.task_type,
-      priority_group: group,
-      title: taskTitle(c.task_type, topicName),
-      description: taskDescription(c.task_type, fileName, pageLabel(c.page_start, c.page_end)),
-      reason: templateReason(group, stateByTopic.get(c.topic_id)),
-      reason_code: group === 'must_do' ? 'next_in_course_map' : 'source_grounded_candidate',
-      reason_metadata: {
-        sourceConfidence: 'high_or_confirmed',
-        topicImportance: c.course_topics?.importance || 'medium',
-        topicState: stateByTopic.get(c.topic_id) || 'not_started'
-      },
-      source_file_id: c.source_file_id,
-      page_start: c.page_start,
-      page_end: c.page_end,
-      estimated_minutes: c.estimated_minutes,
-      status: 'todo',
-      order_index: nextOrder + idx
-    };
+    // Higher priority score wins.
+    return (b.priority_score ?? 0.5) - (a.priority_score ?? 0.5);
   });
-  await supaRequest(
-    'POST',
-    'daily_study_tasks',
-    taskRows,
-    serviceKey,
-    { Prefer: 'return=minimal' }
+
+  // Fill up to targetMinutes.
+  const result: SequencedTask[] = [];
+  let usedMinutes = 0;
+  let order = 0;
+  const seenTopicAndType = new Set<string>();
+
+  for (const c of eligible) {
+    const key = `${c.topic_id ?? '_'}:${c.source_file_id ?? '_'}:${c.task_type}`;
+    if (seenTopicAndType.has(key)) continue;
+
+    const cost = Math.max(10, Math.min(60, c.estimated_minutes || 30));
+    if (result.length > 0 && usedMinutes + cost > targetMinutes + 10) continue;
+
+    seenTopicAndType.add(key);
+    result.push({
+      candidate: c,
+      estimatedMinutes: cost,
+      dayOrder: order++,
+      priorityScore: c.priority_score ?? 0.5,
+    });
+    usedMinutes += cost;
+
+    if (usedMinutes >= targetMinutes) break;
+  }
+
+  // Always return at least 1 task if candidates exist.
+  if (result.length === 0 && eligible.length > 0) {
+    const c = eligible[0]!;
+    result.push({
+      candidate: c,
+      estimatedMinutes: Math.max(10, Math.min(60, c.estimated_minutes || 30)),
+      dayOrder: 0,
+      priorityScore: c.priority_score ?? 0.5,
+    });
+  }
+
+  return result;
+}
+
+// ── E. Weekly plan generation ─────────────────────────────────────────────────
+
+export async function generateWeeklyPlan(
+  userId: string,
+  weekStartDate: Date,
+  scope: PlanScope,
+  courseId: string | null,
+  serviceKey: string
+): Promise<{ planId: string; taskCount: number; subjects: string[] }> {
+  const weekStart = dateToString(getWeekStart(weekStartDate));
+
+  // Fetch preferences.
+  const prefRes = await supaRequest<StudyPreferences[]>(
+    'GET',
+    'study_preferences?user_id=eq.' + encodeURIComponent(userId) + '&select=*&limit=1',
+    null,
+    serviceKey
   );
-  const total = keptMinutes + taskRows.reduce((sum, t) => sum + t.estimated_minutes, 0);
-  const reason = regenerate ? 'regenerated_from_valid_candidates' : 'generated_from_valid_candidates';
-  await markPlanGenerated(serviceKey, plan.id, total, reason);
+  const prefs: StudyPreferences = Array.isArray(prefRes.body) && prefRes.body[0]
+    ? prefRes.body[0]
+    : {
+        user_id: userId,
+        default_plan_scope: 'global_week',
+        daily_study_minutes: 120,
+        preferred_subjects: [],
+        excluded_subjects: [],
+        study_days: [1, 2, 3, 4, 5],
+      };
+
+  // Fetch subject states to get exam dates, priorities, exclusions.
+  let subjectStateUrl =
+    'student_subject_state?user_id=eq.' + encodeURIComponent(userId) + '&select=*';
+  if (courseId) subjectStateUrl += '&course_id=eq.' + encodeURIComponent(courseId);
+  const ssRes = await supaRequest<SubjectState[]>('GET', subjectStateUrl, null, serviceKey);
+  const subjectStates = new Map<string, SubjectState>(
+    Array.isArray(ssRes.body)
+      ? ssRes.body.map((s) => [s.course_id, s])
+      : []
+  );
+
+  // Collect excluded course IDs (from both prefs and subject state rows).
+  const excludedCourses = new Set<string>([
+    ...(prefs.excluded_subjects ?? []),
+    ...Array.from(subjectStates.values())
+      .filter((s) => s.user_excluded)
+      .map((s) => s.course_id),
+  ]);
+
+  // Collect valid candidates.
+  const allCandidates = await collectCandidates(userId, serviceKey, courseId ?? undefined);
+
+  // Seed if needed for the target course(s).
+  const courseIds = courseId
+    ? [courseId]
+    : [...new Set(allCandidates.map((c) => c.course_id))];
+
+  // If no candidates at all, attempt a seed for each course.
+  let candidates = allCandidates;
+  if (!candidates.length || !candidates.some((c) => c.task_type === 'study_topic' || c.task_type === 'read_pages')) {
+    for (const cid of courseIds) {
+      await seedCandidatesFromTopics(userId, cid, serviceKey);
+    }
+    candidates = await collectCandidates(userId, serviceKey, courseId ?? undefined);
+  }
+
+  // Filter excluded courses.
+  candidates = candidates.filter((c) => !excludedCourses.has(c.course_id));
+
+  // Fetch topic states.
+  let topicStateUrl =
+    'student_topic_state?user_id=eq.' + encodeURIComponent(userId) + '&select=*';
+  if (courseId) topicStateUrl += '&course_id=eq.' + encodeURIComponent(courseId);
+  const tsRes = await supaRequest<TopicState[]>('GET', topicStateUrl, null, serviceKey);
+  const topicStates = new Map<string, TopicState>(
+    Array.isArray(tsRes.body)
+      ? tsRes.body.map((t) => [t.topic_id, t])
+      : []
+  );
+
+  // Group candidates by course.
+  const byCourse = new Map<string, TaskCandidate[]>();
+  for (const c of candidates) {
+    const arr = byCourse.get(c.course_id) ?? [];
+    arr.push(c);
+    byCourse.set(c.course_id, arr);
+  }
+
+  // Score subjects.
+  const scoredSubjects: ScoredSubject[] = [];
+  for (const [cid, cands] of byCourse) {
+    const state = subjectStates.get(cid) ?? null;
+    const subjName =
+      state?.subject_name ??
+      cands[0]?.subject_name ??
+      cands[0]?.course_topics?.name ??
+      cid;
+    const courseTopicStates = new Map<string, TopicState>(
+      [...topicStates.entries()].filter(([, ts]) => ts.course_id === cid)
+    );
+    scoredSubjects.push({
+      courseId: cid,
+      subjectName: subjName,
+      score: scoreSubject(state, cands),
+      state,
+      candidates: cands,
+      topicStates: courseTopicStates,
+    });
+  }
+
+  // Distribute across the week.
+  const weekStartObj = new Date(weekStart + 'T00:00:00Z');
+  const dayAllocations = distributeAcrossWeek(scoredSubjects, prefs, weekStartObj);
+
+  // Find or create the weekly plan record.
+  const planKey =
+    'weekly_study_plans?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&week_start_date=eq.' +
+    encodeURIComponent(weekStart) +
+    '&plan_scope=eq.' +
+    encodeURIComponent(scope) +
+    '&' +
+    (courseId
+      ? 'course_id=eq.' + encodeURIComponent(courseId)
+      : 'course_id=is.null') +
+    '&select=*&limit=1';
+
+  const existingPlanRes = await supaRequest<WeeklyStudyPlan[]>('GET', planKey, null, serviceKey);
+  const existingPlan = Array.isArray(existingPlanRes.body) ? existingPlanRes.body[0] ?? null : null;
+  const isRegen = !!existingPlan;
+
+  let planId: string;
+  if (existingPlan) {
+    planId = existingPlan.id;
+    // Delete only todo tasks — never touch completed/in_progress/skipped.
+    await supaRequest(
+      'DELETE',
+      'weekly_study_tasks?plan_id=eq.' + encodeURIComponent(planId) + '&status=eq.todo',
+      null,
+      serviceKey
+    );
+    await supaRequest(
+      'PATCH',
+      'weekly_study_plans?id=eq.' + encodeURIComponent(planId),
+      { regenerated_at: new Date().toISOString(), status: 'active' },
+      serviceKey,
+      { Prefer: 'return=minimal' }
+    );
+  } else {
+    const created = await supaRequest<WeeklyStudyPlan[]>(
+      'POST',
+      'weekly_study_plans',
+      {
+        user_id: userId,
+        week_start_date: weekStart,
+        plan_scope: scope,
+        course_id: courseId ?? null,
+        status: 'active',
+        generation_params: {
+          daily_study_minutes: prefs.daily_study_minutes,
+          study_days: prefs.study_days,
+        },
+      },
+      serviceKey,
+      { Prefer: 'return=representation' }
+    );
+    if (!Array.isArray(created.body) || !created.body[0]) {
+      throw new Error('Could not create weekly study plan');
+    }
+    planId = created.body[0]!.id;
+  }
+
+  // Build task rows.
+  const taskRows: Record<string, unknown>[] = [];
+  const subjectsSeen = new Set<string>();
+  let globalDayOrder = 0;
+
+  for (const dayAlloc of dayAllocations) {
+    let dayOrder = 0;
+    for (const alloc of dayAlloc.allocations) {
+      subjectsSeen.add(alloc.courseId);
+      const tasks = sequenceTasksForSubject(
+        alloc.candidates,
+        alloc.topicStates,
+        alloc.minutesAllocated
+      );
+
+      for (const t of tasks) {
+        const c = t.candidate;
+        taskRows.push({
+          plan_id: planId,
+          user_id: userId,
+          plan_date: dayAlloc.date,
+          day_order: dayOrder++,
+          course_id: alloc.courseId,
+          subject_name: alloc.subjectName,
+          topic_id: c.topic_id ?? null,
+          source_file_id: c.source_file_id ?? null,
+          exercise_file_id: c.exercise_file_id ?? null,
+          task_type: c.task_type,
+          task_title: c.task_title || buildTaskTitle(c),
+          task_description: c.task_description ?? buildTaskDescription(c),
+          estimated_minutes: t.estimatedMinutes,
+          priority_score: t.priorityScore,
+          study_state_required: c.study_state_required ?? 'not_started',
+          exercise_available: c.exercise_available ?? false,
+          page_range: c.page_range ?? null,
+          status: 'todo',
+          source_confidence: c.source_confidence,
+          is_valid: true,
+        });
+        globalDayOrder++;
+      }
+    }
+  }
+
+  // Insert tasks in batches of 50.
+  for (let i = 0; i < taskRows.length; i += 50) {
+    const batch = taskRows.slice(i, i + 50);
+    await supaRequest('POST', 'weekly_study_tasks', batch, serviceKey, {
+      Prefer: 'return=minimal',
+    });
+  }
+
+  // Write study event.
   await writeStudyEvent(serviceKey, {
     user_id: userId,
-    course_id: courseId,
-    event_type: regenerate ? 'plan_regenerated' : 'plan_generated',
-    value: reason,
-    metadata: { planDate, taskCount: taskRows.length, keptMinutes }
-  });
-  const fresh = await fetchPlanWithTasks(serviceKey, userId, courseId, planDate);
-  return { plan: fresh.plan || plan, tasks: fresh.tasks };
-}
-
-export async function writeStudyEvent(serviceKey: string, row: Record<string, unknown>): Promise<void> {
-  await supaRequest('POST', 'study_events', row, serviceKey, { Prefer: 'return=minimal' });
-}
-
-export function studyPlanResponse(data: { plan: PlanRow | null; tasks: TaskRow[]; noValidCandidates?: boolean }): LambdaResponse {
-  const completed = data.tasks.filter((t) => t.status === 'completed').length;
-  const remaining = data.tasks.filter((t) => !['completed', 'replaced'].includes(t.status)).reduce((s, t) => s + (t.estimated_minutes || 0), 0);
-  return jsonResponse(200, {
-    hasPlan: !!data.plan,
-    plan: data.plan,
-    tasks: data.tasks,
-    summary: {
-      completedTasks: completed,
-      totalTasks: data.tasks.length,
-      minutesRemaining: remaining,
-      status: data.plan?.status || 'none',
-      noValidCandidates: !!data.noValidCandidates
-    }
-  });
-}
-
-async function markPlanGenerated(serviceKey: string, planId: string, total: number, reason: string): Promise<void> {
-  await supaRequest(
-    'PATCH',
-    'daily_study_plans?id=eq.' + encodeURIComponent(planId),
-    {
-      generation_status: 'completed',
-      total_estimated_minutes: total,
-      generated_reason: reason,
-      updated_at: new Date().toISOString()
+    course_id: courseId ?? null,
+    event_type: isRegen ? 'plan_regenerated' : 'plan_generated',
+    metadata: {
+      weekStart,
+      scope,
+      taskCount: taskRows.length,
+      subjects: [...subjectsSeen],
     },
-    serviceKey,
-    { Prefer: 'return=minimal' }
-  );
-}
-
-function rankCandidates(candidates: CandidateRow[], stateByTopic: Map<string, string>): CandidateRow[] {
-  return [...candidates].sort((a, b) => {
-    const stateA = STATE_RANK[stateByTopic.get(a.topic_id) || 'not_started'] ?? 1;
-    const stateB = STATE_RANK[stateByTopic.get(b.topic_id) || 'not_started'] ?? 1;
-    if (stateA !== stateB) return stateA - stateB;
-    const impA = IMPORTANCE_RANK[a.course_topics?.importance || 'medium'] ?? 1;
-    const impB = IMPORTANCE_RANK[b.course_topics?.importance || 'medium'] ?? 1;
-    if (impA !== impB) return impA - impB;
-    // Within same topic priority: study before quiz/practice
-    const typeA = TASK_TYPE_RANK[a.task_type] ?? 99;
-    const typeB = TASK_TYPE_RANK[b.task_type] ?? 99;
-    return typeA - typeB;
   });
+
+  return {
+    planId,
+    taskCount: taskRows.length,
+    subjects: [...subjectsSeen],
+  };
 }
 
-function selectCandidates(candidates: CandidateRow[], minutes: number): CandidateRow[] {
-  const maxTasks = minutes <= 15 ? 1 : minutes <= 30 ? 2 : minutes <= 60 ? 3 : 5;
-  const seen = new Set<string>();
-  const out: CandidateRow[] = [];
-  let used = 0;
-  for (const c of candidates) {
-    const key = [c.topic_id, c.source_file_id, c.task_type].join(':');
-    if (seen.has(key)) continue;
-    const cost = Math.max(10, Math.min(45, c.estimated_minutes || 20));
-    if (out.length && used + cost > minutes) continue;
-    seen.add(key);
-    out.push({ ...c, estimated_minutes: cost });
-    used += cost;
-    if (out.length >= maxTasks) break;
+// ── F. Daily task slice ───────────────────────────────────────────────────────
+
+export async function getDailyTasks(
+  userId: string,
+  date: Date,
+  serviceKey: string,
+  courseId?: string
+): Promise<WeeklyStudyTask[]> {
+  const dateStr = dateToString(date);
+  const weekStart = dateToString(getWeekStart(date));
+
+  // Find the active plan for this week.
+  let planUrl =
+    'weekly_study_plans?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&week_start_date=eq.' +
+    encodeURIComponent(weekStart) +
+    '&status=eq.active&select=id&limit=1';
+  if (courseId) planUrl += '&course_id=eq.' + encodeURIComponent(courseId);
+  else planUrl += '&course_id=is.null';
+
+  const planRes = await supaRequest<{ id: string }[]>('GET', planUrl, null, serviceKey);
+  let planId = Array.isArray(planRes.body) ? planRes.body[0]?.id ?? null : null;
+
+  if (!planId) {
+    // Generate a new plan on the fly.
+    const scope: PlanScope = courseId ? 'course_week' : 'global_week';
+    const result = await generateWeeklyPlan(
+      userId,
+      date,
+      scope,
+      courseId ?? null,
+      serviceKey
+    );
+    planId = result.planId;
   }
-  return out.length ? out : candidates.slice(0, 1);
+
+  // Return tasks for the specific date.
+  const taskUrl =
+    'weekly_study_tasks?plan_id=eq.' +
+    encodeURIComponent(planId) +
+    '&plan_date=eq.' +
+    encodeURIComponent(dateStr) +
+    '&order=day_order.asc' +
+    '&select=*';
+
+  const taskRes = await supaRequest<WeeklyStudyTask[]>('GET', taskUrl, null, serviceKey);
+  return Array.isArray(taskRes.body) ? taskRes.body : [];
 }
 
-function taskTitle(taskType: string, topicName: string): string {
-  if (taskType === 'learn') return 'Study: ' + topicName;
-  if (taskType === 'review') return 'Review: ' + topicName;
-  if (taskType === 'practice') return 'Practice: ' + topicName + ' (exercises)';
-  if (taskType === 'quiz') return 'Quiz: ' + topicName;
-  if (taskType === 'flashcards') return 'Flashcards: ' + topicName;
-  if (taskType === 'deeplearn') return 'Deep Learn: ' + topicName;
-  if (taskType === 'examforge') return 'ExamForge drill: ' + topicName;
-  return 'Study: ' + topicName;
-}
-
-function taskDescription(taskType: string, fileName: string, pageStr: string): string {
-  if (taskType === 'learn') return 'Read through ' + fileName + pageStr + '.';
-  if (taskType === 'practice') return 'Work through the exercises in ' + fileName + pageStr + '.';
-  if (taskType === 'quiz') return 'Test yourself using ' + fileName + pageStr + '.';
-  return 'Use ' + fileName + pageStr + '.';
-}
-
-function pageLabel(start: number | null, end: number | null): string {
-  if (!start) return '';
-  if (!end || end === start) return ', page ' + start;
-  return ', pages ' + start + '-' + end;
-}
-
-function templateReason(group: string, topicState?: string): string {
-  if (group === 'must_do') {
-    if (topicState === 'weak') return 'You marked this topic as weak — it is the top priority today.';
-    if (topicState === 'not_started' || !topicState) return 'This is the next source-confirmed topic in your course map.';
-    return 'This keeps your progress moving on a confirmed course topic.';
-  }
-  if (group === 'should_do') return 'This task is grounded in a confirmed course source.';
-  return 'Optional extra practice if you have more time today.';
-}
+// ── G. Candidate seeding ──────────────────────────────────────────────────────
 
 interface TopicSeedRow {
   id: string;
   importance: string;
   source_document_ids: string[] | null;
+  name: string | null;
 }
 
 interface DocSeedRow {
   id: string;
   source_type: string | null;
+  file_name: string | null;
 }
 
-function sourceTypeToTaskType(sourceType: string | null | undefined): string {
-  if (sourceType === 'lecture') return 'learn';
-  if (sourceType === 'exercise' || sourceType === 'solution') return 'practice';
-  if (sourceType === 'exam') return 'quiz';
-  return 'review';
+function sourceTypeToNewTaskType(sourceType: string | null | undefined): string {
+  if (sourceType === 'lecture') return 'study_topic';
+  if (sourceType === 'exercise' || sourceType === 'solution') return 'solve_exercise_sheet';
+  if (sourceType === 'exam') return 'exam_style_practice';
+  return 'review_topic';
 }
 
-async function seedCandidatesFromTopics(
-  serviceKey: string,
+function studyStateRequired(taskType: string): string {
+  if (taskType === 'solve_exercise_sheet' || taskType === 'practice_problem_set') return 'studied';
+  if (taskType === 'exam_style_practice') return 'practiced';
+  return 'not_started';
+}
+
+function estimatedMinutesForType(taskType: string): number {
+  if (taskType === 'study_topic' || taskType === 'read_pages') return 30;
+  if (taskType === 'solve_exercise_sheet' || taskType === 'practice_problem_set') return 25;
+  if (taskType === 'exam_style_practice') return 20;
+  return 20;
+}
+
+function buildTaskTitle(c: TaskCandidate): string {
+  const topicName = c.course_topics?.name ?? 'Topic';
+  const fileName = c.documents?.file_name ?? '';
+  switch (c.task_type) {
+    case 'study_topic':
+    case 'read_pages':
+      return `Study: ${topicName}`;
+    case 'solve_exercise_sheet':
+    case 'practice_problem_set':
+      return `Practice: ${topicName}${fileName ? ' (' + fileName + ')' : ''}`;
+    case 'generate_quiz_if_no_exercises':
+      return `Quiz: ${topicName}`;
+    case 'review_weak_topic':
+    case 'review_topic':
+      return `Review: ${topicName}`;
+    case 'exam_style_practice':
+      return `Exam drill: ${topicName}`;
+    default:
+      return `Study: ${topicName}`;
+  }
+}
+
+function buildTaskDescription(c: TaskCandidate): string {
+  const fileName = c.documents?.file_name ?? 'course source';
+  const pageStr = c.page_range ? `, ${c.page_range}` : '';
+  switch (c.task_type) {
+    case 'study_topic':
+    case 'read_pages':
+      return `Read through ${fileName}${pageStr}.`;
+    case 'solve_exercise_sheet':
+    case 'practice_problem_set':
+      return `Work through the exercises in ${fileName}${pageStr}.`;
+    case 'generate_quiz_if_no_exercises':
+      return `Test yourself using a generated quiz for this topic.`;
+    case 'review_weak_topic':
+      return `Review and re-consolidate ${fileName}${pageStr}.`;
+    case 'exam_style_practice':
+      return `Practise exam-style questions from ${fileName}${pageStr}.`;
+    default:
+      return `Use ${fileName}${pageStr}.`;
+  }
+}
+
+/** Extract a numeric suffix from a filename, e.g. "Lec8.pdf" → 8. */
+function fileNumericSuffix(fileName: string): number | null {
+  const m = fileName.replace(/\.[^.]+$/, '').match(/(\d+)$/);
+  return m ? parseInt(m[1]!, 10) : null;
+}
+
+export async function seedCandidatesFromTopics(
   userId: string,
-  courseId: string
+  courseId: string,
+  serviceKey: string
 ): Promise<number> {
   const topicsRes = await supaRequest<TopicSeedRow[]>(
     'GET',
-    'course_topics?user_id=eq.' + encodeURIComponent(userId) +
-      '&course_id=eq.' + encodeURIComponent(courseId) +
-      '&select=id,importance,source_document_ids' +
+    'course_topics?user_id=eq.' +
+      encodeURIComponent(userId) +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&select=id,importance,source_document_ids,name' +
       '&limit=100',
     null,
     serviceKey
@@ -524,63 +832,130 @@ async function seedCandidatesFromTopics(
   }
   if (!allDocIds.size) return 0;
 
-  // Fetch ready documents with their source_type to map lecture→learn, exercise→practice
   const docIdList = [...allDocIds].slice(0, 100);
   const docRes = await supaRequest<DocSeedRow[]>(
     'GET',
-    'documents?id=in.(' + docIdList.map(encodeURIComponent).join(',') + ')' +
+    'documents?id=in.(' +
+      docIdList.map(encodeURIComponent).join(',') +
+      ')' +
       '&processing_status=eq.ready' +
-      '&select=id,source_type' +
+      '&select=id,source_type,file_name' +
       '&limit=100',
     null,
     serviceKey
   );
-  const readyDocs = new Map<string, string | null>(
-    Array.isArray(docRes.body) ? docRes.body.map((d) => [d.id, d.source_type]) : []
+  const readyDocs = new Map<string, DocSeedRow>(
+    Array.isArray(docRes.body) ? docRes.body.map((d) => [d.id, d]) : []
   );
   if (!readyDocs.size) return 0;
 
-  // Delete stale auto-seeded candidates so re-seeds always use the latest logic
+  // Build a map: numericSuffix → exercise doc id, for pairing.
+  const exerciseByNum = new Map<number, string>();
+  for (const [docId, doc] of readyDocs) {
+    if (
+      (doc.source_type === 'exercise' || doc.source_type === 'solution') &&
+      doc.file_name
+    ) {
+      const n = fileNumericSuffix(doc.file_name);
+      if (n !== null) exerciseByNum.set(n, docId);
+    }
+  }
+
+  // Delete stale auto-seeded candidates.
   await supaRequest(
     'DELETE',
-    'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
-      '&course_id=eq.' + encodeURIComponent(courseId) +
+    'valid_task_candidates?user_id=eq.' +
+      encodeURIComponent(userId) +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
       '&candidate_reason=eq.auto_seeded_from_topic_map',
     null,
     serviceKey
   );
 
   const rows: Record<string, unknown>[] = [];
+
   for (const topic of topics) {
     const docIds = Array.isArray(topic.source_document_ids) ? topic.source_document_ids : [];
     for (const docId of docIds) {
-      if (!readyDocs.has(docId)) continue;
-      const sourceType = readyDocs.get(docId);
-      const taskType = sourceTypeToTaskType(sourceType);
-      const minutes = taskType === 'learn' ? 25 : taskType === 'practice' ? 20 : taskType === 'quiz' ? 15 : 20;
+      const doc = readyDocs.get(docId);
+      if (!doc) continue;
+
+      const taskType = sourceTypeToNewTaskType(doc.source_type);
+      const minutes = estimatedMinutesForType(taskType);
+      const reqState = studyStateRequired(taskType);
+      const isExercise = doc.source_type === 'exercise' || doc.source_type === 'solution';
+
+      // Detect exercise pairing for lecture candidates.
+      let exerciseFileId: string | null = null;
+      if (doc.source_type === 'lecture' && doc.file_name) {
+        const n = fileNumericSuffix(doc.file_name);
+        if (n !== null && exerciseByNum.has(n)) {
+          exerciseFileId = exerciseByNum.get(n)!;
+        }
+      }
+
+      const title = taskTitleFromSourceType(doc.source_type, topic.name ?? 'Topic', doc.file_name ?? '');
+
       rows.push({
         user_id: userId,
         course_id: courseId,
         topic_id: topic.id,
         task_type: taskType,
+        task_title: title,
         source_file_id: docId,
-        page_start: null,
-        page_end: null,
+        exercise_file_id: exerciseFileId,
         estimated_minutes: minutes,
         source_confidence: 'high',
         is_valid: true,
-        candidate_reason: 'auto_seeded_from_topic_map'
+        study_state_required: reqState,
+        exercise_available: isExercise,
+        candidate_reason: 'auto_seeded_from_topic_map',
       });
     }
   }
+
   if (!rows.length) return 0;
 
-  await supaRequest(
-    'POST',
-    'valid_task_candidates',
-    rows,
-    serviceKey,
-    { Prefer: 'return=minimal,resolution=ignore-duplicates' }
-  );
+  await supaRequest('POST', 'valid_task_candidates', rows, serviceKey, {
+    Prefer: 'return=minimal,resolution=ignore-duplicates',
+  });
   return rows.length;
+}
+
+function taskTitleFromSourceType(
+  sourceType: string | null | undefined,
+  topicName: string,
+  fileName: string
+): string {
+  if (sourceType === 'lecture') return `Study: ${topicName}`;
+  if (sourceType === 'exercise' || sourceType === 'solution')
+    return `Practice: ${topicName}${fileName ? ' (' + fileName + ')' : ''}`;
+  if (sourceType === 'exam') return `Exam drill: ${topicName}`;
+  return `Review: ${topicName}`;
+}
+
+// ── Legacy response helpers (kept for backward-compat with existing routes) ──
+
+export function studyPlanResponse(data: {
+  plan: null;
+  tasks: WeeklyStudyTask[];
+  noValidCandidates?: boolean;
+}): LambdaResponse {
+  const completed = data.tasks.filter((t) => t.status === 'completed').length;
+  const remaining = data.tasks
+    .filter((t) => !['completed', 'replaced'].includes(t.status))
+    .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
+  return jsonResponse(200, {
+    hasPlan: !!data.plan,
+    plan: data.plan,
+    tasks: data.tasks,
+    summary: {
+      completedTasks: completed,
+      totalTasks: data.tasks.length,
+      minutesRemaining: remaining,
+      status: 'active',
+      noValidCandidates: !!data.noValidCandidates,
+    },
+  });
 }

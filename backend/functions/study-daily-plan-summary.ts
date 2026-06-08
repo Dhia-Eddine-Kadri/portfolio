@@ -2,10 +2,10 @@
 
 import { fail, handleOptions, jsonResponse } from '../lib/responses';
 import {
-  fetchPlanWithTasks,
+  getDailyTasks,
   localPlanDate,
   requireStudyAuth,
-  validateCourseId
+  validateCourseId,
 } from '../lib/study-planner';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
@@ -19,24 +19,33 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const courseId = validateCourseId(qs.courseId);
   if (typeof courseId !== 'string') return courseId;
   const { planDate } = localPlanDate(qs.date, qs.timezone);
-  const data = await fetchPlanWithTasks(auth.serviceKey, auth.user.id, courseId, planDate);
-  const completed = data.tasks.filter((t) => t.status === 'completed').length;
-  const activeTasks = data.tasks.filter((t) => t.status !== 'replaced');
+
+  const tasks = await getDailyTasks(
+    auth.user.id,
+    new Date(planDate + 'T00:00:00Z'),
+    auth.serviceKey,
+    courseId
+  );
+
+  const completed = tasks.filter((t) => t.status === 'completed').length;
+  const activeTasks = tasks.filter((t) => t.status !== 'replaced');
   const remaining = activeTasks
     .filter((t) => t.status !== 'completed')
     .reduce((sum, t) => sum + (t.estimated_minutes || 0), 0);
-  const noValidCandidates = data.plan?.generated_reason === 'no_valid_candidates' && !data.tasks.length;
   const hasUnavailable = activeTasks.some((t) => t.status === 'unavailable');
+
   return jsonResponse(200, {
-    hasPlan: !!data.plan,
+    hasPlan: tasks.length > 0,
     courseId,
     planDate,
     completedTasks: completed,
     totalTasks: activeTasks.length,
     minutesRemaining: remaining,
-    mainFocus: activeTasks.find((t) => t.status !== 'completed' && t.status !== 'unavailable')?.title || null,
-    status: data.plan?.status || 'none',
-    noValidCandidates,
-    hasUnavailableSources: hasUnavailable
+    mainFocus:
+      activeTasks.find((t) => t.status !== 'completed' && t.status !== 'unavailable')
+        ?.task_title ?? null,
+    status: tasks.length > 0 ? 'active' : 'none',
+    noValidCandidates: tasks.length === 0,
+    hasUnavailableSources: hasUnavailable,
   });
 };

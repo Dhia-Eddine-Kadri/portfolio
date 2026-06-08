@@ -1,12 +1,11 @@
 // GET /api/study/daily-plan?date=YYYY-MM-DD&courseId=...
 
-import { fail, handleOptions } from '../lib/responses';
+import { fail, handleOptions, jsonResponse } from '../lib/responses';
 import {
-  fetchPlanWithTasks,
+  getDailyTasks,
   localPlanDate,
   requireStudyAuth,
-  studyPlanResponse,
-  validateCourseId
+  validateCourseId,
 } from '../lib/study-planner';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
@@ -21,6 +20,21 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const courseId = validateCourseId(qs.courseId);
   if (typeof courseId !== 'string') return courseId;
   const { planDate } = localPlanDate(qs.date, qs.timezone);
-  const data = await fetchPlanWithTasks(auth.serviceKey, auth.user.id, courseId, planDate);
-  return studyPlanResponse(data);
+
+  const tasks = await getDailyTasks(auth.user.id, new Date(planDate + 'T00:00:00Z'), auth.serviceKey, courseId);
+  const completed = tasks.filter((t) => t.status === 'completed').length;
+  const remaining = tasks
+    .filter((t) => !['completed', 'replaced'].includes(t.status))
+    .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
+
+  return jsonResponse(200, {
+    hasPlan: tasks.length > 0,
+    tasks,
+    summary: {
+      completedTasks: completed,
+      totalTasks: tasks.length,
+      minutesRemaining: remaining,
+      status: 'active',
+    },
+  });
 };
