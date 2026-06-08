@@ -2419,6 +2419,18 @@ body:not(.night) .dr-orb-b {
   display: none !important;
 }
 
+/* ── AI-mode content area (override dark gradient from document-rail.css) ─ */
+body:not(.night) .dr-drawer.dr-mode-ai .dr-content {
+  background: transparent !important;
+}
+
+/* ── File chip bar ───────────────────────────────────────────────────── */
+body:not(.night) .dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip-bar {
+  background: rgba(238, 245, 255, 0.5) !important;
+  border-top-color: #d9e6ff !important;
+  border-bottom-color: #d9e6ff !important;
+}
+
 /* ── Drawer header ────────────────────────────────────────────────────── */
 body:not(.night) .dr-header {
   background: rgba(255, 255, 255, 0.78) !important;
