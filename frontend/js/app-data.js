@@ -140,6 +140,19 @@ function _saveUserCourses() {
     }).catch(function (e) {
       console.warn('[courses] save failed', e);
     });
+    // Keep profile_cache in sync so the next boot doesn't reload stale
+    // course data (e.g. pre-migration ws2526 courses that trigger repeated
+    // migration cycles).
+    try {
+      var cacheRaw = localStorage.getItem('profile_cache_' + uid);
+      if (cacheRaw) {
+        var cached = JSON.parse(cacheRaw);
+        if (cached) {
+          cached.courses = data;
+          localStorage.setItem('profile_cache_' + uid, JSON.stringify(cached));
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 }
 
@@ -296,7 +309,16 @@ function _loadUserCourses(data) {
   Object.keys(data).forEach(function (sid) {
     if (SEMS[sid] && Array.isArray(data[sid])) {
       var oldCourses = snapshot[sid] || [];
+      // De-duplicate courses by id before assigning to SEMS. Corrupted server
+      // data or stale-cache races could leave the same course id in the array
+      // multiple times, snowballing on every save/load cycle.
+      var seenIds = {};
+      var deduped = [];
       data[sid].forEach(function (c) {
+        if (c && c.id) {
+          if (seenIds[c.id]) return;
+          seenIds[c.id] = true;
+        }
         if (!c.files) c.files = [];
         // Preserve already-loaded files/userFolders from the old course object
         // so that opened courses don't lose their displayed files when SEMS is replaced.
@@ -307,16 +329,25 @@ function _loadUserCourses(data) {
           if (old.files && old.files.length) c.files = old.files;
           if (old.userFolders) c.userFolders = old.userFolders;
         }
+        deduped.push(c);
       });
-      SEMS[sid].courses = data[sid];
+      SEMS[sid].courses = deduped;
     }
   });
   // One-time ws2526 → ss2526 migration. Runs server-side persistence too
   // so the move sticks across devices, not just this browser.
   var didMigrate = _migrateWs2526ToSs2526();
   // Cache scoped by user id so accounts can't leak into each other.
+  // Always write stripped data (no files/userFolders) to prevent localStorage
+  // bloat and to ensure the ws2526 key reflects the post-migration state.
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
-  if (uid) _writeUserCoursesLs(uid, data);
+  if (uid) {
+    var lsData = {};
+    Object.keys(SEMS).forEach(function (sid) {
+      lsData[sid] = SEMS[sid].courses.map(_stripCourseForSave);
+    });
+    _writeUserCoursesLs(uid, lsData);
+  }
   if (didMigrate) {
     // _saveUserCourses re-reads SEMS, so the migrated state is what gets
     // pushed to both localStorage (overwriting the line above) and Supabase.

@@ -277,7 +277,8 @@ async function _ufList(uid, course) {
       sortBy: { column: 'name', order: 'asc' }
     })
   }, 10000);
-  return Array.isArray(items) ? items : [];
+  if (!Array.isArray(items)) return null;
+  return items;
 }
 
 // Fetch an uploaded file's bytes directly using the authenticated endpoint.
@@ -567,12 +568,15 @@ async function _ufMergeImpl(course) {
       : '';
     return { name: displayName, storageName: fname, size: size, date: date };
   }
+  // Root listing — files have an id, folder entries have id: null.
+  // Fetch BEFORE clearing cached files: if the listing fails (null), keep
+  // whatever the user already has so files don't vanish on transient errors.
+  var items = await _ufList(uid, course);
+  if (items === null) return;
   // Clear previously uploaded files so stale entries don't persist after moves/deletes
   course.files = (course.files || []).filter(function (f) {
     return !f._uploaded;
   });
-  // Root listing — files have an id, folder entries have id: null
-  var items = await _ufList(uid, course);
   var discoveredFolders = [];
   items.forEach(function (item) {
     if (!item.id && item.name && !item.name.endsWith('/')) {
