@@ -880,6 +880,134 @@ async function streamAiReply(
 
 type IntentRouteResult = { text: string; missionMarker?: MissionMarker };
 
+// ── Cheatsheet-from-chatbot helpers ──────────────────────────────────────────
+
+interface CheatsheetChatSettings {
+  columns: 2 | 3 | 4;
+  fontSize: 'small' | 'medium' | 'large';
+  padding: 'tight' | 'normal' | 'wide';
+  language: string;
+}
+
+/** Detect an explicit language preference in the user's cheatsheet request. */
+function detectCheatsheetLangPref(text: string): string {
+  if (/\bin english\b|auf englisch|translate.*english/i.test(text)) return 'en';
+  if (/\bin german\b|auf deutsch|translate.*german/i.test(text)) return 'de';
+  if (/german.*terms.*english|deutsch.*begriffe.*englisch/i.test(text)) return 'de_terms_en_explanations';
+  return 'source';
+}
+
+/**
+ * Render an interactive settings card inside `bubble` and resolve with the
+ * user's chosen layout settings once they click "Generate PDF".
+ */
+function showCheatsheetSettingsCard(
+  bubble: HTMLElement | null,
+  initialLang: string
+): Promise<CheatsheetChatSettings | null> {
+  return new Promise((resolve) => {
+    if (!bubble) { resolve(null); return; }
+
+    const card = document.createElement('div');
+    card.className = 'ncb-cs-settings';
+
+    const renderGroup = (
+      key: string, label: string,
+      opts: Array<{ val: string; label: string }>,
+      defaultVal: string
+    ): string =>
+      '<div class="ncb-cs-settings-row">' +
+        '<span class="ncb-cs-settings-label">' + escapeHtml(label) + '</span>' +
+        '<div class="ncb-cs-settings-options" data-key="' + key + '">' +
+          opts.map(o =>
+            '<button type="button" class="ncb-cs-opt' +
+            (o.val === defaultVal ? ' ncb-cs-opt--active' : '') +
+            '" data-val="' + escapeAttr(o.val) + '">' +
+            escapeHtml(o.label) + '</button>'
+          ).join('') +
+        '</div>' +
+      '</div>';
+
+    card.innerHTML =
+      '<div class="ncb-cs-settings-title">Customize your cheatsheet PDF</div>' +
+      renderGroup('columns', 'Columns',
+        [{ val: '2', label: '2' }, { val: '3', label: '3' }, { val: '4', label: '4' }], '3') +
+      renderGroup('fontSize', 'Font size',
+        [{ val: 'small', label: 'Small' }, { val: 'medium', label: 'Medium' }, { val: 'large', label: 'Large' }],
+        'medium') +
+      renderGroup('padding', 'Padding',
+        [{ val: 'tight', label: 'Tight' }, { val: 'normal', label: 'Normal' }, { val: 'wide', label: 'Wide' }],
+        'normal') +
+      renderGroup('language', 'Language', [
+        { val: 'source', label: 'Document language' },
+        { val: 'en', label: 'English' },
+        { val: 'de', label: 'German' },
+        { val: 'de_terms_en_explanations', label: 'DE terms + EN' },
+      ], initialLang) +
+      '<div class="ncb-cs-settings-footer">' +
+        '<button type="button" class="ncb-cs-generate">Generate PDF</button>' +
+      '</div>';
+
+    card.addEventListener('click', (e) => {
+      const btn = (e.target as Element).closest<HTMLButtonElement>('.ncb-cs-opt');
+      if (!btn) return;
+      const group = btn.closest<HTMLElement>('[data-key]');
+      if (!group) return;
+      group.querySelectorAll('.ncb-cs-opt').forEach(b => b.classList.remove('ncb-cs-opt--active'));
+      btn.classList.add('ncb-cs-opt--active');
+    });
+
+    const getVal = (key: string): string =>
+      card.querySelector<HTMLButtonElement>(`[data-key="${key}"] .ncb-cs-opt--active`)?.dataset.val ?? '';
+
+    card.querySelector('.ncb-cs-generate')?.addEventListener('click', () => {
+      const columns = (parseInt(getVal('columns') || '3', 10) || 3) as 2 | 3 | 4;
+      const fontSize = (getVal('fontSize') || 'medium') as 'small' | 'medium' | 'large';
+      const padding = (getVal('padding') || 'normal') as 'tight' | 'normal' | 'wide';
+      const language = getVal('language') || 'source';
+      card.remove();
+      resolve({ columns, fontSize, padding, language });
+    });
+
+    bubble.innerHTML = '';
+    bubble.appendChild(card);
+  });
+}
+
+/** Lazily load cheatsheet.js + cheatsheet.css so the paper view is available. */
+function ensureCheatsheetScripts(): Promise<void> {
+  const w = window as unknown as {
+    openCheatsheetPaper?: unknown;
+    _csScriptsLoading?: Promise<void>;
+  };
+  if (typeof w.openCheatsheetPaper === 'function') return Promise.resolve();
+  if (w._csScriptsLoading) return w._csScriptsLoading;
+
+  const loadScript = (src: string): Promise<void> =>
+    new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load: ' + src));
+      document.head.appendChild(s);
+    });
+
+  const loadStyle = (href: string): void => {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = href;
+    document.head.appendChild(l);
+  };
+
+  w._csScriptsLoading = loadScript('/js/utils/db-helpers.js').then(() => {
+    loadStyle('/views/cheatsheet/cheatsheet.css');
+    return loadScript('/views/cheatsheet/cheatsheet.js');
+  });
+  return w._csScriptsLoading;
+}
+
 async function handleIntentRoute(
   state: ConversationState,
   bubble: HTMLElement | null,
@@ -939,14 +1067,76 @@ async function handleIntentRoute(
   }
 
   if (route.intent === 'cheatsheet') {
-    const skillStatus = showIntentSkillLoading(bubble, thinking, 'cheatsheet');
-    thinking?.set('Finding formulas and facts');
-    const mod = await import('../../services/ai-service.js');
-    thinking?.set('Reading course sources');
-    const result = await mod.generateCheatsheet(route.target.courseId, {});
-    thinking?.set('Formatting cheatsheet');
-    const text = 'Cheatsheet created from your current course sources.\n\n' + ((result && result.text) || 'No cheatsheet was returned.');
-    await finishIntentSkillLoading(skillStatus, thinking);
+    // 1. Detect language preference from the user's message
+    const langPref = detectCheatsheetLangPref(last.text);
+
+    // 2. Remove loading indicator and show settings card
+    if (thinking) await thinking.waitMinimum();
+    thinking?.remove(true);
+
+    const chatSettings = await showCheatsheetSettingsCard(bubble, langPref);
+    if (!chatSettings) {
+      const text = 'Cheatsheet cancelled.';
+      if (bubble) renderRichBubble(bubble, text);
+      return { text };
+    }
+
+    // Map UI choices to API/CSS values
+    const padMap: Record<string, string> = { tight: '6mm', normal: '10mm', wide: '16mm' };
+    const fontApiMap: Record<string, 'small' | 'medium' | 'large'> = {
+      small: 'small', medium: 'medium', large: 'large'
+    };
+    const fontCsMap: Record<string, string> = { small: 'xs', medium: 'sm', large: 'md' };
+
+    // 3. Run generation with a fresh thinking indicator
+    const genThinking = bubble
+      ? createAIThinkingStatus({ context: 'general', host: bubble, surface: 'chatbot', compact: true, append: true })
+      : null;
+    const skillStatus = showIntentSkillLoading(bubble, genThinking, 'cheatsheet');
+    genThinking?.set('Finding formulas and facts');
+
+    const [mod] = await Promise.all([
+      import('../../services/ai-service.js'),
+      ensureCheatsheetScripts(),
+    ]);
+    genThinking?.set('Reading course sources');
+
+    const result = await mod.generateCheatsheet(route.target.courseId, {
+      settings: {
+        columns: chatSettings.columns,
+        fontSize: fontApiMap[chatSettings.fontSize],
+        output: 'web',
+        language: chatSettings.language as 'source' | 'en' | 'de' | 'de_terms_en_explanations',
+      }
+    });
+
+    genThinking?.set('Opening paper view');
+    await finishIntentSkillLoading(skillStatus, genThinking);
+
+    // 4. Open the paper view using the existing cheatsheet page infrastructure
+    const openPaper = (window as unknown as {
+      openCheatsheetPaper?: (opts: Record<string, unknown>) => void
+    }).openCheatsheetPaper;
+
+    if (openPaper && result && result.text) {
+      openPaper({
+        course: route.target.courseId,
+        title: result.title || 'Cheatsheet',
+        scope: result.title || 'Course cheatsheet',
+        meta: '',
+        markdown: result.text,
+        settings: {
+          columns: chatSettings.columns,
+          font: fontCsMap[chatSettings.fontSize] || 'sm',
+          pad: padMap[chatSettings.padding] || '10mm',
+          style: (result.settings && result.settings.style) || 'academic',
+        },
+      });
+    }
+
+    const text = result && result.text
+      ? 'Your cheatsheet is ready. The PDF viewer is open — adjust the layout if needed, then click **⤓ Download PDF**.'
+      : 'No cheatsheet content was returned. Please try again.';
     if (bubble) renderRichBubble(bubble, text);
     return { text };
   }

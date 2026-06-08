@@ -3148,3 +3148,107 @@ body:not(.night) .ncb-skill-live-note {
     transition: none !important;
   }
 }
+
+/* ── Cheatsheet PDF settings card (shown in chatbot bubble before generation) ─ */
+.ncb-cs-settings {
+  display: grid;
+  gap: 10px;
+  max-width: 480px;
+  padding: 16px;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.5);
+  animation: ncb-stream-reveal 180ms ease-out both;
+}
+
+.ncb-cs-settings-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(241, 245, 249, 0.92);
+}
+
+.ncb-cs-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ncb-cs-settings-label {
+  min-width: 88px;
+  font-size: 0.83rem;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.ncb-cs-settings-options {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.ncb-cs-opt {
+  padding: 5px 11px;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.5);
+  color: rgba(203, 213, 225, 0.8);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 110ms, background 110ms, color 110ms;
+}
+
+.ncb-cs-opt:hover {
+  border-color: rgba(147, 197, 253, 0.5);
+  color: #dbeafe;
+}
+
+.ncb-cs-opt--active {
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(37, 99, 235, 0.22);
+  color: #bfdbfe;
+  font-weight: 600;
+}
+
+.ncb-cs-settings-footer {
+  padding-top: 4px;
+}
+
+.ncb-cs-generate {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 110ms;
+}
+
+.ncb-cs-generate:hover { background: #1d4ed8; }
+
+body:not(.night) .ncb-cs-settings {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.85);
+}
+
+body:not(.night) .ncb-cs-settings-title { color: #1e293b; }
+
+body:not(.night) .ncb-cs-settings-label { color: #64748b; }
+
+body:not(.night) .ncb-cs-opt {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: #fff;
+  color: #475569;
+}
+
+body:not(.night) .ncb-cs-opt:hover {
+  border-color: #2563eb;
+  color: #1e40af;
+}
+
+body:not(.night) .ncb-cs-opt--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1e40af;
+}

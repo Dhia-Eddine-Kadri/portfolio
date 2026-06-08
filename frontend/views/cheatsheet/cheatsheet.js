@@ -983,11 +983,12 @@
     // Settings drive the existing dense paper layout via CSS custom properties.
     var paper = ov.querySelector('.cs-paper');
     var st = opts.settings || {};
+    var initialPad = st.pad || '10mm';
     if (paper) {
       if (st.columns) paper.style.setProperty('--cs-columns', String(st.columns));
       var fontEm = { xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm'];
       if (fontEm) paper.style.setProperty('--cs-font', fontEm);
-      paper.style.setProperty('--cs-pad', '10mm');
+      paper.style.setProperty('--cs-pad', initialPad);
       if (st.style) paper.setAttribute('data-style', st.style);
     }
     var colSel = ov.querySelector('[data-act="columns"]');
@@ -995,7 +996,7 @@
     var padSel = ov.querySelector('[data-act="pad"]');
     if (colSel && st.columns) colSel.value = String(st.columns);
     if (fontSel) fontSel.value = ({ xs: '0.72rem', sm: '0.78rem', md: '0.86rem' }[st.font || 'sm']) || '0.78rem';
-    if (padSel) padSel.value = '10mm';
+    if (padSel) padSel.value = initialPad;
     if (colSel) colSel.addEventListener('change', function () {
       if (!paper) return;
       paper.style.setProperty('--cs-columns', colSel.value);
@@ -1298,6 +1299,8 @@
       onConfirm(allChecked && ids.length > 5 ? null : ids);
     };
   }
+
+  window.openCheatsheetPaper = _openPaper;
 
   window.mountCheatsheet = function (target, course) {
     if (!target) return;
