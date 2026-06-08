@@ -90,7 +90,6 @@ function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
     const tryStart = (): void => {
       const user = window._currentUser;
       const hasUser = !!(user && (user.id || user.sub));
-      console.log('[waitMerge] tryStart hasUser=', hasUser, '_ufMerge?', typeof window._ufMerge, 'elapsed=', Date.now() - startedAt);
       if (hasUser && typeof window._ufMerge === 'function') {
         try {
           Promise.resolve(window._ufMerge(course)).then(resolve, reject);
@@ -105,19 +104,7 @@ function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
       }
       window.setTimeout(tryStart, 120);
     };
-    // Wait for the auth session token before listing files.
-    // Without this, _ufMerge can fire while _sbToken is still null
-    // and the storage list returns 401 → first open shows 0 files.
-    const ready = window._sbSessionReady as Promise<unknown> | undefined;
-    if (ready) {
-      console.log('[waitMerge] awaiting _sbSessionReady');
-      Promise.race([
-        ready.catch(() => {}),
-        new Promise<void>((r) => setTimeout(r, TIMEOUT_MS)),
-      ]).then(tryStart);
-    } else {
-      tryStart();
-    }
+    tryStart();
   });
 }
 
@@ -414,7 +401,6 @@ function buildFilesContent(course: LegacyCourse): string {
 }
 
 export function openCourse(course: LegacyCourse): void {
-  console.log('[openCourse]', course.id, 'files=', course.files?.length, 'userFolders=', course.userFolders?.length);
   if (!course.files) course.files = [];
   window.activeCourseId = course.id;
   window.activeFileName = null;
@@ -489,13 +475,13 @@ export function openCourse(course: LegacyCourse): void {
   // small "refreshing" pill while the background _ufMerge runs.
   course._filesLoading = !hadCacheEntry && !hasAnyFiles;
   course._filesRefreshing = hadCacheEntry;
-  console.log('[openCourse] hadCache=', hadCacheEntry, 'hasFiles=', hasAnyFiles, 'loading=', course._filesLoading);
 
   showCourseSection(course, 'files');
   if (typeof window._setAiChipsVisible === 'function') window._setAiChipsVisible(false);
   if (typeof window.renderCourses === 'function') window.renderCourses();
 
-  const myCourseSeq = ++(window._courseOpenSeq as number);
+  if (typeof window._courseOpenSeq !== 'number') window._courseOpenSeq = 0;
+  const myCourseSeq = ++window._courseOpenSeq;
   const currentCourseSection = (): string =>
     window.activeCourseRef === course && window.activeCourseSection
       ? window.activeCourseSection
@@ -553,7 +539,6 @@ export function openCourse(course: LegacyCourse): void {
       course._filesLoading = false;
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
-      console.log('[openCourse] merge done, files=', course.files?.length, 'folders=', course.userFolders?.length, 'stillHere=', stillOnThisCourse);
       if (stillOnThisCourse) {
         window._ssRestoring = true;
         showCourseSection(course, currentCourseSection());
@@ -586,8 +571,7 @@ export function openCourse(course: LegacyCourse): void {
         localStorage.setItem('ss_fc_' + course.id, String(total));
       } catch { /* quota or stringify */ }
     })
-    .catch((err: unknown) => {
-      console.warn('[openCourse] merge FAILED', err);
+    .catch(() => {
       cleanup();
       course._filesLoading = false;
       course._filesRefreshing = false;

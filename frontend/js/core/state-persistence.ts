@@ -146,7 +146,6 @@ export function initStatePersistence(options: StatePersistenceOptions): {
         if (sem) {
           const course = sem.courses.find((c) => c.id === st.courseId);
           if (course) {
-            console.log('[restoreState] restoring course', st.courseId, 'files=', course.files?.length);
             options.setActiveCourseId(st.courseId);
             if (!course.files) course.files = [];
             options.panelHide(document.getElementById('welcomeState'));

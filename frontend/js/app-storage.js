@@ -261,31 +261,22 @@ async function _ufList(uid, course) {
   await _ufEnsureFreshToken();
 
   var prefix = uid + '/' + _ufKey(course) + '/';
-  function _doList() {
-    return _ufFetchJsonWithTimeout(SUPA_URL + '/storage/v1/object/list/' + _UF_BUCKET, {
-      method: 'POST',
-      headers: {
-        apikey: SUPA_KEY,
-        Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
-        'Content-Type': 'application/json'
-      },
-      // sortBy is required by current Supabase Storage validation — older
-      // versions accepted just { prefix, limit, offset }, newer ones 400.
-      body: JSON.stringify({
-        prefix: prefix,
-        limit: 200,
-        offset: 0,
-        sortBy: { column: 'name', order: 'asc' }
-      })
-    }, 10000);
-  }
-  var items = await _doList();
-  // Retry once if the first attempt used an anon/stale token (null result
-  // means the storage endpoint returned non-200, typically 401).
-  if (items === null && window._sbSessionReady) {
-    try { await window._sbSessionReady; } catch (e) {}
-    items = await _doList();
-  }
+  var items = await _ufFetchJsonWithTimeout(SUPA_URL + '/storage/v1/object/list/' + _UF_BUCKET, {
+    method: 'POST',
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: 'Bearer ' + (_sbToken || SUPA_KEY),
+      'Content-Type': 'application/json'
+    },
+    // sortBy is required by current Supabase Storage validation — older
+    // versions accepted just { prefix, limit, offset }, newer ones 400.
+    body: JSON.stringify({
+      prefix: prefix,
+      limit: 200,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' }
+    })
+  }, 10000);
   return Array.isArray(items) ? items : [];
 }
 
@@ -553,8 +544,7 @@ function _ufMerge(course) {
 
 async function _ufMergeImpl(course) {
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
-  console.log('[ufMerge] start', course.id, 'uid=', uid, '_sbToken?', !!_sbToken);
-  if (!uid) { console.warn('[ufMerge] no uid — bailing'); return; }
+  if (!uid) return;
   function _parseMeta(item) {
     var fname = decodeURIComponent(item.name || '');
     if (!fname || fname.endsWith('/') || !item.id) return null; // skip folder entries (id is null for folders)
@@ -583,7 +573,6 @@ async function _ufMergeImpl(course) {
   });
   // Root listing — files have an id, folder entries have id: null
   var items = await _ufList(uid, course);
-  console.log('[ufMerge] _ufList returned', items.length, 'items for', course.id);
   var discoveredFolders = [];
   items.forEach(function (item) {
     if (!item.id && item.name && !item.name.endsWith('/')) {
