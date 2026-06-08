@@ -1759,65 +1759,13 @@ body:not(.night) .ncb-skill-thinking-note strong {
   outline-offset: 3px;
 }
 
-.ncb-skill-steps {
-  display: grid;
-  gap: 7px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: rgba(203, 213, 225, 0.7);
-  font-size: 0.82rem;
-}
-
-.ncb-skill-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 22px;
-  opacity: 0.66;
-  transition:
-    opacity 180ms ease,
-    color 180ms ease,
-    transform 180ms ease;
-}
-
-.ncb-skill-step-dot {
-  position: relative;
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.54);
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
-}
-
-.ncb-skill-step.is-active {
-  color: rgba(239, 246, 255, 0.94);
-  opacity: 1;
-  transform: translateX(2px);
-}
-
-.ncb-skill-step.is-active .ncb-skill-step-dot {
-  background: #93c5fd;
-  box-shadow:
-    0 0 0 4px rgba(96, 165, 250, 0.14),
-    0 0 16px rgba(147, 197, 253, 0.58);
-  animation: ncb-skill-step-pulse 850ms ease-in-out infinite;
-}
-
-.ncb-skill-step.is-complete {
-  color: rgba(203, 213, 225, 0.86);
-  opacity: 0.92;
-}
-
-.ncb-skill-step.is-complete .ncb-skill-step-dot {
-  background: #34d399;
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.42);
+.ncb-skill-live-note {
+  color: rgba(148, 163, 184, 0.72);
+  font-size: 0.78rem;
 }
 
 .ncb-skill-loading--collapsed .ncb-skill-thinking-note,
-.ncb-skill-loading--collapsed .ncb-skill-steps {
+.ncb-skill-loading--collapsed .ncb-skill-live-note {
   display: none;
 }
 
@@ -1842,16 +1790,8 @@ body:not(.night) .ncb-skill-chip:hover {
     0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-body:not(.night) .ncb-skill-steps {
+body:not(.night) .ncb-skill-live-note {
   color: #64748b;
-}
-
-body:not(.night) .ncb-skill-step.is-active {
-  color: #1e3a8a;
-}
-
-body:not(.night) .ncb-skill-step.is-complete {
-  color: #334155;
 }
 
 @keyframes ncb-skill-pulse {
@@ -1872,11 +1812,6 @@ body:not(.night) .ncb-skill-step.is-complete {
 @keyframes ncb-skill-core {
   0%, 100% { transform: scale(0.78); opacity: 0.78; }
   50% { transform: scale(1.18); opacity: 1; }
-}
-
-@keyframes ncb-skill-step-pulse {
-  0%, 100% { transform: scale(0.94); }
-  50% { transform: scale(1.16); }
 }
 
 @keyframes ncb-stream-reveal {
