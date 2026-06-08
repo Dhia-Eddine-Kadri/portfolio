@@ -121,12 +121,21 @@ _SYSTEM = (
     "or derivations. Examples: mathematics, physics calculations, mechanics, statistics, "
     "electrical circuits, thermodynamics, control theory.\n"
     "- \"concept-light-math\" — mostly conceptual, but small calculations, tables, values, "
-    "ratios, or technical parameters may appear. Examples: Fertigungstechnik, materials science, "
-    "manufacturing processes, chemistry theory, economics concepts, business analytics basics, "
-    "biology with occasional equations.\n"
-    "- \"no-math\" — purely conceptual, no formulas. Student needs to understand, remember, "
-    "compare, argue, or explain. Examples: history, law, political science, literature, ethics, "
-    "philosophy, language learning, sociology, management theory, marketing.\n"
+    "ratios, or technical parameters may appear. IMPORTANT: this is also the correct engine "
+    "for technical subjects even when no formulas are present — if the topic involves "
+    "technical classifications, material properties, manufacturing processes, engineering "
+    "concepts, scientific mechanisms, process parameters, or technical comparisons, use this "
+    "engine, NOT no-math. Examples: Fertigungstechnik, materials science, manufacturing "
+    "processes, Stoffeigenschaften, Werkstoffkunde, chemistry theory, economics concepts, "
+    "business analytics basics, biology with occasional equations, any engineering or "
+    "natural-science topic where the student must classify, compare, or explain technical "
+    "processes rather than argue or write essays.\n"
+    "- \"no-math\" — purely conceptual, argumentative, or discursive. The student needs to "
+    "understand theories, construct arguments, interpret texts, compare viewpoints, or write "
+    "structured essay answers. This engine is for HUMANITIES AND SOCIAL SCIENCES only. "
+    "Examples: history, law, political science, literature, ethics, philosophy, language "
+    "learning, sociology, management theory, marketing, pedagogy. "
+    "Do NOT use this for technical or engineering subjects — use concept-light-math instead.\n"
     "- \"balanced\" — both conceptual theory AND formulas/calculations are central. "
     "Examples: physics theory + calculations, economics, chemistry, engineering science, "
     "computer science theory, data science, finance, materials testing.\n\n"
@@ -141,12 +150,19 @@ _SYSTEM = (
     "and plausibility. Use adaptiveBlocks only if needed. selfCheck should include a mini "
     "calculation. practiceTasks at easy/medium/exam levels.\n\n"
     "═══ ENGINE 2: concept-light-math ═══\n"
+    "Use this engine for ALL technical/engineering/science subjects, even when no formulas "
+    "are present. If the topic involves material properties, manufacturing processes, "
+    "technical classifications, engineering mechanisms, or scientific concepts — this is "
+    "the correct engine.\n"
     "keyFormulas = [] unless formulas are genuinely central to the topic. Focus on:\n"
     "- adaptiveBlocks with: \"Definition\", \"Classification\", \"Comparison Table\" "
     "(use body field with markdown table — columns like Type|Principle|Application|"
     "Advantage|Disadvantage|Exam clue), \"Selection Criteria\", \"Key Statements\" "
     "(title: \"Prüfungsrelevante Kernaussagen\" or equivalent in lesson language), "
     "\"Process Map\", \"Mechanism\", \"Variants\", \"Conditions\", \"Applications\".\n"
+    "- CRITICAL: Comparison tables MUST include actual data rows, not just headers. "
+    "If you create a table, fill every row with source-supported values. An empty table "
+    "with only column headers is worse than no table — it looks broken.\n"
     "- Classification completeness: for classification topics (e.g. DIN 8580), include ALL "
     "groups — do not omit groups because evidence is thin.\n"
     "- Only list specific examples under a group if the source clearly supports it.\n"
@@ -154,15 +170,25 @@ _SYSTEM = (
     "- Comparison tables are the most exam-valuable block — always include one.\n"
     "- Optional formula/parameter cards only if numeric criteria are truly central.\n"
     "- workedExamples should be application cases (\"Mini-Fallbeispiel\"), not calculations.\n"
-    "- stepByStepMethod framed as exam method: define → classify → explain principle → "
+    "- stepByStepMethod must be topic-specific and technical. For material/process topics: "
+    "1. Identify which property is relevant (strength, toughness, hardness, formability...), "
+    "2. Distinguish between processing requirements and final product requirements, "
+    "3. Identify the material state (e.g. ferritic-pearlitic, annealed, hardened, martensitic), "
+    "4. Describe how the state affects the relevant properties, "
+    "5. Select an appropriate modification process (heat treatment, surface hardening, etc.), "
+    "6. Justify why this process matches the required property (exam-ready reasoning). "
+    "For other technical subjects: define → classify → explain principle → "
     "compare with alternatives → state advantages/disadvantages → justify for the given case.\n"
     "- selfCheck: concept question + classification question + application question.\n\n"
-    "═══ ENGINE 3: no-math ═══\n"
+    "═══ ENGINE 3: no-math (humanities / essay subjects only) ═══\n"
+    "This engine is ONLY for humanities, social sciences, and essay-based subjects "
+    "(history, law, politics, philosophy, literature, sociology, marketing, pedagogy). "
+    "If the topic is technical or engineering-related, you MUST use concept-light-math.\n"
     "keyFormulas = [] (always empty). Focus on:\n"
     "- adaptiveBlocks with: \"Key Terms\" (term + definition pairs), \"Context\" "
     "(historical/legal/social/theoretical background), a structure map chosen from: "
     "\"Timeline\", \"Argument Map\", \"Cause-Effect\", \"Rule-Exception\", "
-    "\"Concept Hierarchy\", \"Theory Comparison\", \"Process Explanation\". "
+    "\"Concept Hierarchy\", \"Theory Comparison\". "
     "Also: \"Main Ideas\" (3-6 most important ideas), \"Comparison\" (related concepts, "
     "theories, authors, rules, cases), \"Key Statements\".\n"
     "- Add an adaptiveBlock \"Exam Answer Structure\" showing how to write an exam answer: "
@@ -821,15 +847,15 @@ def _fallback_method(topic: str, language: str, content_type: str = "") -> list[
     if "no-math" in ct or "rein konzept" in ct or "conceptual" in ct:
         if is_de:
             return [
-                "Definiere den Schlüsselbegriff.",
-                "Gib den Kontext (historisch, rechtlich, theoretisch).",
+                "Definiere den Schlüsselbegriff und ordne ihn in den Fachkontext ein.",
+                "Erläutere den Hintergrund (historisch, rechtlich oder theoretisch).",
                 "Erkläre die Hauptidee oder das zentrale Argument.",
                 "Belege mit einem Beispiel oder einer Quelle.",
                 "Vergleiche oder bewerte und formuliere ein Fazit.",
             ]
         return [
-            "Define the key term.",
-            "Give the context (historical, legal, theoretical).",
+            "Define the key term and place it in context.",
+            "Explain the background (historical, legal, or theoretical).",
             "Explain the main idea or central argument.",
             "Support with an example or source.",
             "Compare or evaluate and formulate a conclusion.",
