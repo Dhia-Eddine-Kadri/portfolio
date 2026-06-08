@@ -214,9 +214,32 @@ export async function generateDailyPlan(
       serviceKey
     )
   ]);
-  const candidates = Array.isArray(candidatesRes.body)
+  let candidates = Array.isArray(candidatesRes.body)
     ? candidatesRes.body.filter((c) => c.documents?.processing_status === 'ready')
     : [];
+
+  // Auto-seed valid_task_candidates from course_topics when the table has no
+  // rows for this user+course yet (first-time generation flow).
+  if (!candidates.length) {
+    const seeded = await seedCandidatesFromTopics(serviceKey, userId, courseId);
+    if (seeded > 0) {
+      const refetchRes = await supaRequest<CandidateRow[]>(
+        'GET',
+        'valid_task_candidates?user_id=eq.' + encodeURIComponent(userId) +
+          '&course_id=eq.' + encodeURIComponent(courseId) +
+          '&is_valid=eq.true' +
+          '&source_confidence=in.(high,confirmed)' +
+          '&select=*,course_topics(name,importance),documents(file_name,processing_status)' +
+          '&order=created_at.asc' +
+          '&limit=40',
+        null,
+        serviceKey
+      );
+      candidates = Array.isArray(refetchRes.body)
+        ? refetchRes.body.filter((c) => c.documents?.processing_status === 'ready')
+        : [];
+    }
+  }
   const candidateIds = new Set(candidates.map((c) => c.id));
   const stateByTopic = new Map<string, string>();
   if (Array.isArray(statesRes.body)) {
@@ -437,4 +460,85 @@ function templateReason(group: string, topicState?: string): string {
   }
   if (group === 'should_do') return 'This task is grounded in a confirmed course source.';
   return 'Optional extra practice if you have more time today.';
+}
+
+interface TopicSeedRow {
+  id: string;
+  importance: string;
+  source_document_ids: string[] | null;
+}
+
+async function seedCandidatesFromTopics(
+  serviceKey: string,
+  userId: string,
+  courseId: string
+): Promise<number> {
+  const topicsRes = await supaRequest<TopicSeedRow[]>(
+    'GET',
+    'course_topics?user_id=eq.' + encodeURIComponent(userId) +
+      '&course_id=eq.' + encodeURIComponent(courseId) +
+      '&select=id,importance,source_document_ids' +
+      '&limit=100',
+    null,
+    serviceKey
+  );
+  const topics = Array.isArray(topicsRes.body) ? topicsRes.body : [];
+  if (!topics.length) return 0;
+
+  const allDocIds = new Set<string>();
+  for (const t of topics) {
+    const ids = Array.isArray(t.source_document_ids) ? t.source_document_ids : [];
+    for (const id of ids) if (id) allDocIds.add(id);
+  }
+  if (!allDocIds.size) return 0;
+
+  // Fetch only ready documents (cap to 100 IDs to stay within URL limits)
+  const docIdList = [...allDocIds].slice(0, 100);
+  const docRes = await supaRequest<Array<{ id: string }>>(
+    'GET',
+    'documents?id=in.(' + docIdList.map(encodeURIComponent).join(',') + ')' +
+      '&processing_status=eq.ready' +
+      '&select=id' +
+      '&limit=100',
+    null,
+    serviceKey
+  );
+  const readyDocIds = new Set(
+    Array.isArray(docRes.body) ? docRes.body.map((d) => d.id) : []
+  );
+  if (!readyDocIds.size) return 0;
+
+  const rows: Record<string, unknown>[] = [];
+  for (const topic of topics) {
+    const docIds = Array.isArray(topic.source_document_ids) ? topic.source_document_ids : [];
+    for (const docId of docIds) {
+      if (!readyDocIds.has(docId)) continue;
+      const types: string[] = topic.importance === 'high' ? ['review', 'quiz'] : ['review'];
+      for (const taskType of types) {
+        rows.push({
+          user_id: userId,
+          course_id: courseId,
+          topic_id: topic.id,
+          task_type: taskType,
+          source_file_id: docId,
+          page_start: null,
+          page_end: null,
+          estimated_minutes: taskType === 'quiz' ? 15 : 20,
+          source_confidence: 'high',
+          is_valid: true,
+          candidate_reason: 'auto_seeded_from_topic_map'
+        });
+      }
+    }
+  }
+  if (!rows.length) return 0;
+
+  await supaRequest(
+    'POST',
+    'valid_task_candidates',
+    rows,
+    serviceKey,
+    { Prefer: 'return=minimal,resolution=ignore-duplicates' }
+  );
+  return rows.length;
 }
