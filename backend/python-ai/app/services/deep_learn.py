@@ -88,7 +88,10 @@ _SYSTEM = (
     "Formula Cards unless formulas or equations are actually supported by the evidence. "
     "Before returning a formula card, check that the formula is copied correctly, the "
     "meaning explains the formula correctly, the source page supports it, and the formula "
-    "is directly relevant to the selected topic. If the formula is nearby but not central, "
+    "is DIRECTLY AND CENTRALLY relevant to the selected topic — not merely from the same "
+    "chapter or general area. A formula about rotational dynamics does not belong in a "
+    "lesson on linear point-mass dynamics unless labelled as \"related\" with a clear "
+    "explanation of the connection. If the formula is nearby but not central, "
     "set relevance to \"related\" and explain the relation briefly in conditions. If it is "
     "uncertain, malformed, or only weakly connected, omit it. A wrong formula is worse than "
     "no formula.\n"
@@ -100,13 +103,27 @@ _SYSTEM = (
     "- Every important claim should be grounded in a source label where possible.\n"
     "- Never cite a source label that is not in COURSE EVIDENCE.\n"
     "- If citation coverage is weak, include a helpful citationWarning, e.g. "
-    "\"Diese Lektion basiert auf den verfuegbaren Kursquellen. Falls bestimmte "
-    "Beispiele, Uebungen oder Details fehlen, lade zusaetzliche Materialien hoch, "
-    "um die Erklaerung genauer zu machen.\"\n\n"
+    "\"Diese Lektion basiert auf den verfügbaren Kursquellen. Falls bestimmte "
+    "Beispiele, Übungen oder Details fehlen, lade zusätzliche Materialien hoch, "
+    "um die Erklärung genauer zu machen.\"\n\n"
     "Quality rules:\n"
-    "- Keep the whole lesson in the requested lesson language.\n"
+    "- Keep the ENTIRE lesson in the requested lesson language — including all text, "
+    "explanations, labels in meaning/variables/conditions fields, commonMistake text, "
+    "and self-check questions. Never mix languages except for original technical terms.\n"
     "- Do not write dead sections like \"No strong course evidence for this section\". "
     "If evidence is incomplete, provide a cautious method inferred from examples and say so.\n"
+    "- stepByStepMethod must be TOPIC-SPECIFIC, not a generic problem-solving template. "
+    "Write concrete steps a student would follow for this particular topic. For example, "
+    "for dynamics: \"Draw the free-body diagram\", \"Decompose forces\", \"Apply Newton's 2nd law\". "
+    "Never return generic steps like \"Identify the system\" or \"Choose the right theorem\".\n\n"
+    "Worked example rules (CRITICAL — a wrong example destroys student trust):\n"
+    "- Before returning a worked example, RECALCULATE every step yourself. Verify that each "
+    "equation follows from the previous one, that force decompositions use the correct "
+    "trig functions (sin vs cos), and that the final numeric answer is correct.\n"
+    "- For physics: check sign conventions, verify which component is sin vs cos for the "
+    "given angle definition, and confirm that initial conditions are correctly applied.\n"
+    "- If you cannot verify the calculation with confidence, return it as a practiceTask "
+    "instead of a workedExample.\n"
     "- Worked examples must end with a real numeric or symbolic final answer. If the sources "
     "do not support a complete worked example, return it as a practiceTask instead.\n"
     "- Stay focused on the selected topic. Related concepts are allowed only when labelled "
@@ -576,11 +593,11 @@ def _fallback_method(topic: str, language: str) -> list[str]:
             "Check whether the result answers the original topic question.",
         ]
     return [
-        "Bestimme zuerst System, gegebene Groessen und gesuchte Groessen.",
+        "Bestimme zuerst System, gegebene Größen und gesuchte Größen.",
         "Notiere die Annahmen und Zwangsbedingungen aus den Kursquellen.",
-        "Waehle den Satz oder die Definition, die in den Quellen direkt gestuetzt wird.",
-        "Setze Werte oder Symbole sauber ein und pruefe Einheiten sowie Vorzeichen.",
-        "Kontrolliere, ob das Ergebnis die urspruengliche Fragestellung zu " + topic + " beantwortet.",
+        "Wähle den Satz oder die Definition, die in den Quellen direkt gestützt wird.",
+        "Setze Werte oder Symbole sauber ein und prüfe Einheiten sowie Vorzeichen.",
+        "Kontrolliere, ob das Ergebnis die ursprüngliche Fragestellung zu " + topic + " beantwortet.",
     ]
 
 
@@ -592,7 +609,7 @@ def _formula_warning(language: str) -> str:
         )
     return (
         "Einige Formelkarten wurden ausgeblendet, weil Schreibweise, Bedeutung oder direkte "
-        "Relevanz durch die verfuegbaren Quellen nicht sicher genug gestuetzt waren."
+        "Relevanz durch die verfügbaren Quellen nicht sicher genug gestützt waren."
     )
 
 
@@ -633,7 +650,7 @@ def _validate_lesson_content(
             if language == "en":
                 note = "Related concept; use only if the source explicitly connects it to this topic."
             else:
-                note = "Verwandtes Konzept; nur verwenden, wenn die Quelle es ausdruecklich mit diesem Thema verbindet."
+                note = "Verwandtes Konzept; nur verwenden, wenn die Quelle es ausdrücklich mit diesem Thema verbindet."
             formula["conditions"] = (_as_str(formula.get("conditions")) + (" " if formula.get("conditions") else "") + note).strip()
         formula["confidence"] = formula.get("confidence") or "checked"
         formulas.append(formula)
@@ -661,7 +678,7 @@ def _validate_lesson_content(
             if prompt:
                 lesson["practiceTasks"].append({
                     "prompt": prompt,
-                    "goal": "Complete the symbolic or numeric final answer." if language == "en" else "Ergaenze das symbolische oder numerische Endergebnis.",
+                    "goal": "Complete the symbolic or numeric final answer." if language == "en" else "Ergänze das symbolische oder numerische Endergebnis.",
                     "source": _as_str(ex.get("sourceOrBasis")),
                 })
             continue
@@ -876,7 +893,7 @@ def generate_deep_learn(
             "workedExample": "",
             "check": None,
             "structuredLesson": None,
-            "warning": "Diese Lektion basiert auf den verfuegbaren Kursquellen. Falls bestimmte Beispiele, Uebungen oder Details fehlen, lade zusaetzliche Materialien hoch, um die Erklaerung genauer zu machen.",
+            "warning": "Diese Lektion basiert auf den verfügbaren Kursquellen. Falls bestimmte Beispiele, Übungen oder Details fehlen, lade zusätzliche Materialien hoch, um die Erklärung genauer zu machen.",
             "groundedSources": [],
             "evidenceSummary": {k: len(v) for k, v in buckets.items()},
         }
@@ -902,6 +919,7 @@ def generate_deep_learn(
 
     data = res.data if isinstance(res.data, dict) else {}
     structured = _normalize_lesson(data, topic, mode)
+    structured["lessonLanguage"] = effective_language
     _validate_lesson_content(
         structured,
         topic=topic,
@@ -912,9 +930,9 @@ def generate_deep_learn(
     citation_issues = _citation_issues(structured, sources)
     if citation_issues and not structured.get("citationWarning"):
         structured["citationWarning"] = (
-            "Diese Lektion basiert auf den verfuegbaren Kursquellen. Falls bestimmte "
-            "Beispiele, Uebungen oder Details fehlen, lade zusaetzliche Materialien hoch, "
-            "um die Erklaerung genauer zu machen."
+            "Diese Lektion basiert auf den verfügbaren Kursquellen. Falls bestimmte "
+            "Beispiele, Übungen oder Details fehlen, lade zusätzliche Materialien hoch, "
+            "um die Erklärung genauer zu machen."
         )
 
     lesson_md, worked_md, check = _lesson_to_legacy_markdown(structured)

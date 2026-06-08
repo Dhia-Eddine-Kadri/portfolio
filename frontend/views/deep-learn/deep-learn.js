@@ -274,7 +274,8 @@
         await _sleep(360);
       }
       if (runId !== _dlRun) return;
-      if (status) status.textContent = 'Lesson complete';
+      var lang = card.getAttribute('data-lang') || 'en';
+      if (status) status.textContent = (_LABELS[lang] || _LABELS.en).lessonComplete;
       if (printBtn) printBtn.disabled = false;
     })();
   }
@@ -306,7 +307,7 @@
       markdown: _structuredToMarkdown(lesson),
     };
     els.result.innerHTML =
-      '<article class="dl-lesson-card dl-structured">' +
+      '<article class="dl-lesson-card dl-structured" data-lang="' + _esc(lesson.lessonLanguage || 'en') + '">' +
         '<div class="dl-lesson-head"><div><p class="dl-kicker">Guided tutor lesson</p><h3>' + _esc(lesson.title || res.title || res.topic || 'Lesson') + '</h3></div>' +
         '<button type="button" class="dl-btn dl-download" data-dl-print>⤓ Download PDF</button></div>' +
         ((res.citationWarning || lesson.citationWarning) ? '<div class="dl-warning">' + _esc(res.citationWarning || lesson.citationWarning) + '</div>' : '') +
@@ -394,6 +395,91 @@
     if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
   }
 
+  var _LABELS = {
+    en: {
+      kicker: 'Guided tutor lesson',
+      learningGoal: 'Learning Goal',
+      bigPicture: 'Big Picture',
+      simple: 'Simple Explanation',
+      core: 'Core Concepts',
+      keyDetails: 'Key Details from Your Sources',
+      formulaCards: 'Formula Cards',
+      methodGuide: 'Which Method Should I Use?',
+      stepByStep: 'Step-by-Step Method',
+      examples: 'Examples / Applications',
+      commonMistakes: 'Common Mistakes',
+      examTraps: 'Exam Traps',
+      selfCheck: 'Self-Check',
+      practiceTasks: 'Practice Tasks',
+      nextStep: 'Next Step',
+      sources: 'Sources',
+      downloadPdf: 'Download PDF',
+      hint: 'Hint',
+      showAnswer: 'Show answer',
+      explainSteps: 'Explain step-by-step',
+      variables: 'Variables',
+      useWhen: 'Use when / conditions',
+      commonMistake: 'Common mistake',
+      source: 'Source',
+      coreFormula: 'Core formula',
+      relatedConcept: 'Related concept',
+      prompt: 'Prompt',
+      result: 'Result',
+      task: 'Task',
+      goal: 'Goal',
+      useWhenShort: 'Use when',
+      avoidWhen: 'Avoid when',
+      example: 'Example',
+      miniExample: 'Mini-example',
+      learningBlock: 'Learning Block',
+      lessonComplete: 'Lesson complete',
+    },
+    de: {
+      kicker: 'Geführte Tutorlektion',
+      learningGoal: 'Lernziel',
+      bigPicture: 'Gesamtbild',
+      simple: 'Einfache Erklärung',
+      core: 'Kernkonzepte',
+      keyDetails: 'Wichtige Details aus deinen Quellen',
+      formulaCards: 'Formelkarten',
+      methodGuide: 'Welche Methode soll ich verwenden?',
+      stepByStep: 'Schritt-für-Schritt-Methode',
+      examples: 'Beispiele / Anwendungen',
+      commonMistakes: 'Häufige Fehler',
+      examTraps: 'Prüfungsfallen',
+      selfCheck: 'Selbsttest',
+      practiceTasks: 'Übungsaufgaben',
+      nextStep: 'Nächster Schritt',
+      sources: 'Quellen',
+      downloadPdf: 'PDF herunterladen',
+      hint: 'Hinweis',
+      showAnswer: 'Antwort zeigen',
+      explainSteps: 'Schritt für Schritt erklären',
+      variables: 'Variablen',
+      useWhen: 'Anwenden wenn / Bedingungen',
+      commonMistake: 'Häufiger Fehler',
+      source: 'Quelle',
+      coreFormula: 'Kernformel',
+      relatedConcept: 'Verwandtes Konzept',
+      prompt: 'Aufgabe',
+      result: 'Endergebnis',
+      task: 'Aufgabe',
+      goal: 'Ziel',
+      useWhenShort: 'Anwenden wenn',
+      avoidWhen: 'Vermeiden wenn',
+      example: 'Beispiel',
+      miniExample: 'Kurzbeispiel',
+      learningBlock: 'Lernblock',
+      lessonComplete: 'Lektion abgeschlossen',
+    },
+  };
+
+  function _l(lesson, key) {
+    var lang = (lesson && lesson.lessonLanguage) || 'en';
+    var labels = _LABELS[lang] || _LABELS.en;
+    return labels[key] || _LABELS.en[key] || key;
+  }
+
   function _renderStructuredResultAdaptive(els, res, lesson) {
     var formulas = _asList(lesson.keyFormulas);
     var checks = _asList(lesson.selfCheck);
@@ -405,24 +491,24 @@
     function addSection(title, cls) {
       sections.push('<section class="dl-study-section"><h4>' + _esc(title) + '</h4><div class="' + cls + '"></div></section>');
     }
-    if (lesson.learningGoal) addSection('Learning Goal', 'dl-learning-goal');
-    if (lesson.bigPicture) addSection('Big Picture', 'dl-big-picture');
-    if (lesson.simpleExplanation || lesson.intuition) addSection('Simple Explanation', 'dl-simple');
-    if (lesson.coreExplanation) addSection('Core Concepts', 'dl-core');
-    if (_asList(lesson.keyDetails).length) addSection('Key Details from Your Sources', 'dl-key-details');
-    if (formulas.length) addSection('Formula Cards', 'dl-formulas');
-    if (_asList(lesson.methodGuide).length) addSection('Which Method Should I Use?', 'dl-method-guide');
+    if (lesson.learningGoal) addSection(_l(lesson, 'learningGoal'), 'dl-learning-goal');
+    if (lesson.bigPicture) addSection(_l(lesson, 'bigPicture'), 'dl-big-picture');
+    if (lesson.simpleExplanation || lesson.intuition) addSection(_l(lesson, 'simple'), 'dl-simple');
+    if (lesson.coreExplanation) addSection(_l(lesson, 'core'), 'dl-core');
+    if (_asList(lesson.keyDetails).length) addSection(_l(lesson, 'keyDetails'), 'dl-key-details');
+    if (formulas.length) addSection(_l(lesson, 'formulaCards'), 'dl-formulas');
+    if (_asList(lesson.methodGuide).length) addSection(_l(lesson, 'methodGuide'), 'dl-method-guide');
     _asList(lesson.adaptiveBlocks).forEach(function (b, i) {
-      sections.push('<section class="dl-study-section dl-adaptive-section"><h4>' + _esc(b.title || b.type || 'Learning Block') + '</h4><div class="dl-adaptive-block" data-block="' + i + '"></div></section>');
+      sections.push('<section class="dl-study-section dl-adaptive-section"><h4>' + _esc(b.title || b.type || _l(lesson, 'learningBlock')) + '</h4><div class="dl-adaptive-block" data-block="' + i + '"></div></section>');
     });
-    if (_asList(lesson.stepByStepMethod).length) addSection('Step-by-Step Method', 'dl-method');
-    if (examples.length) addSection('Examples / Applications', 'dl-examples');
-    if (_asList(lesson.commonMistakes).length) addSection('Common Mistakes', 'dl-mistakes');
-    if (_asList(lesson.examTraps).length) addSection('Exam Traps', 'dl-traps');
-    if (checks.length) addSection('Self-Check', 'dl-checks');
-    if (_asList(lesson.practiceTasks).length) addSection('Practice Tasks', 'dl-practice-tasks');
-    if (lesson.nextStep) addSection('Next Step', 'dl-next-step');
-    addSection('Sources', 'dl-source-list');
+    if (_asList(lesson.stepByStepMethod).length) addSection(_l(lesson, 'stepByStep'), 'dl-method');
+    if (examples.length) addSection(_l(lesson, 'examples'), 'dl-examples');
+    if (_asList(lesson.commonMistakes).length) addSection(_l(lesson, 'commonMistakes'), 'dl-mistakes');
+    if (_asList(lesson.examTraps).length) addSection(_l(lesson, 'examTraps'), 'dl-traps');
+    if (checks.length) addSection(_l(lesson, 'selfCheck'), 'dl-checks');
+    if (_asList(lesson.practiceTasks).length) addSection(_l(lesson, 'practiceTasks'), 'dl-practice-tasks');
+    if (lesson.nextStep) addSection(_l(lesson, 'nextStep'), 'dl-next-step');
+    addSection(_l(lesson, 'sources'), 'dl-source-list');
 
     els._print = {
       course: els.courseName || '',
@@ -430,10 +516,10 @@
       markdown: _structuredToMarkdown(lesson),
     };
     els.result.innerHTML =
-      '<article class="dl-lesson-card dl-structured">' +
-        '<div class="dl-lesson-head"><div><p class="dl-kicker">Guided tutor lesson</p><h3>' + _esc(lesson.title || res.title || res.topic || 'Lesson') + '</h3>' +
+      '<article class="dl-lesson-card dl-structured" data-lang="' + _esc(lesson.lessonLanguage || 'en') + '">' +
+        '<div class="dl-lesson-head"><div><p class="dl-kicker">' + _esc(_l(lesson, 'kicker')) + '</p><h3>' + _esc(lesson.title || res.title || res.topic || 'Lesson') + '</h3>' +
         '<div class="dl-lesson-meta">' + _esc([lesson.lessonMode, lesson.subjectArea, lesson.contentType].filter(Boolean).join(' · ')) + '</div></div>' +
-        '<button type="button" class="dl-btn dl-download" data-dl-print>Download PDF</button></div>' +
+        '<button type="button" class="dl-btn dl-download" data-dl-print>' + _esc(_l(lesson, 'downloadPdf')) + '</button></div>' +
         ((res.citationWarning || lesson.citationWarning) ? '<div class="dl-warning">' + _esc(res.citationWarning || lesson.citationWarning) + '</div>' : '') +
         sections.join('') +
       '</article>';
@@ -451,17 +537,17 @@
     var formulaHost = els.result.querySelector('.dl-formulas');
     if (formulaHost) {
       formulaHost.innerHTML = formulas.map(function (f, i) {
-        var rel = (f.relevance || '').toLowerCase() === 'related' ? 'Related concept' : (f.relevance ? f.relevance : '');
+        var rel = (f.relevance || '').toLowerCase() === 'related' ? _l(lesson, 'relatedConcept') : (f.relevance ? f.relevance : '');
         var confidence = f.confidence ? ' · ' + f.confidence : '';
         return '<details class="dl-formula-box" open>' +
           '<summary><span class="dl-formula-title">' + _esc(f.meaning || f.formula || 'Formula') + '</span>' +
-          (rel || confidence ? '<span class="dl-formula-meta">' + _esc((rel || 'Core formula') + confidence) + '</span>' : '') +
+          (rel || confidence ? '<span class="dl-formula-meta">' + _esc((rel || _l(lesson, 'coreFormula')) + confidence) + '</span>' : '') +
           '</summary>' +
           '<div class="dl-formula-main" data-formula="' + i + '"></div>' +
-          '<dl><dt>Variables</dt><dd>' + _esc(f.variables || '') + '</dd>' +
-          '<dt>Use when / conditions</dt><dd>' + _esc(f.conditions || '') + '</dd>' +
-          (f.commonMistake ? '<dt>Common mistake</dt><dd>' + _esc(f.commonMistake) + '</dd>' : '') +
-          '<dt>Source</dt><dd>' + _esc(f.source || 'Missing source') + '</dd></dl></details>';
+          '<dl><dt>' + _esc(_l(lesson, 'variables')) + '</dt><dd>' + _esc(f.variables || '') + '</dd>' +
+          '<dt>' + _esc(_l(lesson, 'useWhen')) + '</dt><dd>' + _esc(f.conditions || '') + '</dd>' +
+          (f.commonMistake ? '<dt>' + _esc(_l(lesson, 'commonMistake')) + '</dt><dd>' + _esc(f.commonMistake) + '</dd>' : '') +
+          '<dt>' + _esc(_l(lesson, 'source')) + '</dt><dd>' + _esc(f.source || 'Missing source') + '</dd></dl></details>';
       }).join('');
       formulaHost.querySelectorAll('.dl-formula-main').forEach(function (el) {
         var f = formulas[Number(el.getAttribute('data-formula') || 0)] || {};
@@ -473,8 +559,8 @@
     if (methodHost) {
       methodHost.innerHTML = _asList(lesson.methodGuide).map(function (m) {
         return '<div class="dl-method-card"><strong>' + _esc(m.method || 'Method') + '</strong>' +
-          (m.useWhen ? '<p><b>Use when:</b> ' + _esc(m.useWhen) + '</p>' : '') +
-          (m.avoidWhen ? '<p><b>Avoid when:</b> ' + _esc(m.avoidWhen) + '</p>' : '') +
+          (m.useWhen ? '<p><b>' + _esc(_l(lesson, 'useWhenShort')) + ':</b> ' + _esc(m.useWhen) + '</p>' : '') +
+          (m.avoidWhen ? '<p><b>' + _esc(_l(lesson, 'avoidWhen')) + ':</b> ' + _esc(m.avoidWhen) + '</p>' : '') +
           (m.source ? '<p class="dl-source-basis">' + _esc(m.source) + '</p>' : '') + '</div>';
       }).join('');
     }
@@ -491,10 +577,10 @@
     if (exampleHost) {
       exampleHost.innerHTML = examples.map(function (worked) {
         return '<div class="dl-example-card">' +
-          '<h5>' + _esc(worked.title || (worked.isMiniExample ? 'Mini-example' : 'Example')) + (worked.difficulty ? ' · ' + _esc(worked.difficulty) : '') + '</h5>' +
-          (worked.problem ? '<p><strong>Prompt:</strong> ' + _esc(worked.problem) + '</p>' : '') +
+          '<h5>' + _esc(worked.title || (worked.isMiniExample ? _l(lesson, 'miniExample') : _l(lesson, 'example'))) + (worked.difficulty ? ' · ' + _esc(worked.difficulty) : '') + '</h5>' +
+          (worked.problem ? '<p><strong>' + _esc(_l(lesson, 'prompt')) + ':</strong> ' + _esc(worked.problem) + '</p>' : '') +
           (_asList(worked.solutionSteps).length ? '<ol>' + _asList(worked.solutionSteps).map(function (s) { return '<li>' + _esc(s) + '</li>'; }).join('') + '</ol>' : '') +
-          (worked.finalAnswer ? '<p><strong>Result:</strong> ' + _esc(worked.finalAnswer) + '</p>' : '') +
+          (worked.finalAnswer ? '<p><strong>' + _esc(_l(lesson, 'result')) + ':</strong> ' + _esc(worked.finalAnswer) + '</p>' : '') +
           (worked.sourceOrBasis ? '<p class="dl-source-basis">' + _esc(worked.sourceOrBasis) + '</p>' : '') +
         '</div>';
       }).join('');
@@ -505,9 +591,9 @@
       checkHost.innerHTML = checks.map(function (c, i) {
         return '<div class="dl-check-card"><p class="dl-check-q">' + _esc(c.question || '') + '</p>' +
           '<div class="dl-check-actions">' +
-            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="hint">Hint</button>' +
-            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="answer">Show answer</button>' +
-            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="explain">Explain step-by-step</button>' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="hint">' + _esc(_l(lesson, 'hint')) + '</button>' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="answer">' + _esc(_l(lesson, 'showAnswer')) + '</button>' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="explain">' + _esc(_l(lesson, 'explainSteps')) + '</button>' +
           '</div><div class="dl-check-a" hidden></div></div>';
       }).join('');
       checkHost.querySelectorAll('.dl-reveal').forEach(function (btn) {
@@ -531,8 +617,8 @@
     var practiceHost = els.result.querySelector('.dl-practice-tasks');
     if (practiceHost) {
       practiceHost.innerHTML = _asList(lesson.practiceTasks).map(function (t) {
-        return '<div class="dl-practice-card"><p><strong>Task:</strong> ' + _esc(t.prompt || '') + '</p>' +
-          (t.goal ? '<p><strong>Goal:</strong> ' + _esc(t.goal) + '</p>' : '') +
+        return '<div class="dl-practice-card"><p><strong>' + _esc(_l(lesson, 'task')) + ':</strong> ' + _esc(t.prompt || '') + '</p>' +
+          (t.goal ? '<p><strong>' + _esc(_l(lesson, 'goal')) + ':</strong> ' + _esc(t.goal) + '</p>' : '') +
           (t.source ? '<p class="dl-source-basis">' + _esc(t.source) + '</p>' : '') + '</div>';
       }).join('');
     }
