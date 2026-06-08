@@ -27,28 +27,25 @@ function renderClarificationMessage(question: string): void {
   if (input) input.focus();
 }
 
-/** Opens the daily/weekly mission panel instead of sending to the AI. */
+/** Renders the daily/weekly mission as an inline chat bubble in the message thread. */
 function handleMissionIntent(result: IntentResult): void {
   const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
   if (!aiMsgs) return;
 
   const isWeekly = result.intent === 'weekly_mission';
-  const label = isWeekly ? 'Planning your week across all active subjects…' : 'Loading your daily mission…';
 
-  // Render a loading bubble first so the user sees an immediate response.
+  // Create the assistant message wrapper with a loading state first.
   const wrap = document.createElement('div');
   wrap.className = 'ai-msg-wrap';
   wrap.innerHTML =
     '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
     '<div class="msg-body"><div class="ai-bubble bot dm-intent-bubble"></div></div>';
   const bubble = wrap.querySelector<HTMLElement>('.ai-bubble.bot');
-  if (bubble) bubble.textContent = label;
   aiMsgs.appendChild(wrap);
   aiMsgs.scrollTop = aiMsgs.scrollHeight;
 
   if (isWeekly) {
-    // Weekly mission: show the message then let the weekly generate endpoint
-    // handle the rest. The weekly mission feature will be wired up later.
+    // Weekly mission: placeholder until the weekly generate endpoint is wired.
     if (bubble) {
       bubble.innerHTML =
         '<strong>Planning your week across all active subjects…</strong>' +
@@ -57,17 +54,8 @@ function handleMissionIntent(result: IntentResult): void {
     return;
   }
 
-  // Daily mission: try window._dailyMission.open() first; otherwise mount
-  // the panel inline in the chat area.
-  const _dm = (window as unknown as { _dailyMission?: { open?: () => void } })._dailyMission;
-  if (_dm && typeof _dm.open === 'function') {
-    _dm.open();
-    if (bubble) bubble.textContent = 'Opening today\'s study mission…';
-    return;
-  }
-
-  // Graceful fallback: mount the panel directly in a dedicated host div
-  // inside the chat bubble so users can interact with it inline.
+  // Daily mission: mount the full task-card UI directly inside this chat bubble.
+  // There is NO separate panel element — the bubble IS the surface.
   const courseId =
     (window as unknown as { activeCourseId?: string }).activeCourseId ||
     (window as unknown as { currentCourseId?: string }).currentCourseId ||
@@ -75,13 +63,15 @@ function handleMissionIntent(result: IntentResult): void {
 
   if (!courseId) {
     if (bubble) {
-      bubble.innerHTML =
+      bubble.textContent =
         'Open a course first, then ask me for your daily mission and I\'ll build your study plan from your uploaded files.';
     }
     return;
   }
 
-  // Swap the bubble for a panel host element and mount the full Daily Mission UI.
+  if (bubble) bubble.textContent = 'Loading your daily mission…';
+
+  // Replace the bubble with a panel-host div and mount the Daily Mission UI inside it.
   const msgBody = wrap.querySelector<HTMLElement>('.msg-body');
   if (!msgBody) return;
   msgBody.innerHTML = '';
@@ -89,8 +79,6 @@ function handleMissionIntent(result: IntentResult): void {
   host.className = 'dm-panel-host';
   msgBody.appendChild(host);
 
-  // Dynamically import to avoid circular deps; daily-mission-ui.ts is only
-  // needed when this branch is actually hit.
   import('./../../features/daily-mission/daily-mission-ui.js')
     .then((mod) => {
       const courseTitle =
@@ -101,7 +89,7 @@ function handleMissionIntent(result: IntentResult): void {
       aiMsgs.scrollTop = aiMsgs.scrollHeight;
     })
     .catch(() => {
-      host.textContent = 'Could not load the Daily Mission panel. Please try again.';
+      host.textContent = 'Could not load your daily mission. Please try again.';
     });
 }
 
