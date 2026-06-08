@@ -181,7 +181,8 @@ var _sb = {
           if (_k && (
             _k.indexOf('ss_course_qa_') === 0 ||
             _k.indexOf('ss_opened_') === 0 ||
-            _k.indexOf('ss_lastopen_') === 0
+            _k.indexOf('ss_lastopen_') === 0 ||
+            _k === 'ss_stats'
           )) _qaKeys.push(_k);
         }
         _qaKeys.forEach(function (k) { localStorage.removeItem(k); });
@@ -573,6 +574,14 @@ function _enterApp(user) {
   }
   if (typeof updateAuthIndicator === 'function') updateAuthIndicator(user);
   if (user && typeof loadUserData === 'function') loadUserData(user.id);
+  // Hydrate localStorage from DB so study progress & lounge stats survive
+  // clearing browser storage. No-op if progress-sync hasn't loaded yet —
+  // the ss-ready listener inside progress-sync.ts covers the page-reload path.
+  try {
+    if (window._progressSync && typeof window._progressSync.loadAndHydrate === 'function') {
+      window._progressSync.loadAndHydrate().catch(function () {});
+    }
+  } catch (e) {}
   _ssAuth('entered', { source: 'enterApp', user: user });
   if (_SS && typeof _SS.markReady === 'function')
     _SS.markReady('auth', { userId: user && user.id });

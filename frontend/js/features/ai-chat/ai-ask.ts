@@ -385,6 +385,8 @@ function _appendCourseHistory(courseId: string | null | undefined, question: str
     pairs.push({ q: question, a: answer, ts: Date.now() });
   }
   _saveCourseHistory(courseId, pairs);
+  const _ps = (window as unknown as { _progressSync?: { syncCourseAiSessions?: (id: string, n: number) => void } })._progressSync;
+  if (courseId) _ps?.syncCourseAiSessions?.(courseId, pairs.length);
 
   // Also persist to the chat_history table (RLS-scoped to the user) so history
   // survives a refresh and syncs across devices. restoreCourseHistory() reads

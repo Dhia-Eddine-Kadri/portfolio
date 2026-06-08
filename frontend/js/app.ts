@@ -40,6 +40,7 @@ import {
   renderCourses as _renderCourses,
   sdRenderCourses as _sdRenderCourses,
 } from './features/courses/courses-render.js';
+import { initCoursesLayout } from './features/courses/courses-layout.js';
 import { initCourseSearch } from './features/courses/course-search.js';
 import { initAuthBridge } from './features/auth/auth-bridge.js';
 import {
@@ -209,6 +210,9 @@ function _recordCourseFileOpen(course: LegacyCourse | null | undefined, file: { 
     arr.push(file.name);
     if (arr.length > _OPENED_MAX) arr.splice(0, arr.length - _OPENED_MAX);
     localStorage.setItem(key, JSON.stringify(arr));
+    const ts = Number(localStorage.getItem('ss_lastopen_' + course.id)) || Date.now();
+    const ps = (window as unknown as { _progressSync?: { syncCourseProgress?: (id: string, f: string[], ms: number) => void } })._progressSync;
+    ps?.syncCourseProgress?.(course.id, arr, ts);
   } catch { /* corrupted entry or quota — skip silently */ }
 }
 function downloadFile(fname: string): unknown { return _downloadFile(fname); }
@@ -329,6 +333,7 @@ initCourseSearch({
   saveUserCourses: () => { _saveUserCourses(); },
   renderCourses: () => { sdRenderCourses(); },
 });
+initCoursesLayout();
 
 // Studip semester dropdown
 const sdSemBtn = document.getElementById('sdSemBtn');
