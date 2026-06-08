@@ -1663,6 +1663,197 @@ body:not(.night) .ncb-skill-thinking-note strong {
   color: #475569;
 }
 
+.ncb-skill-loading-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ncb-skill-orb {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), rgba(147, 197, 253, 0.82) 24%, rgba(37, 99, 235, 0.62) 62%, rgba(30, 64, 175, 0.76));
+  box-shadow:
+    0 0 0 1px rgba(191, 219, 254, 0.32),
+    0 0 24px rgba(96, 165, 250, 0.34);
+  overflow: hidden;
+}
+
+.ncb-skill-orb::before,
+.ncb-skill-orb::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  border: 1px solid rgba(191, 219, 254, 0.42);
+  animation: ncb-skill-orbit 1.6s linear infinite;
+}
+
+.ncb-skill-orb::after {
+  inset: 7px;
+  border-color: rgba(255, 255, 255, 0.48);
+  animation-duration: 1.05s;
+  animation-direction: reverse;
+}
+
+.ncb-skill-orb span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.95);
+  animation: ncb-skill-core 900ms ease-in-out infinite;
+}
+
+.ncb-skill-loading-copy {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ncb-skill-progress {
+  width: min(360px, 100%);
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(30, 41, 59, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+}
+
+.ncb-skill-progress span {
+  display: block;
+  width: var(--ncb-skill-progress, 12%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa, #22d3ee, #34d399);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.38);
+  transition: width 420ms cubic-bezier(.22, .9, .28, 1);
+}
+
+.ncb-skill-chip {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.ncb-skill-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.72);
+  background: rgba(30, 64, 175, 0.18);
+  box-shadow:
+    0 10px 28px rgba(15, 23, 42, 0.2),
+    0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.ncb-skill-chip:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.86);
+  outline-offset: 3px;
+}
+
+.ncb-skill-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: rgba(203, 213, 225, 0.7);
+  font-size: 0.82rem;
+}
+
+.ncb-skill-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  opacity: 0.66;
+  transition:
+    opacity 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.ncb-skill-step-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.54);
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.2);
+}
+
+.ncb-skill-step.is-active {
+  color: rgba(239, 246, 255, 0.94);
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.ncb-skill-step.is-active .ncb-skill-step-dot {
+  background: #93c5fd;
+  box-shadow:
+    0 0 0 4px rgba(96, 165, 250, 0.14),
+    0 0 16px rgba(147, 197, 253, 0.58);
+  animation: ncb-skill-step-pulse 850ms ease-in-out infinite;
+}
+
+.ncb-skill-step.is-complete {
+  color: rgba(203, 213, 225, 0.86);
+  opacity: 0.92;
+}
+
+.ncb-skill-step.is-complete .ncb-skill-step-dot {
+  background: #34d399;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.42);
+}
+
+.ncb-skill-loading--collapsed .ncb-skill-thinking-note,
+.ncb-skill-loading--collapsed .ncb-skill-steps {
+  display: none;
+}
+
+body:not(.night) .ncb-skill-orb {
+  background:
+    radial-gradient(circle at 35% 30%, #ffffff, #bfdbfe 24%, #60a5fa 62%, #2563eb);
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.18),
+    0 0 22px rgba(37, 99, 235, 0.18);
+}
+
+body:not(.night) .ncb-skill-progress {
+  background: #e2e8f0;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.24);
+}
+
+body:not(.night) .ncb-skill-chip:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  box-shadow:
+    0 10px 24px rgba(37, 99, 235, 0.12),
+    0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+body:not(.night) .ncb-skill-steps {
+  color: #64748b;
+}
+
+body:not(.night) .ncb-skill-step.is-active {
+  color: #1e3a8a;
+}
+
+body:not(.night) .ncb-skill-step.is-complete {
+  color: #334155;
+}
+
 @keyframes ncb-skill-pulse {
   0%, 100% { opacity: 0.82; }
   50% { opacity: 1; }
@@ -1671,6 +1862,21 @@ body:not(.night) .ncb-skill-thinking-note strong {
 @keyframes ncb-skill-check {
   0%, 100% { opacity: 0.72; transform: scale(0.96); }
   50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes ncb-skill-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ncb-skill-core {
+  0%, 100% { transform: scale(0.78); opacity: 0.78; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+
+@keyframes ncb-skill-step-pulse {
+  0%, 100% { transform: scale(0.94); }
+  50% { transform: scale(1.16); }
 }
 
 @keyframes ncb-stream-reveal {

@@ -928,21 +928,35 @@ async function handleIntentRoute(
 
 type RoutedSkillIntent = 'daily_mission' | 'summary' | 'cheatsheet';
 
-const ROUTED_SKILL_UI: Record<RoutedSkillIntent, { title: string; chip: string; thinking: string }> = {
+type RoutedSkillCopy = {
+  title: string;
+  chip: string;
+  thinking: string;
+  steps: string[];
+};
+
+type SkillLoadingElement = HTMLElement & {
+  _skillLoadingTimer?: number;
+};
+
+const ROUTED_SKILL_UI: Record<RoutedSkillIntent, RoutedSkillCopy> = {
   daily_mission: {
     title: 'Planning Today',
     chip: 'dailyMissionPlanning',
-    thinking: 'Building your Daily Mission'
+    thinking: 'Building your Daily Mission',
+    steps: ['Reading course context', 'Checking valid tasks', 'Ranking today\'s mission', 'Preparing actions']
   },
   summary: {
     title: 'Generating a Summary',
     chip: 'summaryGeneration',
-    thinking: 'Generating a summary'
+    thinking: 'Generating a summary',
+    steps: ['Finding source context', 'Extracting key points', 'Grouping ideas', 'Writing summary']
   },
   cheatsheet: {
     title: 'Generating a Cheatsheet',
     chip: 'cheatsheetGeneration',
-    thinking: 'Generating a cheatsheet'
+    thinking: 'Generating a cheatsheet',
+    steps: ['Finding formulas and facts', 'Compressing concepts', 'Ordering sections', 'Building cheatsheet']
   }
 };
 
@@ -955,9 +969,16 @@ function showIntentSkillLoading(
   const copy = ROUTED_SKILL_UI[intent];
   thinking?.set(copy.thinking);
 
-  const el = document.createElement('div');
+  const el = document.createElement('div') as SkillLoadingElement;
   el.className = 'ncb-skill-loading';
   el.setAttribute('aria-live', 'polite');
+  el.style.setProperty('--ncb-skill-progress', '12%');
+  const stepHtml = copy.steps.map((step, index) => (
+    '<li class="ncb-skill-step' + (index === 0 ? ' is-active' : '') + '" data-step-index="' + index + '">' +
+      '<span class="ncb-skill-step-dot" aria-hidden="true"></span>' +
+      '<span>' + escapeHtml(step) + '</span>' +
+    '</li>'
+  )).join('');
   el.innerHTML =
     '<div class="ncb-skill-loading-line">' +
       '<span class="ncb-skill-loading-word">Loading</span>' +
@@ -969,6 +990,44 @@ function showIntentSkillLoading(
       '<strong>' + escapeHtml(copy.title) + '</strong>' +
       '<span>I am preparing the right course tool and checking the available context before showing the result.</span>' +
     '</div>';
+
+  el.innerHTML =
+    '<div class="ncb-skill-loading-top">' +
+      '<span class="ncb-skill-orb" aria-hidden="true"><span></span></span>' +
+      '<div class="ncb-skill-loading-copy">' +
+        '<div class="ncb-skill-loading-line">' +
+          '<span class="ncb-skill-loading-word">Loading</span>' +
+          '<span class="ncb-skill-loading-skill">skills</span>' +
+          '<span class="ncb-skill-loading-check" aria-hidden="true">&#10003;</span>' +
+        '</div>' +
+        '<button type="button" class="ncb-skill-chip" aria-expanded="true">' + escapeHtml(copy.chip) + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="ncb-skill-progress" aria-hidden="true"><span></span></div>' +
+    '<div class="ncb-skill-thinking-note">' +
+      '<strong>' + escapeHtml(copy.title) + '</strong>' +
+      '<span>I am preparing the right course tool and checking the available context before showing the result.</span>' +
+    '</div>' +
+    '<ol class="ncb-skill-steps">' + stepHtml + '</ol>';
+
+  const chip = el.querySelector<HTMLButtonElement>('.ncb-skill-chip');
+  const steps = Array.from(el.querySelectorAll<HTMLElement>('.ncb-skill-step'));
+  let activeStep = 0;
+  chip?.addEventListener('click', () => {
+    const collapsed = el.classList.toggle('ncb-skill-loading--collapsed');
+    chip.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  });
+  el._skillLoadingTimer = window.setInterval(() => {
+    activeStep = Math.min(activeStep + 1, steps.length - 1);
+    const pct = Math.min(92, 12 + ((activeStep + 1) / Math.max(steps.length, 1)) * 72);
+    el.style.setProperty('--ncb-skill-progress', pct.toFixed(0) + '%');
+    steps.forEach((step, index) => {
+      step.classList.toggle('is-complete', index < activeStep);
+      step.classList.toggle('is-active', index === activeStep);
+    });
+    const stepText = copy.steps[activeStep];
+    if (stepText) thinking?.set(stepText);
+  }, 760);
 
   if (thinking?.el && thinking.el.parentElement === bubble) {
     bubble.insertBefore(el, thinking.el);
@@ -984,8 +1043,18 @@ async function finishIntentSkillLoading(
 ): Promise<void> {
   if (thinking) await thinking.waitMinimum();
   if (skillStatus) {
+    const liveSkillStatus = skillStatus as SkillLoadingElement;
+    if (liveSkillStatus._skillLoadingTimer) {
+      window.clearInterval(liveSkillStatus._skillLoadingTimer);
+      liveSkillStatus._skillLoadingTimer = undefined;
+    }
+    skillStatus.style.setProperty('--ncb-skill-progress', '100%');
+    skillStatus.querySelectorAll('.ncb-skill-step').forEach((step) => {
+      step.classList.add('is-complete');
+      step.classList.remove('is-active');
+    });
     skillStatus.classList.add('ncb-skill-loading--done');
-    await new Promise((resolve) => window.setTimeout(resolve, 160));
+    await new Promise((resolve) => window.setTimeout(resolve, 260));
     skillStatus.remove();
   }
   thinking?.remove(true);
