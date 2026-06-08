@@ -441,9 +441,15 @@ export interface DeepLearnResult {
   workedExample: string;
   structuredLesson?: {
     title?: string;
+    subjectArea?: string;
+    contentType?: string;
+    lessonMode?: string;
     learningGoal?: string;
+    bigPicture?: string;
+    simpleExplanation?: string;
     intuition?: string;
     coreExplanation?: string;
+    keyDetails?: string[];
     keyFormulas?: Array<{
       formula?: string;
       meaning?: string;
@@ -451,8 +457,21 @@ export interface DeepLearnResult {
       conditions?: string;
       source?: string;
       commonMistake?: string;
+      relevance?: string;
+      confidence?: string;
     }>;
+    methodGuide?: Array<{ method?: string; useWhen?: string; avoidWhen?: string; source?: string }>;
+    adaptiveBlocks?: Array<{ type?: string; title?: string; body?: string; items?: string[]; source?: string }>;
     stepByStepMethod?: string[];
+    workedExamples?: Array<{
+      title?: string;
+      problem?: string;
+      solutionSteps?: string[];
+      finalAnswer?: string;
+      sourceOrBasis?: string;
+      difficulty?: string;
+      isMiniExample?: boolean;
+    }>;
     workedExample?: {
       problem?: string;
       solutionSteps?: string[];
@@ -461,7 +480,10 @@ export interface DeepLearnResult {
       isMiniExample?: boolean;
     };
     commonMistakes?: string[];
-    selfCheck?: Array<{ question?: string; answer?: string; explanation?: string }>;
+    examTraps?: string[];
+    selfCheck?: Array<{ question?: string; hint?: string; answer?: string; explanation?: string; stepByStep?: string[] }>;
+    practiceTasks?: Array<{ prompt?: string; goal?: string; source?: string }>;
+    nextStep?: string;
     nextTopics?: string[];
     groundedSources?: string[];
     citationWarning?: string;
@@ -477,7 +499,7 @@ export interface DeepLearnResult {
 export async function generateDeepLearn(
   courseId: string,
   topic: string,
-  opts?: { documentIds?: string[] }
+  opts?: { documentIds?: string[]; lessonMode?: string; lessonLanguage?: string }
 ): Promise<DeepLearnResult> {
   const response = await fetch(_backendUrl() + '/api/ai/deep-learn', {
     method: 'POST',

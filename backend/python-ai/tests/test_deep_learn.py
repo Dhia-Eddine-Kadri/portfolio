@@ -37,7 +37,12 @@ def test_generate_deep_learn_structured(monkeypatch):
     monkeypatch.setattr(dl, "chat_json", lambda **k: _FakeChatResult({
         "title": "Friction",
         "lesson": "## Idea\nFriction opposes motion (Mech.pdf, p.4)",
-        "workedExample": "Block on incline …",
+        "workedExamples": [{
+            "problem": "Block on incline",
+            "solutionSteps": ["Apply the friction definition."],
+            "finalAnswer": "F_f = mu N",
+            "sourceOrBasis": "Source 1: Mech.pdf, p.4",
+        }],
         "check": {"question": "What does friction oppose?", "answer": "Relative motion", "explanation": "By definition"},
     }))
 
@@ -51,6 +56,129 @@ def test_generate_deep_learn_structured(monkeypatch):
     assert out["check"]["answer"] == "Relative motion"
     assert out["groundedSources"][0]["fileName"] == "Mech.pdf"
     assert out["groundedSources"][0]["index"] == 1
+
+
+def test_generate_deep_learn_adapts_lesson_mode_without_forced_formulas(monkeypatch):
+    monkeypatch.setattr(dl, "retrieve_learning_context", lambda **k: [
+        {
+            "chunkId": "c1",
+            "documentId": "d1",
+            "pageStart": 2,
+            "text": "The lecture compares two interpretations of democratic legitimacy.",
+        },
+    ])
+    seen = {}
+
+    def fake_chat_json(**kwargs):
+        seen["user"] = kwargs["user"]
+        return _FakeChatResult({
+            "title": "Democratic legitimacy",
+            "subjectArea": "Political science",
+            "contentType": "Concept comparison",
+            "learningGoal": "Compare two interpretations.",
+            "adaptiveBlocks": [{
+                "type": "Comparison Table",
+                "title": "Interpretation map",
+                "body": "One interpretation stresses consent; the other stresses institutional procedure.",
+                "items": ["Consent-based legitimacy", "Procedure-based legitimacy"],
+                "source": "PolSci.pdf, p.2",
+            }],
+            "selfCheck": [{
+                "question": "What is the key contrast?",
+                "hint": "Look at what each view treats as decisive.",
+                "answer": "Consent versus institutional procedure.",
+                "stepByStep": ["Identify the basis of legitimacy.", "Compare the two bases."],
+            }],
+        })
+
+    monkeypatch.setattr(dl, "chat_json", fake_chat_json)
+    out = dl.generate_deep_learn(
+        user_id="u",
+        course_id="c",
+        topic="Democratic legitimacy",
+        document_ids=["d1"],
+        doc_names={"d1": "PolSci.pdf"},
+        lesson_mode="revision",
+    )
+    lesson = out["structuredLesson"]
+    assert "LESSON MODE: Fast Revision" in seen["user"]
+    assert lesson["lessonMode"] == "Fast Revision"
+    assert lesson["subjectArea"] == "Political science"
+    assert lesson["keyFormulas"] == []
+    assert lesson["adaptiveBlocks"][0]["type"] == "Comparison Table"
+    assert lesson["selfCheck"][0]["hint"] == "Look at what each view treats as decisive."
+
+
+def test_generate_deep_learn_validates_formula_method_example_and_language(monkeypatch):
+    monkeypatch.setattr(dl, "retrieve_learning_context", lambda **k: [
+        {
+            "chunkId": "c1",
+            "documentId": "d1",
+            "pageStart": 7,
+            "text": "Dynamik von Punktmassen: Arbeitssatz Delta E_k = W. Kraefte, Freikoerperbild, Einheiten.",
+        },
+        {
+            "chunkId": "c2",
+            "documentId": "d1",
+            "pageStart": 8,
+            "text": "Massentraegheitsmoment: Theta_A = integral r^2 dm.",
+        },
+    ])
+    seen = {}
+
+    def fake_chat_json(**kwargs):
+        seen["user"] = kwargs["user"]
+        return _FakeChatResult({
+            "title": "Dynamik von Punktmassen",
+            "learningGoal": "Verstehen",
+            "coreExplanation": "Punktmassen werden mit Kraeften beschrieben.",
+            "keyFormulas": [
+                {
+                    "formula": "Ek0 = W(e) + W(i) = W Ek",
+                    "meaning": "Initial kinetic energy is the sum of work.",
+                    "source": "Source 1: Mech.pdf, p.7",
+                },
+                {
+                    "formula": "Delta E_k = W",
+                    "meaning": "Die Aenderung der kinetischen Energie ist gleich der Arbeit.",
+                    "source": "Source 1: Mech.pdf, p.7",
+                },
+                {
+                    "formula": "Theta_A = integral r^2 dm",
+                    "meaning": "Massentraegheitsmoment",
+                    "source": "Source 2: Mech.pdf, p.8",
+                },
+            ],
+            "stepByStepMethod": ["No strong course evidence for this section."],
+            "workedExamples": [{
+                "title": "Seilaufgabe",
+                "problem": "Zwei Massen am Seil.",
+                "solutionSteps": ["Kraeftegleichungen aufstellen."],
+                "finalAnswer": "Calculate the individual accelerations and tension in the rope.",
+                "sourceOrBasis": "Source 1: Mech.pdf, p.7",
+            }],
+        })
+
+    monkeypatch.setattr(dl, "chat_json", fake_chat_json)
+    out = dl.generate_deep_learn(
+        user_id="u",
+        course_id="c",
+        topic="Dynamik von Punktmassen",
+        document_ids=["d1"],
+        doc_names={"d1": "Mech.pdf"},
+        lesson_language="de",
+    )
+    lesson = out["structuredLesson"]
+    formulas = lesson["keyFormulas"]
+    assert "LESSON LANGUAGE: German" in seen["user"]
+    assert [f["formula"] for f in formulas] == ["Delta E_k = W", "Theta_A = integral r^2 dm"]
+    assert formulas[0]["relevance"] == "core"
+    assert formulas[1]["relevance"] == "related"
+    assert "No strong course evidence" not in " ".join(lesson["stepByStepMethod"])
+    assert lesson["workedExamples"] == []
+    assert lesson["workedExample"]["problem"] == ""
+    assert lesson["practiceTasks"][0]["prompt"] == "Zwei Massen am Seil."
+    assert "Formelkarten" in lesson["citationWarning"]
 
 
 def test_generate_deep_learn_no_evidence_warns(monkeypatch):

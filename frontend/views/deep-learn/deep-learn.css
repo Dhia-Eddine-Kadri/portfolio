@@ -28,6 +28,8 @@
 }
 .dl-select { flex: 1 1 240px; min-width: 200px; }
 .dl-topic { flex: 1 1 200px; min-width: 160px; }
+.dl-mode-select { flex: 0 1 190px; min-width: 170px; }
+.dl-language-select { flex: 0 1 160px; min-width: 145px; }
 .dl-btn {
   padding: 9px 18px;
   border-radius: 8px;
@@ -351,6 +353,12 @@
   color: #93c5fd;
   font-weight: 700;
 }
+.dl-lesson-meta {
+  margin-top: 4px;
+  color: var(--muted, #94a3b8);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
 .dl-warning {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -419,10 +427,53 @@
   display: grid;
   gap: 10px;
 }
+.dl-check-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .dl-check-card {
   padding: 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
+}
+.dl-method-guide,
+.dl-examples,
+.dl-practice-tasks {
+  display: grid;
+  gap: 10px;
+}
+.dl-method-card,
+.dl-example-card,
+.dl-practice-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background: rgba(59, 130, 246, 0.055);
+}
+.dl-example-card h5 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  color: var(--text, #e2e8f0);
+}
+.dl-formula-box summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+.dl-formula-title {
+  color: #bfdbfe;
+}
+.dl-formula-meta {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  background: rgba(59, 130, 246, 0.10);
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 800;
+  vertical-align: 1px;
 }
 .dl-source-list {
   display: flex;
@@ -721,6 +772,26 @@ body:not(.night) .dl-writing-line,
 body:not(.night) .dl-formula-box dt,
 body:not(.night) .dl-source-list .src-cite,
 body:not(.night) .dl-source-chip {
+  color: #1d4ed8 !important;
+}
+body:not(.night) .dl-lesson-meta {
+  color: var(--lm-muted) !important;
+}
+body:not(.night) .dl-method-card,
+body:not(.night) .dl-example-card,
+body:not(.night) .dl-practice-card {
+  background: var(--lm-nested-bg) !important;
+  border-color: var(--lm-nested-border) !important;
+  color: var(--lm-text) !important;
+  box-shadow: var(--lm-nested-shadow) !important;
+}
+body:not(.night) .dl-example-card h5,
+body:not(.night) .dl-formula-title {
+  color: #1d4ed8 !important;
+}
+body:not(.night) .dl-formula-meta {
+  background: rgba(37, 99, 235, 0.08) !important;
+  border-color: rgba(37, 99, 235, 0.18) !important;
   color: #1d4ed8 !important;
 }
 

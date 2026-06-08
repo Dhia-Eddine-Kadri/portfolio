@@ -57,6 +57,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
   const courseId = body.courseId;
   const topic = body.topic;
+  const lessonMode = body.lessonMode;
+  const lessonLanguage = body.lessonLanguage;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!topic || typeof topic !== 'string' || !topic.trim()) return fail(400, 'topic is required');
   if (topic.length > MAX_TOPIC_LENGTH) return fail(400, 'topic is too long');
@@ -85,6 +87,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     courseId,
     topic,
     documentIds: docIds,
+    lessonMode: typeof lessonMode === 'string' ? lessonMode : null,
+    lessonLanguage: typeof lessonLanguage === 'string' ? lessonLanguage : null,
   });
   if (!upstream.ok) {
     const err = (upstream.body as { error?: string }).error;

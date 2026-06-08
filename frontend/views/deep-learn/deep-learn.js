@@ -28,6 +28,18 @@
       '<div class="dl-controls">' +
         '<select id="dlTopicSelect" class="dl-select"><option value="">Loading topics…</option></select>' +
         '<input type="text" id="dlTopicText" class="dl-topic" placeholder="…or type any topic">' +
+        '<select id="dlLessonMode" class="dl-select dl-mode-select" title="Lesson mode">' +
+          '<option value="exam">Exam preparation</option>' +
+          '<option value="simple">Simple explanation</option>' +
+          '<option value="professor">Professor-style</option>' +
+          '<option value="application">Practical application</option>' +
+          '<option value="revision">Fast revision</option>' +
+        '</select>' +
+        '<select id="dlLessonLanguage" class="dl-select dl-language-select" title="Lesson language">' +
+          '<option value="same">Same as course</option>' +
+          '<option value="de">German</option>' +
+          '<option value="en">English</option>' +
+        '</select>' +
         '<button class="dl-btn dl-btn-primary" id="dlGenerate" type="button">Teach me this</button>' +
       '</div>' +
       '<div class="dl-saved" id="dlSaved" hidden>' +
@@ -91,14 +103,19 @@
     lesson = lesson || {};
     var parts = ['# ' + (lesson.title || 'Deep Learn')];
     if (lesson.learningGoal) parts.push('## Learning Goal\n\n' + lesson.learningGoal);
+    if (lesson.bigPicture) parts.push('## Big Picture\n\n' + lesson.bigPicture);
+    if (lesson.simpleExplanation) parts.push('## Simple Explanation\n\n' + lesson.simpleExplanation);
     if (lesson.intuition) parts.push('## Intuition\n\n' + lesson.intuition);
     if (lesson.coreExplanation) parts.push('## Core Explanation\n\n' + lesson.coreExplanation);
+    if (_asList(lesson.keyDetails).length) parts.push('## Key Details from Your Sources\n\n' + _asList(lesson.keyDetails).map(function (s) { return '- ' + s; }).join('\n'));
     if (_asList(lesson.keyFormulas).length) {
       parts.push('## Key Formulas\n\n' + _asList(lesson.keyFormulas).map(function (f) {
         return '**Formula:** ' + (f.formula || '') +
           '\n\n**Meaning:** ' + (f.meaning || '') +
           '\n\n**Variables:** ' + (f.variables || '') +
           '\n\n**Use when / conditions:** ' + (f.conditions || '') +
+          (f.relevance ? '\n\n**Relevance:** ' + f.relevance : '') +
+          (f.confidence ? '\n\n**Confidence:** ' + f.confidence : '') +
           (f.commonMistake ? '\n\n**Common mistake:** ' + f.commonMistake : '') +
           '\n\n**Source:** ' + (f.source || '');
       }).join('\n\n---\n\n'));
@@ -108,20 +125,44 @@
         return (i + 1) + '. ' + s;
       }).join('\n'));
     }
-    var worked = lesson.workedExample || {};
-    if (worked.problem || _asList(worked.solutionSteps).length) {
-      parts.push('## ' + (worked.isMiniExample ? 'Mini-example based on formulas above' : 'Worked Example') + '\n\n' +
+    if (_asList(lesson.methodGuide).length) {
+      parts.push('## Which Method Should I Use?\n\n' + _asList(lesson.methodGuide).map(function (m) {
+        return '**' + (m.method || 'Method') + '**' +
+          (m.useWhen ? '\n\nUse when: ' + m.useWhen : '') +
+          (m.avoidWhen ? '\n\nAvoid when: ' + m.avoidWhen : '') +
+          (m.source ? '\n\nSource: ' + m.source : '');
+      }).join('\n\n---\n\n'));
+    }
+    _asList(lesson.adaptiveBlocks).forEach(function (b) {
+      var body = b.body || '';
+      if (_asList(b.items).length) body += (body ? '\n\n' : '') + _asList(b.items).map(function (s) { return '- ' + s; }).join('\n');
+      if (b.source) body += (body ? '\n\n' : '') + '**Source:** ' + b.source;
+      if (body.trim()) parts.push('## ' + (b.title || b.type || 'Learning Block') + '\n\n' + body);
+    });
+    var examples = _asList(lesson.workedExamples);
+    if (!examples.length && lesson.workedExample) examples = [lesson.workedExample];
+    examples.forEach(function (worked) {
+      if (!(worked.problem || _asList(worked.solutionSteps).length)) return;
+      parts.push('## ' + (worked.title || (worked.isMiniExample ? 'Mini-example' : 'Worked Example')) + '\n\n' +
         (worked.problem ? '**Problem:** ' + worked.problem + '\n\n' : '') +
         _asList(worked.solutionSteps).map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n') +
         (worked.finalAnswer ? '\n\n**Final answer:** ' + worked.finalAnswer : '') +
         (worked.sourceOrBasis ? '\n\n**Source or basis:** ' + worked.sourceOrBasis : ''));
-    }
+    });
     if (_asList(lesson.commonMistakes).length) parts.push('## Common Mistakes\n\n' + _asList(lesson.commonMistakes).map(function (s) { return '- ' + s; }).join('\n'));
+    if (_asList(lesson.examTraps).length) parts.push('## Exam Traps\n\n' + _asList(lesson.examTraps).map(function (s) { return '- ' + s; }).join('\n'));
     if (_asList(lesson.selfCheck).length) {
       parts.push('## Self-Check\n\n' + _asList(lesson.selfCheck).map(function (c) {
-        return '**Question:** ' + (c.question || '') + '\n\n**Answer:** ' + (c.answer || '') + '\n\n**Explanation:** ' + (c.explanation || '');
+        return '**Question:** ' + (c.question || '') +
+          (c.hint ? '\n\n**Hint:** ' + c.hint : '') +
+          '\n\n**Answer:** ' + (c.answer || '') +
+          (c.explanation ? '\n\n**Explanation:** ' + c.explanation : '');
       }).join('\n\n'));
     }
+    if (_asList(lesson.practiceTasks).length) parts.push('## Practice Tasks\n\n' + _asList(lesson.practiceTasks).map(function (t) {
+      return '**Task:** ' + (t.prompt || '') + (t.goal ? '\n\nGoal: ' + t.goal : '') + (t.source ? '\n\nSource: ' + t.source : '');
+    }).join('\n\n'));
+    if (lesson.nextStep) parts.push('## Next Step\n\n' + lesson.nextStep);
     if (_asList(lesson.nextTopics).length) parts.push('## Next Topics\n\n' + _asList(lesson.nextTopics).map(function (s) { return '- ' + s; }).join('\n'));
     if (_asList(lesson.groundedSources).length) parts.push('## Sources\n\n' + _asList(lesson.groundedSources).map(function (s) { return '- ' + s; }).join('\n'));
     return parts.filter(Boolean).join('\n\n');
@@ -352,6 +393,168 @@
     var dlBtn = els.result.querySelector('[data-dl-print]');
     if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
   }
+
+  function _renderStructuredResultAdaptive(els, res, lesson) {
+    var formulas = _asList(lesson.keyFormulas);
+    var checks = _asList(lesson.selfCheck);
+    var sources = res.groundedSources || [];
+    var examples = _asList(lesson.workedExamples);
+    if (!examples.length && lesson.workedExample) examples = [lesson.workedExample];
+    examples = examples.filter(function (w) { return w && (w.problem || _asList(w.solutionSteps).length || w.finalAnswer); });
+    var sections = [];
+    function addSection(title, cls) {
+      sections.push('<section class="dl-study-section"><h4>' + _esc(title) + '</h4><div class="' + cls + '"></div></section>');
+    }
+    if (lesson.learningGoal) addSection('Learning Goal', 'dl-learning-goal');
+    if (lesson.bigPicture) addSection('Big Picture', 'dl-big-picture');
+    if (lesson.simpleExplanation || lesson.intuition) addSection('Simple Explanation', 'dl-simple');
+    if (lesson.coreExplanation) addSection('Core Concepts', 'dl-core');
+    if (_asList(lesson.keyDetails).length) addSection('Key Details from Your Sources', 'dl-key-details');
+    if (formulas.length) addSection('Formula Cards', 'dl-formulas');
+    if (_asList(lesson.methodGuide).length) addSection('Which Method Should I Use?', 'dl-method-guide');
+    _asList(lesson.adaptiveBlocks).forEach(function (b, i) {
+      sections.push('<section class="dl-study-section dl-adaptive-section"><h4>' + _esc(b.title || b.type || 'Learning Block') + '</h4><div class="dl-adaptive-block" data-block="' + i + '"></div></section>');
+    });
+    if (_asList(lesson.stepByStepMethod).length) addSection('Step-by-Step Method', 'dl-method');
+    if (examples.length) addSection('Examples / Applications', 'dl-examples');
+    if (_asList(lesson.commonMistakes).length) addSection('Common Mistakes', 'dl-mistakes');
+    if (_asList(lesson.examTraps).length) addSection('Exam Traps', 'dl-traps');
+    if (checks.length) addSection('Self-Check', 'dl-checks');
+    if (_asList(lesson.practiceTasks).length) addSection('Practice Tasks', 'dl-practice-tasks');
+    if (lesson.nextStep) addSection('Next Step', 'dl-next-step');
+    addSection('Sources', 'dl-source-list');
+
+    els._print = {
+      course: els.courseName || '',
+      title: lesson.title || res.title || res.topic || 'Lesson',
+      markdown: _structuredToMarkdown(lesson),
+    };
+    els.result.innerHTML =
+      '<article class="dl-lesson-card dl-structured">' +
+        '<div class="dl-lesson-head"><div><p class="dl-kicker">Guided tutor lesson</p><h3>' + _esc(lesson.title || res.title || res.topic || 'Lesson') + '</h3>' +
+        '<div class="dl-lesson-meta">' + _esc([lesson.lessonMode, lesson.subjectArea, lesson.contentType].filter(Boolean).join(' · ')) + '</div></div>' +
+        '<button type="button" class="dl-btn dl-download" data-dl-print>Download PDF</button></div>' +
+        ((res.citationWarning || lesson.citationWarning) ? '<div class="dl-warning">' + _esc(res.citationWarning || lesson.citationWarning) + '</div>' : '') +
+        sections.join('') +
+      '</article>';
+
+    _renderMarkdown(els.result.querySelector('.dl-learning-goal'), lesson.learningGoal || '');
+    _renderMarkdown(els.result.querySelector('.dl-big-picture'), lesson.bigPicture || '');
+    _renderMarkdown(els.result.querySelector('.dl-simple'), lesson.simpleExplanation || lesson.intuition || '');
+    _renderMarkdown(els.result.querySelector('.dl-core'), lesson.coreExplanation || '');
+    _renderList(els.result.querySelector('.dl-key-details'), _asList(lesson.keyDetails), false);
+    _renderList(els.result.querySelector('.dl-method'), _asList(lesson.stepByStepMethod), true);
+    _renderList(els.result.querySelector('.dl-mistakes'), _asList(lesson.commonMistakes), false);
+    _renderList(els.result.querySelector('.dl-traps'), _asList(lesson.examTraps), false);
+    _renderMarkdown(els.result.querySelector('.dl-next-step'), lesson.nextStep || '');
+
+    var formulaHost = els.result.querySelector('.dl-formulas');
+    if (formulaHost) {
+      formulaHost.innerHTML = formulas.map(function (f, i) {
+        var rel = (f.relevance || '').toLowerCase() === 'related' ? 'Related concept' : (f.relevance ? f.relevance : '');
+        var confidence = f.confidence ? ' · ' + f.confidence : '';
+        return '<details class="dl-formula-box" open>' +
+          '<summary><span class="dl-formula-title">' + _esc(f.meaning || f.formula || 'Formula') + '</span>' +
+          (rel || confidence ? '<span class="dl-formula-meta">' + _esc((rel || 'Core formula') + confidence) + '</span>' : '') +
+          '</summary>' +
+          '<div class="dl-formula-main" data-formula="' + i + '"></div>' +
+          '<dl><dt>Variables</dt><dd>' + _esc(f.variables || '') + '</dd>' +
+          '<dt>Use when / conditions</dt><dd>' + _esc(f.conditions || '') + '</dd>' +
+          (f.commonMistake ? '<dt>Common mistake</dt><dd>' + _esc(f.commonMistake) + '</dd>' : '') +
+          '<dt>Source</dt><dd>' + _esc(f.source || 'Missing source') + '</dd></dl></details>';
+      }).join('');
+      formulaHost.querySelectorAll('.dl-formula-main').forEach(function (el) {
+        var f = formulas[Number(el.getAttribute('data-formula') || 0)] || {};
+        _renderMarkdown(el, f.formula ? '$$' + f.formula + '$$' : '');
+      });
+    }
+
+    var methodHost = els.result.querySelector('.dl-method-guide');
+    if (methodHost) {
+      methodHost.innerHTML = _asList(lesson.methodGuide).map(function (m) {
+        return '<div class="dl-method-card"><strong>' + _esc(m.method || 'Method') + '</strong>' +
+          (m.useWhen ? '<p><b>Use when:</b> ' + _esc(m.useWhen) + '</p>' : '') +
+          (m.avoidWhen ? '<p><b>Avoid when:</b> ' + _esc(m.avoidWhen) + '</p>' : '') +
+          (m.source ? '<p class="dl-source-basis">' + _esc(m.source) + '</p>' : '') + '</div>';
+      }).join('');
+    }
+
+    els.result.querySelectorAll('.dl-adaptive-block').forEach(function (host) {
+      var b = _asList(lesson.adaptiveBlocks)[Number(host.getAttribute('data-block') || 0)] || {};
+      host.innerHTML = (b.body ? '<div class="dl-adaptive-body"></div>' : '') +
+        (_asList(b.items).length ? '<ul>' + _asList(b.items).map(function (x) { return '<li>' + _esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+        (b.source ? '<p class="dl-source-basis">' + _esc(b.source) + '</p>' : '');
+      if (b.body) _renderMarkdown(host.querySelector('.dl-adaptive-body'), b.body);
+    });
+
+    var exampleHost = els.result.querySelector('.dl-examples');
+    if (exampleHost) {
+      exampleHost.innerHTML = examples.map(function (worked) {
+        return '<div class="dl-example-card">' +
+          '<h5>' + _esc(worked.title || (worked.isMiniExample ? 'Mini-example' : 'Example')) + (worked.difficulty ? ' · ' + _esc(worked.difficulty) : '') + '</h5>' +
+          (worked.problem ? '<p><strong>Prompt:</strong> ' + _esc(worked.problem) + '</p>' : '') +
+          (_asList(worked.solutionSteps).length ? '<ol>' + _asList(worked.solutionSteps).map(function (s) { return '<li>' + _esc(s) + '</li>'; }).join('') + '</ol>' : '') +
+          (worked.finalAnswer ? '<p><strong>Result:</strong> ' + _esc(worked.finalAnswer) + '</p>' : '') +
+          (worked.sourceOrBasis ? '<p class="dl-source-basis">' + _esc(worked.sourceOrBasis) + '</p>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    var checkHost = els.result.querySelector('.dl-checks');
+    if (checkHost) {
+      checkHost.innerHTML = checks.map(function (c, i) {
+        return '<div class="dl-check-card"><p class="dl-check-q">' + _esc(c.question || '') + '</p>' +
+          '<div class="dl-check-actions">' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="hint">Hint</button>' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="answer">Show answer</button>' +
+            '<button class="dl-btn dl-reveal" type="button" data-check="' + i + '" data-part="explain">Explain step-by-step</button>' +
+          '</div><div class="dl-check-a" hidden></div></div>';
+      }).join('');
+      checkHost.querySelectorAll('.dl-reveal').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var c = checks[Number(btn.getAttribute('data-check') || 0)] || {};
+          var part = btn.getAttribute('data-part') || 'answer';
+          var card = btn.closest('.dl-check-card');
+          var ans = card && card.querySelector('.dl-check-a');
+          if (!ans) return;
+          var md = part === 'hint'
+            ? (c.hint || 'Start by identifying the key concept from the lesson.')
+            : part === 'explain'
+              ? (_asList(c.stepByStep).length ? _asList(c.stepByStep).map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n') : (c.explanation || c.answer || ''))
+              : ((c.answer || '') + (c.explanation ? '\n\n*' + c.explanation + '*' : ''));
+          _renderMarkdown(ans, md);
+          ans.removeAttribute('hidden');
+        });
+      });
+    }
+
+    var practiceHost = els.result.querySelector('.dl-practice-tasks');
+    if (practiceHost) {
+      practiceHost.innerHTML = _asList(lesson.practiceTasks).map(function (t) {
+        return '<div class="dl-practice-card"><p><strong>Task:</strong> ' + _esc(t.prompt || '') + '</p>' +
+          (t.goal ? '<p><strong>Goal:</strong> ' + _esc(t.goal) + '</p>' : '') +
+          (t.source ? '<p class="dl-source-basis">' + _esc(t.source) + '</p>' : '') + '</div>';
+      }).join('');
+    }
+
+    var sourceHost = els.result.querySelector('.dl-source-list');
+    if (sourceHost) {
+      sourceHost.innerHTML = sources.length ? sources.map(function (s) {
+        var pg = s.pageStart == null ? '' : s.pageStart;
+        return '<button type="button" class="src-cite" data-src-file="' + _esc(s.fileName || '') +
+          '" data-src-page="' + _esc(pg) + '">' + _esc(s.label || s.fileName || 'Source') + '</button>';
+      }).join('') : _asList(lesson.groundedSources).map(function (s) {
+        return '<span class="dl-source-chip">' + _esc(s) + '</span>';
+      }).join('');
+      if (!sourceHost.innerHTML) sourceHost.innerHTML = '<p class="dl-muted">No clickable sources were returned.</p>';
+      _bindSourceClicks(sourceHost);
+    }
+
+    var dlBtn = els.result.querySelector('[data-dl-print]');
+    if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
+  }
+
+  _renderStructuredResult = _renderStructuredResultAdaptive;
 
   // ── printable white lesson view + download (PDF via the browser) ───────────
 
@@ -851,6 +1054,8 @@
       courseName: (course && (course.name || course.title)) || '',
       select: root.querySelector('#dlTopicSelect'),
       text: root.querySelector('#dlTopicText'),
+      mode: root.querySelector('#dlLessonMode'),
+      language: root.querySelector('#dlLessonLanguage'),
       gen: root.querySelector('#dlGenerate'),
       result: root.querySelector('#dlResult'),
       saved: root.querySelector('#dlSaved'),
@@ -885,6 +1090,8 @@
         .then(function (svc) {
           var opts = {};
           if (documentIds && documentIds.length) opts.documentIds = documentIds;
+          if (els.mode && els.mode.value) opts.lessonMode = els.mode.value;
+          if (els.language && els.language.value) opts.lessonLanguage = els.language.value;
           return svc.generateDeepLearn(courseId, topic, opts).then(function (res) {
             els.gen.disabled = false;
             progress.stop();
