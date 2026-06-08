@@ -553,7 +553,8 @@ function _ufMerge(course) {
 
 async function _ufMergeImpl(course) {
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
-  if (!uid) return;
+  console.log('[ufMerge] start', course.id, 'uid=', uid, '_sbToken?', !!_sbToken);
+  if (!uid) { console.warn('[ufMerge] no uid — bailing'); return; }
   function _parseMeta(item) {
     var fname = decodeURIComponent(item.name || '');
     if (!fname || fname.endsWith('/') || !item.id) return null; // skip folder entries (id is null for folders)
@@ -582,6 +583,7 @@ async function _ufMergeImpl(course) {
   });
   // Root listing — files have an id, folder entries have id: null
   var items = await _ufList(uid, course);
+  console.log('[ufMerge] _ufList returned', items.length, 'items for', course.id);
   var discoveredFolders = [];
   items.forEach(function (item) {
     if (!item.id && item.name && !item.name.endsWith('/')) {

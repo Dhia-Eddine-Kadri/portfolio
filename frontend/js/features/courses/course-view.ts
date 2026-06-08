@@ -90,6 +90,7 @@ function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
     const tryStart = (): void => {
       const user = window._currentUser;
       const hasUser = !!(user && (user.id || user.sub));
+      console.log('[waitMerge] tryStart hasUser=', hasUser, '_ufMerge?', typeof window._ufMerge, 'elapsed=', Date.now() - startedAt);
       if (hasUser && typeof window._ufMerge === 'function') {
         try {
           Promise.resolve(window._ufMerge(course)).then(resolve, reject);
@@ -109,6 +110,7 @@ function _waitForCourseFileMerge(course: LegacyCourse): Promise<void> {
     // and the storage list returns 401 → first open shows 0 files.
     const ready = window._sbSessionReady as Promise<unknown> | undefined;
     if (ready) {
+      console.log('[waitMerge] awaiting _sbSessionReady');
       Promise.race([
         ready.catch(() => {}),
         new Promise<void>((r) => setTimeout(r, TIMEOUT_MS)),
@@ -412,6 +414,7 @@ function buildFilesContent(course: LegacyCourse): string {
 }
 
 export function openCourse(course: LegacyCourse): void {
+  console.log('[openCourse]', course.id, 'files=', course.files?.length, 'userFolders=', course.userFolders?.length);
   if (!course.files) course.files = [];
   window.activeCourseId = course.id;
   window.activeFileName = null;
@@ -486,6 +489,7 @@ export function openCourse(course: LegacyCourse): void {
   // small "refreshing" pill while the background _ufMerge runs.
   course._filesLoading = !hadCacheEntry && !hasAnyFiles;
   course._filesRefreshing = hadCacheEntry;
+  console.log('[openCourse] hadCache=', hadCacheEntry, 'hasFiles=', hasAnyFiles, 'loading=', course._filesLoading);
 
   showCourseSection(course, 'files');
   if (typeof window._setAiChipsVisible === 'function') window._setAiChipsVisible(false);
@@ -549,6 +553,7 @@ export function openCourse(course: LegacyCourse): void {
       course._filesLoading = false;
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
+      console.log('[openCourse] merge done, files=', course.files?.length, 'folders=', course.userFolders?.length, 'stillHere=', stillOnThisCourse);
       if (stillOnThisCourse) {
         window._ssRestoring = true;
         showCourseSection(course, currentCourseSection());
@@ -581,7 +586,8 @@ export function openCourse(course: LegacyCourse): void {
         localStorage.setItem('ss_fc_' + course.id, String(total));
       } catch { /* quota or stringify */ }
     })
-    .catch(() => {
+    .catch((err: unknown) => {
+      console.warn('[openCourse] merge FAILED', err);
       cleanup();
       course._filesLoading = false;
       course._filesRefreshing = false;
