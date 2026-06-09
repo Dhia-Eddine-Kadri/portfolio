@@ -58,7 +58,6 @@ interface DailyMissionState {
   todayDate: string;
   selectedCourseId: string | null;
   examDates: Record<string, string>; // courseId → exam date (YYYY-MM-DD)
-  examDateModalShownForCourses: Set<string>; // Track which courses had modal shown
   urgencyMeta?: {
     message: string;
     recommendExamGeneration: boolean;
@@ -77,7 +76,6 @@ const _state: DailyMissionState = {
   todayDate: '',
   selectedCourseId: null,
   examDates: {},
-  examDateModalShownForCourses: new Set(),
   urgencyMeta: undefined,
 };
 
@@ -237,7 +235,7 @@ async function loadTodaysTasks(force = false): Promise<void> {
     console.log('[DailyMission] Loaded', merged.length, 'tasks from', Object.keys(_state.byId).length, 'courses');
     console.log('[DailyMission] Tasks detail:', merged.map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
 
-    // Show exam date modal if first time (tasks exist but no exam dates)
+    // Show exam date modal if tasks exist but no exam dates
     const courseIds = [...new Set(
       merged
         .map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId)
@@ -246,11 +244,8 @@ async function loadTodaysTasks(force = false): Promise<void> {
     const missingDates = courseIds.filter((id) => !_state.examDates[id]);
     console.log('[DailyMission] courseIds for modal:', courseIds, 'missingDates:', missingDates);
 
-    // Only show modal once per unique set of missing dates
-    const missingKey = missingDates.sort().join(',');
-    if (merged.length > 0 && missingDates.length > 0 && !_state.examDateModalShownForCourses.has(missingKey)) {
+    if (merged.length > 0 && missingDates.length > 0) {
       console.log('[DailyMission] Showing exam date modal for missing dates:', missingDates);
-      _state.examDateModalShownForCourses.add(missingKey);
       setTimeout(() => { void showExamDateModal(missingDates); }, 500);
     }
   } catch (err) {
@@ -606,11 +601,7 @@ function _bindWidgetActions(host: HTMLElement): void {
       // Show exam date modal if switching to a course without exam date
       if (_state.selectedCourseId && !_state.examDates[_state.selectedCourseId]) {
         console.log('[DailyMission] Selected course has no exam date, showing modal for:', _state.selectedCourseId);
-        const modalKey = _state.selectedCourseId;
-        if (!_state.examDateModalShownForCourses.has(modalKey)) {
-          _state.examDateModalShownForCourses.add(modalKey);
-          setTimeout(() => { void showExamDateModal([_state.selectedCourseId!]); }, 300);
-        }
+        setTimeout(() => { void showExamDateModal([_state.selectedCourseId!]); }, 300);
       }
 
       _renderWidget();
@@ -817,11 +808,17 @@ function _tryAutoLoad(): void {
 }
 
 // Start loading after a short delay to let SEMS/courses data settle
-setTimeout(_tryAutoLoad, 2500);
-window.addEventListener('ss-ready', () => { setTimeout(_tryAutoLoad, 1200); }, { once: true });
+// Load exam dates FIRST, then load tasks (to avoid race condition)
+async function _loadSequential(): Promise<void> {
+  await loadExamDates();
+  void loadTodaysTasks();
+}
+
+setTimeout(_loadSequential, 2500);
+window.addEventListener('ss-ready', () => { setTimeout(_loadSequential, 1200); }, { once: true });
 window.addEventListener('ss:courses-ready', () => {
   _watchWidgetElement();
-  void loadTodaysTasks(true);
+  void _loadSequential();
 });
 
 // ─── ─────────────────────────────────────────────────────────────────────────
