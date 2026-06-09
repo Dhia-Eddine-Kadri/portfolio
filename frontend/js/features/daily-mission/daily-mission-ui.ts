@@ -163,14 +163,24 @@ function _courseName(courseId: string): string {
 
 // Watch for widget element being recreated (e.g., when moved) and re-render
 function _watchWidgetElement(): void {
+  let lastChildCount = -1;
   const checkAndRender = () => {
     const host = document.getElementById('daily-mission-widget');
-    if (host && host.querySelector('.dmw-status') && !host.querySelector('.dm-widget')) {
-      // Widget was reset to initial state, re-render
-      console.log('[DailyMission] Widget was reset, re-rendering');
-      _renderWidget();
+    if (host) {
+      const currentChildCount = host.children.length;
+      // Re-render if: widget is empty, or only has loading/status div with no dm-widget content
+      const hasWidget = host.querySelector('.dm-widget');
+      const isEmpty = !hasWidget && (host.textContent?.trim() === '' || host.querySelector('.dmw-status'));
+
+      if (isEmpty || (currentChildCount !== lastChildCount && !hasWidget && _state.tasks.length > 0)) {
+        console.log('[DailyMission] Widget content missing (empty=' + isEmpty + ', childCount=' + currentChildCount + '), re-rendering');
+        lastChildCount = -1;
+        _renderWidget();
+      } else if (hasWidget) {
+        lastChildCount = currentChildCount;
+      }
     }
-    setTimeout(checkAndRender, 500);
+    setTimeout(checkAndRender, 300);
   };
   checkAndRender();
 }
