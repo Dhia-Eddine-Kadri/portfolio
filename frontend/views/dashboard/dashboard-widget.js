@@ -458,6 +458,7 @@
         });
         var el = document.createElement('div');
         el.className = 'dash-widget';
+        if (w.type === 'dailyMission') el.classList.add('dash-widget--daily-mission');
         el.dataset.uid = w.uid;
         var mCols = window.innerWidth <= 768 ? 2 : COLS;
         var mCs = Math.min(w.cs, mCols),
@@ -1380,17 +1381,22 @@
       });
       if (!w) return;
 
-      // Measure natural height by briefly releasing the grid stretch: a grid
-      // item is stretched to its row track by default, which hides a short
-      // list's true height and clamps a long list to the scroll viewport.
-      // align-self:start + height:auto lets the tile report its real content.
-      var prevAlign = el.style.alignSelf;
-      var prevHeight = el.style.height;
-      el.style.alignSelf = 'start';
-      el.style.height = 'auto';
-      var naturalTotal = el.getBoundingClientRect().height;
-      el.style.alignSelf = prevAlign;
-      el.style.height = prevHeight;
+      // Measure the full content height directly. If the list was capped by a
+      // previous fit, briefly uncap it so scrollHeight reflects every task.
+      var taskList = host.querySelector('.dm-widget-tasks--scrollable');
+      var prevListMax = taskList ? taskList.style.maxHeight : '';
+      var prevListOverflow = taskList ? taskList.style.overflowY : '';
+      if (taskList) {
+        taskList.style.maxHeight = 'none';
+        taskList.style.overflowY = 'visible';
+      }
+      el.style.removeProperty('--dm-widget-list-max-height');
+      var naturalTotal = el.scrollHeight;
+      var fullListHeight = taskList ? taskList.scrollHeight : 0;
+      if (taskList) {
+        taskList.style.maxHeight = prevListMax;
+        taskList.style.overflowY = prevListOverflow;
+      }
       if (!naturalTotal) return;
 
       var cell = ROW_H + GAP;
@@ -1401,7 +1407,17 @@
       var maxRows = Math.max(2, Math.floor((avail + GAP) / cell));
       // tileHeight(rs) = rs*ROW_H + (rs-1)*GAP = rs*cell - GAP; solve for rs.
       var wantRs = Math.max(2, Math.ceil((naturalTotal + GAP) / cell));
-      if (wantRs > maxRows) wantRs = maxRows;
+      var capped = wantRs > maxRows;
+      if (capped) wantRs = maxRows;
+
+      if (capped && taskList && fullListHeight) {
+        var maxTileHeight = wantRs * ROW_H + (wantRs - 1) * GAP;
+        var chromeHeight = Math.max(0, naturalTotal - fullListHeight);
+        var listMax = Math.max(120, maxTileHeight - chromeHeight);
+        el.style.setProperty('--dm-widget-list-max-height', listMax + 'px');
+      } else {
+        el.style.removeProperty('--dm-widget-list-max-height');
+      }
 
       if (wantRs === w.rs) return; // already fits — no relayout
       w.rs = wantRs;

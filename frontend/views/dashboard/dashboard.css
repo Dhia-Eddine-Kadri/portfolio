@@ -365,6 +365,18 @@
 .dash-widget:hover .dw-resize {
   opacity: 0.7;
 }
+
+.dash-widget--daily-mission {
+  align-self: start;
+  overflow: visible;
+}
+.dash-widget--daily-mission .dw-body,
+.dash-widget--daily-mission .dmw-root {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
 .dw-resize::after {
   content: '';
   position: absolute;
