@@ -252,6 +252,110 @@ async function updateTaskStatus(taskId: string, newStatus: DailyMissionTask['sta
   }
 }
 
+// ─── Exam date management ────────────────────────────────────────────────────
+
+async function loadExamDates(): Promise<void> {
+  const token = (window as unknown as { _sbToken?: string })._sbToken || '';
+  try {
+    const res = await fetch('/api/study/exam-dates', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (res.ok) {
+      const data = await res.json() as { examDates: Record<string, string> };
+      _state.examDates = data.examDates || {};
+    }
+  } catch (err) {
+    console.error('[DailyMission] loadExamDates error:', err);
+  }
+}
+
+async function saveExamDate(courseId: string, examDate: string): Promise<boolean> {
+  const token = (window as unknown as { _sbToken?: string })._sbToken || '';
+  try {
+    const res = await fetch('/api/study/exam-dates', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify({ courseId, examDate })
+    });
+    if (res.ok) {
+      _state.examDates[courseId] = examDate;
+      return true;
+    }
+  } catch (err) {
+    console.error('[DailyMission] saveExamDate error:', err);
+  }
+  return false;
+}
+
+function showExamDateModal(): Promise<Record<string, string> | null> {
+  return new Promise((resolve) => {
+    const courseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
+    if (!courseIds.length) { resolve(null); return; }
+
+    const modal = document.createElement('div');
+    modal.className = 'dm-exam-modal-overlay';
+    modal.innerHTML = '<div class="dm-exam-modal">' +
+      '<div class="dm-exam-modal-header">' +
+        '<h3>Set Exam Dates</h3>' +
+        '<p>Enter exam dates so we can plan your study timeline</p>' +
+      '</div>' +
+      '<div class="dm-exam-modal-form">' +
+        courseIds.map(cid => '<div class="dm-exam-input-group">' +
+          '<label>' + escapeHtml(_courseName(cid)) + '</label>' +
+          '<input type="date" class="dm-exam-date-input" data-course-id="' + escapeHtml(cid) + '" value="' + (_state.examDates[cid] || '') + '">' +
+        '</div>').join('') +
+      '</div>' +
+      '<div class="dm-exam-modal-actions">' +
+        '<button type="button" class="dm-btn-exam-cancel">Cancel</button>' +
+        '<button type="button" class="dm-btn-exam-save dm-task-btn--primary">Save Exam Dates</button>' +
+      '</div>' +
+    '</div>';
+
+    document.body.appendChild(modal);
+
+    const saveBtn = modal.querySelector('.dm-btn-exam-save') as HTMLButtonElement;
+    const cancelBtn = modal.querySelector('.dm-btn-exam-cancel') as HTMLButtonElement;
+
+    const close = () => { modal.remove(); };
+
+    cancelBtn.addEventListener('click', () => { close(); resolve(null); });
+
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      const inputs = modal.querySelectorAll<HTMLInputElement>('.dm-exam-date-input');
+      const dates: Record<string, string> = {};
+      let allSaved = true;
+
+      for (const input of inputs) {
+        const courseId = input.getAttribute('data-course-id');
+        const date = input.value;
+        if (courseId && date) {
+          dates[courseId] = date;
+          const saved = await saveExamDate(courseId, date);
+          if (!saved) allSaved = false;
+        }
+      }
+
+      if (allSaved) {
+        close();
+        resolve(dates);
+        void loadTodaysTasks(true);
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Exam Dates';
+      }
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) { close(); resolve(null); }
+    });
+  });
+}
+
 // ─── Navigation helper ─────────────────────────────────────────────────────────
 
 function _openInAi(): void {
@@ -547,6 +651,7 @@ function _renderPreviewCard(): void {
 
 // Auto-load when courses data is ready
 function _tryAutoLoad(): void {
+  void loadExamDates();
   if (_allCourseIds().length) {
     void loadTodaysTasks();
   }
