@@ -166,12 +166,15 @@ body:not(.night) .dm-task-btn {
 body:not(.night) .dm-progress-track { background: rgba(15, 23, 42, 0.08); }
 
 /* Widget — fills its dashboard tile (.dmw-root is height:100%) and stays
-   responsive to tile resizing. The task list flexes to fill whatever height is
-   left and scrolls internally, so a tall widget never leaves dead space. */
+   responsive to tile resizing via the dashboard's own .dw-resize handle. The
+   task list flexes to fill whatever height is left and scrolls internally, so a
+   tall widget never leaves dead space and the list is never cut short.
+   NOTE: no `resize: vertical` here — its handle collided with the dashboard's
+   resize handle (same corner) and set an explicit short height that cut the
+   list and got wiped on every re-render. Height is driven by the tile only. */
 .dm-widget {
   height: 100%;
-  min-height: 200px;
-  resize: vertical;
+  min-height: 0;
   overflow: hidden;
   border-radius: 12px;
   display: flex;
