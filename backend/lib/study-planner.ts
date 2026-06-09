@@ -315,10 +315,18 @@ const TASK_TYPE_PLAN_RANK: Record<string, number> = {
   review_topic: 5,
 };
 
+/** Stable identity for a candidate: a given topic+file+type appears once per plan. */
+function candidateKey(c: TaskCandidate): string {
+  return `${c.topic_id ?? '_'}:${c.source_file_id ?? '_'}:${c.task_type}`;
+}
+
 export function sequenceTasksForSubject(
   candidates: TaskCandidate[],
   topicStates: Map<string, TopicState>,
-  targetMinutes: number
+  targetMinutes: number,
+  // Shared across every day/subject of a single plan so the same candidate is
+  // never scheduled twice. When omitted (e.g. unit tests) dedup is per-call.
+  alreadyScheduled?: Set<string>
 ): SequencedTask[] {
   // Group candidates by topic to enforce study-before-practice ordering.
   const byTopic = new Map<string, TaskCandidate[]>();
@@ -409,10 +417,10 @@ export function sequenceTasksForSubject(
   const result: SequencedTask[] = [];
   let usedMinutes = 0;
   let order = 0;
-  const seenTopicAndType = new Set<string>();
+  const seenTopicAndType = alreadyScheduled ?? new Set<string>();
 
   for (const c of eligible) {
-    const key = `${c.topic_id ?? '_'}:${c.source_file_id ?? '_'}:${c.task_type}`;
+    const key = candidateKey(c);
     if (seenTopicAndType.has(key)) continue;
 
     const cost = Math.max(10, Math.min(60, c.estimated_minutes || 30));
@@ -430,15 +438,19 @@ export function sequenceTasksForSubject(
     if (usedMinutes >= targetMinutes) break;
   }
 
-  // Always return at least 1 task if candidates exist.
-  if (result.length === 0 && eligible.length > 0) {
-    const c = eligible[0]!;
-    result.push({
-      candidate: c,
-      estimatedMinutes: Math.max(10, Math.min(60, c.estimated_minutes || 30)),
-      dayOrder: 0,
-      priorityScore: c.priority_score ?? 0.5,
-    });
+  // Return at least 1 task if any eligible candidate is still unscheduled.
+  // Must respect the shared set, or every empty day re-adds the same task.
+  if (result.length === 0) {
+    const c = eligible.find((e) => !seenTopicAndType.has(candidateKey(e)));
+    if (c) {
+      seenTopicAndType.add(candidateKey(c));
+      result.push({
+        candidate: c,
+        estimatedMinutes: Math.max(10, Math.min(60, c.estimated_minutes || 30)),
+        dayOrder: 0,
+        priorityScore: c.priority_score ?? 0.5,
+      });
+    }
   }
 
   return result;
@@ -719,15 +731,25 @@ export async function generateWeeklyPlan(
   const taskRows: Record<string, unknown>[] = [];
   const subjectsSeen = new Set<string>();
   let globalDayOrder = 0;
+  // One candidate = one task across the whole week. distributeAcrossWeek hands the
+  // same candidate list to every day, so without this each candidate would be
+  // re-scheduled daily. Keyed per subject so two subjects never collide.
+  const scheduledByCourse = new Map<string, Set<string>>();
 
   for (const dayAlloc of dayAllocations) {
     let dayOrder = 0;
     for (const alloc of dayAlloc.allocations) {
       subjectsSeen.add(alloc.courseId);
+      let scheduled = scheduledByCourse.get(alloc.courseId);
+      if (!scheduled) {
+        scheduled = new Set<string>();
+        scheduledByCourse.set(alloc.courseId, scheduled);
+      }
       const tasks = sequenceTasksForSubject(
         alloc.candidates,
         alloc.topicStates,
-        alloc.minutesAllocated
+        alloc.minutesAllocated,
+        scheduled
       );
 
       for (const t of tasks) {
@@ -971,6 +993,23 @@ function fileNumericSuffix(fileName: string): number | null {
   return m ? parseInt(m[1]!, 10) : null;
 }
 
+// source_type at upload is client-supplied and defaults to 'lecture', so
+// untagged solution/exercise sheets arrive mislabeled. We never rewrite the
+// stored value (see "no post-upload reindex"), but the planner infers a better
+// type from the filename so a solution sheet isn't scheduled as a "Study" task.
+// Only an explicit, default-y 'lecture'/empty value is overridden — a deliberate
+// 'exercise'/'solution'/'exam' tag is always trusted.
+function effectiveSourceType(stored: string | null | undefined, fileName: string | null | undefined): string {
+  const trusted = stored && stored !== 'lecture' ? stored : null;
+  if (trusted) return trusted;
+  const n = (fileName ?? '').toLowerCase();
+  // Solutions first: "..._Sol", "Solutions", "Loesung"/"Lösung", "_LSG".
+  if (/(\bsol\b|sol\.|_sol|solution|lösung|loesung|musterl|\blsg\b)/.test(n)) return 'solution';
+  if (/(exercise|aufgabe|übung|uebung|tutorial|problem|\bex\d|_ex\b|_ex\d)/.test(n)) return 'exercise';
+  if (/(exam|klausur|prüfung|pruefung|midterm|final)/.test(n)) return 'exam';
+  return stored || 'lecture';
+}
+
 export async function seedCandidatesFromTopics(
   userId: string,
   courseId: string,
@@ -1019,7 +1058,7 @@ export async function seedCandidatesFromTopics(
   // paired here, or a lecture would link to a solution instead of a problem set.
   const exerciseByNum = new Map<number, string>();
   for (const [docId, doc] of readyDocs) {
-    if (doc.source_type === 'exercise' && doc.file_name) {
+    if (effectiveSourceType(doc.source_type, doc.file_name) === 'exercise' && doc.file_name) {
       const n = fileNumericSuffix(doc.file_name);
       if (n !== null) exerciseByNum.set(n, docId);
     }
@@ -1045,22 +1084,23 @@ export async function seedCandidatesFromTopics(
       const doc = readyDocs.get(docId);
       if (!doc) continue;
 
-      const taskType = sourceTypeToNewTaskType(doc.source_type);
+      const srcType = effectiveSourceType(doc.source_type, doc.file_name);
+      const taskType = sourceTypeToNewTaskType(srcType);
       const minutes = estimatedMinutesForType(taskType);
       const reqState = studyStateRequired(taskType);
       // Only true exercise sheets are "exercises". Solutions are checked, not solved.
-      const isExercise = doc.source_type === 'exercise';
+      const isExercise = srcType === 'exercise';
 
       // Detect exercise pairing for lecture candidates.
       let exerciseFileId: string | null = null;
-      if (doc.source_type === 'lecture' && doc.file_name) {
+      if (srcType === 'lecture' && doc.file_name) {
         const n = fileNumericSuffix(doc.file_name);
         if (n !== null && exerciseByNum.has(n)) {
           exerciseFileId = exerciseByNum.get(n)!;
         }
       }
 
-      const title = taskTitleFromSourceType(doc.source_type, topic.name ?? 'Topic', doc.file_name ?? '');
+      const title = taskTitleFromSourceType(srcType, topic.name ?? 'Topic', doc.file_name ?? '');
 
       rows.push({
         user_id: userId,
