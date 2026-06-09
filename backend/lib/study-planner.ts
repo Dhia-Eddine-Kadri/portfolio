@@ -412,8 +412,15 @@ export async function persistAiTasks(
   // Rows to INSERT (no matching existing key) vs PATCH (existing key found)
   const toInsert: AiTaskRow[] = [];
   const toPatch: Array<{ id: string; fields: Partial<AiTaskRow> }> = [];
+  // The AI can emit two tasks with identical canonical identity (e.g. two
+  // exam-prep tasks on the same solution file + date). Inserting both violates
+  // the (plan_id, canonical_task_key) unique index and 400s the entire batch,
+  // leaving the plan with zero tasks. De-dupe incoming rows by key, first wins.
+  const seenIncoming = new Set<string>();
 
   for (const row of rows) {
+    if (seenIncoming.has(row.canonical_task_key)) continue;
+    seenIncoming.add(row.canonical_task_key);
     const existing = editableByKey.get(row.canonical_task_key);
     if (existing) {
       // Patch mutable fields only
@@ -441,11 +448,12 @@ export async function persistAiTasks(
     }
   }
 
-  // INSERT in batches of 50
+  // INSERT in batches of 50. ignore-duplicates is a safety net against a
+  // canonical key that already exists in the DB (e.g. a prior partial write).
   for (let i = 0; i < toInsert.length; i += 50) {
     const batch = toInsert.slice(i, i + 50);
     await supaRequest('POST', 'weekly_study_tasks', batch, serviceKey, {
-      Prefer: 'return=minimal',
+      Prefer: 'resolution=ignore-duplicates,return=minimal',
     });
   }
 
