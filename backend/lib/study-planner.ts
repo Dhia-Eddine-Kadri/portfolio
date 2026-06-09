@@ -315,9 +315,15 @@ const TASK_TYPE_PLAN_RANK: Record<string, number> = {
   review_topic: 5,
 };
 
-/** Stable identity for a candidate: a given topic+file+type appears once per plan. */
+// Stable identity for a candidate within a plan. Collapse by FILE, not topic:
+// the topic map routinely extracts many sub-topics from one lecture PDF, all
+// pointing back to that single file. Studying the file once covers them all, so
+// a file+type pair must yield exactly one task — otherwise one PDF shows up as
+// 4-6 near-identical "Study: <topic>" cards. Fall back to topic only when a
+// candidate has no source file.
 function candidateKey(c: TaskCandidate): string {
-  return `${c.topic_id ?? '_'}:${c.source_file_id ?? '_'}:${c.task_type}`;
+  if (c.source_file_id) return `file:${c.source_file_id}:${c.task_type}`;
+  return `topic:${c.topic_id ?? '_'}:${c.task_type}`;
 }
 
 export function sequenceTasksForSubject(
@@ -721,10 +727,20 @@ export async function generateWeeklyPlan(
       serviceKey,
       { Prefer: 'return=representation' }
     );
-    if (!Array.isArray(created.body) || !created.body[0]) {
-      throw new Error('Could not create weekly study plan');
+    if (Array.isArray(created.body) && created.body[0]) {
+      planId = created.body[0]!.id;
+    } else {
+      // The dashboard fires several daily-plan reads at once; with no plan yet
+      // they all try to generate, and the unique (user, week, scope, course)
+      // constraint rejects the losers with a 409. That's not an error — the
+      // winner already created the plan and is filling its tasks. Re-fetch the
+      // plan and return WITHOUT building tasks, so we don't double-insert into
+      // the winner's plan. The next read picks up the winner's tasks.
+      const raceRes = await supaRequest<WeeklyStudyPlan[]>('GET', planKey, null, serviceKey);
+      const racePlan = Array.isArray(raceRes.body) ? raceRes.body[0] ?? null : null;
+      if (!racePlan) throw new Error('Could not create weekly study plan');
+      return { planId: racePlan.id, taskCount: 0, subjects: [], urgency };
     }
-    planId = created.body[0]!.id;
   }
 
   // Build task rows.
