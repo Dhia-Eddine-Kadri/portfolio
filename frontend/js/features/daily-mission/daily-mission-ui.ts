@@ -217,6 +217,7 @@ async function loadTodaysTasks(force = false): Promise<void> {
     _state.tasks = merged;
     _state.lastLoaded = now;
     console.log('[DailyMission] Loaded', merged.length, 'tasks from', Object.keys(_state.byId).length, 'courses');
+    console.log('[DailyMission] Tasks detail:', merged.map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
 
     // Show exam date modal if first time (tasks exist but no exam dates)
     const courseIds = [...new Set(
@@ -446,6 +447,8 @@ function _renderWidget(): void {
 
   if (total === 0 && _state.tasks.length > 0) {
     console.log('[DailyMission] Warning: Have', _state.tasks.length, 'tasks but displaying 0 (selectedCourseId=' + _state.selectedCourseId + ')');
+    console.log('[DailyMission] Raw _state.tasks:', _state.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
+    console.log('[DailyMission] After filter "replaced":', _state.tasks.filter((t) => t.status !== 'replaced').map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
   }
 
   let inner = '';
