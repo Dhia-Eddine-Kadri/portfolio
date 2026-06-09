@@ -94,6 +94,25 @@ export async function regenerateDailyMission(courseId: string, availableMinutes?
 }
 
 export async function getDailyMissionSummary(courseId: string): Promise<DailyMissionSummary> {
+  // Wait for auth token to be available
+  const token = (window as unknown as { _sbToken?: string })._sbToken;
+  if (!token) {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const checkToken = () => {
+        const t = (window as unknown as { _sbToken?: string })._sbToken;
+        if (t) {
+          getDailyMissionSummary(courseId).then(resolve).catch(reject);
+        } else if (attempts++ < 10) {
+          setTimeout(checkToken, 100);
+        } else {
+          reject(new Error('Auth token not available'));
+        }
+      };
+      checkToken();
+    });
+  }
+
   const qs = new URLSearchParams({ courseId, date: todayLocalDate(), timezone: timezone() });
   const res = await fetch('/api/study/daily-plan/summary?' + qs.toString(), { headers: authHeaders() });
   if (!res.ok) throw new Error('Daily Mission summary could not be loaded');
