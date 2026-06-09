@@ -791,13 +791,15 @@ function _renderPreviewCard(): void {
   reload: () => loadTodaysTasks(true),
   generatePlan,
   // Paint the widget into the (possibly freshly recreated) host element.
-  // Renders instantly from memory if tasks are already loaded — no API call —
-  // so dashboard resize/move never wipes the list. Loads if state is empty.
+  // Always repaints immediately so the dashboard's stale "Loading…" placeholder
+  // is replaced with our UI (tasks from memory, or the empty/loading state).
+  // Resize/move never wipes the list because this paints from memory — no API
+  // call needed when tasks are already loaded.
   render: () => {
-    if (_state.tasks.length > 0 || _state.isLoading) {
-      _renderWidget();
-      _watchWidgetElement();
-    } else {
+    _renderWidget();
+    _watchWidgetElement();
+    // If we have nothing yet, kick off a load (this also repaints when done).
+    if (_state.tasks.length === 0 && !_state.isLoading) {
       void _loadSequential();
     }
   },
