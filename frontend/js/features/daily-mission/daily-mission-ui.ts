@@ -58,6 +58,7 @@ interface DailyMissionState {
   todayDate: string;
   selectedCourseId: string | null;
   examDates: Record<string, string>; // courseId → exam date (YYYY-MM-DD)
+  examDateModalShownToday: boolean; // Track if modal was shown in this session
   urgencyMeta?: {
     message: string;
     recommendExamGeneration: boolean;
@@ -76,6 +77,7 @@ const _state: DailyMissionState = {
   todayDate: '',
   selectedCourseId: null,
   examDates: {},
+  examDateModalShownToday: false,
   urgencyMeta: undefined,
 };
 
@@ -241,8 +243,9 @@ async function loadTodaysTasks(force = false): Promise<void> {
     )];
     const missingDates = courseIds.filter((id) => !_state.examDates[id]);
     console.log('[DailyMission] courseIds for modal:', courseIds, 'missingDates:', missingDates);
-    if (merged.length > 0 && missingDates.length > 0) {
+    if (merged.length > 0 && missingDates.length > 0 && !_state.examDateModalShownToday) {
       console.log('[DailyMission] Showing exam date modal for:', missingDates);
+      _state.examDateModalShownToday = true;
       setTimeout(() => { void showExamDateModal(); }, 500);
     }
   } catch (err) {
@@ -484,15 +487,18 @@ function _renderWidget(): void {
   inner += '<span class="dm-widget-date">' + escapeHtml(dateStr) + '</span>';
   inner += '</div>';
 
-  // Course picker
-  const courseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
-  console.log('[DailyMission] courseIds:', courseIds, 'length:', courseIds.length);
-  if (courseIds.length > 1) {
+  // Course picker — show all system courses if > 1, mark which have tasks
+  const taskCourseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
+  const allSystemCourseIds = _allCourseIds();
+  console.log('[DailyMission] taskCourseIds:', taskCourseIds, 'allSystemCourseIds:', allSystemCourseIds);
+
+  if (allSystemCourseIds.length > 1) {
     inner += '<select class="dm-course-picker">';
     inner += '<option value="">All Courses</option>';
-    courseIds.forEach((cid) => {
+    allSystemCourseIds.forEach((cid) => {
       const selected = _state.selectedCourseId === cid ? ' selected' : '';
-      inner += '<option value="' + escapeHtml(cid) + '"' + selected + '>' + escapeHtml(_courseName(cid)) + '</option>';
+      const hasTasks = taskCourseIds.includes(cid) ? '' : ' (no tasks)';
+      inner += '<option value="' + escapeHtml(cid) + '"' + selected + '>' + escapeHtml(_courseName(cid)) + hasTasks + '</option>';
     });
     inner += '</select>';
   }
