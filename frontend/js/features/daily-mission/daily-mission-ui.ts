@@ -159,20 +159,23 @@ function _courseName(courseId: string): string {
 
 // ─── Data loading ──────────────────────────────────────────────────────────────
 
-// Watch for widget element being cleared and restore immediately from memory
+// Watch the current widget host for its content being cleared and restore it
+// from memory. The dashboard recreates this element on resize/move, so the
+// observer is (re)bound to whichever element is live at call time.
+let _widgetObserver: MutationObserver | null = null;
+let _observedHost: HTMLElement | null = null;
 function _watchWidgetElement(): void {
   const host = document.getElementById('daily-mission-widget');
-  if (!host) return;
+  if (!host || host === _observedHost) return;
 
-  // Use MutationObserver to detect when the widget gets reset
-  const observer = new MutationObserver(() => {
-    // If widget exists but content was cleared, restore from memory
+  if (_widgetObserver) _widgetObserver.disconnect();
+  _observedHost = host;
+  _widgetObserver = new MutationObserver(() => {
     if (_state.tasks.length > 0 && !host.querySelector('.dm-widget')) {
       _renderWidget();
     }
   });
-
-  observer.observe(host, { childList: true, subtree: true });
+  _widgetObserver.observe(host, { childList: true, subtree: true });
 }
 
 async function loadTodaysTasks(force = false): Promise<void> {
@@ -779,6 +782,7 @@ function _renderPreviewCard(): void {
   _dailyMission?: {
     reload: () => Promise<void>;
     generatePlan: () => Promise<void>;
+    render: () => void;
   };
 })._dailyMission = {
   // Note: there is no `open()` method — the chatbot renders Daily Mission as
@@ -786,6 +790,17 @@ function _renderPreviewCard(): void {
   // must NOT exist outside the chat thread.
   reload: () => loadTodaysTasks(true),
   generatePlan,
+  // Paint the widget into the (possibly freshly recreated) host element.
+  // Renders instantly from memory if tasks are already loaded — no API call —
+  // so dashboard resize/move never wipes the list. Loads if state is empty.
+  render: () => {
+    if (_state.tasks.length > 0 || _state.isLoading) {
+      _renderWidget();
+      _watchWidgetElement();
+    } else {
+      void _loadSequential();
+    }
+  },
 };
 
 // Start loading after a short delay to let SEMS/courses data settle

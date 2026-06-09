@@ -1091,68 +1091,21 @@
         });
       });
       canvas.querySelectorAll('.dw-body').forEach(function (body) {
-        var root = body.querySelector('.dmw-root');
+        var root = body.querySelector('#daily-mission-widget');
         if (!root || root._dmwBound) return;
         root._dmwBound = true;
-        function _courseId() {
-          if (window.activeCourseRef && window.activeCourseRef.id) return window.activeCourseRef.id;
-          if (window.activeCourseId) return window.activeCourseId;
-          var sem = SEMS && SEMS[window.sdActiveSemId];
-          var first = sem && sem.courses && sem.courses.find(function (c) { return c.id; });
-          return first && first.id;
-        }
-        function _openAi() {
-          try { sessionStorage.setItem('ss_daily_mission_seed', 'to-do'); } catch (e) {}
-          if (typeof window.setNavActive === 'function') window.setNavActive('psbAIPage');
-          if (typeof window.showPortalSection === 'function') {
-            window.showPortalSection('aipage');
-          }
-          setTimeout(function () {
-            var ta = document.querySelector('.ncb-input-textarea');
-            if (ta) {
-              ta.value = 'to-do';
-              ta.dispatchEvent(new Event('input', { bubbles: true }));
-              ta.focus();
+        // Hand off rendering to the multi-subject Daily Mission system
+        // (daily-mission-ui.ts). It owns #daily-mission-widget and paints the
+        // full task list. On resize/move the dashboard recreates this element,
+        // so we re-trigger its render() — which repaints instantly from memory
+        // (no API call) and keeps the list from disappearing.
+        import('js/features/daily-mission/daily-mission-ui.js')
+          .then(function () {
+            if (window._dailyMission && typeof window._dailyMission.render === 'function') {
+              window._dailyMission.render();
             }
-          }, 350);
-        }
-        function _paintLoading() {
-          root.innerHTML = '<div class="dmw-status">Loading today&rsquo;s mission...</div>';
-        }
-        function _paintEmpty() {
-          root.innerHTML =
-            '<div class="dmw-head"><span class="dmw-dot"></span><strong>Daily Study Mission</strong></div>' +
-            '<div class="dmw-status">Turn your course files into today&rsquo;s trusted study plan.</div>' +
-            '<button class="dmw-btn" type="button">Open in AI</button>';
-          var btn = root.querySelector('.dmw-btn');
-          if (btn) btn.addEventListener('click', _openAi);
-        }
-        function _paint(data, renderProgressHeaderHtml) {
-          if (!data || !data.hasPlan || !data.tasks.length) { _paintEmpty(); return; }
-          var mainFocus = data.tasks.find(function (t) {
-            return t.status !== 'completed' && t.status !== 'unavailable' && t.status !== 'replaced';
-          });
-          root.innerHTML =
-            '<div class="dmw-head"><span class="dmw-dot"></span><strong>Daily Study Mission</strong></div>' +
-            renderProgressHeaderHtml(data) +
-            '<div class="dmw-focus">' + (mainFocus ? mainFocus.title : 'Today&rsquo;s mission is ready') + '</div>' +
-            '<button class="dmw-btn" type="button">Open in AI</button>';
-          var btn = root.querySelector('.dmw-btn');
-          if (btn) btn.addEventListener('click', _openAi);
-        }
-        var cid = _courseId();
-        if (!cid) { _paintEmpty(); return; }
-        _paintLoading();
-        Promise.all([
-          import('js/services/study-service.js'),
-          import('js/features/daily-mission/daily-mission-ui.js')
-        ])
-          .then(function (mods) {
-            return mods[0].getDailyMission(cid).then(function (data) {
-              _paint(data, mods[1].renderProgressHeaderHtml);
-            });
           })
-          .catch(_paintEmpty);
+          .catch(function () {});
       });
       updateCards();
     }
