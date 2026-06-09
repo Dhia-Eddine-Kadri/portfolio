@@ -268,12 +268,17 @@ async function generatePlan(): Promise<void> {
   if (!ids.length) return;
   // Use selected course if available, otherwise use active course, fall back to first available
   const courseId = _state.selectedCourseId || findPrimaryCourseId() || ids[0];
-  if (!courseId) return;
+  if (!courseId) {
+    console.error('[DailyMission] No course selected for plan generation');
+    return;
+  }
+  console.log('[DailyMission] Generating plan for course:', courseId);
   try {
-    await generateDailyMission(courseId);
+    const result = await generateDailyMission(courseId);
+    console.log('[DailyMission] Plan generated:', result);
     await loadTodaysTasks(true);
   } catch (err) {
-    console.error('[DailyMission] generatePlan error:', err);
+    console.error('[DailyMission] generatePlan error:', err instanceof Error ? err.message : String(err));
   }
 }
 
