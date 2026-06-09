@@ -159,6 +159,20 @@ function _courseName(courseId: string): string {
 
 // ─── Data loading ──────────────────────────────────────────────────────────────
 
+// Watch for widget element being recreated (e.g., when moved) and re-render
+function _watchWidgetElement(): void {
+  const checkAndRender = () => {
+    const host = document.getElementById('daily-mission-widget');
+    if (host && host.querySelector('.dmw-status') && !host.querySelector('.dm-widget')) {
+      // Widget was reset to initial state, re-render
+      console.log('[DailyMission] Widget was reset, re-rendering');
+      _renderWidget();
+    }
+    setTimeout(checkAndRender, 500);
+  };
+  checkAndRender();
+}
+
 async function loadTodaysTasks(force = false): Promise<void> {
   if (_state.isLoading) return;
   const now = Date.now();
@@ -435,6 +449,13 @@ function _renderWidget(): void {
   const host = document.getElementById('daily-mission-widget');
   console.log('[DailyMission] _renderWidget called, host element:', host ? 'found' : 'NOT FOUND');
   if (!host) return;
+
+  // If widget was reset (moved/recreated), re-render tasks
+  const widgetContent = host.querySelector('.dm-widget');
+  if (!widgetContent && _state.tasks.length > 0) {
+    console.log('[DailyMission] Widget content missing, force re-render');
+    // Continue with render below
+  }
 
   const d = new Date();
   const dateStr = _formatDate(d);
@@ -765,7 +786,10 @@ function _tryAutoLoad(): void {
 // Start loading after a short delay to let SEMS/courses data settle
 setTimeout(_tryAutoLoad, 2500);
 window.addEventListener('ss-ready', () => { setTimeout(_tryAutoLoad, 1200); }, { once: true });
-window.addEventListener('ss:courses-ready', () => { void loadTodaysTasks(true); });
+window.addEventListener('ss:courses-ready', () => {
+  _watchWidgetElement();
+  void loadTodaysTasks(true);
+});
 
 // ─── ─────────────────────────────────────────────────────────────────────────
 // LEGACY API (kept for shell.ts + chatbot compatibility)
