@@ -253,7 +253,7 @@
         );
       }
       if (type === 'dailyMission') {
-        return '<div class="dmw-root"><div class="dmw-status">Loading today&rsquo;s mission...</div></div>';
+        return '<div id="daily-mission-widget" class="dmw-root"><div class="dmw-status">Loading today&rsquo;s mission...</div></div>';
       }
       return '';
     }
