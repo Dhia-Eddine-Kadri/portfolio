@@ -87,7 +87,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       },
     });
   } catch (err) {
-    console.error('[study-daily-plan-generate] Error:', err);
-    return fail(500, 'Failed to generate daily mission');
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('[study-daily-plan-generate] Error:', errMsg, err);
+    return fail(500, 'Failed to generate daily mission: ' + errMsg);
   }
 };
