@@ -226,7 +226,9 @@ async function loadTodaysTasks(force = false): Promise<void> {
         .filter((id): id is string => !!id)
     )];
     const missingDates = courseIds.filter((id) => !_state.examDates[id]);
+    console.log('[DailyMission] courseIds for modal:', courseIds, 'missingDates:', missingDates);
     if (merged.length > 0 && missingDates.length > 0) {
+      console.log('[DailyMission] Showing exam date modal for:', missingDates);
       setTimeout(() => { void showExamDateModal(); }, 500);
     }
   } catch (err) {
