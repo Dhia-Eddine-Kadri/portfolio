@@ -486,6 +486,13 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
       if (tasks.length === 0) {
         modal.innerHTML += '<div class="dm-modal-empty">No active tasks for today</div>';
       } else {
+        const labels: Record<string, string> = {
+          study_topic: 'Study', read_pages: 'Read', solve_exercise_sheet: 'Exercises',
+          practice_problem_set: 'Practice', generate_quiz_if_no_exercises: 'Quiz',
+          review_weak_topic: 'Review', review_topic: 'Review', exam_style_practice: 'Exam prep',
+          create_flashcards: 'Flashcards'
+        };
+        const getTypeLabel = (taskType: string) => labels[taskType] || 'Study';
         const groups = ['must_do', 'should_do', 'optional'];
         const groupLabels: Record<string, string> = { must_do: 'Must Do', should_do: 'Should Do', optional: 'Optional' };
         groups.forEach((group) => {
@@ -494,16 +501,9 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
             modal.innerHTML += '<div class="dm-modal-group"><div class="dm-modal-group-title">' + groupLabels[group] + '</div>';
             groupTasks.forEach((task) => {
               const isDone = task.status === 'completed';
-              const typeLabel = (labels: Record<string, string>, taskType: string) => labels[taskType] || 'Study';
-              const labels: Record<string, string> = {
-                study_topic: 'Study', read_pages: 'Read', solve_exercise_sheet: 'Exercises',
-                practice_problem_set: 'Practice', generate_quiz_if_no_exercises: 'Quiz',
-                review_weak_topic: 'Review', review_topic: 'Review', exam_style_practice: 'Exam prep',
-                create_flashcards: 'Flashcards'
-              };
               modal.innerHTML += '<div class="dm-task dm-task--' + task.status + '">' +
                 '<div class="dm-task-title' + (isDone ? ' is-done' : '') + '">' + task.title + '</div>' +
-                '<div class="dm-task-meta">' + typeLabel(labels, task.task_type) + ' &middot; ' + task.estimated_minutes + 'min</div>' +
+                '<div class="dm-task-meta">' + getTypeLabel(task.task_type) + ' &middot; ' + task.estimated_minutes + 'min</div>' +
               '</div>';
             });
             modal.innerHTML += '</div>';
