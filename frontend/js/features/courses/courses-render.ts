@@ -457,11 +457,21 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
   };
 
   const showTasksModal = async (): Promise<void> => {
-    if (!courseId) return;
+    console.log('[DailyMission] showTasksModal clicked, courseId:', courseId);
+    if (!courseId) {
+      console.log('[DailyMission] No courseId, returning');
+      return;
+    }
     try {
+      console.log('[DailyMission] Importing getDailyMission...');
       const { getDailyMission } = await import('../../services/study-service.js');
+      console.log('[DailyMission] Got getDailyMission, fetching data for', courseId);
       const data = await getDailyMission(courseId);
-      if (!data.hasPlan || !data.tasks.length) return;
+      console.log('[DailyMission] Got data:', data);
+      if (!data.hasPlan || !data.tasks.length) {
+        console.log('[DailyMission] No plan or tasks, returning');
+        return;
+      }
 
       const modal = document.createElement('div');
       modal.className = 'dm-tasks-modal-overlay';
