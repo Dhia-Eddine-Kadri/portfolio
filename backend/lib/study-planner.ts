@@ -533,6 +533,29 @@ async function findOrCreateWeeklyPlan(
   return { planId: racePlan.id, isNew: false, raceHandled: true };
 }
 
+// Look up an existing weekly plan's id WITHOUT creating one. Used by the AI path
+// so it can decide whether to call Python before any DB write happens.
+async function findExistingWeeklyPlanId(
+  userId: string,
+  weekStart: string,
+  scope: PlanScope,
+  courseId: string | null,
+  serviceKey: string
+): Promise<string | null> {
+  const planKey =
+    'weekly_study_plans?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&week_start_date=eq.' +
+    encodeURIComponent(weekStart) +
+    '&plan_scope=eq.' +
+    encodeURIComponent(scope) +
+    '&' +
+    (courseId ? 'course_id=eq.' + encodeURIComponent(courseId) : 'course_id=is.null') +
+    '&select=id&limit=1';
+  const res = await supaRequest<Array<{ id: string }>>('GET', planKey, null, serviceKey);
+  return Array.isArray(res.body) ? res.body[0]?.id ?? null : null;
+}
+
 // ── AI: validate possible-matches from the Python response ───────────────────
 
 function validatePossibleMatches(raw: unknown): PossibleMatch[] {
@@ -581,26 +604,20 @@ async function generateWeeklyPlanViaAI(
 ): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: null }> {
   const weekStart = dateToString(getWeekStart(weekStartDate));
 
-  const { planId, isNew, raceHandled } = await findOrCreateWeeklyPlan(
-    userId,
-    weekStart,
-    scope,
-    courseId,
-    serviceKey,
-    { gen_version: 'ai-planner-v1' }
-  );
+  // Look up an existing plan WITHOUT creating one. Creating the plan row before
+  // Python succeeds poisons the deterministic fallback: on a Python failure we
+  // throw, the caller falls through to the deterministic body, which then sees
+  // an (empty) existing plan and — on the read path (regenerateExisting=false) —
+  // returns it untouched, leaving a permanently empty plan. So we create the row
+  // only once Python has actually returned usable tasks (below).
+  const existingPlanId = await findExistingWeeklyPlanId(userId, weekStart, scope, courseId, serviceKey);
 
-  // Race-handled: winner is filling tasks; return early.
-  if (raceHandled) {
-    return { planId, taskCount: 0, subjects: [], urgency: null };
+  // Read path shortcut: a plan already exists and the caller doesn't want a regen.
+  if (existingPlanId && !regenerateExisting) {
+    return { planId: existingPlanId, taskCount: 0, subjects: [], urgency: null };
   }
 
-  // Read path shortcut: plan exists and caller doesn't want regen.
-  if (!isNew && !regenerateExisting) {
-    return { planId, taskCount: 0, subjects: [], urgency: null };
-  }
-
-  // Call Python AI planner
+  // Call the Python AI planner FIRST — before any DB write.
   const proxyResult = await forwardToPython<PythonPlanResponse>('study-planner/generate-week', {
     userId,
     weekStartDate: weekStart,
@@ -620,6 +637,21 @@ async function generateWeeklyPlanViaAI(
 
   if (rawTasks.length === 0) {
     throw new Error('AI planner returned 0 tasks');
+  }
+
+  // Python returned usable tasks — only NOW create/find the plan row.
+  const { planId, isNew, raceHandled } = await findOrCreateWeeklyPlan(
+    userId,
+    weekStart,
+    scope,
+    courseId,
+    serviceKey,
+    { gen_version: 'ai-planner-v1' }
+  );
+
+  // Race-handled: another request created the plan and is filling it; return early.
+  if (raceHandled) {
+    return { planId, taskCount: 0, subjects: [], urgency: null };
   }
 
   // Validate and map
