@@ -79,6 +79,7 @@ create table if not exists public.weekly_study_tasks (
 -- Drop dependent objects first (tasks referenced daily_study_plans.id)
 drop table if exists public.daily_study_tasks cascade;
 drop table if exists public.daily_study_plans cascade;
+drop view if exists public.daily_study_plans cascade;
 
 create or replace view public.daily_study_plans as
 select
