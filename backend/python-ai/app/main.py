@@ -20,6 +20,7 @@ from .routers import generate as generate_router
 from .routers import index as index_router
 from .routers import learning as learning_router
 from .routers import misc as misc_router
+from .routers import study_planner as study_planner_router
 from .routers import notes_full as notes_full_router
 from .routers import stream as stream_router
 from .routers import writing_coach as writing_coach_router
@@ -75,6 +76,7 @@ app.include_router(notes_full_router.router)
 app.include_router(writing_coach_router.router)
 app.include_router(corrections_router.router)
 app.include_router(learning_router.router)
+app.include_router(study_planner_router.router)
 
 
 @app.get("/health")

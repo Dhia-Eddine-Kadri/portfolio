@@ -1,10 +1,11 @@
 // Multi-subject weekly study planner.
 // Replaces the old single-course daily-mission scheduler.
 
-import { requireEnv } from './env';
+import { requireEnv, optionalEnv } from './env';
 import { fail, jsonResponse } from './responses';
 import { supaRequest } from './supabase-admin';
 import { extractBearerToken, verifySupabaseToken } from './supabase-auth';
+import { forwardToPython, pythonAiConfigured } from './python-ai-proxy';
 import { isSafeCourseId } from './validation';
 import type { LambdaResponse, NetlifyEvent, SupabaseUser } from './types';
 import type {
@@ -24,6 +25,603 @@ import type {
 
 // Re-export types that external modules need.
 export type { WeeklyStudyTask };
+
+// ── AI planner feature flag ────────────────────────────────────────────────────
+
+const AI_PLANNER_ON = optionalEnv('AI_PLANNER', 'off') === 'on';
+
+// ── AI planner contract types ─────────────────────────────────────────────────
+
+export type AiTaskType =
+  | 'study_lecture'
+  | 'continue_lecture'
+  | 'solve_exercise_sheet'
+  | 'check_solution_sheet'
+  | 'repeat_lecture'
+  | 'review_weak_topic'
+  | 'review_completed_exercise'
+  | 'generate_quiz_if_no_exercises'
+  | 'exam_style_practice'
+  | 'pre_exam_review';
+
+const ALLOWED_AI_TASK_TYPES: ReadonlySet<string> = new Set<AiTaskType>([
+  'study_lecture',
+  'continue_lecture',
+  'solve_exercise_sheet',
+  'check_solution_sheet',
+  'repeat_lecture',
+  'review_weak_topic',
+  'review_completed_exercise',
+  'generate_quiz_if_no_exercises',
+  'exam_style_practice',
+  'pre_exam_review',
+]);
+
+export interface PyTask {
+  id: string;
+  planDate: string;
+  dayIndex: number;
+  courseId: string;
+  subjectName: string;
+  taskType: string;
+  lectureFileId?: string;
+  lectureFileName?: string;
+  lectureTopics?: string[];
+  exerciseFileId?: string;
+  exerciseFileName?: string;
+  solutionFileId?: string;
+  solutionFileName?: string;
+  relatedLectureFileId?: string;
+  relatedLectureFileName?: string;
+  relatedLectureTopics?: string[];
+  pageRange?: string;
+  estimatedMinutes: number;
+  reason: string;
+  status: string;
+  repetitionStage?: number;
+  sourceConfidence: string;
+}
+
+export interface PythonPlanResponse {
+  weekStartDate: string;
+  subjectAllocation: Array<{
+    courseId: string;
+    subjectName: string;
+    percentage: number;
+    reason: string;
+  }>;
+  tasks: PyTask[];
+  possibleMatches: Array<{
+    courseId: string;
+    exerciseFileId: string;
+    exerciseFileName: string;
+    possibleLectureFileId: string;
+    possibleLectureFileName: string;
+    confidence: 'medium' | 'low';
+    reason: string;
+  }>;
+}
+
+// ── AI task row shape ─────────────────────────────────────────────────────────
+
+export interface AiTaskRow {
+  plan_id: string;
+  user_id: string;
+  plan_date: string;
+  day_order: number;
+  course_id: string;
+  subject_name: string;
+  task_type: string;
+  task_title: string;
+  task_description: string;
+  source_file_id: string | null;
+  exercise_file_id: string | null;
+  solution_file_id: string | null;
+  related_lecture_file_id: string | null;
+  lecture_topics: string[];
+  related_lecture_topics: string[];
+  page_range: string | null;
+  estimated_minutes: number;
+  reason: string;
+  status: string;
+  source_confidence: string;
+  priority_score: number;
+  repetition_stage: number | null;
+  canonical_task_key: string;
+  study_state_required: string;
+  exercise_available: boolean;
+  is_valid: boolean;
+}
+
+// ── AI helper: derive priority_score from task type ───────────────────────────
+
+function priorityScoreForAiTaskType(taskType: string): number {
+  switch (taskType) {
+    case 'exam_style_practice':
+    case 'pre_exam_review':
+    case 'review_weak_topic':
+    case 'solve_exercise_sheet':
+      return 0.85;
+    case 'study_lecture':
+    case 'continue_lecture':
+    case 'check_solution_sheet':
+      return 0.6;
+    default:
+      return 0.4;
+  }
+}
+
+// ── AI helper: build task_title + task_description for AI task types ──────────
+
+function buildAiTaskTitle(t: PyTask): string {
+  const lectureName =
+    t.lectureFileName ??
+    (t.lectureTopics && t.lectureTopics.length > 0 ? t.lectureTopics[0] : null) ??
+    t.relatedLectureFileName ??
+    'Lecture';
+  const exerciseName = t.exerciseFileName ?? 'Exercise sheet';
+  const solutionName = t.solutionFileName ?? 'Solutions';
+
+  switch (t.taskType as AiTaskType) {
+    case 'study_lecture':
+      return `Study: ${lectureName}`;
+    case 'continue_lecture':
+      return `Continue: ${lectureName}`;
+    case 'solve_exercise_sheet':
+      return `Practice: ${exerciseName}`;
+    case 'check_solution_sheet':
+      return `Check solutions: ${solutionName}`;
+    case 'repeat_lecture':
+      return `Repeat: ${lectureName}`;
+    case 'review_weak_topic': {
+      const topicName =
+        (t.lectureTopics && t.lectureTopics.length > 0 ? t.lectureTopics[0] : null) ?? lectureName;
+      return `Review: ${topicName}`;
+    }
+    case 'review_completed_exercise':
+      return `Re-review: ${exerciseName}`;
+    case 'generate_quiz_if_no_exercises': {
+      const topicName =
+        (t.lectureTopics && t.lectureTopics.length > 0 ? t.lectureTopics[0] : null) ?? lectureName;
+      return `Quiz: ${topicName}`;
+    }
+    case 'exam_style_practice':
+      return `Exam drill: ${exerciseName}`;
+    case 'pre_exam_review': {
+      const topicName =
+        (t.lectureTopics && t.lectureTopics.length > 0 ? t.lectureTopics[0] : null) ?? lectureName;
+      return `Pre-exam review: ${topicName}`;
+    }
+    default:
+      return `Study: ${lectureName}`;
+  }
+}
+
+function buildAiTaskDescription(t: PyTask): string {
+  if (t.reason && t.reason.trim()) return t.reason.trim();
+  const pageStr = t.pageRange ? `, ${t.pageRange}` : '';
+  switch (t.taskType as AiTaskType) {
+    case 'study_lecture':
+    case 'continue_lecture':
+      return `Read through ${t.lectureFileName ?? 'the lecture'}${pageStr}.`;
+    case 'solve_exercise_sheet':
+      return `Work through the exercises in ${t.exerciseFileName ?? 'the exercise sheet'}${pageStr}.`;
+    case 'check_solution_sheet':
+      return `Check your answers against ${t.solutionFileName ?? 'the solution sheet'}${pageStr}.`;
+    case 'repeat_lecture':
+      return `Revisit ${t.lectureFileName ?? 'the lecture'}${pageStr} to reinforce understanding.`;
+    case 'review_weak_topic':
+      return `Re-consolidate weak areas in ${t.lectureFileName ?? 'this topic'}${pageStr}.`;
+    case 'review_completed_exercise':
+      return `Review completed work in ${t.exerciseFileName ?? 'the exercise sheet'}${pageStr}.`;
+    case 'generate_quiz_if_no_exercises':
+      return `Test yourself using a generated quiz for this topic.`;
+    case 'exam_style_practice':
+      return `Practise exam-style questions from ${t.exerciseFileName ?? 'the exercise sheet'}${pageStr}.`;
+    case 'pre_exam_review':
+      return `Final review pass before the exam${pageStr}.`;
+    default:
+      return `Study ${t.lectureFileName ?? 'the material'}${pageStr}.`;
+  }
+}
+
+// ── AI helper: coerce source_confidence ──────────────────────────────────────
+
+function coerceSourceConfidence(raw: string): string {
+  if (raw === 'confirmed' || raw === 'high' || raw === 'medium' || raw === 'low') return raw;
+  return 'high';
+}
+
+// ── AI helper: study_state_required from AI task type ────────────────────────
+
+function studyStateRequiredForAiType(taskType: string): string {
+  if (taskType === 'solve_exercise_sheet' || taskType === 'review_completed_exercise') return 'studied';
+  if (taskType === 'check_solution_sheet') return 'studied';
+  if (taskType === 'exam_style_practice' || taskType === 'pre_exam_review') return 'practiced';
+  return 'not_started';
+}
+
+// ── AI helper: build canonical_task_key ──────────────────────────────────────
+
+/**
+ * Stable identity key for a task within a plan.
+ * Format: planScope|plan_date|course_id|task_type|lectureFileId|exerciseFileId|solutionFileId|sortedTopics|pageRange|repetitionStage|
+ * Does NOT include: title, reason, estimated_minutes, priority_score, status.
+ */
+export function buildCanonicalTaskKey(
+  planScope: string,
+  planDate: string,
+  courseId: string,
+  taskType: string,
+  lectureFileId: string,
+  exerciseFileId: string,
+  solutionFileId: string,
+  lectureTopics: string[],
+  pageRange: string,
+  repetitionStage: string
+): string {
+  const sortedTopics = [...lectureTopics].sort().join(',');
+  return [
+    planScope,
+    planDate,
+    courseId,
+    taskType,
+    lectureFileId,
+    exerciseFileId,
+    solutionFileId,
+    sortedTopics,
+    pageRange,
+    repetitionStage,
+    '', // repetitionOriginTaskId reserved
+  ].join('|');
+}
+
+// ── AI helper: validate and map a PyTask to a DB row ─────────────────────────
+
+/**
+ * Maps a Python planner task to a weekly_study_tasks row.
+ * Returns null if the task is invalid (bad taskType, planDate, or courseId).
+ * `dayOrderCounter` is mutated (incremented) to assign day_order.
+ */
+export function validateAndMapPyTask(
+  t: PyTask,
+  planId: string,
+  userId: string,
+  planScope: string,
+  dayOrderCounter: { value: number }
+): AiTaskRow | null {
+  // Validate taskType
+  if (!ALLOWED_AI_TASK_TYPES.has(t.taskType)) return null;
+
+  // Validate planDate (YYYY-MM-DD)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t.planDate)) return null;
+
+  // Validate courseId
+  if (!t.courseId || typeof t.courseId !== 'string' || !t.courseId.trim()) return null;
+
+  // Clamp estimatedMinutes [5..180]
+  const estimatedMinutes = Math.max(5, Math.min(180, t.estimatedMinutes || 30));
+
+  // Map file IDs
+  const lectureFileId = t.lectureFileId ?? null;
+  const relatedLectureFileId = t.relatedLectureFileId ?? null;
+  const exerciseFileId = t.exerciseFileId ?? null;
+  const solutionFileId = t.solutionFileId ?? null;
+
+  // source_file_id = lectureFileId ?? relatedLectureFileId ?? null
+  const sourceFileId = lectureFileId ?? relatedLectureFileId ?? null;
+
+  const lectureTopics = t.lectureTopics ?? [];
+  const relatedLectureTopics = t.relatedLectureTopics ?? [];
+  const pageRange = t.pageRange ?? null;
+  const repetitionStage = t.repetitionStage ?? null;
+
+  // Build canonical key
+  const canonicalTaskKey = buildCanonicalTaskKey(
+    planScope,
+    t.planDate,
+    t.courseId,
+    t.taskType,
+    lectureFileId ?? '',
+    exerciseFileId ?? '',
+    solutionFileId ?? '',
+    lectureTopics,
+    pageRange ?? '',
+    repetitionStage !== null ? String(repetitionStage) : ''
+  );
+
+  const dayOrder = dayOrderCounter.value++;
+
+  return {
+    plan_id: planId,
+    user_id: userId,
+    plan_date: t.planDate,
+    day_order: dayOrder,
+    course_id: t.courseId,
+    subject_name: t.subjectName,
+    task_type: t.taskType,
+    task_title: buildAiTaskTitle(t),
+    task_description: buildAiTaskDescription(t),
+    source_file_id: sourceFileId,
+    exercise_file_id: exerciseFileId,
+    solution_file_id: solutionFileId,
+    related_lecture_file_id: relatedLectureFileId,
+    lecture_topics: lectureTopics,
+    related_lecture_topics: relatedLectureTopics,
+    page_range: pageRange,
+    estimated_minutes: estimatedMinutes,
+    reason: t.reason ?? '',
+    status: 'todo',
+    source_confidence: coerceSourceConfidence(t.sourceConfidence ?? ''),
+    priority_score: priorityScoreForAiTaskType(t.taskType),
+    repetition_stage: repetitionStage,
+    canonical_task_key: canonicalTaskKey,
+    study_state_required: studyStateRequiredForAiType(t.taskType),
+    exercise_available: t.taskType === 'solve_exercise_sheet' || t.taskType === 'review_completed_exercise',
+    is_valid: true,
+  };
+}
+
+// ── AI helper: diff-upsert persisted tasks ────────────────────────────────────
+
+const PROTECTED_STATUSES = new Set(['completed', 'skipped', 'moved', 'unavailable', 'replaced']);
+
+interface ExistingTaskStub {
+  id: string;
+  plan_date: string;
+  status: string;
+  canonical_task_key: string | null;
+}
+
+export async function persistAiTasks(
+  planId: string,
+  _userId: string,
+  serviceKey: string,
+  rows: AiTaskRow[]
+): Promise<void> {
+  // Fetch existing tasks for the plan
+  const existingRes = await supaRequest<ExistingTaskStub[]>(
+    'GET',
+    'weekly_study_tasks?plan_id=eq.' +
+      encodeURIComponent(planId) +
+      '&select=id,plan_date,status,canonical_task_key',
+    null,
+    serviceKey
+  );
+  const existing: ExistingTaskStub[] = Array.isArray(existingRes.body) ? existingRes.body : [];
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Partition existing into editable vs protected
+  const editableByKey = new Map<string, ExistingTaskStub>();
+  const editableIds = new Set<string>();
+
+  for (const ex of existing) {
+    const isPast = ex.plan_date < todayStr;
+    const isProtected = PROTECTED_STATUSES.has(ex.status) || isPast;
+    if (!isProtected && ex.canonical_task_key) {
+      editableByKey.set(ex.canonical_task_key, ex);
+      editableIds.add(ex.id);
+    }
+  }
+
+  // Build incoming canonical key set
+  const incomingKeys = new Set(rows.map((r) => r.canonical_task_key));
+
+  // Rows to INSERT (no matching existing key) vs PATCH (existing key found)
+  const toInsert: AiTaskRow[] = [];
+  const toPatch: Array<{ id: string; fields: Partial<AiTaskRow> }> = [];
+
+  for (const row of rows) {
+    const existing = editableByKey.get(row.canonical_task_key);
+    if (existing) {
+      // Patch mutable fields only
+      toPatch.push({
+        id: existing.id,
+        fields: {
+          task_title: row.task_title,
+          task_description: row.task_description,
+          reason: row.reason,
+          estimated_minutes: row.estimated_minutes,
+          page_range: row.page_range,
+          priority_score: row.priority_score,
+        },
+      });
+    } else {
+      toInsert.push(row);
+    }
+  }
+
+  // Existing editable tasks whose key is NOT in the incoming set → mark replaced
+  const toReplace: string[] = [];
+  for (const [key, ex] of editableByKey) {
+    if (!incomingKeys.has(key)) {
+      toReplace.push(ex.id);
+    }
+  }
+
+  // INSERT in batches of 50
+  for (let i = 0; i < toInsert.length; i += 50) {
+    const batch = toInsert.slice(i, i + 50);
+    await supaRequest('POST', 'weekly_study_tasks', batch, serviceKey, {
+      Prefer: 'return=minimal',
+    });
+  }
+
+  // PATCH mutable fields per task
+  for (const { id, fields } of toPatch) {
+    await supaRequest(
+      'PATCH',
+      'weekly_study_tasks?id=eq.' + encodeURIComponent(id),
+      fields,
+      serviceKey,
+      { Prefer: 'return=minimal' }
+    );
+  }
+
+  // Mark replaced in batches of 50 (using IN filter)
+  for (let i = 0; i < toReplace.length; i += 50) {
+    const batch = toReplace.slice(i, i + 50);
+    await supaRequest(
+      'PATCH',
+      'weekly_study_tasks?id=in.(' + batch.map(encodeURIComponent).join(',') + ')',
+      { status: 'replaced' },
+      serviceKey,
+      { Prefer: 'return=minimal' }
+    );
+  }
+}
+
+// ── AI: find-or-create weekly_study_plans row (shared helper) ─────────────────
+
+interface FindOrCreatePlanResult {
+  planId: string;
+  isNew: boolean;
+  raceHandled: boolean;
+}
+
+async function findOrCreateWeeklyPlan(
+  userId: string,
+  weekStart: string,
+  scope: PlanScope,
+  courseId: string | null,
+  serviceKey: string,
+  generationParams: Record<string, unknown>
+): Promise<FindOrCreatePlanResult> {
+  const planKey =
+    'weekly_study_plans?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&week_start_date=eq.' +
+    encodeURIComponent(weekStart) +
+    '&plan_scope=eq.' +
+    encodeURIComponent(scope) +
+    '&' +
+    (courseId ? 'course_id=eq.' + encodeURIComponent(courseId) : 'course_id=is.null') +
+    '&select=*&limit=1';
+
+  const existingRes = await supaRequest<WeeklyStudyPlan[]>('GET', planKey, null, serviceKey);
+  const existing = Array.isArray(existingRes.body) ? existingRes.body[0] ?? null : null;
+
+  if (existing) {
+    return { planId: existing.id, isNew: false, raceHandled: false };
+  }
+
+  const created = await supaRequest<WeeklyStudyPlan[]>(
+    'POST',
+    'weekly_study_plans',
+    {
+      user_id: userId,
+      week_start_date: weekStart,
+      plan_scope: scope,
+      course_id: courseId ?? null,
+      status: 'active',
+      generation_params: generationParams,
+    },
+    serviceKey,
+    { Prefer: 'return=representation' }
+  );
+
+  if (Array.isArray(created.body) && created.body[0]) {
+    return { planId: created.body[0]!.id, isNew: true, raceHandled: false };
+  }
+
+  // Race condition: another process created it. Re-fetch.
+  const raceRes = await supaRequest<WeeklyStudyPlan[]>('GET', planKey, null, serviceKey);
+  const racePlan = Array.isArray(raceRes.body) ? raceRes.body[0] ?? null : null;
+  if (!racePlan) throw new Error('Could not create weekly study plan');
+  return { planId: racePlan.id, isNew: false, raceHandled: true };
+}
+
+// ── AI: generate weekly plan via Python AI proxy ──────────────────────────────
+
+async function generateWeeklyPlanViaAI(
+  userId: string,
+  weekStartDate: Date,
+  scope: PlanScope,
+  courseId: string | null,
+  serviceKey: string,
+  regenerateExisting: boolean
+): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: null }> {
+  const weekStart = dateToString(getWeekStart(weekStartDate));
+
+  const { planId, isNew, raceHandled } = await findOrCreateWeeklyPlan(
+    userId,
+    weekStart,
+    scope,
+    courseId,
+    serviceKey,
+    { gen_version: 'ai-planner-v1' }
+  );
+
+  // Race-handled: winner is filling tasks; return early.
+  if (raceHandled) {
+    return { planId, taskCount: 0, subjects: [], urgency: null };
+  }
+
+  // Read path shortcut: plan exists and caller doesn't want regen.
+  if (!isNew && !regenerateExisting) {
+    return { planId, taskCount: 0, subjects: [], urgency: null };
+  }
+
+  // Call Python AI planner
+  const proxyResult = await forwardToPython<PythonPlanResponse>('study-planner/generate-week', {
+    userId,
+    weekStartDate: weekStart,
+    planScope: scope,
+    courseId,
+    timezone: 'UTC',
+    dailyAvailabilityMinutes: {},
+    regenerate: regenerateExisting,
+  });
+
+  if (!proxyResult.ok) {
+    throw new Error(`AI planner proxy error: ${proxyResult.status}`);
+  }
+
+  const response = proxyResult.body as PythonPlanResponse;
+  const rawTasks: PyTask[] = Array.isArray(response?.tasks) ? response.tasks : [];
+
+  if (rawTasks.length === 0) {
+    throw new Error('AI planner returned 0 tasks');
+  }
+
+  // Validate and map
+  const dayOrderCounter = { value: 0 };
+  const mappedRows: AiTaskRow[] = [];
+  for (const t of rawTasks) {
+    const row = validateAndMapPyTask(t, planId, userId, scope, dayOrderCounter);
+    if (row) mappedRows.push(row);
+  }
+
+  if (mappedRows.length === 0) {
+    throw new Error('AI planner: all tasks failed validation');
+  }
+
+  await persistAiTasks(planId, userId, serviceKey, mappedRows);
+
+  const subjectsSeen = [...new Set(mappedRows.map((r) => r.course_id))];
+
+  // Write study event
+  await writeStudyEvent(serviceKey, {
+    user_id: userId,
+    course_id: courseId ?? null,
+    event_type: isNew ? 'plan_generated' : 'plan_regenerated',
+    metadata: {
+      weekStart,
+      scope,
+      taskCount: mappedRows.length,
+      subjects: subjectsSeen,
+      source: 'ai_planner',
+    },
+  });
+
+  return {
+    planId,
+    taskCount: mappedRows.length,
+    subjects: subjectsSeen,
+    urgency: null,
+  };
+}
 
 // ── Auth helpers (preserved from old planner) ────────────────────────────────
 
@@ -544,6 +1142,23 @@ export async function generateWeeklyPlan(
   // Only the explicit generate endpoint passes true.
   regenerateExisting = true
 ): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: StudyUrgency | null }> {
+  // AI planner path: try first, fall through to deterministic on any error.
+  if (AI_PLANNER_ON && pythonAiConfigured()) {
+    try {
+      const aiResult = await generateWeeklyPlanViaAI(
+        userId,
+        weekStartDate,
+        scope,
+        courseId,
+        serviceKey,
+        regenerateExisting
+      );
+      return aiResult;
+    } catch (err) {
+      console.error('[study-planner] AI planner failed, falling back to deterministic:', err);
+      // Fall through to deterministic body below.
+    }
+  }
   const weekStart = dateToString(getWeekStart(weekStartDate));
 
   // Fetch preferences.
