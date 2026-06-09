@@ -20,32 +20,37 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (typeof courseId !== 'string') return courseId;
   const { planDate } = localPlanDate(qs.date, qs.timezone);
 
-  const tasks = await getDailyTasks(
-    auth.user.id,
-    new Date(planDate + 'T00:00:00Z'),
-    auth.serviceKey,
-    courseId
-  );
+  try {
+    const tasks = await getDailyTasks(
+      auth.user.id,
+      new Date(planDate + 'T00:00:00Z'),
+      auth.serviceKey,
+      courseId
+    );
 
-  const completed = tasks.filter((t) => t.status === 'completed').length;
-  const activeTasks = tasks.filter((t) => t.status !== 'replaced');
-  const remaining = activeTasks
-    .filter((t) => t.status !== 'completed')
-    .reduce((sum, t) => sum + (t.estimated_minutes || 0), 0);
-  const hasUnavailable = activeTasks.some((t) => t.status === 'unavailable');
+    const completed = tasks.filter((t) => t.status === 'completed').length;
+    const activeTasks = tasks.filter((t) => t.status !== 'replaced');
+    const remaining = activeTasks
+      .filter((t) => t.status !== 'completed')
+      .reduce((sum, t) => sum + (t.estimated_minutes || 0), 0);
+    const hasUnavailable = activeTasks.some((t) => t.status === 'unavailable');
 
-  return jsonResponse(200, {
-    hasPlan: tasks.length > 0,
-    courseId,
-    planDate,
-    completedTasks: completed,
-    totalTasks: activeTasks.length,
-    minutesRemaining: remaining,
-    mainFocus:
-      activeTasks.find((t) => t.status !== 'completed' && t.status !== 'unavailable')
-        ?.task_title ?? null,
-    status: tasks.length > 0 ? 'active' : 'none',
-    noValidCandidates: tasks.length === 0,
-    hasUnavailableSources: hasUnavailable,
-  });
+    return jsonResponse(200, {
+      hasPlan: tasks.length > 0,
+      courseId,
+      planDate,
+      completedTasks: completed,
+      totalTasks: activeTasks.length,
+      minutesRemaining: remaining,
+      mainFocus:
+        activeTasks.find((t) => t.status !== 'completed' && t.status !== 'unavailable')
+          ?.task_title ?? null,
+      status: tasks.length > 0 ? 'active' : 'none',
+      noValidCandidates: tasks.length === 0,
+      hasUnavailableSources: hasUnavailable,
+    });
+  } catch (err) {
+    console.error('[study-daily-plan-summary] Error:', err);
+    return fail(500, 'Failed to load summary');
+  }
 };

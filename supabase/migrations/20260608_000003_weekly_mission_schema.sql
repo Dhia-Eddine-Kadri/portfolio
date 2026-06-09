@@ -35,7 +35,7 @@ create table if not exists public.weekly_study_plans (
   generated_at      timestamptz not null default now(),
   regenerated_at    timestamptz,
   generation_params jsonb                 default '{}',
-  created_at        timestamptz not null default now(),
+  created_at        timestamptz not null default now()
 );
 
 -- ────────────────────────────────────────────────────────────────────────────

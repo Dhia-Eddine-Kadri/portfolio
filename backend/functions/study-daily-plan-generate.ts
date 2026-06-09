@@ -28,38 +28,43 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const { planDate } = localPlanDate(payload.date, payload.timezone);
   const scope: PlanScope = payload.scope === 'global_week' ? 'global_week' : 'course_week';
 
-  const result = await generateWeeklyPlan(
-    auth.user.id,
-    new Date(planDate + 'T00:00:00Z'),
-    scope,
-    courseId,
-    auth.serviceKey
-  );
+  try {
+    const result = await generateWeeklyPlan(
+      auth.user.id,
+      new Date(planDate + 'T00:00:00Z'),
+      scope,
+      courseId,
+      auth.serviceKey
+    );
 
-  // Return today's tasks for the generated plan.
-  const tasks = await getDailyTasks(
-    auth.user.id,
-    new Date(planDate + 'T00:00:00Z'),
-    auth.serviceKey,
-    courseId
-  );
+    // Return today's tasks for the generated plan.
+    const tasks = await getDailyTasks(
+      auth.user.id,
+      new Date(planDate + 'T00:00:00Z'),
+      auth.serviceKey,
+      courseId
+    );
 
-  const completed = tasks.filter((t) => t.status === 'completed').length;
-  const remaining = tasks
-    .filter((t) => !['completed', 'replaced'].includes(t.status))
-    .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
+    const completed = tasks.filter((t) => t.status === 'completed').length;
+    const remaining = tasks
+      .filter((t) => !['completed', 'replaced'].includes(t.status))
+      .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
 
-  return jsonResponse(200, {
-    planId: result.planId,
-    taskCount: result.taskCount,
-    subjects: result.subjects,
-    hasPlan: true,
-    tasks,
-    summary: {
-      completedTasks: completed,
-      totalTasks: tasks.length,
-      minutesRemaining: remaining,
-      status: 'active',
-    },
-  });
+    return jsonResponse(200, {
+      planId: result.planId,
+      taskCount: result.taskCount,
+      subjects: result.subjects,
+      hasPlan: true,
+      tasks,
+      summary: {
+        completedTasks: completed,
+        totalTasks: tasks.length,
+        minutesRemaining: remaining,
+        status: 'active',
+      },
+    });
+  } catch (err) {
+    console.error('[study-daily-plan-generate] Error:', err);
+    return fail(500, 'Failed to generate daily mission');
+  }
 };

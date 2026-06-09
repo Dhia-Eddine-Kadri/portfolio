@@ -21,20 +21,25 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (typeof courseId !== 'string') return courseId;
   const { planDate } = localPlanDate(qs.date, qs.timezone);
 
-  const tasks = await getDailyTasks(auth.user.id, new Date(planDate + 'T00:00:00Z'), auth.serviceKey, courseId);
-  const completed = tasks.filter((t) => t.status === 'completed').length;
-  const remaining = tasks
-    .filter((t) => !['completed', 'replaced'].includes(t.status))
-    .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
+  try {
+    const tasks = await getDailyTasks(auth.user.id, new Date(planDate + 'T00:00:00Z'), auth.serviceKey, courseId);
+    const completed = tasks.filter((t) => t.status === 'completed').length;
+    const remaining = tasks
+      .filter((t) => !['completed', 'replaced'].includes(t.status))
+      .reduce((s, t) => s + (t.estimated_minutes || 0), 0);
 
-  return jsonResponse(200, {
-    hasPlan: tasks.length > 0,
-    tasks,
-    summary: {
-      completedTasks: completed,
-      totalTasks: tasks.length,
-      minutesRemaining: remaining,
-      status: 'active',
-    },
-  });
+    return jsonResponse(200, {
+      hasPlan: tasks.length > 0,
+      tasks,
+      summary: {
+        completedTasks: completed,
+        totalTasks: tasks.length,
+        minutesRemaining: remaining,
+        status: 'active',
+      },
+    });
+  } catch (err) {
+    console.error('[study-daily-plan] Error:', err);
+    return fail(500, 'Failed to load daily mission');
+  }
 };
