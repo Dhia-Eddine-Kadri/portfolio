@@ -159,28 +159,20 @@ function _courseName(courseId: string): string {
 
 // ─── Data loading ──────────────────────────────────────────────────────────────
 
-// Watch for widget element being recreated/resized and re-render
+// Watch for widget element being cleared and restore immediately from memory
 function _watchWidgetElement(): void {
-  let lastHadTasks = false;
-  const checkAndRender = () => {
-    const host = document.getElementById('daily-mission-widget');
-    if (host && _state.tasks.length > 0) {
-      const hasWidget = host.querySelector('.dm-widget');
-      // Check for actual task elements or a button to generate plan
-      const hasTasks = host.querySelector('.dm-task') || host.querySelector('.dm-btn-generate');
-      const isEmpty = !hasTasks && host.querySelector('.dmw-status');
+  const host = document.getElementById('daily-mission-widget');
+  if (!host) return;
 
-      // If we had tasks rendering before but they disappeared, re-render
-      if (lastHadTasks && isEmpty) {
-        _renderWidget();
-      }
-
-      // Update state for next check
-      lastHadTasks = !!hasTasks && !!hasWidget;
+  // Use MutationObserver to detect when the widget gets reset
+  const observer = new MutationObserver(() => {
+    // If widget exists but content was cleared, restore from memory
+    if (_state.tasks.length > 0 && !host.querySelector('.dm-widget')) {
+      _renderWidget();
     }
-    setTimeout(checkAndRender, 200);
-  };
-  checkAndRender();
+  });
+
+  observer.observe(host, { childList: true, subtree: true });
 }
 
 async function loadTodaysTasks(force = false): Promise<void> {
