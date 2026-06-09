@@ -436,6 +436,12 @@ var _sb = {
   }
 };
 
+// Expose token getter to window for frontend API clients
+Object.defineProperty(window, '_sbToken', {
+  get: function () { return _sbToken; },
+  configurable: true
+});
+
 console.log('Supabase REST client ready ✓');
 // Quick connectivity test
 fetch(SUPA_URL + '/auth/v1/health', { headers: { apikey: SUPA_KEY } })
