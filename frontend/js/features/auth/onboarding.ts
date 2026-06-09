@@ -688,6 +688,7 @@ export function initOnboarding(): void {
   };
 
   window._obSelectPath = function (path: string) {
+    if (path === 'learner') return;
     document.querySelectorAll('.ob-path-card').forEach((c) => {
       c.classList.remove('selected');
     });
@@ -990,6 +991,7 @@ export function initOnboarding(): void {
 
     document.querySelectorAll<HTMLElement>('.ob-path-card[data-path]').forEach((card) => {
       card.addEventListener('click', () => {
+        if (card.matches(':disabled,[aria-disabled="true"]')) return;
         const path = card.dataset['path'];
         if (path) window._obSelectPath?.(path);
       });

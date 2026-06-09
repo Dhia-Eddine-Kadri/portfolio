@@ -199,6 +199,17 @@
   border-color: rgba(96, 165, 250, 0.45);
   background: rgba(59, 130, 246, 0.05);
 }
+.ob-path-card.is-disabled,
+.ob-path-card:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+.ob-path-card.is-disabled:hover,
+.ob-path-card:disabled:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
 .ob-path-card.selected {
   border-color: #3b82f6;
   background: rgba(59, 130, 246, 0.1);
