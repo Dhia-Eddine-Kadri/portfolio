@@ -165,15 +165,18 @@ body:not(.night) .dm-task-btn {
 }
 body:not(.night) .dm-progress-track { background: rgba(15, 23, 42, 0.08); }
 
-/* Widget — resizable and responsive */
+/* Widget — fills its dashboard tile (.dmw-root is height:100%) and stays
+   responsive to tile resizing. The task list flexes to fill whatever height is
+   left and scrolls internally, so a tall widget never leaves dead space. */
 .dm-widget {
+  height: 100%;
+  min-height: 200px;
   resize: vertical;
-  overflow: visible;
+  overflow: hidden;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 200px;
 }
 
 /* Widget header with course picker */
@@ -288,14 +291,15 @@ body:not(.night) .dm-course-picker {
   background: rgba(99, 102, 241, 0.3);
 }
 
-/* Widget scrollable task list */
+/* Widget scrollable task list — flex-fills the widget's remaining height. */
 .dm-widget-tasks {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 .dm-widget-tasks--scrollable {
-  max-height: 400px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
@@ -314,19 +318,6 @@ body:not(.night) .dm-course-picker {
 }
 .dm-widget-tasks--scrollable::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
-}
-
-/* Responsive: smaller screens */
-@media (max-width: 768px) {
-  .dm-widget-tasks--scrollable {
-    max-height: 350px;
-  }
-}
-
-@media (max-width: 480px) {
-  .dm-widget-tasks--scrollable {
-    max-height: 280px;
-  }
 }
 
 /* Exam date modal */

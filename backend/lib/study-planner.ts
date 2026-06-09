@@ -537,7 +537,12 @@ export async function generateWeeklyPlan(
   weekStartDate: Date,
   scope: PlanScope,
   courseId: string | null,
-  serviceKey: string
+  serviceKey: string,
+  // When false (the read path), an already-existing plan is returned untouched
+  // instead of being torn down and rebuilt. This stops concurrent dashboard
+  // reads from each regenerating the same plan and stacking duplicate tasks.
+  // Only the explicit generate endpoint passes true.
+  regenerateExisting = true
 ): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: StudyUrgency | null }> {
   const weekStart = dateToString(getWeekStart(weekStartDate));
 
@@ -695,6 +700,11 @@ export async function generateWeeklyPlan(
   let planId: string;
   if (existingPlan) {
     planId = existingPlan.id;
+    // Read path: a plan already exists, so just hand it back. Rebuilding here is
+    // what let concurrent reads delete + re-insert each other's tasks.
+    if (!regenerateExisting) {
+      return { planId, taskCount: 0, subjects: [], urgency };
+    }
     // Delete only todo tasks — never touch completed/in_progress/skipped.
     await supaRequest(
       'DELETE',
@@ -722,7 +732,7 @@ export async function generateWeeklyPlan(
         generation_params: {
           daily_study_minutes: prefs.daily_study_minutes,
           study_days: prefs.study_days,
-          gen_version: 'filekey-v3',
+          gen_version: 'filekey-v4-noregen',
         },
       },
       serviceKey,
@@ -852,14 +862,17 @@ export async function getDailyTasks(
   let planId = Array.isArray(planRes.body) ? planRes.body[0]?.id ?? null : null;
 
   if (!planId) {
-    // Generate a new plan on the fly.
+    // Generate a new plan on the fly. regenerateExisting=false: if a concurrent
+    // read already created the plan, reuse it rather than rebuilding (which
+    // would race and stack duplicate tasks).
     const scope: PlanScope = courseId ? 'course_week' : 'global_week';
     const result = await generateWeeklyPlan(
       userId,
       date,
       scope,
       courseId ?? null,
-      serviceKey
+      serviceKey,
+      false
     );
     planId = result.planId;
   }
