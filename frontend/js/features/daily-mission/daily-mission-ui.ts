@@ -111,6 +111,9 @@ function _taskTypeLabel(taskType: string): string {
     review_weak_topic: 'Review',
     review_topic: 'Review',
     exam_style_practice: 'Exam prep',
+    check_solution_sheet: 'Check Solutions',
+    review_completed_exercise: 'Review Exercise',
+    pre_exam_review: 'Pre-Exam Review',
     create_flashcards: 'Flashcards',
     // legacy types from old system
     learn: 'Study',
@@ -134,6 +137,9 @@ function _startButtonLabel(taskType: string): string {
     practice_problem_set: 'Open Exercises',
     generate_quiz_if_no_exercises: 'Start Quiz',
     exam_style_practice: 'Start Exam',
+    check_solution_sheet: 'Open Solutions',
+    review_completed_exercise: 'Open Exercises',
+    pre_exam_review: 'Start Review',
     create_flashcards: 'Create Flashcards',
     // legacy
     learn: 'Open File',
@@ -266,10 +272,8 @@ async function generatePlan(): Promise<void> {
     console.error('[DailyMission] No course selected for plan generation');
     return;
   }
-  console.log('[DailyMission] Generating plan for course:', courseId);
   try {
-    const result = await generateDailyMission(courseId);
-    console.log('[DailyMission] Plan generated:', result);
+    await generateDailyMission(courseId);
     await loadTodaysTasks(true);
   } catch (err) {
     console.error('[DailyMission] generatePlan error:', err instanceof Error ? err.message : String(err));
@@ -452,7 +456,8 @@ function _buildTaskRowHtml(task: DailyMissionTask & { _courseId?: string }): str
     '<div class="dm-task dm-task--' + escapeHtml(task.status) + statusCls + '" data-task-id="' + escapeHtml(task.id) + '">' +
       (courseName ? '<div class="dm-task-subject">' + escapeHtml(courseName) + '</div>' : '') +
       '<div class="dm-task-title' + (isDone ? ' is-done' : '') + '">' + escapeHtml(task.title) + '</div>' +
-      '<div class="dm-task-meta">' + escapeHtml(typeLabel) + ' &middot; ' + task.estimated_minutes + 'min</div>' +
+      taskFileLabel(task) +
+      '<div class="dm-task-meta">' + escapeHtml(typeLabel) + ' &middot; ' + task.estimated_minutes + 'min' + pageLabel(task) + '</div>' +
       (actions ? '<div class="dm-task-actions">' + actions + '</div>' : '') +
     '</div>'
   );
@@ -461,12 +466,6 @@ function _buildTaskRowHtml(task: DailyMissionTask & { _courseId?: string }): str
 function _renderWidget(): void {
   const host = document.getElementById('daily-mission-widget');
   if (!host) return;
-
-  // If widget was reset (moved/recreated), re-render tasks
-  const widgetContent = host.querySelector('.dm-widget');
-  if (!widgetContent && _state.tasks.length > 0) {
-    // Continue with render below
-  }
 
   const d = new Date();
   const dateStr = _formatDate(d);
@@ -479,9 +478,6 @@ function _renderWidget(): void {
 
   const done = displayTasks.filter((t) => t.status === 'completed').length;
   const total = displayTasks.length;
-
-  if (total === 0 && _state.tasks.length > 0) {
-  }
 
   let inner = '';
 
@@ -592,7 +588,6 @@ function _bindWidgetActions(host: HTMLElement): void {
 
       // Show exam date modal if switching to a course without exam date
       if (_state.selectedCourseId && !_state.examDates[_state.selectedCourseId]) {
-        console.log('[DailyMission] Selected course has no exam date, showing modal for:', _state.selectedCourseId);
         setTimeout(() => { void showExamDateModal([_state.selectedCourseId!]); }, 300);
       }
 
@@ -832,9 +827,20 @@ window.addEventListener('ss:courses-ready', () => {
 // ─── ─────────────────────────────────────────────────────────────────────────
 
 function pageLabel(task: DailyMissionTask): string {
+  // New plan model carries a free-form page_range string; fall back to the
+  // legacy numeric page_start/page_end pair for older cached tasks.
+  if (task.page_range) return ' · p.' + task.page_range;
   if (!task.page_start) return '';
   if (!task.page_end || task.page_end === task.page_start) return ' · p.' + task.page_start;
   return ' · p.' + task.page_start + '-' + task.page_end;
+}
+
+// The file a task points at — for "check solutions"/"review" tasks the relevant
+// document is the source file itself; for a study task with a paired exercise we
+// also surface that exercise sheet's name.
+function taskFileLabel(task: DailyMissionTask): string {
+  const name = task.source_file_name || task.exercise_file_name;
+  return name ? '<div class="dm-task-file">' + escapeHtml(name) + '</div>' : '';
 }
 
 function statusBadge(status: DailyMissionTask['status']): string {
@@ -915,6 +921,7 @@ export function renderTaskCardHtml(task: DailyMissionTask): string {
           '<span class="dm-task-title' + (isDone ? ' is-done' : '') + '">' + escapeHtml(task.title) + '</span>' +
           statusBadge(task.status) +
         '</div>' +
+        taskFileLabel(task) +
         (task.description ? '<div class="dm-task-desc">' + escapeHtml(task.description) + pageLabel(task) + '</div>' : '') +
         '<div class="dm-task-meta">' + task.estimated_minutes + ' min</div>' +
       '</div>' +

@@ -35,9 +35,15 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       estimated_minutes: t.estimated_minutes,
       page_start: undefined,
       page_end: undefined,
-      reason: undefined,
-      reason_code: undefined,
+      // The synthesized description doubles as the "why this task" explanation;
+      // surface it as reason so the UI's "Why?" affordance has content.
+      reason: t.invalidation_reason || t.task_description || undefined,
+      reason_code: t.invalidation_reason ? 'unavailable' : undefined,
       source_file_id: t.source_file_id,
+      source_file_name: t.source_file_name ?? undefined,
+      exercise_file_id: t.exercise_file_id,
+      exercise_file_name: t.exercise_file_name ?? undefined,
+      page_range: t.page_range ?? undefined,
     }));
 
     const completed = formattedTasks.filter((t) => t.status === 'completed').length;

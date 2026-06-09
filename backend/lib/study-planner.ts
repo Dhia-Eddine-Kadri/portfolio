@@ -16,6 +16,7 @@ import type {
   StudyPreferences,
   SubjectState,
   TaskCandidate,
+  TaskStatus,
   TopicState,
   WeeklyStudyPlan,
   WeeklyStudyTask,
@@ -306,8 +307,11 @@ const TASK_TYPE_PLAN_RANK: Record<string, number> = {
   review_weak_topic: 1,
   solve_exercise_sheet: 2,
   practice_problem_set: 2,
+  check_solution_sheet: 2,
+  review_completed_exercise: 2,
   generate_quiz_if_no_exercises: 3,
   exam_style_practice: 4,
+  pre_exam_review: 4,
   review_topic: 5,
 };
 
@@ -484,8 +488,9 @@ async function calculateStudyUrgency(
   ).length;
   const studiedPercentage = Math.round((studiedTopics / totalTopics) * 100);
 
-  const examDate = subjectState?.exam_date ? new Date(subjectState.exam_date + 'T00:00:00Z') : null;
-  const daysUntilExam = examDate ? daysBetween(today, examDate) : 999;
+  const daysUntilExam = subjectState?.exam_date
+    ? daysBetween(dateToString(today), subjectState.exam_date)
+    : 999;
 
   // Determine study phase
   let phase: StudyPhase = 'normal';
@@ -515,7 +520,7 @@ export async function generateWeeklyPlan(
   scope: PlanScope,
   courseId: string | null,
   serviceKey: string
-): Promise<{ planId: string; taskCount: number; subjects: string[] }> {
+): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: StudyUrgency | null }> {
   const weekStart = dateToString(getWeekStart(weekStartDate));
 
   // Fetch preferences.
@@ -830,7 +835,52 @@ export async function getDailyTasks(
     '&select=*';
 
   const taskRes = await supaRequest<WeeklyStudyTask[]>('GET', taskUrl, null, serviceKey);
-  return Array.isArray(taskRes.body) ? taskRes.body : [];
+  const tasks = Array.isArray(taskRes.body) ? taskRes.body : [];
+  await enrichTasksWithFileNames(tasks, serviceKey);
+  return tasks;
+}
+
+// Attach real document file names to tasks and reconcile against deletes/renames.
+// - If a referenced source/exercise file no longer resolves in `documents`, the
+//   task is flagged unavailable (id trusted over name; the file is truly gone).
+// - If the file still exists, its current name is attached for display, so a
+//   renamed file shows its new name without invalidating the task.
+async function enrichTasksWithFileNames(
+  tasks: WeeklyStudyTask[],
+  serviceKey: string
+): Promise<void> {
+  if (!tasks.length) return;
+  const ids = new Set<string>();
+  for (const t of tasks) {
+    if (t.source_file_id) ids.add(t.source_file_id);
+    if (t.exercise_file_id) ids.add(t.exercise_file_id);
+  }
+  if (!ids.size) return;
+
+  const idList = [...ids].slice(0, 200);
+  const docRes = await supaRequest<{ id: string; file_name: string | null }[]>(
+    'GET',
+    'documents?id=in.(' + idList.map(encodeURIComponent).join(',') + ')&select=id,file_name',
+    null,
+    serviceKey
+  );
+  const nameById = new Map<string, string | null>(
+    Array.isArray(docRes.body) ? docRes.body.map((d) => [d.id, d.file_name]) : []
+  );
+
+  for (const t of tasks) {
+    if (t.source_file_id) {
+      if (nameById.has(t.source_file_id)) t.source_file_name = nameById.get(t.source_file_id) ?? null;
+      else if (t.status !== 'completed') {
+        t.status = 'unavailable' as TaskStatus;
+        t.is_valid = false;
+        t.invalidation_reason = t.invalidation_reason || 'source_file_deleted';
+      }
+    }
+    if (t.exercise_file_id) {
+      if (nameById.has(t.exercise_file_id)) t.exercise_file_name = nameById.get(t.exercise_file_id) ?? null;
+    }
+  }
 }
 
 // ── G. Candidate seeding ──────────────────────────────────────────────────────
@@ -850,21 +900,25 @@ interface DocSeedRow {
 
 function sourceTypeToNewTaskType(sourceType: string | null | undefined): string {
   if (sourceType === 'lecture') return 'study_topic';
-  if (sourceType === 'exercise' || sourceType === 'solution') return 'solve_exercise_sheet';
+  if (sourceType === 'exercise') return 'solve_exercise_sheet';
+  // Solution sheets are NOT exercises — you check your work against them.
+  if (sourceType === 'solution') return 'check_solution_sheet';
   if (sourceType === 'exam') return 'exam_style_practice';
   return 'review_topic';
 }
 
 function studyStateRequired(taskType: string): string {
   if (taskType === 'solve_exercise_sheet' || taskType === 'practice_problem_set') return 'studied';
-  if (taskType === 'exam_style_practice') return 'practiced';
+  if (taskType === 'check_solution_sheet' || taskType === 'review_completed_exercise') return 'studied';
+  if (taskType === 'exam_style_practice' || taskType === 'pre_exam_review') return 'practiced';
   return 'not_started';
 }
 
 function estimatedMinutesForType(taskType: string): number {
   if (taskType === 'study_topic' || taskType === 'read_pages') return 30;
   if (taskType === 'solve_exercise_sheet' || taskType === 'practice_problem_set') return 25;
-  if (taskType === 'exam_style_practice') return 20;
+  if (taskType === 'check_solution_sheet' || taskType === 'review_completed_exercise') return 15;
+  if (taskType === 'exam_style_practice' || taskType === 'pre_exam_review') return 20;
   return 20;
 }
 
@@ -960,13 +1014,12 @@ export async function seedCandidatesFromTopics(
   );
   if (!readyDocs.size) return 0;
 
-  // Build a map: numericSuffix → exercise doc id, for pairing.
+  // Build a map: numericSuffix → exercise doc id, for pairing a lecture with
+  // its exercise sheet. Solution sheets are NOT exercises and must never be
+  // paired here, or a lecture would link to a solution instead of a problem set.
   const exerciseByNum = new Map<number, string>();
   for (const [docId, doc] of readyDocs) {
-    if (
-      (doc.source_type === 'exercise' || doc.source_type === 'solution') &&
-      doc.file_name
-    ) {
+    if (doc.source_type === 'exercise' && doc.file_name) {
       const n = fileNumericSuffix(doc.file_name);
       if (n !== null) exerciseByNum.set(n, docId);
     }
@@ -995,7 +1048,8 @@ export async function seedCandidatesFromTopics(
       const taskType = sourceTypeToNewTaskType(doc.source_type);
       const minutes = estimatedMinutesForType(taskType);
       const reqState = studyStateRequired(taskType);
-      const isExercise = doc.source_type === 'exercise' || doc.source_type === 'solution';
+      // Only true exercise sheets are "exercises". Solutions are checked, not solved.
+      const isExercise = doc.source_type === 'exercise';
 
       // Detect exercise pairing for lecture candidates.
       let exerciseFileId: string | null = null;
@@ -1040,8 +1094,10 @@ function taskTitleFromSourceType(
   fileName: string
 ): string {
   if (sourceType === 'lecture') return `Study: ${topicName}`;
-  if (sourceType === 'exercise' || sourceType === 'solution')
+  if (sourceType === 'exercise')
     return `Practice: ${topicName}${fileName ? ' (' + fileName + ')' : ''}`;
+  if (sourceType === 'solution')
+    return `Check solutions: ${topicName}${fileName ? ' (' + fileName + ')' : ''}`;
   if (sourceType === 'exam') return `Exam drill: ${topicName}`;
   return `Review: ${topicName}`;
 }

@@ -11,6 +11,10 @@ export interface DailyMissionTask {
   reason?: string | null;
   reason_code?: string | null;
   source_file_id?: string | null;
+  source_file_name?: string | null;
+  exercise_file_id?: string | null;
+  exercise_file_name?: string | null;
+  page_range?: string | null;
 }
 
 export interface DailyMissionResponse {

@@ -484,7 +484,8 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
           study_topic: 'Study', read_pages: 'Read', solve_exercise_sheet: 'Exercises',
           practice_problem_set: 'Practice', generate_quiz_if_no_exercises: 'Quiz',
           review_weak_topic: 'Review', review_topic: 'Review', exam_style_practice: 'Exam prep',
-          create_flashcards: 'Flashcards'
+          check_solution_sheet: 'Check Solutions', review_completed_exercise: 'Review Exercise',
+          pre_exam_review: 'Pre-Exam Review', create_flashcards: 'Flashcards'
         };
         const getTypeLabel = (taskType: string) => labels[taskType] || 'Study';
         const groups = ['must_do', 'should_do', 'optional'];

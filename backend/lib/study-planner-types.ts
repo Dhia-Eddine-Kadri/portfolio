@@ -126,6 +126,9 @@ export interface WeeklyStudyTask {
   invalidation_reason: string | null;
   created_at: string;
   updated_at: string;
+  // Enriched at read time (getDailyTasks) by joining `documents`. Not stored.
+  source_file_name?: string | null;
+  exercise_file_name?: string | null;
 }
 
 export interface WeeklyStudyPlan {
