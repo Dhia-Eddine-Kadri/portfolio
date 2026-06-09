@@ -351,7 +351,6 @@ function _renderWidget(): void {
   // Study progress & exam countdown
   if (_state.urgencyMeta?.daysUntilExam !== undefined) {
     const studied = _state.urgencyMeta.studiedPercentage ?? 0;
-    const remaining = 100 - studied;
     const daysLeft = _state.urgencyMeta.daysUntilExam;
     inner += '<div class="dm-widget-urgency">';
     inner += '<div class="dm-urgency-row">';

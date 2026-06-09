@@ -453,10 +453,6 @@ interface StudyUrgency {
   recommendCheatsheet: boolean;
 }
 
-function daysBetween(from: Date, to: Date): number {
-  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 async function calculateStudyUrgency(
   userId: string,
   courseId: string,
