@@ -473,19 +473,12 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
         return;
       }
 
-      const modal = document.createElement('div');
-      modal.className = 'dm-tasks-modal-overlay';
-      modal.innerHTML = '<div class="dm-tasks-modal">' +
-        '<div class="dm-tasks-modal-header">' +
-          '<h3>Today\'s Tasks</h3>' +
-          '<button type="button" class="dm-modal-close" aria-label="Close">×</button>' +
-        '</div>' +
-        '<div class="dm-tasks-modal-content">';
-
       const tasks = data.tasks.filter((t) => t.status !== 'replaced');
       console.log('[DailyMission] Modal tasks filtered:', tasks.length, 'from', data.tasks.length);
+
+      let content = '';
       if (tasks.length === 0) {
-        modal.innerHTML += '<div class="dm-modal-empty">No active tasks for today</div>';
+        content = '<div class="dm-modal-empty">No active tasks for today</div>';
       } else {
         const labels: Record<string, string> = {
           study_topic: 'Study', read_pages: 'Read', solve_exercise_sheet: 'Exercises',
@@ -499,20 +492,28 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
         groups.forEach((group) => {
           const groupTasks = tasks.filter((t) => (t as any).priority_group === group);
           if (groupTasks.length > 0) {
-            modal.innerHTML += '<div class="dm-modal-group"><div class="dm-modal-group-title">' + groupLabels[group] + '</div>';
+            content += '<div class="dm-modal-group"><div class="dm-modal-group-title">' + groupLabels[group] + '</div>';
             groupTasks.forEach((task) => {
               const isDone = task.status === 'completed';
-              modal.innerHTML += '<div class="dm-task dm-task--' + task.status + '">' +
+              content += '<div class="dm-task dm-task--' + task.status + '">' +
                 '<div class="dm-task-title' + (isDone ? ' is-done' : '') + '">' + task.title + '</div>' +
                 '<div class="dm-task-meta">' + getTypeLabel(task.task_type) + ' &middot; ' + task.estimated_minutes + 'min</div>' +
               '</div>';
             });
-            modal.innerHTML += '</div>';
+            content += '</div>';
           }
         });
       }
 
-      modal.innerHTML += '</div></div>';
+      const modal = document.createElement('div');
+      modal.className = 'dm-tasks-modal-overlay';
+      modal.innerHTML = '<div class="dm-tasks-modal">' +
+        '<div class="dm-tasks-modal-header">' +
+          '<h3>Today\'s Tasks</h3>' +
+          '<button type="button" class="dm-modal-close" aria-label="Close">×</button>' +
+        '</div>' +
+        '<div class="dm-tasks-modal-content">' + content + '</div>' +
+      '</div>';
       document.body.appendChild(modal);
 
       const closeBtn = modal.querySelector('.dm-modal-close') as HTMLButtonElement;
