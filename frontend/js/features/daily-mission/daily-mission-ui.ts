@@ -92,9 +92,7 @@ function _allCourseIds(): string[] {
     (sem.courses || []).forEach((c) => { if (c.id) ids.push(c.id); });
   });
   // Deduplicate
-  const deduped = ids.filter((v, i, a) => a.indexOf(v) === i);
-  console.log('[DailyMission] _allCourseIds from SEMS:', deduped);
-  return deduped;
+  return ids.filter((v, i, a) => a.indexOf(v) === i);
 }
 
 function _formatDate(d: Date): string {
@@ -161,26 +159,28 @@ function _courseName(courseId: string): string {
 
 // ─── Data loading ──────────────────────────────────────────────────────────────
 
-// Watch for widget element being recreated (e.g., when moved) and re-render
+// Watch for widget element being recreated/resized and re-render
 function _watchWidgetElement(): void {
-  let lastChildCount = -1;
+  let lastRenderedState = '';
   const checkAndRender = () => {
     const host = document.getElementById('daily-mission-widget');
-    if (host) {
-      const currentChildCount = host.children.length;
-      // Re-render if: widget is empty, or only has loading/status div with no dm-widget content
+    if (host && _state.tasks.length > 0) {
       const hasWidget = host.querySelector('.dm-widget');
-      const isEmpty = !hasWidget && (host.textContent?.trim() === '' || host.querySelector('.dmw-status'));
+      const hasContent = hasWidget && host.textContent && host.textContent.trim().length > 20;
 
-      if (isEmpty || (currentChildCount !== lastChildCount && !hasWidget && _state.tasks.length > 0)) {
-        console.log('[DailyMission] Widget content missing (empty=' + isEmpty + ', childCount=' + currentChildCount + '), re-rendering');
-        lastChildCount = -1;
+      // Track if we have actual rendered content
+      const currentState = hasContent ? 'rendered' : 'empty';
+
+      // If content was rendered before but is now empty, re-render
+      if (lastRenderedState === 'rendered' && currentState === 'empty') {
         _renderWidget();
-      } else if (hasWidget) {
-        lastChildCount = currentChildCount;
+      } else if (currentState === 'rendered') {
+        lastRenderedState = 'rendered';
+      } else if (currentState === 'empty' && lastRenderedState !== 'empty') {
+        _renderWidget();
       }
     }
-    setTimeout(checkAndRender, 300);
+    setTimeout(checkAndRender, 250);
   };
   checkAndRender();
 }
@@ -242,8 +242,6 @@ async function loadTodaysTasks(force = false): Promise<void> {
 
     _state.tasks = merged;
     _state.lastLoaded = now;
-    console.log('[DailyMission] Loaded', merged.length, 'tasks from', Object.keys(_state.byId).length, 'courses');
-    console.log('[DailyMission] Tasks detail:', merged.map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
 
     // Show exam date modal if tasks exist but no exam dates
     const courseIds = [...new Set(
@@ -252,10 +250,8 @@ async function loadTodaysTasks(force = false): Promise<void> {
         .filter((id): id is string => !!id)
     )];
     const missingDates = courseIds.filter((id) => !_state.examDates[id]);
-    console.log('[DailyMission] courseIds for modal:', courseIds, 'missingDates:', missingDates);
 
     if (merged.length > 0 && missingDates.length > 0) {
-      console.log('[DailyMission] Showing exam date modal for missing dates:', missingDates);
       setTimeout(() => { void showExamDateModal(missingDates); }, 500);
     }
   } catch (err) {
@@ -471,13 +467,11 @@ function _buildTaskRowHtml(task: DailyMissionTask & { _courseId?: string }): str
 
 function _renderWidget(): void {
   const host = document.getElementById('daily-mission-widget');
-  console.log('[DailyMission] _renderWidget called, host element:', host ? 'found' : 'NOT FOUND');
   if (!host) return;
 
   // If widget was reset (moved/recreated), re-render tasks
   const widgetContent = host.querySelector('.dm-widget');
   if (!widgetContent && _state.tasks.length > 0) {
-    console.log('[DailyMission] Widget content missing, force re-render');
     // Continue with render below
   }
 
@@ -494,9 +488,6 @@ function _renderWidget(): void {
   const total = displayTasks.length;
 
   if (total === 0 && _state.tasks.length > 0) {
-    console.log('[DailyMission] Warning: Have', _state.tasks.length, 'tasks but displaying 0 (selectedCourseId=' + _state.selectedCourseId + ')');
-    console.log('[DailyMission] Raw _state.tasks:', _state.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
-    console.log('[DailyMission] After filter "replaced":', _state.tasks.filter((t) => t.status !== 'replaced').map((t) => ({ id: t.id, title: t.title, status: t.status, _courseId: (t as any)._courseId })));
   }
 
   let inner = '';
@@ -511,7 +502,6 @@ function _renderWidget(): void {
   // Course picker — show all system courses if > 1, mark which have tasks
   const taskCourseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
   const allSystemCourseIds = _allCourseIds();
-  console.log('[DailyMission] taskCourseIds:', taskCourseIds, 'allSystemCourseIds:', allSystemCourseIds);
 
   if (allSystemCourseIds.length > 1) {
     inner += '<select class="dm-course-picker">';
@@ -565,7 +555,6 @@ function _renderWidget(): void {
   } else {
     // Show all tasks in scrollable container (filtered by course)
     const visible = displayTasks.filter((t) => t.status !== 'skipped');
-    console.log('[DailyMission] visible tasks:', visible.length, 'total:', total, 'displayTasks:', displayTasks.length);
 
     if (visible.length === 0) {
       // No visible tasks (either none exist or all are skipped)
