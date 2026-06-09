@@ -482,7 +482,8 @@ function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLEle
         '</div>' +
         '<div class="dm-tasks-modal-content">';
 
-      const tasks = data.tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && t.status !== 'replaced');
+      const tasks = data.tasks.filter((t) => t.status !== 'replaced');
+      console.log('[DailyMission] Modal tasks filtered:', tasks.length, 'from', data.tasks.length);
       if (tasks.length === 0) {
         modal.innerHTML += '<div class="dm-modal-empty">No active tasks for today</div>';
       } else {
