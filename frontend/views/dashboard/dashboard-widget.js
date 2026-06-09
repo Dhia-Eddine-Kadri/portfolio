@@ -3,36 +3,6 @@
   var container = document.getElementById('psec-dashboard');
   if (!container) return;
 
-  /*
-  fetch('views/dashboard/dashboard.html')
-    .then(function (r) {
-      return r.text();
-    })
-    .then(function (html) {
-      // Inject inner content — split out the widget panel/FAB/ghost into body
-      var tmp = document.createElement('div');
-      tmp.innerHTML = html;
-      // Move #psec-dashboard children into the real container
-      var sec = tmp.querySelector('#psec-dashboard');
-      if (sec) {
-        while (sec.firstChild) container.appendChild(sec.firstChild);
-      }
-      // Append widget panel, FAB, and drag ghost to body
-      var body = tmp; // remaining siblings
-      while (body.firstChild) {
-        var node = body.firstChild;
-        body.removeChild(node);
-        if (node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim())) {
-          document.body.appendChild(node);
-        }
-      }
-      _init();
-    })
-    .catch(function (err) {
-      console.error('dashboard.html load error:', err);
-    });
-  */
-
   if (!document.getElementById('dashCanvas')) {
     container.innerHTML =
       '<div id="dashEmpty" class="dash-empty">' +
@@ -80,8 +50,8 @@
         requires: function () { return !!(window._germanLevel); } },
       { type: 'ai', icon: '🤖', nameKey: 'wdg_ai_name', name: 'AI quick chat', descKey: 'wdg_ai_desc', desc: 'Ask anything', cols: 2, rows: 2 },
       { type: 'gcal', icon: '📆', nameKey: 'wdg_gcal_name', name: 'Google Calendar', descKey: 'wdg_gcal_desc', desc: 'View & edit events', cols: 1, rows: 3 },
-      { type: 'mastery', icon: '🎯', nameKey: 'wdg_mastery_name', name: 'Practice focus', descKey: 'wdg_mastery_desc', desc: 'Weak topics from your quizzes', cols: 2, rows: 2 }
-      ,{ type: 'dailyMission', icon: 'DM', nameKey: 'wdg_daily_mission_name', name: 'Daily Mission', descKey: 'wdg_daily_mission_desc', desc: 'Today\'s study plan', cols: 2, rows: 2 }
+      { type: 'mastery', icon: '🎯', nameKey: 'wdg_mastery_name', name: 'Practice focus', descKey: 'wdg_mastery_desc', desc: 'Weak topics from your quizzes', cols: 2, rows: 2 },
+      { type: 'dailyMission', icon: 'DM', nameKey: 'wdg_daily_mission_name', name: 'Daily Mission', descKey: 'wdg_daily_mission_desc', desc: 'Today\'s study plan', cols: 2, rows: 2 }
     ];
     function defName(def) { return _t(def.nameKey, def.name || def.nameKey); }
     function defDesc(def) { return _t(def.descKey, def.desc || def.descKey); }
