@@ -249,9 +249,9 @@ async function loadTodaysTasks(force = false): Promise<void> {
     // Only show modal once per unique set of missing dates
     const missingKey = missingDates.sort().join(',');
     if (merged.length > 0 && missingDates.length > 0 && !_state.examDateModalShownForCourses.has(missingKey)) {
-      console.log('[DailyMission] Showing exam date modal for:', missingDates);
+      console.log('[DailyMission] Showing exam date modal for missing dates:', missingDates);
       _state.examDateModalShownForCourses.add(missingKey);
-      setTimeout(() => { void showExamDateModal(); }, 500);
+      setTimeout(() => { void showExamDateModal(missingDates); }, 500);
     }
   } catch (err) {
     _state.error = 'Could not load today\'s mission.';
@@ -343,9 +343,15 @@ async function saveExamDate(courseId: string, examDate: string): Promise<boolean
   return false;
 }
 
-function showExamDateModal(): Promise<Record<string, string> | null> {
+function showExamDateModal(forceShowCourseIds?: string[]): Promise<Record<string, string> | null> {
   return new Promise((resolve) => {
-    const courseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
+    // If forced to show specific courses, use those; otherwise use all courses with tasks
+    let courseIds: string[];
+    if (forceShowCourseIds) {
+      courseIds = forceShowCourseIds;
+    } else {
+      courseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
+    }
     if (!courseIds.length) { resolve(null); return; }
 
     const modal = document.createElement('div');
@@ -599,11 +605,11 @@ function _bindWidgetActions(host: HTMLElement): void {
 
       // Show exam date modal if switching to a course without exam date
       if (_state.selectedCourseId && !_state.examDates[_state.selectedCourseId]) {
-        console.log('[DailyMission] Selected course has no exam date, showing modal');
+        console.log('[DailyMission] Selected course has no exam date, showing modal for:', _state.selectedCourseId);
         const modalKey = _state.selectedCourseId;
         if (!_state.examDateModalShownForCourses.has(modalKey)) {
           _state.examDateModalShownForCourses.add(modalKey);
-          setTimeout(() => { void showExamDateModal(); }, 300);
+          setTimeout(() => { void showExamDateModal([_state.selectedCourseId!]); }, 300);
         }
       }
 
