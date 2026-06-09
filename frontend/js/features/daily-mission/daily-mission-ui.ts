@@ -266,11 +266,11 @@ async function loadTodaysTasks(force = false): Promise<void> {
 async function generatePlan(): Promise<void> {
   const ids = _allCourseIds();
   if (!ids.length) return;
-  // Use active course first, fall back to first available
-  const primaryId = findPrimaryCourseId() || ids[0];
-  if (!primaryId) return;
+  // Use selected course if available, otherwise use active course, fall back to first available
+  const courseId = _state.selectedCourseId || findPrimaryCourseId() || ids[0];
+  if (!courseId) return;
   try {
-    await generateDailyMission(primaryId);
+    await generateDailyMission(courseId);
     await loadTodaysTasks(true);
   } catch (err) {
     console.error('[DailyMission] generatePlan error:', err);
@@ -471,14 +471,7 @@ function _renderWidget(): void {
   // Filter tasks by selected course if one is selected
   let displayTasks = _state.tasks.filter((t) => t.status !== 'replaced');
   if (_state.selectedCourseId) {
-    const filtered = displayTasks.filter((t) => (t as DailyMissionTask & { _courseId?: string })._courseId === _state.selectedCourseId);
-    // If selected course has no tasks, show all tasks instead
-    if (filtered.length === 0 && displayTasks.length > 0) {
-      console.log('[DailyMission] Selected course has no tasks, showing all courses');
-      _state.selectedCourseId = null;
-    } else {
-      displayTasks = filtered;
-    }
+    displayTasks = displayTasks.filter((t) => (t as DailyMissionTask & { _courseId?: string })._courseId === _state.selectedCourseId);
   }
 
   const done = displayTasks.filter((t) => t.status === 'completed').length;
@@ -598,6 +591,17 @@ function _bindWidgetActions(host: HTMLElement): void {
   if (picker) {
     picker.addEventListener('change', (e) => {
       _state.selectedCourseId = (e.target as HTMLSelectElement).value || null;
+
+      // Show exam date modal if switching to a course without exam date
+      if (_state.selectedCourseId && !_state.examDates[_state.selectedCourseId]) {
+        console.log('[DailyMission] Selected course has no exam date, showing modal');
+        const modalKey = _state.selectedCourseId;
+        if (!_state.examDateModalShownForCourses.has(modalKey)) {
+          _state.examDateModalShownForCourses.add(modalKey);
+          setTimeout(() => { void showExamDateModal(); }, 300);
+        }
+      }
+
       _renderWidget();
       _bindWidgetActions(host);
     });
