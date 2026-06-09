@@ -150,8 +150,6 @@ export async function collectCandidates(
   const res = await supaRequest<TaskCandidate[]>('GET', url, null, serviceKey);
   const all = Array.isArray(res.body) ? res.body : [];
 
-  console.error('[collectCandidates] Found', all.length, 'candidates for userId:', userId, 'courseId:', courseId);
-
   // If we have candidates, verify their documents are ready (fetch separately to avoid join issues)
   if (all.length > 0 && all[0]?.source_file_id) {
     const fileIds = [...new Set(all.map(c => c.source_file_id).filter(Boolean))];
@@ -492,7 +490,6 @@ export async function generateWeeklyPlan(
 
   // Collect valid candidates.
   const allCandidates = await collectCandidates(userId, serviceKey, courseId ?? undefined);
-  console.error('[generateWeeklyPlan] allCandidates:', allCandidates.length, 'courseId:', courseId);
 
   // Seed if needed for the target course(s).
   const courseIds = courseId
@@ -502,18 +499,14 @@ export async function generateWeeklyPlan(
   // If no candidates at all, attempt a seed for each course.
   let candidates = allCandidates;
   if (!candidates.length || !candidates.some((c) => c.task_type === 'study_topic' || c.task_type === 'read_pages')) {
-    console.error('[generateWeeklyPlan] Seeding from topics, courseIds:', courseIds);
     for (const cid of courseIds) {
       await seedCandidatesFromTopics(userId, cid, serviceKey);
     }
     candidates = await collectCandidates(userId, serviceKey, courseId ?? undefined);
-    console.error('[generateWeeklyPlan] After seeding:', candidates.length);
   }
 
   // Filter excluded courses.
-  const beforeFilter = candidates.length;
   candidates = candidates.filter((c) => !excludedCourses.has(c.course_id));
-  console.error('[generateWeeklyPlan] After excluding courses:', beforeFilter, '->', candidates.length, 'excluded:', [...excludedCourses]);
 
   // Fetch topic states.
   let topicStateUrl =
