@@ -325,16 +325,13 @@ function _renderWidget(): void {
     inner += '<button type="button" class="dm-btn-generate dm-cta">Plan My Week</button>';
     inner += '</div>';
   } else {
-    // Show up to 5 tasks
-    const visible = tasks.filter((t) => t.status !== 'skipped').slice(0, 5);
-    inner += '<div class="dm-widget-tasks">';
+    // Show all tasks in scrollable container
+    const visible = tasks.filter((t) => t.status !== 'skipped');
+    inner += '<div class="dm-widget-tasks dm-widget-tasks--scrollable">';
     visible.forEach((t) => {
       inner += _buildTaskRowHtml(t as DailyMissionTask & { _courseId?: string });
     });
     inner += '</div>';
-    if (tasks.length > 5) {
-      inner += '<button type="button" class="dm-btn-open-ai dm-task-btn">Open in AI →</button>';
-    }
   }
 
   host.innerHTML = '<div class="dm-widget">' + inner + '</div>';
