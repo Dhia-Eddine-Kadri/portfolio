@@ -142,7 +142,7 @@ export async function collectCandidates(
     encodeURIComponent(userId) +
     '&is_valid=eq.true' +
     '&source_confidence=in.(high,confirmed)' +
-    '&select=*,course_topics(name,importance),documents(file_name,processing_status,source_type)' +
+    '&select=*' +
     '&order=created_at.asc' +
     '&limit=200';
   if (courseId) url += '&course_id=eq.' + encodeURIComponent(courseId);
@@ -150,8 +150,22 @@ export async function collectCandidates(
   const res = await supaRequest<TaskCandidate[]>('GET', url, null, serviceKey);
   const all = Array.isArray(res.body) ? res.body : [];
 
-  // Filter out candidates whose source document is not ready yet.
-  return all.filter((c) => !c.documents || c.documents.processing_status === 'ready');
+  console.error('[collectCandidates] Found', all.length, 'candidates for userId:', userId, 'courseId:', courseId);
+
+  // If we have candidates, verify their documents are ready (fetch separately to avoid join issues)
+  if (all.length > 0 && all[0]?.source_file_id) {
+    const fileIds = [...new Set(all.map(c => c.source_file_id).filter(Boolean))];
+    const docUrl = 'documents?id=in.(' + fileIds.map(id => encodeURIComponent(id as string)).join(',') + ')&select=id,processing_status';
+    const docsRes = await supaRequest<{ id: string; processing_status: string }[]>('GET', docUrl, null, serviceKey);
+    const readyDocs = new Set(
+      (Array.isArray(docsRes.body) ? docsRes.body : [])
+        .filter(d => d.processing_status === 'ready')
+        .map(d => d.id)
+    );
+    return all.filter(c => !c.source_file_id || readyDocs.has(c.source_file_id as string));
+  }
+
+  return all;
 }
 
 // ── B. Subject priority scoring ───────────────────────────────────────────────
