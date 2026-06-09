@@ -33,6 +33,8 @@ async function _loadCourseSuggestions(major: string): Promise<Subject[]> {
 }
 
 export interface CourseSearchContext {
+  getUserUniversity: () => string;
+  getUserUniversityName: () => string;
   getUserMajor: () => string;
   getUserVertiefung: () => string;
   getSubjectList: () => Subject[];
@@ -154,7 +156,14 @@ export function initCourseSearch(context: CourseSearchContext): void {
     const inStatic = subjectList.some(
       (s) => s.name.toLowerCase() === subject.name.toLowerCase()
     );
-    if (!inStatic) void submitSuggestion('course', userMajor || '*', subject.name);
+    if (!inStatic) {
+      void submitSuggestion('course', userMajor || '*', subject.name, {
+        university: context.getUserUniversity(),
+        universityName: context.getUserUniversityName(),
+        major: userMajor,
+        vertiefung: context.getUserVertiefung(),
+      });
+    }
     const sems = context.getSems();
     const sem = sems[context.getActiveSemesterId()];
     if (!sem) return;

@@ -70,6 +70,8 @@ let _obSelectedHochschule: Hochschule | null = null;
 // keystroke in the Vertiefung input.
 const _obVertSuggestions: Record<string, string[]> = {};
 let _obVertSuggestionsLoading: Record<string, boolean> = {};
+const _obMajorSuggestions: Record<string, string[]> = {};
+let _obMajorSuggestionsLoading: Record<string, boolean> = {};
 
 async function _loadVertSuggestions(major: string): Promise<void> {
   if (!major || _obVertSuggestions[major] !== undefined) return;
@@ -82,6 +84,25 @@ async function _loadVertSuggestions(major: string): Promise<void> {
     _obVertSuggestions[major] = [];
   } finally {
     _obVertSuggestionsLoading[major] = false;
+  }
+}
+
+function _obUniversityKey(hs: Hochschule | null = _obSelectedHochschule): string {
+  return hs?.short || '*';
+}
+
+async function _loadMajorSuggestions(university: string): Promise<void> {
+  const key = university || '*';
+  if (_obMajorSuggestions[key] !== undefined) return;
+  if (_obMajorSuggestionsLoading[key]) return;
+  _obMajorSuggestionsLoading[key] = true;
+  try {
+    const items = await listSuggestions('major', key);
+    _obMajorSuggestions[key] = items.map((i) => i.value);
+  } catch {
+    _obMajorSuggestions[key] = [];
+  } finally {
+    _obMajorSuggestionsLoading[key] = false;
   }
 }
 
@@ -409,9 +430,22 @@ function setupProgAutocomplete(): void {
   function _showProgDrop(q: string): void {
     if (!drop || !inp) return;
     const MAJOR_LIST = window.MAJOR_LIST || [];
+    const uniKey = _obUniversityKey();
+    if (_obMajorSuggestions[uniKey] === undefined) {
+      void _loadMajorSuggestions(uniKey).then(() => {
+        if (inp.value.trim() === q) _showProgDrop(q);
+      });
+    }
+    const crowd = _obMajorSuggestions[uniKey] || [];
+    const seen = new Set<string>();
+    const base: string[] = [];
+    [...MAJOR_LIST, ...crowd].forEach((v) => {
+      const key = v.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); base.push(v); }
+    });
     const items = q
-      ? MAJOR_LIST.filter((v) => v.toLowerCase().includes(q.toLowerCase()))
-      : MAJOR_LIST;
+      ? base.filter((v) => v.toLowerCase().includes(q.toLowerCase()))
+      : base;
     if (!items.length) {
       drop.style.display = 'none';
       return;
@@ -775,7 +809,24 @@ export function initOnboarding(): void {
     if (vertiefung) {
       const staticList = _obIsTuBraunschweig() ? ((window.VERTIEFUNG_MAP || {})[prog] || []) : [];
       const inStatic = staticList.some((v) => v.toLowerCase() === vertiefung.toLowerCase());
-      if (!inStatic) void submitSuggestion('vertiefung', prog, vertiefung);
+      if (!inStatic) {
+        void submitSuggestion('vertiefung', prog, vertiefung, {
+          university: _obSelectedHochschule?.short || '',
+          universityName: _obSelectedHochschule?.name || '',
+          major: prog,
+        });
+      }
+    }
+
+    if (prog) {
+      const inStaticMajor = MAJOR_LIST.some((m) => m.toLowerCase() === prog.toLowerCase());
+      if (!inStaticMajor) {
+        void submitSuggestion('major', _obSelectedHochschule?.short || '*', prog, {
+          university: _obSelectedHochschule?.short || '',
+          universityName: _obSelectedHochschule?.name || '',
+          vertiefung,
+        });
+      }
     }
 
     const _currentUser = window._currentUser;

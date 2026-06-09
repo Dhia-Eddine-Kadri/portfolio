@@ -1,4 +1,4 @@
-// Client for /api/suggestions — crowd-sourced Vertiefung & course-name
+// Client for /api/suggestions — crowd-sourced major, Vertiefung, and course-name
 // dropdown enrichment. See backend/functions/suggestions.ts.
 
 function _authHeaders(): Record<string, string> {
@@ -8,11 +8,25 @@ function _authHeaders(): Record<string, string> {
   };
 }
 
-export type SuggestionKind = 'vertiefung' | 'course';
+export type SuggestionKind = 'vertiefung' | 'course' | 'major';
 
 export interface SuggestionItem {
   value: string;
   count: number;
+}
+
+export interface SuggestionContext {
+  university?: string | null;
+  universityName?: string | null;
+  major?: string | null;
+  vertiefung?: string | null;
+}
+
+export interface SuggestionSubmitResult {
+  count: number;
+  approved: boolean;
+  accepted: boolean;
+  reason?: string;
 }
 
 // Approved suggestions for a given (kind, parent). `parent` scopes the bucket
@@ -41,18 +55,27 @@ export async function listSuggestions(
 export async function submitSuggestion(
   kind: SuggestionKind,
   parent: string | null | undefined,
-  value: string
-): Promise<{ count: number; approved: boolean } | null> {
+  value: string,
+  context?: SuggestionContext
+): Promise<SuggestionSubmitResult | null> {
   const trimmed = (value || '').trim();
   if (!trimmed) return null;
   try {
     const res = await fetch('/api/suggestions', {
       method: 'POST',
       headers: _authHeaders(),
-      body: JSON.stringify({ kind, parent: parent || '*', value: trimmed }),
+      body: JSON.stringify({ kind, parent: parent || '*', value: trimmed, context: context || {} }),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as { count: number; approved: boolean };
+    const data = (await res.json().catch(() => null)) as Partial<SuggestionSubmitResult> | null;
+    if (!res.ok) {
+      return {
+        count: 0,
+        approved: false,
+        accepted: false,
+        reason: data?.reason || 'not_accepted',
+      };
+    }
+    return data as SuggestionSubmitResult;
   } catch {
     return null;
   }

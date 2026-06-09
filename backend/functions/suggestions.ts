@@ -3,18 +3,19 @@ import { jsonResponse, fail } from '../lib/responses';
 import { getCorsHeaders } from '../lib/cors';
 import { supaRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
+import { forwardToPython, pythonAiConfigured } from '../lib/python-ai-proxy';
 import { countRecentEvents, rateLimitResponse } from '../lib/rate-limit';
 import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
-// Crowd-sourced dropdown suggestions for the onboarding modal (Vertiefung)
-// and the course-creation field. Once an entry receives 5 submissions it
-// auto-promotes to `approved = true` (see supabase/migrations/.._suggestions.sql)
-// and starts appearing in everyone's dropdown.
+// Crowd-sourced dropdown suggestions for onboarding (major/Vertiefung) and
+// the course-creation field. AI validation only controls whether a typed value
+// can enter this shared 5-user counter; personal saves stay user-controlled.
 
-const KINDS = new Set(['vertiefung', 'course']);
+const KINDS = new Set(['vertiefung', 'course', 'major']);
 const MAX_VALUE_LEN = 120;
 const MAX_PARENT_LEN = 120;
+const MAX_CONTEXT_LEN = 160;
 const SUBMIT_RATE_LIMIT_MAX = 60;
 const SUBMIT_RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
@@ -30,8 +31,55 @@ interface RpcRow {
   approved: boolean;
 }
 
+interface SuggestionContext {
+  university?: unknown;
+  universityName?: unknown;
+  major?: unknown;
+  vertiefung?: unknown;
+}
+
+interface ValidationBody {
+  accepted?: boolean;
+  reason?: string;
+  normalized?: string;
+}
+
 function clean(input: unknown, max: number): string {
   return String(input || '').trim().slice(0, max);
+}
+
+async function validateSuggestionWithAi(
+  kind: string,
+  parent: string,
+  value: string,
+  context: SuggestionContext,
+  userId: string,
+): Promise<{ accepted: boolean; reason: string; normalized?: string }> {
+  if (!pythonAiConfigured()) {
+    return { accepted: false, reason: 'ai_not_configured' };
+  }
+  const payload = {
+    userId,
+    kind,
+    parent,
+    value,
+    context: {
+      university: clean(context.university, MAX_CONTEXT_LEN),
+      universityName: clean(context.universityName, MAX_CONTEXT_LEN),
+      major: clean(context.major, MAX_CONTEXT_LEN),
+      vertiefung: clean(context.vertiefung, MAX_CONTEXT_LEN),
+    },
+  };
+  const res = await forwardToPython<ValidationBody>('suggestions/validate', payload);
+  if (!res.ok) {
+    return { accepted: false, reason: 'ai_unavailable' };
+  }
+  const body = res.body as ValidationBody;
+  return {
+    accepted: body.accepted === true,
+    reason: clean(body.reason, 120) || (body.accepted ? 'accepted' : 'rejected'),
+    normalized: clean(body.normalized, MAX_VALUE_LEN),
+  };
 }
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
@@ -76,7 +124,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
   }
 
-  let body: { kind?: unknown; parent?: unknown; value?: unknown } = {};
+  let body: { kind?: unknown; parent?: unknown; value?: unknown; context?: SuggestionContext } = {};
   try { body = JSON.parse(event.body || '{}'); } catch { return fail(400, 'Invalid JSON'); }
   const kind = clean(body.kind, 40);
   const parent = clean(body.parent, MAX_PARENT_LEN) || '*';
@@ -96,10 +144,32 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   }
   await logSecurityEvent(serviceKey, user.id, 'suggestion_submit', { kind, parent });
 
+  const validation = await validateSuggestionWithAi(
+    kind,
+    parent,
+    value,
+    body.context || {},
+    user.id,
+  );
+  await logSecurityEvent(serviceKey, user.id, 'suggestion_ai_validation', {
+    kind,
+    parent,
+    accepted: validation.accepted,
+    reason: validation.reason,
+  });
+  if (!validation.accepted) {
+    return jsonResponse(200, {
+      count: 0,
+      approved: false,
+      accepted: false,
+      reason: validation.reason,
+    });
+  }
+
   const rpcRes = await supaRequest<RpcRow[]>(
     'POST',
     'rpc/suggestion_submit',
-    { p_kind: kind, p_parent: parent, p_value: value, p_threshold: 5 },
+    { p_kind: kind, p_parent: parent, p_value: validation.normalized || value, p_threshold: 5 },
     serviceKey
   );
   if (rpcRes.status < 200 || rpcRes.status >= 300) return fail(500, 'Could not submit suggestion');
@@ -107,5 +177,6 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   return jsonResponse(200, {
     count: row?.count ?? 1,
     approved: !!row?.approved,
+    accepted: true,
   });
 };

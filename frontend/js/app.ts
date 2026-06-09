@@ -325,6 +325,16 @@ exposeLegacyVar('sdActiveSemId', () => sdActiveSemId, (v: string) => {
 });
 
 initCourseSearch({
+  getUserUniversity: () => window._userUniversity || localStorage.getItem('ss_university') || '',
+  getUserUniversityName: () => {
+    try {
+      const uid = window._currentUser?.id || window._currentUser?.sub || localStorage.getItem('ss_last_uid') || '';
+      const cached = uid ? JSON.parse(localStorage.getItem('profile_cache_' + uid) || 'null') : null;
+      return String(cached?.university_name || cached?.university || window._userUniversity || '');
+    } catch {
+      return window._userUniversity || '';
+    }
+  },
   getUserMajor: () => _userMajor,
   getUserVertiefung: () => _userVertiefung,
   getSubjectList: () => SUBJECT_LIST,
