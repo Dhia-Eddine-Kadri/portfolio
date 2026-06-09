@@ -22,6 +22,7 @@ var _SBCFG = window.MinalloConfig || {};
 var SUPA_URL = _SBCFG.supabaseUrl || window._SUPA || '';
 var SUPA_KEY = _SBCFG.supabaseAnonKey || window._SAKEY || '';
 var _sbToken = null; // access token after login
+window._sbToken = null; // expose to window for API clients
 var _currentUser = null;
 var _sbAuthCallbacks = [];
 var _SS = window.Minallo;

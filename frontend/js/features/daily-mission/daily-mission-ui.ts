@@ -164,6 +164,13 @@ async function loadTodaysTasks(force = false): Promise<void> {
   const now = Date.now();
   if (!force && _state.lastLoaded && now - _state.lastLoaded < 30_000) return;
 
+  // Check if auth token is available; if not, retry in 500ms
+  const token = (window as unknown as { _sbToken?: string })._sbToken;
+  if (!token) {
+    setTimeout(() => { void loadTodaysTasks(force); }, 500);
+    return;
+  }
+
   _state.isLoading = true;
   _state.error = null;
   _state.todayDate = todayLocalDate();
@@ -266,7 +273,11 @@ async function updateTaskStatus(taskId: string, newStatus: DailyMissionTask['sta
 // ─── Exam date management ────────────────────────────────────────────────────
 
 async function loadExamDates(): Promise<void> {
-  const token = (window as unknown as { _sbToken?: string })._sbToken || '';
+  const token = (window as unknown as { _sbToken?: string })._sbToken;
+  if (!token) {
+    setTimeout(() => { void loadExamDates(); }, 500);
+    return;
+  }
   try {
     const res = await fetch('/api/study/exam-dates', {
       headers: { Authorization: 'Bearer ' + token }
