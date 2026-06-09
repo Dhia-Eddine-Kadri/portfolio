@@ -58,7 +58,7 @@ interface DailyMissionState {
   todayDate: string;
   selectedCourseId: string | null;
   examDates: Record<string, string>; // courseId → exam date (YYYY-MM-DD)
-  examDateModalShownToday: boolean; // Track if modal was shown in this session
+  examDateModalShownForCourses: Set<string>; // Track which courses had modal shown
   urgencyMeta?: {
     message: string;
     recommendExamGeneration: boolean;
@@ -77,7 +77,7 @@ const _state: DailyMissionState = {
   todayDate: '',
   selectedCourseId: null,
   examDates: {},
-  examDateModalShownToday: false,
+  examDateModalShownForCourses: new Set(),
   urgencyMeta: undefined,
 };
 
@@ -245,9 +245,12 @@ async function loadTodaysTasks(force = false): Promise<void> {
     )];
     const missingDates = courseIds.filter((id) => !_state.examDates[id]);
     console.log('[DailyMission] courseIds for modal:', courseIds, 'missingDates:', missingDates);
-    if (merged.length > 0 && missingDates.length > 0 && !_state.examDateModalShownToday) {
+
+    // Only show modal once per unique set of missing dates
+    const missingKey = missingDates.sort().join(',');
+    if (merged.length > 0 && missingDates.length > 0 && !_state.examDateModalShownForCourses.has(missingKey)) {
       console.log('[DailyMission] Showing exam date modal for:', missingDates);
-      _state.examDateModalShownToday = true;
+      _state.examDateModalShownForCourses.add(missingKey);
       setTimeout(() => { void showExamDateModal(); }, 500);
     }
   } catch (err) {
@@ -468,7 +471,14 @@ function _renderWidget(): void {
   // Filter tasks by selected course if one is selected
   let displayTasks = _state.tasks.filter((t) => t.status !== 'replaced');
   if (_state.selectedCourseId) {
-    displayTasks = displayTasks.filter((t) => (t as DailyMissionTask & { _courseId?: string })._courseId === _state.selectedCourseId);
+    const filtered = displayTasks.filter((t) => (t as DailyMissionTask & { _courseId?: string })._courseId === _state.selectedCourseId);
+    // If selected course has no tasks, show all tasks instead
+    if (filtered.length === 0 && displayTasks.length > 0) {
+      console.log('[DailyMission] Selected course has no tasks, showing all courses');
+      _state.selectedCourseId = null;
+    } else {
+      displayTasks = filtered;
+    }
   }
 
   const done = displayTasks.filter((t) => t.status === 'completed').length;
