@@ -809,14 +809,6 @@ function _renderPreviewCard(): void {
   generatePlan,
 };
 
-// Auto-load when courses data is ready
-function _tryAutoLoad(): void {
-  void loadExamDates();
-  if (_allCourseIds().length) {
-    void loadTodaysTasks();
-  }
-}
-
 // Start loading after a short delay to let SEMS/courses data settle
 // Load exam dates FIRST, then load tasks (to avoid race condition)
 async function _loadSequential(): Promise<void> {
