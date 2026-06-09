@@ -440,7 +440,78 @@ export function sequenceTasksForSubject(
   return result;
 }
 
-// ── E. Weekly plan generation ─────────────────────────────────────────────────
+// ── E. Study phase & urgency calculation ──────────────────────────────────────
+
+type StudyPhase = 'normal' | 'exam_prep' | 'final_week' | 'crisis';
+
+interface StudyUrgency {
+  phase: StudyPhase;
+  daysUntilExam: number;
+  studiedPercentage: number;
+  requiredDailyCompletion: number;
+  isUrg: boolean;
+  recommendCheatsheet: boolean;
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+async function calculateStudyUrgency(
+  userId: string,
+  courseId: string,
+  serviceKey: string,
+  today: Date
+): Promise<StudyUrgency> {
+  const subjectStateUrl =
+    'student_subject_state?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&course_id=eq.' +
+    encodeURIComponent(courseId) +
+    '&select=*&limit=1';
+  const ssRes = await supaRequest<SubjectState[]>('GET', subjectStateUrl, null, serviceKey);
+  const subjectState = Array.isArray(ssRes.body) ? ssRes.body[0] : null;
+
+  // Get topics to calculate % studied
+  const topicStateUrl =
+    'student_topic_state?user_id=eq.' +
+    encodeURIComponent(userId) +
+    '&course_id=eq.' +
+    encodeURIComponent(courseId) +
+    '&select=*&limit=1000';
+  const tsRes = await supaRequest<TopicState[]>('GET', topicStateUrl, null, serviceKey);
+  const topicStates = Array.isArray(tsRes.body) ? tsRes.body : [];
+
+  const totalTopics = topicStates.length || 1;
+  const studiedTopics = topicStates.filter(
+    (t) => t.progress_state && ['studied', 'practiced', 'mastered'].includes(t.progress_state)
+  ).length;
+  const studiedPercentage = Math.round((studiedTopics / totalTopics) * 100);
+
+  const examDate = subjectState?.exam_date ? new Date(subjectState.exam_date + 'T00:00:00Z') : null;
+  const daysUntilExam = examDate ? daysBetween(today, examDate) : 999;
+
+  // Determine study phase
+  let phase: StudyPhase = 'normal';
+  if (daysUntilExam <= 7) phase = 'final_week';
+  else if (daysUntilExam <= 21) phase = 'exam_prep';
+
+  // Crisis detection: not enough studied by now
+  const requiredByNow = Math.max(20, 100 - daysUntilExam * 5); // 5% per day minimum
+  const isCrisis = daysUntilExam <= 7 && studiedPercentage < requiredByNow;
+  if (isCrisis) phase = 'crisis';
+
+  return {
+    phase,
+    daysUntilExam,
+    studiedPercentage,
+    requiredDailyCompletion: daysUntilExam > 0 ? Math.ceil((100 - studiedPercentage) / daysUntilExam) : 100,
+    isUrg: studiedPercentage < requiredByNow,
+    recommendCheatsheet: daysUntilExam <= 7 && studiedPercentage >= 70,
+  };
+}
+
+// ── F. Weekly plan generation ─────────────────────────────────────────────────
 
 export async function generateWeeklyPlan(
   userId: string,
@@ -488,6 +559,12 @@ export async function generateWeeklyPlan(
       .map((s) => s.course_id),
   ]);
 
+  // Calculate study urgency for task filtering
+  let urgency: StudyUrgency | null = null;
+  if (courseId) {
+    urgency = await calculateStudyUrgency(userId, courseId, serviceKey, weekStartObj);
+  }
+
   // Collect valid candidates.
   const allCandidates = await collectCandidates(userId, serviceKey, courseId ?? undefined);
 
@@ -507,6 +584,29 @@ export async function generateWeeklyPlan(
 
   // Filter excluded courses.
   candidates = candidates.filter((c) => !excludedCourses.has(c.course_id));
+
+  // Phase-based task filtering
+  if (urgency) {
+    if (urgency.phase === 'crisis' || urgency.phase === 'final_week') {
+      // Crisis/final week: only exams, quizzes, and practice
+      candidates = candidates.filter((c) =>
+        ['generate_quiz_if_no_exercises', 'exam_style_practice', 'solve_exercise_sheet', 'practice_problem_set'].includes(c.task_type)
+      );
+    } else if (urgency.phase === 'exam_prep') {
+      // Exam prep: reduce lectures, increase practice
+      const lectureRatio = candidates.filter((c) => c.task_type === 'study_topic' || c.task_type === 'read_pages').length /
+        Math.max(1, candidates.length);
+      if (lectureRatio > 0.5) {
+        // Too many lectures, reduce them
+        candidates = candidates.filter((c) => {
+          if (c.task_type === 'study_topic' || c.task_type === 'read_pages') {
+            return Math.random() > 0.4; // Keep 60% of lectures
+          }
+          return true;
+        });
+      }
+    }
+  }
 
   // Fetch topic states.
   let topicStateUrl =
@@ -681,6 +781,7 @@ export async function generateWeeklyPlan(
     planId,
     taskCount: taskRows.length,
     subjects: [...subjectsSeen],
+    urgency,
   };
 }
 

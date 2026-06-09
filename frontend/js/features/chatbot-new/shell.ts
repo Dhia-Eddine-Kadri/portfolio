@@ -880,10 +880,11 @@ async function streamAiReply(
 
 type IntentRouteResult = { text: string; missionMarker?: MissionMarker };
 
-// ── Cheatsheet-from-chatbot helpers ──────────────────────────────────────────
+// ── PDF settings card (shared by cheatsheet + summary) ───────────────────────
 
-interface CheatsheetChatSettings {
-  columns: 2 | 3 | 4;
+interface PdfChatSettings {
+  columns: number;
+  pages: string;   // 'auto' | '1' | '2' | '3' | '4'
   fontSize: 'small' | 'medium' | 'large';
   padding: 'tight' | 'normal' | 'wide';
   language: string;
@@ -897,14 +898,24 @@ function detectCheatsheetLangPref(text: string): string {
   return 'source';
 }
 
+interface PdfSettingsCardConfig {
+  title: string;
+  columnChoices: string[];
+  defaultColumns: string;
+  showPages: boolean;
+  showLanguage: boolean;
+  initialLang?: string;
+  generateLabel?: string;
+}
+
 /**
  * Render an interactive settings card inside `bubble` and resolve with the
- * user's chosen layout settings once they click "Generate PDF".
+ * user's chosen layout settings once they click the generate button.
  */
-function showCheatsheetSettingsCard(
+function showPdfSettingsCard(
   bubble: HTMLElement | null,
-  initialLang: string
-): Promise<CheatsheetChatSettings | null> {
+  cfg: PdfSettingsCardConfig
+): Promise<PdfChatSettings | null> {
   return new Promise((resolve) => {
     if (!bubble) { resolve(null); return; }
 
@@ -928,25 +939,40 @@ function showCheatsheetSettingsCard(
         '</div>' +
       '</div>';
 
-    card.innerHTML =
-      '<div class="ncb-cs-settings-title">Customize your cheatsheet PDF</div>' +
-      renderGroup('columns', 'Columns',
-        [{ val: '2', label: '2' }, { val: '3', label: '3' }, { val: '4', label: '4' }], '3') +
+    const colOpts = cfg.columnChoices.map(v => ({ val: v, label: v }));
+    let html =
+      '<div class="ncb-cs-settings-title">' + escapeHtml(cfg.title) + '</div>' +
+      renderGroup('columns', 'Columns', colOpts, cfg.defaultColumns);
+
+    if (cfg.showPages) {
+      html += renderGroup('pages', 'Pages',
+        [{ val: 'auto', label: 'Auto' }, { val: '1', label: '1' },
+         { val: '2', label: '2' }, { val: '3', label: '3' }, { val: '4', label: '4' }],
+        'auto');
+    }
+
+    html +=
       renderGroup('fontSize', 'Font size',
         [{ val: 'small', label: 'Small' }, { val: 'medium', label: 'Medium' }, { val: 'large', label: 'Large' }],
         'medium') +
       renderGroup('padding', 'Padding',
         [{ val: 'tight', label: 'Tight' }, { val: 'normal', label: 'Normal' }, { val: 'wide', label: 'Wide' }],
-        'normal') +
-      renderGroup('language', 'Language', [
+        'normal');
+
+    if (cfg.showLanguage) {
+      html += renderGroup('language', 'Language', [
         { val: 'source', label: 'Document language' },
         { val: 'en', label: 'English' },
         { val: 'de', label: 'German' },
         { val: 'de_terms_en_explanations', label: 'DE terms + EN' },
-      ], initialLang) +
-      '<div class="ncb-cs-settings-footer">' +
-        '<button type="button" class="ncb-cs-generate">Generate PDF</button>' +
-      '</div>';
+      ], cfg.initialLang || 'source');
+    }
+
+    html += '<div class="ncb-cs-settings-footer">' +
+      '<button type="button" class="ncb-cs-generate">' +
+      escapeHtml(cfg.generateLabel || 'Generate PDF') + '</button></div>';
+
+    card.innerHTML = html;
 
     card.addEventListener('click', (e) => {
       const btn = (e.target as Element).closest<HTMLButtonElement>('.ncb-cs-opt');
@@ -961,12 +987,13 @@ function showCheatsheetSettingsCard(
       card.querySelector<HTMLButtonElement>(`[data-key="${key}"] .ncb-cs-opt--active`)?.dataset.val ?? '';
 
     card.querySelector('.ncb-cs-generate')?.addEventListener('click', () => {
-      const columns = (parseInt(getVal('columns') || '3', 10) || 3) as 2 | 3 | 4;
+      const columns = parseInt(getVal('columns') || cfg.defaultColumns, 10) || parseInt(cfg.defaultColumns, 10);
+      const pages = getVal('pages') || 'auto';
       const fontSize = (getVal('fontSize') || 'medium') as 'small' | 'medium' | 'large';
       const padding = (getVal('padding') || 'normal') as 'tight' | 'normal' | 'wide';
       const language = getVal('language') || 'source';
       card.remove();
-      resolve({ columns, fontSize, padding, language });
+      resolve({ columns, pages, fontSize, padding, language });
     });
 
     bubble.innerHTML = '';
@@ -1053,42 +1080,167 @@ async function handleIntentRoute(
     return { text, missionMarker: marker };
   }
 
-  if (route.intent === 'summary') {
-    const skillStatus = showIntentSkillLoading(bubble, thinking, 'summary');
-    thinking?.set('Finding source context');
-    const mod = await import('../../services/ai-service.js');
-    thinking?.set('Reading course sources');
-    const result = await mod.generateStudyTool(route.target.courseId, 'summary') as { text?: string };
-    thinking?.set('Formatting summary');
-    const text = 'Summary created from your current course sources.\n\n' + ((result && result.text) || 'No summary was returned.');
-    await finishIntentSkillLoading(skillStatus, thinking);
-    if (bubble) renderRichBubble(bubble, text);
-    return { text };
+  // ── Shared PDF layout helpers (used by both summary and cheatsheet) ──────────
+  const padMap: Record<string, string> = { tight: '6mm', normal: '10mm', wide: '16mm' };
+  const fontCsMap: Record<string, string> = { small: 'xs', medium: 'sm', large: 'md' };
+
+  /**
+   * Return the openCheatsheetPaper function (already loaded or no-op if missing).
+   * Wrapped in a thunk so it's re-read after ensureCheatsheetScripts() resolves.
+   */
+  const getOpenPaper = (): ((opts: Record<string, unknown>) => void) =>
+    (window as unknown as { openCheatsheetPaper?: (o: Record<string, unknown>) => void })
+      .openCheatsheetPaper ?? (() => { /* not yet loaded */ });
+
+  /** Build CSS layout settings from the user's card choices. */
+  const buildLayoutSettings = (s: PdfChatSettings, styleName = 'academic'): Record<string, unknown> => ({
+    columns: s.columns,
+    font: fontCsMap[s.fontSize] || 'sm',
+    pad: padMap[s.padding] || '10mm',
+    style: styleName,
+  });
+
+  /** Attach a persistent "Open PDF viewer" button whose click reopens the overlay. */
+  function attachReopenButton(
+    host: HTMLElement,
+    getPaperOpts: () => Record<string, unknown> | null
+  ): void {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ncb-cs-reopen-btn';
+    btn.textContent = '⤓ Open PDF viewer';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = 'Loading…';
+      ensureCheatsheetScripts()
+        .then(() => { const o = getPaperOpts(); if (o) getOpenPaper()(o); })
+        .catch(() => { const o = getPaperOpts(); if (o) getOpenPaper()(o); })
+        .finally(() => { btn.disabled = false; btn.textContent = '⤓ Open PDF viewer'; });
+    });
+    host.appendChild(btn);
   }
 
+  // ── summary ──────────────────────────────────────────────────────────────────
+  if (route.intent === 'summary') {
+    // 1. Show settings card
+    if (thinking) await thinking.waitMinimum();
+    thinking?.remove(true);
+
+    const chatSettings = await showPdfSettingsCard(bubble, {
+      title: 'Customize your summary PDF',
+      columnChoices: ['1', '2', '3'],
+      defaultColumns: '2',
+      showPages: true,
+      showLanguage: false,
+      generateLabel: 'Generate PDF',
+    });
+    if (!chatSettings) {
+      const text = 'Summary cancelled.';
+      if (bubble) renderRichBubble(bubble, text);
+      return { text };
+    }
+
+    // 2. Generate
+    const genThinkingSum = bubble
+      ? createAIThinkingStatus({ context: 'general', host: bubble, surface: 'chatbot', compact: true, append: true })
+      : null;
+    const skillStatusSum = showIntentSkillLoading(bubble, genThinkingSum, 'summary');
+    genThinkingSum?.set('Finding source context');
+
+    const [modSum] = await Promise.all([
+      import('../../services/ai-service.js'),
+      ensureCheatsheetScripts(),
+    ]);
+    genThinkingSum?.set('Reading course sources');
+
+    const sumResult = await modSum.generateStudyTool(
+      route.target.courseId, 'summary'
+    ) as { text?: string; title?: string };
+
+    genThinkingSum?.set('Opening paper view');
+    await finishIntentSkillLoading(skillStatusSum, genThinkingSum);
+
+    // 3. Build opts; persist full markdown to localStorage (no noteId for summary)
+    const sumLayout = buildLayoutSettings(chatSettings);
+    const sumLsKey = 'minallo_sum_last_' + route.target.courseId;
+    let sumPaperOpts: Record<string, unknown> | null = sumResult && sumResult.text ? {
+      course: route.target.courseId,
+      title: sumResult.title || 'Summary',
+      scope: sumResult.title || 'Course summary',
+      meta: '',
+      markdown: sumResult.text,
+      settings: sumLayout,
+    } : null;
+
+    if (sumPaperOpts) {
+      try {
+        localStorage.setItem(sumLsKey, JSON.stringify({
+          markdown: sumResult.text,
+          title: sumResult.title || 'Summary',
+          settings: sumLayout,
+        }));
+      } catch { /* storage full — non-fatal */ }
+      getOpenPaper()(sumPaperOpts);
+    }
+
+    const sumText = sumPaperOpts
+      ? 'Your summary is ready. The PDF viewer is open — click **⤓ Download PDF** to save it.'
+      : 'No summary could be generated from your course sources. Please try again.';
+    if (bubble) renderRichBubble(bubble, sumText);
+
+    if (bubble && sumPaperOpts) {
+      attachReopenButton(bubble, () => {
+        if (sumPaperOpts) return sumPaperOpts;
+        // Fallback: restore from localStorage after page refresh
+        try {
+          const stored = JSON.parse(localStorage.getItem(sumLsKey) || 'null') as
+            { markdown: string; title: string; settings: Record<string, unknown> } | null;
+          if (stored?.markdown) {
+            sumPaperOpts = {
+              course: route.target.courseId,
+              title: stored.title,
+              scope: stored.title,
+              meta: '',
+              markdown: stored.markdown,
+              settings: stored.settings ?? sumLayout,
+            };
+          }
+        } catch { /* ignore */ }
+        return sumPaperOpts;
+      });
+    }
+    return { text: sumText };
+  }
+
+  // ── cheatsheet ────────────────────────────────────────────────────────────
   if (route.intent === 'cheatsheet') {
     // 1. Detect language preference from the user's message
     const langPref = detectCheatsheetLangPref(last.text);
 
-    // 2. Remove loading indicator and show settings card
+    // 2. Show settings card
     if (thinking) await thinking.waitMinimum();
     thinking?.remove(true);
 
-    const chatSettings = await showCheatsheetSettingsCard(bubble, langPref);
+    const chatSettings = await showPdfSettingsCard(bubble, {
+      title: 'Customize your cheatsheet PDF',
+      columnChoices: ['2', '3', '4'],
+      defaultColumns: '3',
+      showPages: true,
+      showLanguage: true,
+      initialLang: langPref,
+      generateLabel: 'Generate PDF',
+    });
     if (!chatSettings) {
       const text = 'Cheatsheet cancelled.';
       if (bubble) renderRichBubble(bubble, text);
       return { text };
     }
 
-    // Map UI choices to API/CSS values
-    const padMap: Record<string, string> = { tight: '6mm', normal: '10mm', wide: '16mm' };
     const fontApiMap: Record<string, 'small' | 'medium' | 'large'> = {
       small: 'small', medium: 'medium', large: 'large'
     };
-    const fontCsMap: Record<string, string> = { small: 'xs', medium: 'sm', large: 'md' };
 
-    // 3. Run generation with a fresh thinking indicator
+    // 3. Generate
     const genThinking = bubble
       ? createAIThinkingStatus({ context: 'general', host: bubble, surface: 'chatbot', compact: true, append: true })
       : null;
@@ -1103,7 +1255,7 @@ async function handleIntentRoute(
 
     const result = await mod.generateCheatsheet(route.target.courseId, {
       settings: {
-        columns: chatSettings.columns,
+        columns: chatSettings.columns as 2 | 3 | 4,
         fontSize: fontApiMap[chatSettings.fontSize],
         output: 'web',
         language: chatSettings.language as 'source' | 'en' | 'de' | 'de_terms_en_explanations',
@@ -1113,13 +1265,8 @@ async function handleIntentRoute(
     genThinking?.set('Opening paper view');
     await finishIntentSkillLoading(skillStatus, genThinking);
 
-    // 4. Build paper opts — reused for the initial open and the reopen button
-    const csLayoutSettings = {
-      columns: chatSettings.columns,
-      font: fontCsMap[chatSettings.fontSize] || 'sm',
-      pad: padMap[chatSettings.padding] || '10mm',
-      style: (result.settings && result.settings.style) || 'academic',
-    };
+    // 4. Build opts and persist
+    const csLayoutSettings = buildLayoutSettings(chatSettings, (result.settings && result.settings.style as string) || 'academic');
     let paperOpts: Record<string, unknown> | null = result && result.text ? {
       course: route.target.courseId,
       title: result.title || 'Cheatsheet',
@@ -1129,8 +1276,6 @@ async function handleIntentRoute(
       settings: csLayoutSettings,
     } : null;
 
-    // Persist to localStorage so the reopen button survives a page refresh.
-    // Keyed per course so multiple courses don't overwrite each other.
     const lsKey = 'minallo_cs_last_' + route.target.courseId;
     if (paperOpts && result.noteId) {
       try {
@@ -1142,15 +1287,7 @@ async function handleIntentRoute(
       } catch { /* storage full — non-fatal */ }
     }
 
-    const openFn = (): (opts: Record<string, unknown>) => void => {
-      return (window as unknown as {
-        openCheatsheetPaper?: (opts: Record<string, unknown>) => void
-      }).openCheatsheetPaper ?? (() => { /* not loaded yet */ });
-    };
-
-    const callOpenPaper = (): void => { if (paperOpts) openFn()(paperOpts); };
-
-    if (paperOpts) callOpenPaper();
+    if (paperOpts) getOpenPaper()(paperOpts);
 
     const savedNote = !!result.noteId;
     const text = paperOpts
@@ -1159,45 +1296,30 @@ async function handleIntentRoute(
       : 'No cheatsheet content was returned. Please try again.';
     if (bubble) renderRichBubble(bubble, text);
 
-    // Reopen button: uses in-memory opts if available, otherwise fetches from
-    // the saved note (works after a page refresh as long as the note was saved).
     if (bubble && (paperOpts || result.noteId)) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ncb-cs-reopen-btn';
-      btn.textContent = '⤓ Open PDF viewer';
-      btn.addEventListener('click', () => {
-        btn.disabled = true;
-        btn.textContent = 'Loading…';
-        const restore = (): Promise<void> => {
-          if (paperOpts) return Promise.resolve();
-          // In-memory opts were lost (page refresh) — reload from localStorage/API
-          const stored = (() => {
-            try { return JSON.parse(localStorage.getItem(lsKey) || 'null'); } catch { return null; }
-          })() as { noteId: string; title: string; settings: Record<string, unknown> } | null;
+      attachReopenButton(bubble, () => {
+        if (paperOpts) return paperOpts;
+        // Restore from localStorage/API after page refresh
+        try {
+          const stored = JSON.parse(localStorage.getItem(lsKey) || 'null') as
+            { noteId: string; title: string; settings: Record<string, unknown> } | null;
           const noteId = stored?.noteId ?? result.noteId;
-          if (!noteId) return Promise.reject(new Error('no noteId'));
-          return import('../../services/ai-service.js').then(svc =>
-            svc.getNoteById(noteId)
-          ).then(note => {
-            if (!note) throw new Error('note not found');
-            paperOpts = {
-              course: route.target.courseId,
-              title: note.title || stored?.title || 'Cheatsheet',
-              scope: note.title || 'Course cheatsheet',
-              meta: '',
-              markdown: note.content_markdown,
-              settings: stored?.settings ?? csLayoutSettings,
-            };
-          });
-        };
-        ensureCheatsheetScripts()
-          .then(restore)
-          .then(() => { callOpenPaper(); })
-          .catch(() => { /* silently ignore — openFn will no-op */ })
-          .finally(() => { btn.disabled = false; btn.textContent = '⤓ Open PDF viewer'; });
+          if (noteId) {
+            // Async load — we return null here and the button retries via the click handler
+            import('../../services/ai-service.js').then(svc => svc.getNoteById(noteId)).then(note => {
+              if (note) paperOpts = {
+                course: route.target.courseId,
+                title: note.title || stored?.title || 'Cheatsheet',
+                scope: note.title || 'Course cheatsheet',
+                meta: '',
+                markdown: note.content_markdown,
+                settings: stored?.settings ?? csLayoutSettings,
+              };
+            }).catch(() => { /* non-fatal */ });
+          }
+        } catch { /* ignore */ }
+        return paperOpts;
       });
-      bubble.appendChild(btn);
     }
 
     return { text };

@@ -62,6 +62,13 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         minutesRemaining: remaining,
         status: 'active',
       },
+      meta: {
+        message: result.urgency ? (result.urgency.isUrg ? '⚠️ You\'re behind schedule. Focus on exams and practice.' : '') : '',
+        recommendExamGeneration: result.urgency?.phase === 'crisis' || result.urgency?.phase === 'final_week',
+        recommendCheatsheet: result.urgency?.recommendCheatsheet,
+        daysUntilExam: result.urgency?.daysUntilExam,
+        studiedPercentage: result.urgency?.studiedPercentage,
+      },
     });
   } catch (err) {
     console.error('[study-daily-plan-generate] Error:', err);
