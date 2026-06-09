@@ -173,7 +173,7 @@ body:not(.night) .dm-progress-track { background: rgba(15, 23, 42, 0.08); }
    resize handle (same corner) and set an explicit short height that cut the
    list and got wiped on every re-render. Height is driven by the tile only. */
 .dm-widget {
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
   border-radius: 12px;

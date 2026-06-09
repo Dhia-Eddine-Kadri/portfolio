@@ -365,7 +365,7 @@
             'css/theme.css?v=5',
             'css/styles.css?v=37',
             'css/courses-redesign.css?v=39',
-            'views/daily-mission/daily-mission.css?v=5',
+            'views/daily-mission/daily-mission.css?v=6',
             'css/app-design-system.css?v=5',
             'css/layout.css?v=10',
             'css/document-rail.css?v=28',
@@ -559,7 +559,7 @@
                     ],
                 };
                 const lazyCssMap = {
-                    dashboard: ['views/dashboard/dashboard.css'],
+                    dashboard: ['views/dashboard/dashboard.css?v=2'],
                     chat: ['views/chat/chat.css'],
                     aipage: ['views/chatbot/chatbot.css?v=6'],
                     german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
