@@ -56,6 +56,7 @@ interface DailyMissionState {
   error: string | null;
   lastLoaded: number;
   todayDate: string;
+  selectedCourseId: string | null; // Currently selected course for filtering
 }
 
 const _state: DailyMissionState = {
@@ -65,6 +66,7 @@ const _state: DailyMissionState = {
   error: null,
   lastLoaded: 0,
   todayDate: '',
+  selectedCourseId: null,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -291,16 +293,37 @@ function _renderWidget(): void {
 
   const d = new Date();
   const dateStr = _formatDate(d);
-  const tasks = _state.tasks.filter((t) => t.status !== 'replaced');
-  const done = tasks.filter((t) => t.status === 'completed').length;
-  const total = tasks.length;
+
+  // Filter tasks by selected course if one is selected
+  let displayTasks = _state.tasks.filter((t) => t.status !== 'replaced');
+  if (_state.selectedCourseId) {
+    displayTasks = displayTasks.filter((t) => (t as DailyMissionTask & { _courseId?: string })._courseId === _state.selectedCourseId);
+  }
+
+  const done = displayTasks.filter((t) => t.status === 'completed').length;
+  const total = displayTasks.length;
 
   let inner = '';
 
-  // Header
+  // Header with course picker
   inner += '<div class="dm-widget-header">';
+  inner += '<div class="dm-widget-title-row">';
   inner += '<span class="dm-widget-title">Today\'s Mission</span>';
   inner += '<span class="dm-widget-date">' + escapeHtml(dateStr) + '</span>';
+  inner += '</div>';
+
+  // Course picker
+  const courseIds = [...new Set(_state.tasks.map((t) => (t as DailyMissionTask & { _courseId?: string })._courseId || '').filter(Boolean))];
+  if (courseIds.length > 1) {
+    inner += '<select class="dm-course-picker">';
+    inner += '<option value="">All Courses</option>';
+    courseIds.forEach((cid) => {
+      const selected = _state.selectedCourseId === cid ? ' selected' : '';
+      inner += '<option value="' + escapeHtml(cid) + '"' + selected + '>' + escapeHtml(_courseName(cid)) + '</option>';
+    });
+    inner += '</select>';
+  }
+
   if (total > 0) {
     inner += '<span class="dm-widget-progress">' + done + ' / ' + total + ' done</span>';
   }
@@ -325,8 +348,8 @@ function _renderWidget(): void {
     inner += '<button type="button" class="dm-btn-generate dm-cta">Plan My Week</button>';
     inner += '</div>';
   } else {
-    // Show all tasks in scrollable container
-    const visible = tasks.filter((t) => t.status !== 'skipped');
+    // Show all tasks in scrollable container (filtered by course)
+    const visible = displayTasks.filter((t) => t.status !== 'skipped');
     inner += '<div class="dm-widget-tasks dm-widget-tasks--scrollable">';
     visible.forEach((t) => {
       inner += _buildTaskRowHtml(t as DailyMissionTask & { _courseId?: string });
@@ -343,10 +366,17 @@ function _bindWidgetActions(host: HTMLElement): void {
   if (generate) {
     generate.addEventListener('click', () => { void generatePlan(); });
   }
-  const openAi = host.querySelector('.dm-btn-open-ai');
-  if (openAi) {
-    openAi.addEventListener('click', _openInAi);
+
+  // Course picker
+  const picker = host.querySelector<HTMLSelectElement>('.dm-course-picker');
+  if (picker) {
+    picker.addEventListener('change', (e) => {
+      _state.selectedCourseId = (e.target as HTMLSelectElement).value || null;
+      _renderWidget();
+      _bindWidgetActions(host);
+    });
   }
+
   host.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((btn) => {
     const action = btn.getAttribute('data-action');
     const taskId = btn.getAttribute('data-task-id');

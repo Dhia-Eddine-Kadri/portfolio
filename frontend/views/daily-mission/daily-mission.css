@@ -165,6 +165,46 @@ body:not(.night) .dm-progress-track { background: rgba(15, 23, 42, 0.08); }
   border-radius: 12px;
 }
 
+/* Widget header with course picker */
+.dm-widget-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dm-widget-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Course picker dropdown */
+.dm-course-picker {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text, #e2e8f0);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.dm-course-picker:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.dm-course-picker:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+body:not(.night) .dm-course-picker {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: #1e293b;
+}
+
 /* Widget scrollable task list */
 .dm-widget-tasks--scrollable {
   max-height: 500px;
