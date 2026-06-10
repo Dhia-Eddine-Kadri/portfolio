@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+import os
+import threading
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ..supabase_client import get_supabase
@@ -48,6 +50,110 @@ log = logging.getLogger(__name__)
 
 class IndexingError(Exception):
     """Indexing failed in a way the caller (the API layer) needs to surface."""
+
+
+# ── Concurrency + crash recovery ─────────────────────────────────────────────
+#
+# Indexing is heavy (download → OCR render → embed) and runs in-process via the
+# router's BackgroundTask, sharing the same threadpool that serves answers and
+# generation. Two safeguards keep an upload burst (or a redeploy) from hurting
+# the rest of the service:
+#   1. A bounded semaphore caps how many documents index at once PER PROCESS, so
+#      uploads can't drain the event-loop threadpool and starve generation. It
+#      also protects the 2 GB box from N concurrent vision-OCR rasterizations.
+#   2. recover_orphaned_indexing() re-queues documents a killed process left
+#      stuck mid-pipeline (the "frozen in extracting_text after a deploy" trap).
+# Env-overridable; no settings.py change needed.
+
+_INDEXING_MAX_CONCURRENCY = max(1, int(os.getenv("INDEXING_MAX_CONCURRENCY", "2")))
+_INDEXING_RECOVERY_AGE_SECONDS = max(60, int(os.getenv("INDEXING_RECOVERY_AGE_SECONDS", "120")))
+_INDEXING_SEMAPHORE = threading.BoundedSemaphore(_INDEXING_MAX_CONCURRENCY)
+
+# Non-terminal statuses an interrupted indexing run leaves behind.
+_IN_FLIGHT_STATUSES = ("extracting_text", "chunking", "embedding")
+
+
+def run_document_indexing(document_id: str, *, force: bool = False) -> dict[str, Any]:
+    """Concurrency-bounded entrypoint for indexing — what callers should use.
+
+    Caps concurrent indexing per process (``_INDEXING_SEMAPHORE``) so an upload
+    burst can't exhaust the threadpool that also serves answers/generation, then
+    delegates to :func:`index_document`. Blocks until a slot frees."""
+    with _INDEXING_SEMAPHORE:
+        return index_document(document_id, force=force)
+
+
+def claim_orphaned_indexing() -> list[str]:
+    """Atomically claim documents left mid-indexing by a dead process.
+
+    Selects rows stuck in a non-terminal status and untouched for longer than
+    ``_INDEXING_RECOVERY_AGE_SECONDS`` (the staleness guard means we never grab a
+    document a peer worker is actively processing — a live run re-stamps
+    ``updated_at`` at each phase). For each candidate we issue a guarded UPDATE
+    (``WHERE updated_at < threshold``) that re-stamps ``updated_at``; Postgres
+    serializes the writes, so only the worker whose UPDATE actually changes the
+    row claims it — every other worker's guarded UPDATE matches 0 rows. Returns
+    the claimed document ids. Never raises."""
+    sb = get_supabase()
+    threshold_iso = (
+        datetime.now(timezone.utc) - timedelta(seconds=_INDEXING_RECOVERY_AGE_SECONDS)
+    ).isoformat()
+    try:
+        stuck = (
+            sb.table("documents")
+            .select("id, processing_status, updated_at")
+            .in_("processing_status", list(_IN_FLIGHT_STATUSES))
+            .lt("updated_at", threshold_iso)
+            .limit(200)
+            .execute()
+        ).data or []
+    except Exception:  # noqa: BLE001
+        log.exception("claim_orphaned_indexing: failed to query stuck documents")
+        return []
+
+    claimed: list[str] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for row in stuck:
+        doc_id = row.get("id")
+        if not doc_id:
+            continue
+        try:
+            resp = (
+                sb.table("documents")
+                .update({"updated_at": now_iso})
+                .eq("id", doc_id)
+                .lt("updated_at", threshold_iso)
+                .execute()
+            )
+            if resp.data:
+                claimed.append(doc_id)
+        except Exception:  # noqa: BLE001
+            log.exception("claim_orphaned_indexing: claim failed for %s", doc_id)
+    return claimed
+
+
+def recover_orphaned_indexing() -> int:
+    """Claim and re-index documents orphaned by a killed/redeployed process.
+
+    Meant to run once per process at startup (off the request path). Re-indexes
+    each claimed document with ``force=True`` — the partial state from the
+    interrupted run is unreliable, and ``index_document`` is idempotent (it
+    deletes existing pages/chunks first). Returns the number re-queued."""
+    claimed = claim_orphaned_indexing()
+    if not claimed:
+        return 0
+    log.warning(
+        "recover_orphaned_indexing: re-indexing %d orphaned document(s): %s",
+        len(claimed), claimed,
+    )
+    for doc_id in claimed:
+        try:
+            run_document_indexing(doc_id, force=True)
+        except IndexingError:
+            log.warning("recover_orphaned_indexing: reindex failed for %s", doc_id)
+        except Exception:  # noqa: BLE001
+            log.exception("recover_orphaned_indexing: unexpected error reindexing %s", doc_id)
+    return len(claimed)
 
 
 def index_document(document_id: str, *, force: bool = False) -> dict[str, Any]:

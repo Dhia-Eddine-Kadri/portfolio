@@ -16,7 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ..auth import require_internal_token
-from ..services.indexing import IndexingError, get_index_status, index_document
+from ..services.indexing import IndexingError, get_index_status, run_document_indexing
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ def index_document_endpoint(
 
     def _run() -> None:
         try:
-            index_document(payload.documentId, force=payload.force)
+            run_document_indexing(payload.documentId, force=payload.force)
         except IndexingError:
             # Already recorded on the row by indexing.py — just log and move on.
             log.warning("indexing failed for document %s", payload.documentId)
