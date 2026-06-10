@@ -499,7 +499,8 @@ function _showEditMenu(anchor: HTMLElement): void {
   menu.className = 'dm-edit-menu';
   menu.innerHTML =
     '<button type="button" class="dm-edit-menu-item" data-edit-action="exam-date">Change exam date</button>' +
-    '<button type="button" class="dm-edit-menu-item" data-edit-action="done-files">Mark completed files</button>';
+    '<button type="button" class="dm-edit-menu-item" data-edit-action="done-files">Mark completed files</button>' +
+    '<button type="button" class="dm-edit-menu-item" data-edit-action="regenerate">Regenerate today’s plan</button>';
   document.body.appendChild(menu);
 
   const r = anchor.getBoundingClientRect();
@@ -528,9 +529,33 @@ function _showEditMenu(anchor: HTMLElement): void {
       if (action === 'done-files') {
         const cid = _editTargetCourseId();
         if (cid) void _showDoneFilesModal(cid);
+        return;
+      }
+      if (action === 'regenerate') {
+        const cid = _editTargetCourseId();
+        if (cid) void _regeneratePlan(cid);
       }
     });
   });
+}
+
+// Rebuild today's plan from scratch (the only user-facing way to refresh the
+// plan after marking files / fixing settings). Shows a transient loading state.
+async function _regeneratePlan(courseId: string): Promise<void> {
+  const toast = (window as unknown as { showToast?: (t: string, m: string) => void }).showToast;
+  toast?.('Regenerating…', 'Building a fresh plan for this course.');
+  _state.isLoading = true;
+  _renderWidget();
+  try {
+    await regenerateDailyMission(courseId);
+    await loadTodaysTasks(true);
+    toast?.('Plan updated', 'Today’s plan was regenerated.');
+  } catch (err) {
+    _state.isLoading = false;
+    _renderWidget();
+    console.error('[DailyMission] regenerate failed:', err);
+    toast?.('Could not regenerate', 'Please try again in a moment.');
+  }
 }
 
 async function _showDoneFilesModal(courseId: string): Promise<void> {
