@@ -8,6 +8,12 @@ primary_region = 'fra'
 
 [build]
 
+[env]
+  # Drives CORS origin allow-list + whether sourceDebug payloads are exposed to
+  # clients (app/main.py, ask.py). Must be 'production' on the live app so we
+  # don't ship debug internals or localhost CORS to real users.
+  ENVIRONMENT = 'production'
+
 [http_service]
   internal_port = 8080
   force_https = true
