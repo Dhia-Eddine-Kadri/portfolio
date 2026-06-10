@@ -29,7 +29,11 @@ export type { PossibleMatch, WeeklyStudyTask };
 
 // ── AI planner feature flag ────────────────────────────────────────────────────
 
-const AI_PLANNER_ON = optionalEnv('AI_PLANNER', 'off') === 'on';
+// Accept any common truthy spelling — a value of 'true'/'ON'/'1' was silently
+// disabling the AI planner because the old check required the exact string 'on'.
+const AI_PLANNER_ON = ['on', 'true', '1', 'yes', 'enabled'].includes(
+  optionalEnv('AI_PLANNER', 'off').trim().toLowerCase()
+);
 
 // ── AI planner contract types ─────────────────────────────────────────────────
 
@@ -1291,7 +1295,16 @@ export async function generateWeeklyPlan(
   // reads from each regenerating the same plan and stacking duplicate tasks.
   // Only the explicit generate endpoint passes true.
   regenerateExisting = true
-): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: StudyUrgency | null }> {
+): Promise<{ planId: string; taskCount: number; subjects: string[]; urgency: StudyUrgency | null; source?: 'ai' | 'deterministic'; aiError?: string }> {
+  // Diagnostic surfaced to the client so a fallback is visible without server
+  // logs: why the AI planner didn't produce this plan.
+  let aiError: string | undefined;
+  if (!AI_PLANNER_ON) {
+    aiError = 'AI planner disabled (AI_PLANNER not truthy)';
+  } else if (!pythonAiConfigured()) {
+    aiError = 'AI service not configured (AI_SERVICE_URL / INTERNAL_SECRET missing)';
+  }
+
   // AI planner path: try first, fall through to deterministic on any error.
   if (AI_PLANNER_ON && pythonAiConfigured()) {
     try {
@@ -1303,8 +1316,9 @@ export async function generateWeeklyPlan(
         serviceKey,
         regenerateExisting
       );
-      return aiResult;
+      return { ...aiResult, source: 'ai' };
     } catch (err) {
+      aiError = err instanceof Error ? err.message : String(err);
       console.error('[study-planner] AI planner failed, falling back to deterministic:', err);
       // Fall through to deterministic body below.
     }
@@ -1599,6 +1613,8 @@ export async function generateWeeklyPlan(
     taskCount: taskRows.length,
     subjects: [...subjectsSeen],
     urgency,
+    source: 'deterministic',
+    aiError,
   };
 }
 

@@ -88,6 +88,10 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         recommendCheatsheet: result.urgency?.recommendCheatsheet,
         daysUntilExam: result.urgency?.daysUntilExam,
         studiedPercentage: result.urgency?.studiedPercentage,
+        // Diagnostic: which planner produced this, and why the AI didn't (if it
+        // fell back). Visible in the network response so no server logs needed.
+        planSource: result.source,
+        aiError: result.aiError,
       },
     });
   } catch (err) {
