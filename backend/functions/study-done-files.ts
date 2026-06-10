@@ -220,14 +220,31 @@ async function revertUnmarkedFileTopics(
   const removedSet = new Set(removedDocs);
   const stillDoneSet = new Set(stillDoneDocs);
 
-  const toRevert: string[] = [];
+  const candidates: string[] = [];
   for (const t of topics) {
     const docs = Array.isArray(t.source_document_ids) ? t.source_document_ids.map((d) => String(d)) : [];
     const coveredByRemoved = docs.some((d) => removedSet.has(d));
     if (!coveredByRemoved) continue;
     const coveredByStillDone = docs.some((d) => stillDoneSet.has(d));
-    if (!coveredByStillDone) toRevert.push(t.id);
+    if (!coveredByStillDone) candidates.push(t.id);
   }
+  if (candidates.length === 0) return;
+
+  // Provenance guard: a candidate topic's 'studied' state may have been earned by
+  // actually completing a mission task (study-task.ts writes a 'task_completed'
+  // study event with the topic_id), not just by marking a file done. Never revert
+  // those — only revert topics that became studied purely from a file mark.
+  const eventsRes = await supaRequest<Array<{ topic_id: string }>>(
+    'GET',
+    'study_events?user_id=eq.' + encodeURIComponent(userId) +
+      '&event_type=eq.task_completed' +
+      '&topic_id=in.(' + candidates.map((id) => encodeURIComponent(id)).join(',') + ')' +
+      '&select=topic_id',
+    null,
+    serviceKey
+  );
+  const earned = new Set((Array.isArray(eventsRes.body) ? eventsRes.body : []).map((r) => r.topic_id));
+  const toRevert = candidates.filter((id) => !earned.has(id));
   if (toRevert.length === 0) return;
 
   await supaRequest(

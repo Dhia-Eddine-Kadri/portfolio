@@ -478,6 +478,15 @@ def _coerce_task(
             # e.g. an exercise/solution scheduled as a lecture to study — drop.
             return None
 
+    # The exercise's paired "related lecture" must itself be a lecture. If it's a
+    # known non-lecture (exercise/solution), strip the bad link rather than drop
+    # the whole exercise task — the exercise can still stand on its own.
+    related_lecture_file_id = str(raw.get("relatedLectureFileId") or "").strip() or None
+    related_lecture_file_name = str(raw.get("relatedLectureFileName") or "").strip() or None
+    if related_lecture_file_id and roles.get(related_lecture_file_id, "") in _NON_LECTURE_ROLES:
+        related_lecture_file_id = None
+        related_lecture_file_name = None
+
     try:
         est = int(raw.get("estimatedMinutes"))
     except (TypeError, ValueError):
@@ -521,8 +530,8 @@ def _coerce_task(
         ("exerciseFileName", _str_or_none(raw.get("exerciseFileName"))),
         ("solutionFileId", solution_file_id),
         ("solutionFileName", _str_or_none(raw.get("solutionFileName"))),
-        ("relatedLectureFileId", _str_or_none(raw.get("relatedLectureFileId"))),
-        ("relatedLectureFileName", _str_or_none(raw.get("relatedLectureFileName"))),
+        ("relatedLectureFileId", related_lecture_file_id),
+        ("relatedLectureFileName", related_lecture_file_name),
         ("pageRange", _str_or_none(raw.get("pageRange"))),
     ]:
         if value is not None:
@@ -925,7 +934,12 @@ def generate_week_plan(payload: dict[str, Any]) -> dict[str, Any]:
                 src_conf = str(raw_task.get("sourceConfidence") or "high").strip().lower()
                 ex_id = str(raw_task.get("exerciseFileId") or "").strip()
                 rel_lec_id = str(raw_task.get("relatedLectureFileId") or "").strip()
-                if task_type == "solve_exercise_sheet" and ex_id and rel_lec_id:
+                # A related "lecture" that is actually an exercise/solution is a
+                # bogus pairing — don't surface it as a possibleMatch. Let it fall
+                # through; _coerce_task strips the bad link and the exercise can
+                # still schedule standalone.
+                rel_is_bad_lecture = doc_roles.get(rel_lec_id, "") in _NON_LECTURE_ROLES
+                if task_type == "solve_exercise_sheet" and ex_id and rel_lec_id and not rel_is_bad_lecture:
                     uncertain = src_conf in ("medium", "low")
                     no_shared_topics = False
                     if not uncertain:
