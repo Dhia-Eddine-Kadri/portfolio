@@ -71,7 +71,10 @@ export function syncCourseProgress(
 ): void {
   const uid = _uid();
   if (!uid || !window._SUPA || !courseId) return;
-  void fetch(_base() + 'course_progress', {
+  // on_conflict targets the (user_id, course_id) unique key — without it
+  // PostgREST resolves the merge on the PK (id), so a repeat open of any file in
+  // an already-synced course 409s instead of updating.
+  void fetch(_base() + 'course_progress?on_conflict=user_id,course_id', {
     method: 'POST',
     headers: _headers({ Prefer: 'return=minimal,resolution=merge-duplicates' }),
     body: JSON.stringify({
@@ -88,7 +91,7 @@ export function syncCourseProgress(
 export function syncCourseAiSessions(courseId: string, sessionCount: number): void {
   const uid = _uid();
   if (!uid || !window._SUPA || !courseId) return;
-  void fetch(_base() + 'course_progress', {
+  void fetch(_base() + 'course_progress?on_conflict=user_id,course_id', {
     method: 'POST',
     headers: _headers({ Prefer: 'return=minimal,resolution=merge-duplicates' }),
     body: JSON.stringify({
