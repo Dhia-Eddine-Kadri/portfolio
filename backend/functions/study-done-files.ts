@@ -12,10 +12,11 @@ import { bodyJson, requireStudyAuth, validateCourseId, writeStudyEvent } from '.
 import { supaRequest } from '../lib/supabase-admin';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
-// Topic progress states a file-mark may set to 'studied'. Anything else
-// (practiced / mastered / weak / …) is already more advanced and must not be
-// downgraded by marking a file done.
-const _OVERWRITABLE_STATES = new Set(['', 'not_started', 'studied']);
+// Topic progress states a file-mark may write 'studied' onto. A topic already at
+// 'studied' is left untouched (re-writing would flatten its last_studied_at /
+// study_sessions); anything more advanced (practiced / mastered / weak / …) must
+// never be downgraded.
+const _MARKABLE_STATES = new Set(['', 'not_started']);
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
@@ -181,10 +182,11 @@ async function markFileTopicsStudied(
     return { topicsMarked: 0, ok: true, filesWithoutTopics };
   }
 
-  // Never downgrade a topic the user has advanced past 'studied' (practiced /
-  // mastered / weak). Only set 'studied' on topics that have no row yet or are at
-  // 'not_started'/'studied'. Fetch current states and filter first — the upsert
-  // would otherwise blindly overwrite progress_state back to 'studied'.
+  // Only write 'studied' onto topics with no row yet or at 'not_started'. Topics
+  // already 'studied' need no change (and rewriting them would flatten their
+  // metadata); anything more advanced (practiced/mastered/weak) must not be
+  // downgraded. Fetch current states and filter first — the upsert would
+  // otherwise blindly overwrite progress_state back to 'studied'.
   const idArr = [...topicIds];
   const stateRes = await supaRequest<Array<{ topic_id: string; progress_state: string }>>(
     'GET',
@@ -197,7 +199,7 @@ async function markFileTopicsStudied(
   const currentState = new Map(
     (Array.isArray(stateRes.body) ? stateRes.body : []).map((r) => [r.topic_id, String(r.progress_state || '')])
   );
-  const writeIds = idArr.filter((id) => _OVERWRITABLE_STATES.has(currentState.get(id) ?? ''));
+  const writeIds = idArr.filter((id) => _MARKABLE_STATES.has(currentState.get(id) ?? ''));
 
   if (writeIds.length === 0) {
     // Every covered topic is already at or beyond 'studied' — nothing to write.
@@ -279,20 +281,29 @@ async function revertUnmarkedFileTopics(
       null,
       serviceKey
     ),
-    supaRequest<Array<{ source_file_id: string | null; related_lecture_file_id: string | null }>>(
+    supaRequest<Array<{
+      source_file_id: string | null;
+      related_lecture_file_id: string | null;
+      exercise_file_id: string | null;
+      solution_file_id: string | null;
+    }>>(
       'GET',
       'weekly_study_tasks?user_id=eq.' + encodeURIComponent(userId) +
         '&course_id=eq.' + encodeURIComponent(courseId) +
-        '&status=eq.completed&select=source_file_id,related_lecture_file_id',
+        '&status=eq.completed&select=source_file_id,related_lecture_file_id,exercise_file_id,solution_file_id',
       null,
       serviceKey
     ),
   ]);
   const earned = new Set((Array.isArray(eventsRes.body) ? eventsRes.body : []).map((r) => r.topic_id));
+  // Every file a completed task actually worked on — lecture/source, the paired
+  // lecture, the exercise sheet, and the solution sheet — counts as "studied".
   const completedFiles = new Set<string>();
   (Array.isArray(completedRes.body) ? completedRes.body : []).forEach((r) => {
     if (r.source_file_id) completedFiles.add(String(r.source_file_id));
     if (r.related_lecture_file_id) completedFiles.add(String(r.related_lecture_file_id));
+    if (r.exercise_file_id) completedFiles.add(String(r.exercise_file_id));
+    if (r.solution_file_id) completedFiles.add(String(r.solution_file_id));
   });
 
   const toRevert = candidates.filter((id) => {
