@@ -12,6 +12,11 @@ import { bodyJson, requireStudyAuth, validateCourseId, writeStudyEvent } from '.
 import { supaRequest } from '../lib/supabase-admin';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
+// Topic progress states a file-mark may set to 'studied'. Anything else
+// (practiced / mastered / weak / …) is already more advanced and must not be
+// downgraded by marking a file done.
+const _OVERWRITABLE_STATES = new Set(['', 'not_started', 'studied']);
+
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
   const auth = await requireStudyAuth(event);
@@ -176,11 +181,34 @@ async function markFileTopicsStudied(
     return { topicsMarked: 0, ok: true, filesWithoutTopics };
   }
 
+  // Never downgrade a topic the user has advanced past 'studied' (practiced /
+  // mastered / weak). Only set 'studied' on topics that have no row yet or are at
+  // 'not_started'/'studied'. Fetch current states and filter first — the upsert
+  // would otherwise blindly overwrite progress_state back to 'studied'.
+  const idArr = [...topicIds];
+  const stateRes = await supaRequest<Array<{ topic_id: string; progress_state: string }>>(
+    'GET',
+    'student_topic_state?user_id=eq.' + encodeURIComponent(userId) +
+      '&topic_id=in.(' + idArr.map((id) => encodeURIComponent(id)).join(',') + ')' +
+      '&select=topic_id,progress_state',
+    null,
+    serviceKey
+  );
+  const currentState = new Map(
+    (Array.isArray(stateRes.body) ? stateRes.body : []).map((r) => [r.topic_id, String(r.progress_state || '')])
+  );
+  const writeIds = idArr.filter((id) => _OVERWRITABLE_STATES.has(currentState.get(id) ?? ''));
+
+  if (writeIds.length === 0) {
+    // Every covered topic is already at or beyond 'studied' — nothing to write.
+    return { topicsMarked: 0, ok: true, filesWithoutTopics };
+  }
+
   try {
     await supaRequest(
       'POST',
       'student_topic_state?on_conflict=user_id,topic_id',
-      [...topicIds].map((topic_id) => ({
+      writeIds.map((topic_id) => ({
         user_id: userId,
         course_id: courseId,
         topic_id,
@@ -191,7 +219,7 @@ async function markFileTopicsStudied(
       serviceKey,
       { Prefer: 'resolution=merge-duplicates,return=minimal' }
     );
-    return { topicsMarked: topicIds.size, ok: true, filesWithoutTopics };
+    return { topicsMarked: writeIds.length, ok: true, filesWithoutTopics };
   } catch (err) {
     console.error('[study-done-files] topic-state upsert failed:', err);
     return { topicsMarked: 0, ok: false, filesWithoutTopics };
@@ -221,30 +249,58 @@ async function revertUnmarkedFileTopics(
   const stillDoneSet = new Set(stillDoneDocs);
 
   const candidates: string[] = [];
+  const candidateDocs = new Map<string, string[]>();
   for (const t of topics) {
     const docs = Array.isArray(t.source_document_ids) ? t.source_document_ids.map((d) => String(d)) : [];
     const coveredByRemoved = docs.some((d) => removedSet.has(d));
     if (!coveredByRemoved) continue;
     const coveredByStillDone = docs.some((d) => stillDoneSet.has(d));
-    if (!coveredByStillDone) candidates.push(t.id);
+    if (!coveredByStillDone) {
+      candidates.push(t.id);
+      candidateDocs.set(t.id, docs);
+    }
   }
   if (candidates.length === 0) return;
 
-  // Provenance guard: a candidate topic's 'studied' state may have been earned by
-  // actually completing a mission task (study-task.ts writes a 'task_completed'
-  // study event with the topic_id), not just by marking a file done. Never revert
-  // those — only revert topics that became studied purely from a file mark.
-  const eventsRes = await supaRequest<Array<{ topic_id: string }>>(
-    'GET',
-    'study_events?user_id=eq.' + encodeURIComponent(userId) +
-      '&event_type=eq.task_completed' +
-      '&topic_id=in.(' + candidates.map((id) => encodeURIComponent(id)).join(',') + ')' +
-      '&select=topic_id',
-    null,
-    serviceKey
-  );
+  // Provenance guard. A candidate topic's 'studied' state may have been earned by
+  // actually completing a study task, not just by marking a file done. Two signals:
+  //   (a) a 'task_completed' study event carrying this topic_id, and
+  //   (b) a completed weekly_study_task whose lecture/source file covers the topic
+  //       — AI-planner tasks frequently have topic_id=null, so the event alone
+  //       misses them; the file linkage catches those.
+  // A topic protected by either signal is never reverted.
+  const [eventsRes, completedRes] = await Promise.all([
+    supaRequest<Array<{ topic_id: string }>>(
+      'GET',
+      'study_events?user_id=eq.' + encodeURIComponent(userId) +
+        '&event_type=eq.task_completed' +
+        '&topic_id=in.(' + candidates.map((id) => encodeURIComponent(id)).join(',') + ')' +
+        '&select=topic_id',
+      null,
+      serviceKey
+    ),
+    supaRequest<Array<{ source_file_id: string | null; related_lecture_file_id: string | null }>>(
+      'GET',
+      'weekly_study_tasks?user_id=eq.' + encodeURIComponent(userId) +
+        '&course_id=eq.' + encodeURIComponent(courseId) +
+        '&status=eq.completed&select=source_file_id,related_lecture_file_id',
+      null,
+      serviceKey
+    ),
+  ]);
   const earned = new Set((Array.isArray(eventsRes.body) ? eventsRes.body : []).map((r) => r.topic_id));
-  const toRevert = candidates.filter((id) => !earned.has(id));
+  const completedFiles = new Set<string>();
+  (Array.isArray(completedRes.body) ? completedRes.body : []).forEach((r) => {
+    if (r.source_file_id) completedFiles.add(String(r.source_file_id));
+    if (r.related_lecture_file_id) completedFiles.add(String(r.related_lecture_file_id));
+  });
+
+  const toRevert = candidates.filter((id) => {
+    if (earned.has(id)) return false;
+    const docs = candidateDocs.get(id) ?? [];
+    if (docs.some((d) => completedFiles.has(d))) return false; // studied via a completed task
+    return true;
+  });
   if (toRevert.length === 0) return;
 
   await supaRequest(
