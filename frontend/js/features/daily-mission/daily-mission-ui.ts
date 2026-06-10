@@ -589,11 +589,9 @@ async function _showDoneFilesModal(courseId: string): Promise<void> {
     const checked = Array.from(listEl.querySelectorAll<HTMLInputElement>('.dm-done-check:checked')).map((c) => c.value);
     try {
       const result = await saveDoneFiles(courseId, checked);
-      // Marking files done flips their topics to 'studied', so regenerate the
-      // plan: tasks covering now-known material are dropped (the planner only
-      // keeps it for spaced repetition).
-      saveBtn.textContent = 'Updating plan…';
-      try { await regenerateDailyMission(courseId); } catch { /* keep prior plan on failure */ }
+      // The endpoint completes just the tasks tied to the done files and seeds
+      // spaced repetition for the learning ones — no full regeneration — so we
+      // only need to reload to reflect the now-smaller plan.
       await loadTodaysTasks(true);
       close();
       const toast = (window as unknown as { showToast?: (t: string, m: string) => void }).showToast;
@@ -602,7 +600,10 @@ async function _showDoneFilesModal(courseId: string): Promise<void> {
       } else if (result.filesWithoutTopics.length > 0) {
         toast?.('Saved', result.filesWithoutTopics.length + ' file(s) have no topic map yet, so they won’t change the plan until indexing builds their topics.');
       } else {
-        toast?.('Saved', 'Completed files updated and plan refreshed.');
+        const parts: string[] = [];
+        if (result.tasksCompleted > 0) parts.push(result.tasksCompleted + ' task(s) marked done');
+        if (result.repetitionsScheduled > 0) parts.push(result.repetitionsScheduled + ' scheduled for spaced repetition');
+        toast?.('Saved', parts.length ? parts.join(', ') + '.' : 'Completed files updated.');
       }
     } catch (err) {
       saveBtn.disabled = false;

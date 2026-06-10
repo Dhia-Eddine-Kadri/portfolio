@@ -16,7 +16,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 // Task types eligible for spaced-repetition scheduling.
-const LEARNING_TASK_TYPES = new Set([
+export const LEARNING_TASK_TYPES = new Set([
   'study_lecture',
   'continue_lecture',
   'repeat_lecture',
@@ -166,7 +166,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 };
 
 /** Best-effort: schedule the next spaced-repetition review task. */
-async function scheduleRepetition(
+export async function scheduleRepetition(
   serviceKey: string,
   userId: string,
   current: {

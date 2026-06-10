@@ -165,6 +165,8 @@ export interface SaveDoneFilesResult {
   topicsMarked: number;
   topicWriteOk: boolean;
   filesWithoutTopics: string[];
+  tasksCompleted: number;
+  repetitionsScheduled: number;
 }
 
 /** Replace the set of "already studied" files for a course. Newly-marked files
@@ -183,6 +185,8 @@ export async function saveDoneFiles(courseId: string, documentIds: string[]): Pr
     topicsMarked: typeof data.topicsMarked === 'number' ? data.topicsMarked : 0,
     topicWriteOk: data.topicWriteOk !== false,
     filesWithoutTopics: Array.isArray(data.filesWithoutTopics) ? data.filesWithoutTopics : [],
+    tasksCompleted: typeof data.tasksCompleted === 'number' ? data.tasksCompleted : 0,
+    repetitionsScheduled: typeof data.repetitionsScheduled === 'number' ? data.repetitionsScheduled : 0,
   };
 }
 
