@@ -400,13 +400,24 @@ export async function persistAiTasks(
   // Partition existing into editable vs protected
   const editableByKey = new Map<string, ExistingTaskStub>();
   const editableIds = new Set<string>();
+  // Editable tasks with NO canonical_task_key. Legacy deterministic-fallback
+  // inserts never set one, so they can't be matched against any incoming task —
+  // which used to make them immortal: every AI regen layered fresh tasks on top
+  // but could never mark these stale, leaving a plan permanently polluted with
+  // pre-fix tasks (e.g. standalone "Check solutions" rows). A keyless editable
+  // task carries no identity to preserve, so the fresh AI batch is authoritative:
+  // sweep them all to 'replaced'.
+  const keylessEditableIds: string[] = [];
 
   for (const ex of existing) {
     const isPast = ex.plan_date < todayStr;
     const isProtected = PROTECTED_STATUSES.has(ex.status) || isPast;
-    if (!isProtected && ex.canonical_task_key) {
+    if (isProtected) continue;
+    if (ex.canonical_task_key) {
       editableByKey.set(ex.canonical_task_key, ex);
       editableIds.add(ex.id);
+    } else {
+      keylessEditableIds.push(ex.id);
     }
   }
 
@@ -444,8 +455,9 @@ export async function persistAiTasks(
     }
   }
 
-  // Existing editable tasks whose key is NOT in the incoming set → mark replaced
-  const toReplace: string[] = [];
+  // Existing editable tasks whose key is NOT in the incoming set → mark replaced.
+  // Keyless editable tasks are always swept (see keylessEditableIds above).
+  const toReplace: string[] = [...keylessEditableIds];
   for (const [key, ex] of editableByKey) {
     if (!incomingKeys.has(key)) {
       toReplace.push(ex.id);
