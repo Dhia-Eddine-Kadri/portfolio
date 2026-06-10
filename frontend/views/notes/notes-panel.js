@@ -27,6 +27,11 @@
   // ── Markdown + KaTeX renderer ─────────────────────────────────────────────
   function _renderMath(text) {
     if (!text || !window.katex) return text;
+    // Normalize \[…\]/\(…\) delimiters and bare formula-line LaTeX into $…$/$$…$$
+    // so the KaTeX passes below actually catch them (NotesMath loads first).
+    if (window.NotesMath && window.NotesMath.normalize) {
+      text = window.NotesMath.normalize(text);
+    }
     text = text.replace(/\$\$([^$]+?)\$\$/g, function (_, m) {
       try { return window.katex.renderToString(m, { displayMode: true,  throwOnError: false }); }
       catch (e) { return '$$' + m + '$$'; }

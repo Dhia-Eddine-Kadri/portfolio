@@ -67,6 +67,17 @@ def _lang_instr(lang: str) -> str:
     return "Match the language of the source material."
 
 
+def _math_format_rules() -> str:
+    # The Notes/Summary renderer only displays math wrapped in $…$ / $$…$$.
+    # Bare LaTeX commands and \[…\] / \(…\) delimiters showed up as raw
+    # backslashes for users, so spell the contract out explicitly.
+    return """## MATH FORMATTING (STRICT — the renderer ONLY displays delimited math)
+- Wrap EVERY mathematical expression in $...$ (inline) or $$...$$ (display). This includes simple ones: variables ($x$, $a_0$), function definitions ($f(x)=\\frac{x}{1+x^2}$), limits, sums, integrals, fractions, roots and Greek letters.
+- NEVER write a LaTeX command (\\frac, \\sum, \\lim, \\sqrt, \\in, \\R, \\quad, \\infty, \\varphi, …) outside $...$ — bare commands render as literal backslashes.
+- NEVER use \\[ … \\] or \\( … \\) delimiters. Use ONLY $$ … $$ (display) and $ … $ (inline).
+- Keep the page citation OUTSIDE the math: write $f(x)=\\frac{x}{1+x^2}$ *(S. 1)*, never $f(x)=\\frac{x}{1+x^2} (S. 1)$."""
+
+
 def _notes_prompt(lang: str) -> str:
     return f"""You are generating detailed, exam-ready study notes from university lecture PDF slides.
 
@@ -91,7 +102,9 @@ STRUCTURE:
 ## Vergleiche / Comparisons
 ## Prüfungsrelevanz / Exam Focus
 
-Cite page numbers throughout. No filler sentences."""
+Cite page numbers throughout. No filler sentences.
+
+{_math_format_rules()}"""
 
 
 _DETAIL_ALIASES: dict[str, str] = {
@@ -434,7 +447,9 @@ Do NOT create empty sections. Keep it to 3-5 lines maximum.
 - Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source discusses logarithmic strain / Umformgrad.
 - Tables with markdown for comparisons.
 - Do NOT force the full template on content-light pages.
-- If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content."""
+- If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content.
+
+{_math_format_rules()}"""
 
 
 def _exam_page_group_instructions(page_ref: str) -> str:
@@ -486,7 +501,9 @@ Your FIRST line of output MUST be exactly one of:
 
 {_exam_page_group_instructions(page_ref)}
 
-If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections."""
+If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections.
+
+{_math_format_rules()}"""
         return f"""You are generating a study summary for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
@@ -505,7 +522,9 @@ If the pages contain study content:
 - Reproduce every list in full.
 - KaTeX for formulas.
 - OMIT sections that would be empty — never write "keine vorhanden".
-- No filler. Every bullet must add information."""
+- No filler. Every bullet must add information.
+
+{_math_format_rules()}"""
     return f"""You are generating detailed study notes for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
@@ -518,7 +537,9 @@ Your FIRST line of output MUST be exactly one of:
 If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note. Do NOT create empty study sections.
 
 If the pages contain study content:
-Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty."""
+Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty.
+
+{_math_format_rules()}"""
 
 
 def _exam_merge_prompt(lang: str) -> str:
@@ -572,7 +593,9 @@ Coverage transparency:
   Use the page ranges from the input section headers to determine X–Y. If total pages is unknown, omit "von Z".
 - If the merged content clearly does not cover the entire PDF (e.g. early pages only, or a table of contents mentions topics not found in any input section), add:
   > Wichtige Themen ab S. [first uncovered page] (z. B. [topic names visible in ToC/headings]) sind in diesem Bereich nicht enthalten.
-  Only name topics that appear in a table of contents, chapter heading, or cross-reference within the input. Do NOT guess."""
+  Only name topics that appear in a table of contents, chapter heading, or cross-reference within the input. Do NOT guess.
+
+{_math_format_rules()}"""
 
 
 def _merge_prompt(lang: str, tool: str, detail_level: str = "detailed") -> str:
@@ -601,7 +624,9 @@ Rules:
 - Group related content under ## headings.
 - OMIT sections that would be empty — do NOT create empty headings.
 - End with a ## Prüfungsrelevanz section with the 5–10 most exam-relevant points (only if study content exists).
-- Do NOT invent new information."""
+- Do NOT invent new information.
+
+{_math_format_rules()}"""
     return f"""You are merging multiple section notes into one final structured study note.
 
 {_lang_instr(lang)}
@@ -626,7 +651,9 @@ Rules:
 - Every method/process keeps its own ### subsection.
 - OMIT sections that would be empty.
 - End with ## Prüfungsrelevanz (only if study content exists).
-- Do NOT invent new information."""
+- Do NOT invent new information.
+
+{_math_format_rules()}"""
 
 
 # ── DB helpers ───────────────────────────────────────────────────────────────

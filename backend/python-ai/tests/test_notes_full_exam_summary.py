@@ -82,6 +82,28 @@ def test_exam_main_prompt_has_all_templates() -> None:
     assert "TABULAR DATA PRECISION" in prompt
 
 
+def test_math_format_rules_present_in_every_generation_prompt() -> None:
+    from app.routers import notes_full
+
+    prompts = [
+        notes_full._notes_prompt("de"),
+        notes_full._summary_prompt("de", "detailed"),
+        notes_full._summary_prompt("de", "exam"),
+        notes_full._section_prompt("de", 3, 6, "summary", "exam"),
+        notes_full._section_prompt("de", 3, 6, "summary", "detailed"),
+        notes_full._section_prompt("de", 3, 6, "notes", "detailed"),
+        notes_full._merge_prompt("de", "summary", "detailed"),
+        notes_full._merge_prompt("de", "notes", "detailed"),
+        notes_full._merge_prompt("de", "summary", "exam"),
+    ]
+    for p in prompts:
+        # The strict contract that stops bare/`\[…\]` LaTeX reaching the renderer.
+        assert "MATH FORMATTING (STRICT" in p
+        assert "NEVER use \\[ … \\] or \\( … \\)" in p
+        assert "render as literal backslashes" in p
+        assert "$f(x)=\\frac{x}{1+x^2}$" in p
+
+
 def test_staged_merge_sends_all_sections_without_silent_truncation(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.routers import notes_full
 
