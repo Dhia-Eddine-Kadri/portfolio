@@ -72,7 +72,13 @@ def test_auto_with_selected_file_prefers_course_files() -> None:
     assert decision.source_scope == SourceScope.COURSE_FILES
 
 
-def test_auto_without_file_or_current_signal_uses_general_knowledge() -> None:
+def test_auto_without_file_defaults_to_course_files() -> None:
+    # Auto mode now retrieves from course files FIRST and only falls back to
+    # general knowledge downstream — in ask.py, when retrieval finds no strong
+    # course anchor (see commit "Auto mode: retrieve from course files before
+    # falling back to general knowledge"). So classify_source_scope itself
+    # returns COURSE_FILES here; the general-knowledge decision is made later
+    # from retrieval relevance, not at classification time.
     from app.services.source_router import SourceScope, classify_source_scope
 
     decision = classify_source_scope(
@@ -80,7 +86,7 @@ def test_auto_without_file_or_current_signal_uses_general_knowledge() -> None:
         source_mode="auto",
     )
 
-    assert decision.source_scope == SourceScope.GENERAL_KNOWLEDGE
+    assert decision.source_scope == SourceScope.COURSE_FILES
 
 
 def test_course_relevance_scores_semantic_overlap() -> None:

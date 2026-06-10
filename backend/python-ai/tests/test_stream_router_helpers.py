@@ -47,7 +47,12 @@ def test_cached_grounded_sources_keep_pages_string() -> None:
         },
     ])
 
+    # The helper also carries documentId/pageStart/index through so the frontend
+    # can open the cited PDF by id (robust against mangled file names) at the
+    # right page. They're None here because the inputs don't supply them.
     assert out == [
-        {"file_name": "AG_9.1.pdf", "pages": "currently visible", "section": "Open PDF"},
-        {"file_name": "Lecture.pdf", "pages": "8-10", "section": "Schraubenberechnung"},
+        {"file_name": "AG_9.1.pdf", "pages": "currently visible", "section": "Open PDF",
+         "documentId": None, "pageStart": None, "index": None},
+        {"file_name": "Lecture.pdf", "pages": "8-10", "section": "Schraubenberechnung",
+         "documentId": None, "pageStart": 8, "index": None},
     ]
