@@ -607,6 +607,13 @@
           _toast('Finish the exam', 'Answer every question before submitting.');
           return;
         }
+        // Grading requires a persisted session + per-question ids. A locally
+        // built / unsaved exam can never be graded, so block submission.
+        if (!s.id || String(s.id).indexOf('local-') === 0 ||
+            s.questions.some(function (q) { return !q.id; })) {
+          _toast('This exam can\'t be graded', 'It was not saved properly. Generate it again to grade it.');
+          return;
+        }
         st.submitted = true;
         renderExam();
         _persistAnswers(s, st.answers);
@@ -788,9 +795,23 @@
             language: els.language && els.language.value || 'auto',
           });
         }).then(function (res) {
-          var session = _normaliseSession(res || {});
+          res = res || {};
+          // Persistence gate: an exam is only usable if the backend genuinely
+          // saved it (a real sessionId + a DB id on every question). Without
+          // that, grading/tracking is impossible, so we refuse to start it.
+          if (res.error || !res.sessionId) {
+            _toast('ExamForge could not save this exam',
+              res.error || res.warning || 'The exam was not saved, so it can\'t be graded. Please try again.');
+            return;
+          }
+          var session = _normaliseSession(res);
           if (!session.questions.length) {
-            _toast('ExamForge could not create questions', res && (res.error || res.warning) || 'Try different files.');
+            _toast('ExamForge could not create questions', res.error || res.warning || 'Try different files.');
+            return;
+          }
+          if (session.questions.some(function (q) { return !q.id; })) {
+            _toast('ExamForge could not save this exam',
+              'Some questions were not saved, so this exam can\'t be graded. Please try again.');
             return;
           }
           st.sessions.unshift(session);

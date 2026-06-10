@@ -422,60 +422,107 @@ def generate_examforge(
             "completionTokens": quiz_out.get("completionTokens"),
         }
 
+    topics = _fetch_course_topics(course_id, document_ids)
+
+    def _error(message: str) -> dict[str, Any]:
+        # Persistence failed: an exam that cannot be saved cannot be graded or
+        # tracked, so we must NOT hand the frontend ungradeable questions.
+        return {
+            "sessionId": None,
+            "title": topic_query or "ExamForge",
+            "requestedCount": requested,
+            "actualCount": 0,
+            "questions": [],
+            "topicMap": [{"name": t} for t in topics[:24]],
+            "grounded": grounded_used,
+            "groundedSources": grounded_sources,
+            "warning": warning,
+            "error": message,
+            "model": meta.get("model"),
+            "promptTokens": meta.get("promptTokens"),
+            "completionTokens": meta.get("completionTokens"),
+        }
+
+    if not questions:
+        # No questions generated at all — surface the upstream warning, no exam.
+        return {
+            "sessionId": None,
+            "title": topic_query or "ExamForge",
+            "requestedCount": requested,
+            "actualCount": 0,
+            "questions": [],
+            "topicMap": [{"name": t} for t in topics[:24]],
+            "grounded": grounded_used,
+            "groundedSources": grounded_sources,
+            "warning": warning,
+            "error": None,
+            "model": meta.get("model"),
+            "promptTokens": meta.get("promptTokens"),
+            "completionTokens": meta.get("completionTokens"),
+        }
+
     sb = get_supabase()
     session_id: str | None = None
-    saved_questions: list[dict[str, Any]] = questions
-    if questions:
-        try:
-            session_resp = sb.table("exam_sessions").insert({
+    saved_questions: list[dict[str, Any]] = []
+    try:
+        session_resp = sb.table("exam_sessions").insert({
+            "user_id": user_id,
+            "course_id": course_id,
+            "title": topic_query or "ExamForge",
+            "difficulty": diff,
+            "question_count": len(questions),
+            "question_types": types,
+            "source_document_ids": document_ids or None,
+            "topic": topic_query or None,
+            "status": "ready",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+        session_id = ((session_resp.data or [{}])[0] or {}).get("id")
+        if not session_id:
+            raise RuntimeError("exam_sessions insert returned no id")
+        question_rows = []
+        for idx, q in enumerate(questions):
+            src = (q.get("sources") or [{}])[0] if isinstance(q.get("sources"), list) else {}
+            pages = q.get("source_pages_list") or ([src.get("pages")] if src.get("pages") else None)
+            chunk_ids = q.get("source_chunk_ids") or None
+            val = q.get("validation") or {}
+            question_rows.append({
+                "exam_session_id": session_id,
                 "user_id": user_id,
-                "course_id": course_id,
-                "title": topic_query or "ExamForge",
-                "difficulty": diff,
-                "question_count": len(questions),
-                "question_types": types,
-                "source_document_ids": document_ids or None,
-                "topic": topic_query or None,
-                "status": "ready",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).execute()
-            session_id = session_resp.data[0]["id"]
-            question_rows = []
-            for idx, q in enumerate(questions):
-                src = (q.get("sources") or [{}])[0] if isinstance(q.get("sources"), list) else {}
-                pages = q.get("source_pages_list") or ([src.get("pages")] if src.get("pages") else None)
-                chunk_ids = q.get("source_chunk_ids") or None
-                val = q.get("validation") or {}
-                question_rows.append({
-                    "exam_session_id": session_id,
-                    "user_id": user_id,
-                    "position": idx,
-                    "question_type": q["type"],
-                    "topic": q.get("topic"),
-                    "difficulty": q.get("difficulty") or diff,
-                    "points": q.get("points") or 1,
-                    "question_text": q["question"],
-                    "options": q.get("options") or [],
-                    "correct_answer": str(q.get("answer") or ""),
-                    "explanation": q.get("explanation") or "",
-                    "source_chunk_ids": chunk_ids,
-                    "source_document_names": [src.get("fileName")] if src.get("fileName") else None,
-                    "source_pages": pages,
-                    "validation_status": val.get("status") or "grounded",
-                    "validation_score": val.get("score") if val.get("score") is not None else 1,
-                })
-            saved_resp = sb.table("exam_questions").insert(question_rows).execute()
-            saved_rows = saved_resp.data or []
-            if saved_rows:
-                saved_questions = [
-                    {**questions[idx], "id": row.get("id")}
-                    for idx, row in enumerate(saved_rows)
-                    if idx < len(questions)
-                ]
-        except Exception:
-            log.exception("examforge persistence failed")
+                "position": idx,
+                "question_type": q["type"],
+                "topic": q.get("topic"),
+                "difficulty": q.get("difficulty") or diff,
+                "points": q.get("points") or 1,
+                "question_text": q["question"],
+                "options": q.get("options") or [],
+                "correct_answer": str(q.get("answer") or ""),
+                "explanation": q.get("explanation") or "",
+                "source_chunk_ids": chunk_ids,
+                "source_document_names": [src.get("fileName")] if src.get("fileName") else None,
+                "source_pages": pages,
+                "validation_status": val.get("status") or "grounded",
+                "validation_score": val.get("score") if val.get("score") is not None else 1,
+            })
+        saved_resp = sb.table("exam_questions").insert(question_rows).execute()
+        saved_rows = saved_resp.data or []
+        # Every question MUST come back with a persisted id, or the exam is only
+        # partially gradeable — treat that as a persistence failure.
+        if len(saved_rows) != len(questions) or any(not (row or {}).get("id") for row in saved_rows):
+            raise RuntimeError(
+                f"exam_questions persisted {len(saved_rows)}/{len(questions)} rows with ids"
+            )
+        saved_questions = [
+            {**questions[idx], "id": row.get("id")}
+            for idx, row in enumerate(saved_rows)
+        ]
+    except Exception:
+        log.exception("examforge persistence failed")
+        return _error(
+            "We generated your exam but couldn't save it, so it can't be graded. "
+            "Please try again."
+        )
 
-    topics = _fetch_course_topics(course_id, document_ids)
     return {
         "sessionId": session_id,
         "title": topic_query or "ExamForge",
@@ -486,6 +533,7 @@ def generate_examforge(
         "grounded": grounded_used,
         "groundedSources": grounded_sources,
         "warning": warning,
+        "error": None,
         "model": meta.get("model"),
         "promptTokens": meta.get("promptTokens"),
         "completionTokens": meta.get("completionTokens"),
