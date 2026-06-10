@@ -19,6 +19,18 @@ class _FakeChatResult:
         self.completion_tokens = 70
 
 
+def test_system_prompt_requires_katex_math_formatting():
+    # The lesson renderer only displays $…$/$$…$$ math; the prompt must force the
+    # model to delimit every expression so it doesn't ship plain-text math.
+    sys = dl._SYSTEM
+    assert "Math formatting (STRICT" in sys
+    assert "$f(x)=\\frac{x}{1+x^2}$" in sys
+    assert "NEVER use \\[ ... \\] or \\( ... \\)" in sys
+    assert "bare LaTeX command" in sys
+    # keyFormulas.formula must stay raw (the formula card wraps it itself).
+    assert "keyFormulas.formula stays raw LaTeX WITHOUT $ delimiters" in sys
+
+
 def test_sources_indexed_for_clickability():
     chunks = [
         {"chunkId": "c1", "documentId": "d1", "pageStart": 3, "pageEnd": 3},
