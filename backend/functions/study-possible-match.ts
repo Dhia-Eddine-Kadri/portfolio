@@ -128,6 +128,27 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     });
   }
 
+  // Record the decision durably so it survives plan regeneration and informs the
+  // planner: a dismissed pair is never re-suggested, a confirmed pair is treated
+  // as a known-good pairing the planner should use directly.
+  const pairingCourseId = matchEntry?.courseId ?? plan.course_id ?? '';
+  if (pairingCourseId) {
+    await supaRequest(
+      'POST',
+      'student_exercise_pairings?on_conflict=user_id,exercise_file_id,lecture_file_id',
+      {
+        user_id: auth.user.id,
+        course_id: pairingCourseId,
+        exercise_file_id: exerciseFileId,
+        lecture_file_id: possibleLectureFileId,
+        status: action === 'confirm' ? 'confirmed' : 'dismissed',
+        updated_at: new Date().toISOString(),
+      },
+      auth.serviceKey,
+      { Prefer: 'resolution=merge-duplicates,return=minimal' }
+    ).catch((err) => console.error('[study-possible-match] pairing persist failed (non-fatal):', err));
+  }
+
   // Remove the entry from possible_matches (match on exerciseFileId + possibleLectureFileId).
   const updatedMatches = currentMatches.filter(
     (m) => !(m.exerciseFileId === exerciseFileId && m.possibleLectureFileId === possibleLectureFileId)

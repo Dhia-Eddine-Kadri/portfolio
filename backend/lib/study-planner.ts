@@ -646,6 +646,24 @@ async function generateWeeklyPlanViaAI(
     dailyAvailabilityMinutes[String(pyIdx)] = dailyMinutes;
   }
 
+  // Durable user pairing decisions so the AI uses confirmed exercise↔lecture
+  // pairs and never re-suggests dismissed ones.
+  const pairingsRes = await supaRequest<Array<{ exercise_file_id: string; lecture_file_id: string; status: string }>>(
+    'GET',
+    'student_exercise_pairings?user_id=eq.' + encodeURIComponent(userId) +
+      (courseId ? '&course_id=eq.' + encodeURIComponent(courseId) : '') +
+      '&select=exercise_file_id,lecture_file_id,status',
+    null,
+    serviceKey
+  );
+  const pairingRows = Array.isArray(pairingsRes.body) ? pairingsRes.body : [];
+  const confirmedPairings = pairingRows
+    .filter((p) => p.status === 'confirmed')
+    .map((p) => ({ exerciseFileId: p.exercise_file_id, lectureFileId: p.lecture_file_id }));
+  const dismissedPairings = pairingRows
+    .filter((p) => p.status === 'dismissed')
+    .map((p) => ({ exerciseFileId: p.exercise_file_id, lectureFileId: p.lecture_file_id }));
+
   // Call the Python AI planner FIRST — before any DB write.
   const proxyResult = await forwardToPython<PythonPlanResponse>('study-planner/generate-week', {
     userId,
@@ -654,6 +672,8 @@ async function generateWeeklyPlanViaAI(
     courseId,
     timezone: 'UTC',
     dailyAvailabilityMinutes,
+    confirmedPairings,
+    dismissedPairings,
     regenerate: regenerateExisting,
   });
 
@@ -1651,7 +1671,35 @@ export async function getDailyTasksWithPlan(
   const taskRes = await supaRequest<WeeklyStudyTask[]>('GET', taskUrl, null, serviceKey);
   const tasks = Array.isArray(taskRes.body) ? taskRes.body : [];
   await enrichTasksWithFileNames(tasks, serviceKey);
+
+  // Hide suggestions the user already decided on. The decision is durable
+  // (student_exercise_pairings), so even if a regeneration repopulated
+  // possible_matches, a previously confirmed/dismissed pair never reappears.
+  possibleMatches = await filterDecidedMatches(userId, possibleMatches, serviceKey);
+
   return { planId, tasks, possibleMatches };
+}
+
+// Drop possible-match suggestions whose (exercise, lecture) pair already has a
+// confirmed/dismissed decision recorded.
+async function filterDecidedMatches(
+  userId: string,
+  matches: PossibleMatch[],
+  serviceKey: string
+): Promise<PossibleMatch[]> {
+  if (!matches.length) return matches;
+  const res = await supaRequest<Array<{ exercise_file_id: string; lecture_file_id: string }>>(
+    'GET',
+    'student_exercise_pairings?user_id=eq.' + encodeURIComponent(userId) +
+      '&select=exercise_file_id,lecture_file_id',
+    null,
+    serviceKey
+  );
+  const decided = new Set(
+    (Array.isArray(res.body) ? res.body : []).map((r) => r.exercise_file_id + '|' + r.lecture_file_id)
+  );
+  if (!decided.size) return matches;
+  return matches.filter((m) => !decided.has(m.exerciseFileId + '|' + m.possibleLectureFileId));
 }
 
 // Attach real document file names to tasks and reconcile against deletes/renames.

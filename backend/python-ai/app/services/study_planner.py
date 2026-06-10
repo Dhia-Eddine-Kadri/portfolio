@@ -639,6 +639,8 @@ def _build_planner_prompt(
     daily_availability: dict[str, int],
     course_data: list[dict[str, Any]],
     plan_scope: str,
+    confirmed_pairings: list[dict[str, str]] | None = None,
+    dismissed_pairings: list[dict[str, str]] | None = None,
 ) -> str:
     """Compose the compact user prompt for the weekly planning LLM call."""
     lines: list[str] = [
@@ -648,6 +650,20 @@ def _build_planner_prompt(
     ]
     for day, mins in sorted(daily_availability.items()):
         lines.append(f"  {day}: {mins}")
+
+    # User-decided exercise↔lecture pairings (by document id). These are AUTHORITATIVE:
+    # schedule confirmed pairs directly as solve_exercise_sheet tasks (do NOT demote
+    # them to possibleMatches), and never propose a dismissed pair in possibleMatches.
+    if confirmed_pairings:
+        lines.append("")
+        lines.append("User-CONFIRMED exercise↔lecture pairings (schedule these directly):")
+        for p in confirmed_pairings:
+            lines.append(f"  exercise {p.get('exerciseFileId','')} ↔ lecture {p.get('lectureFileId','')}")
+    if dismissed_pairings:
+        lines.append("")
+        lines.append("User-DISMISSED pairings (never suggest these):")
+        for p in dismissed_pairings:
+            lines.append(f"  exercise {p.get('exerciseFileId','')} ↔ lecture {p.get('lectureFileId','')}")
 
     lines.append("")
     lines.append("Courses to plan:")
@@ -864,12 +880,16 @@ def generate_week_plan(payload: dict[str, Any]) -> dict[str, Any]:
             return {**_EMPTY_WEEK_PLAN, "weekStartDate": week_start}
 
         # ── Call the LLM planner ──────────────────────────────────────────────
+        confirmed_pairings = payload.get("confirmedPairings")
+        dismissed_pairings = payload.get("dismissedPairings")
         user_prompt = _build_planner_prompt(
             user_id=user_id,
             week_start=week_start,
             daily_availability=daily_availability,
             course_data=course_data,
             plan_scope=plan_scope,
+            confirmed_pairings=confirmed_pairings if isinstance(confirmed_pairings, list) else None,
+            dismissed_pairings=dismissed_pairings if isinstance(dismissed_pairings, list) else None,
         )
 
         settings = get_settings()
