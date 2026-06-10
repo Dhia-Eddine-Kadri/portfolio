@@ -29,14 +29,23 @@ from typing import Iterable
 # ── public types ────────────────────────────────────────────────────────────
 
 DOCUMENT_TYPES = (
+    "exam",
+    "lecture",
     "exercise_sheet",
     "solution_sheet",
-    "lecture",
-    "formula_sheet",
     "summary",
-    "exam",
+    "slides",
+    "textbook_chapter",
+    "assignment",
+    "cheat_sheet",
+    "formula_sheet",
     "unknown",
 )
+
+# Types treated as compressed reference material (same downstream behaviour).
+# cheat_sheet is a distinct vocabulary entry but behaves like formula_sheet so
+# the existing formula_sheet retrieval/prompt handling stays backward-compatible.
+REFERENCE_TYPES = ("cheat_sheet", "formula_sheet", "summary")
 
 EXTRACTION_QUALITIES = ("good", "weak", "failed")
 
@@ -53,19 +62,28 @@ class QualityRollup:
 
 # ── classification ──────────────────────────────────────────────────────────
 
-# Filename → strong-signal mapping. Lowercased substring match.
+# Filename → strong-signal mapping. Lowercased substring match. ORDER MATTERS —
+# more specific signals must come before broader ones (e.g. "folien" → slides
+# before "vorlesung" → lecture; "musterlösung" → solution before "aufgabe").
 _FILENAME_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("loesung", "lösung", "loesungen", "lösungen", "solution", "solutions",
-      "musterlösung", "musterloesung"),                                   "solution_sheet"),
+      "musterlösung", "musterloesung", "answer-key", "answerkey"),         "solution_sheet"),
+    (("klausur", "prüfung", "pruefung", "midterm", "final-exam", "exam",
+      "probeklausur", "altklausur"),                                       "exam"),
+    (("hausaufgabe", "hausübung", "hausuebung", "homework", "assignment",
+      "abgabe", "hand-in", "handin", "problem-set", "problemset"),         "assignment"),
     (("aufgaben", "aufgabe", "übung", "uebung", "übungen", "uebungen",
-      "exercise", "exercises", "problem-set", "problemset", "task-sheet"), "exercise_sheet"),
+      "exercise", "exercises", "task-sheet", "tutorial"),                  "exercise_sheet"),
+    (("cheatsheet", "cheat-sheet", "cheat_sheet", "spickzettel"),          "cheat_sheet"),
     (("formelsammlung", "formel-sammlung", "formelzettel", "formula-sheet",
-      "formula_sheet", "cheatsheet", "cheat-sheet"),                       "formula_sheet"),
-    (("klausur", "exam", "prüfung", "pruefung", "midterm", "final"),       "exam"),
-    (("zusammenfassung", "summary", "skript-zusammenfassung",
-      "spickzettel"),                                                      "summary"),
-    (("skript", "lecture", "vorlesung", "slides", "folien", "kapitel",
-      "chapter"),                                                          "lecture"),
+      "formula_sheet", "formelblatt"),                                     "formula_sheet"),
+    (("zusammenfassung", "summary", "skript-zusammenfassung", "recap",
+      "uebersicht", "übersicht"),                                          "summary"),
+    (("folien", "slides", "präsentation", "praesentation", "presentation",
+      "slideshow", ".pptx", ".ppt"),                                       "slides"),
+    (("lehrbuch", "textbook", "buchkapitel", "book-chapter", "ebook",
+      "e-book"),                                                           "textbook_chapter"),
+    (("skript", "lecture", "vorlesung", "kapitel", "chapter"),             "lecture"),
 )
 
 # Content-side signals — used only when filename is ambiguous.
@@ -82,12 +100,38 @@ _EXAM_RE = re.compile(
     r"\b(?:klausur|exam|prüfung|pruefung|midterm|final|exam date|points?:?\s*\d+)\b",
     re.IGNORECASE,
 )
+# Exam-specific administrative markers that almost never appear outside a real
+# exam: time budget, reachable points, sub-tasks, formal candidate fields.
+_EXAM_STRONG_RE = re.compile(
+    r"\b(?:bearbeitungszeit|erreichbare\s+punkte|teilaufgabe|matrikelnummer|"
+    r"klausurnummer|hilfsmittel|zugelassene\s+hilfsmittel|punkte\s*[:/]|"
+    r"viel\s+erfolg|bewertung|max\.?\s*punkte|/\s*\d+\s*punkte|"
+    r"working\s+time|allowed\s+aids|total\s+points|marks?\s*[:/]\s*\d+)\b",
+    re.IGNORECASE,
+)
+# Numbered tasks like "Aufgabe 1", "Task 3", "Problem 2", "1. (5 Punkte)".
+_NUMBERED_TASK_RE = re.compile(
+    r"(?:\b(?:aufgabe|task|problem|exercise|frage|question)\s+\d+\b"
+    r"|^\s*\d+\.\s*\(\s*\d+\s*(?:punkte|points|p\.?)\))",
+    re.IGNORECASE | re.MULTILINE,
+)
 _SUMMARY_RE = re.compile(
     r"\b(?:zusammenfassung|summary|recap|key takeaways|key points)\b",
     re.IGNORECASE,
 )
 _LECTURE_HEADING_RE = re.compile(
     r"\b(?:vorlesung|lecture|chapter|kapitel|section)\s+\d+",
+    re.IGNORECASE,
+)
+# Content-flag signals (independent of the single document_type).
+_THEORY_RE = re.compile(
+    r"\b(?:definition|satz|theorem|lemma|beweis|proof|herleitung|"
+    r"grundlagen|einführung|introduction|concept|konzept|eigenschaft)\b",
+    re.IGNORECASE,
+)
+_EXAMPLE_RE = re.compile(
+    r"\b(?:beispiel|example|z\.\s?b\.|e\.\s?g\.|zum beispiel|for instance|"
+    r"musterbeispiel|worked example)\b",
     re.IGNORECASE,
 )
 
@@ -124,8 +168,20 @@ def _content_class(sample_text: str) -> str:
     solution_hits = len(_SOLUTION_RE.findall(text))
     formula_density = len(_FORMULA_DENSITY_RE.findall(text)) / chars * 1000  # per 1k chars
     exam_hits = len(_EXAM_RE.findall(text))
+    exam_strong_hits = len(_EXAM_STRONG_RE.findall(text))
+    numbered_tasks = len(_NUMBERED_TASK_RE.findall(text))
+    theory_hits = len(_THEORY_RE.findall(text))
     summary_hits = len(_SUMMARY_RE.findall(text))
     lecture_hits = len(_LECTURE_HEADING_RE.findall(text))
+
+    # Exam first: a strong admin marker (Bearbeitungszeit / erreichbare Punkte /
+    # Teilaufgabe) is near-decisive. Note: many numbered tasks ALONE is NOT exam
+    # evidence — exercise sheets look identical; only the exam admin markers (or
+    # explicit exam words) separate them.
+    if exam_strong_hits >= 1 or exam_hits >= 2:
+        return "exam"
+    if numbered_tasks >= 3 and exam_strong_hits >= 1:
+        return "exam"
 
     # A solution sheet must mention both exercises and solutions repeatedly.
     if solution_hits >= 2 and exercise_hits >= 2:
@@ -134,9 +190,6 @@ def _content_class(sample_text: str) -> str:
     # Many exercise markers, few/no solution markers → exercise sheet.
     if exercise_hits >= 3 and solution_hits <= 1:
         return "exercise_sheet"
-
-    if exam_hits >= 2:
-        return "exam"
 
     # Formula sheets are dense with math and short on prose. Tune the
     # threshold against the eval fixture if it misfires.
@@ -225,6 +278,206 @@ def classify_document(file_name: str | None, sample_text: str | None) -> str:
     the result is should use ``classify_document_with_confidence`` instead.
     """
     return classify_document_with_confidence(file_name, sample_text).document_type
+
+
+# ── document understanding (Stage 1: classifier → full payload) ──────────────
+#
+# A document's understanding is more than one type label: every AI feature needs
+# to know what the file *contains* (tasks vs theory vs solutions), its language,
+# and its subject/topic before prompting. These are computed deterministically
+# (no LLM) and persisted so features read them instead of re-deriving each time.
+
+# Below this, doc-type-based behaviour/retrieval boosts should NOT be trusted
+# unless the user explicitly confirmed/overrode the type.
+LOW_CONFIDENCE_THRESHOLD = 0.65
+
+
+@dataclass
+class ContentFlags:
+    """What the document *contains*, independent of its single type label — so an
+    exam can be has_tasks=True / has_theory=False / has_solutions=False."""
+
+    has_tasks: bool
+    has_theory: bool
+    has_solutions: bool
+    has_examples: bool
+    is_mixed: bool
+
+    def to_json(self) -> dict[str, bool]:
+        return {
+            "has_tasks":     self.has_tasks,
+            "has_theory":    self.has_theory,
+            "has_solutions": self.has_solutions,
+            "has_examples":  self.has_examples,
+            "is_mixed":      self.is_mixed,
+        }
+
+
+def detect_content_flags(sample_text: str | None) -> ContentFlags:
+    text = sample_text or ""
+    if not text.strip():
+        return ContentFlags(False, False, False, False, False)
+    has_tasks = (
+        len(_NUMBERED_TASK_RE.findall(text)) >= 1
+        or len(_EXERCISE_RE.findall(text)) >= 1
+    )
+    has_solutions = len(_SOLUTION_RE.findall(text)) >= 1
+    has_theory = (
+        len(_THEORY_RE.findall(text)) >= 2
+        or len(_LECTURE_HEADING_RE.findall(text)) >= 1
+    )
+    has_examples = len(_EXAMPLE_RE.findall(text)) >= 1
+    is_mixed = has_tasks and has_theory
+    return ContentFlags(has_tasks, has_theory, has_solutions, has_examples, is_mixed)
+
+
+# Deterministic de/en detection — umlauts + stopword frequency + filename hints.
+_DE_STOPWORDS = frozenset({
+    "der", "die", "das", "und", "mit", "für", "ist", "eine", "einen", "nicht",
+    "werden", "auf", "von", "den", "dem", "des", "zu", "sich", "auch", "wird",
+    "sind", "aufgabe", "lösung", "über", "durch", "bei", "oder", "als", "aus",
+})
+_EN_STOPWORDS = frozenset({
+    "the", "and", "of", "is", "for", "with", "not", "are", "this", "that",
+    "from", "which", "exercise", "solution", "question", "answer", "you",
+    "there", "their", "these", "where", "when", "while", "because", "therefore",
+})
+_WORD_TOKEN_RE = re.compile(r"[A-Za-zÄÖÜäöüß]+")
+
+
+def detect_language(
+    file_name: str | None,
+    sample_text: str | None,
+    fallback: str | None = None,
+) -> str:
+    """Return 'de' | 'en' | the caller fallback | 'unknown'."""
+    text = sample_text or ""
+    name = (file_name or "").lower()
+    de = 2 * len(re.findall(r"[äöüß]", text, re.IGNORECASE))  # umlauts: strong DE
+    en = 0
+    for w in (t.lower() for t in _WORD_TOKEN_RE.findall(text)[:4000]):
+        if w in _DE_STOPWORDS:
+            de += 1
+        elif w in _EN_STOPWORDS:
+            en += 1
+    if any(h in name for h in ("loesung", "lösung", "klausur", "übung", "uebung",
+                               "vorlesung", "zusammenfassung", "prüfung")):
+        de += 3
+    if any(h in name for h in ("solution", "exercise", "lecture", "summary", "exam")):
+        en += 3
+    if de == 0 and en == 0:
+        return fallback or "unknown"
+    if abs(de - en) <= 1:  # too close to call → trust the stored language if any
+        return fallback or ("de" if de >= en else "en")
+    return "de" if de > en else "en"
+
+
+# Words to strip from a filename before using the remainder as a subject guess.
+_FILENAME_NOISE_RE = re.compile(
+    r"\b(?:pdf|docx?|pptx?|loesung|lösung|aufgaben?|übung|uebung|klausur|exam|"
+    r"prüfung|pruefung|skript|vorlesung|folien|slides|zusammenfassung|summary|"
+    r"formelsammlung|cheatsheet|chapter|kapitel|final|midterm|teil|blatt|sheet|"
+    r"ws\d*|ss\d*|sose\d*|wise\d*)\b",
+    re.IGNORECASE,
+)
+
+
+def extract_subject_name(file_name: str | None, sample_text: str | None) -> str | None:
+    """Best-effort subject from the filename stem (type/term noise stripped),
+    falling back to the first substantive heading. May return None — deliberately
+    conservative; a wrong subject is worse than no subject."""
+    stem = re.sub(r"\.[a-z0-9]+$", "", file_name or "", flags=re.IGNORECASE)
+    stem = re.sub(r"[_\-]+", " ", stem)
+    stem = _FILENAME_NOISE_RE.sub(" ", stem)
+    stem = re.sub(r"\b\d{1,4}\b", " ", stem)
+    stem = re.sub(r"\s+", " ", stem).strip()
+    if len(stem) >= 4 and re.search(r"[A-Za-zÄÖÜäöüß]{4,}", stem):
+        return stem[:80]
+    for raw in (sample_text or "").splitlines():
+        s = raw.strip().lstrip("#").strip()
+        if 4 <= len(s) <= 80 and re.search(r"[A-Za-zÄÖÜäöüß]{4,}", s):
+            return s
+    return None
+
+
+def match_topic_area(
+    sample_text: str | None,
+    course_topics: Iterable[str] | None,
+) -> str | None:
+    """Pick the course topic whose name appears most in the text (>=2 mentions)."""
+    if not course_topics:
+        return None
+    text = (sample_text or "").lower()
+    if not text:
+        return None
+    best: str | None = None
+    best_score = 0
+    for topic in course_topics:
+        if not topic:
+            continue
+        score = text.count(topic.lower())
+        if score > best_score:
+            best, best_score = topic, score
+    return best if best_score >= 2 else None
+
+
+@dataclass
+class DocumentUnderstanding:
+    document_type: str
+    document_type_confidence: float
+    document_type_signals: list[str]
+    detected_language: str
+    subject_name: str | None
+    topic_area: str | None
+    content_flags: ContentFlags
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "document_type":            self.document_type,
+            "document_type_confidence": round(self.document_type_confidence, 3),
+            "document_type_signals":    list(self.document_type_signals),
+            "detected_language":        self.detected_language,
+            "subject_name":             self.subject_name,
+            "topic_area":               self.topic_area,
+            "content_flags":            self.content_flags.to_json(),
+        }
+
+
+def analyze_document(
+    file_name: str | None,
+    sample_text: str | None,
+    *,
+    fallback_language: str | None = None,
+    course_topics: Iterable[str] | None = None,
+) -> DocumentUnderstanding:
+    """Compose the deterministic understanding payload for one document. No LLM,
+    no I/O — safe to call inline during indexing or on a backfill pass."""
+    cls = classify_document_with_confidence(file_name, sample_text)
+    return DocumentUnderstanding(
+        document_type=cls.document_type,
+        document_type_confidence=cls.confidence,
+        document_type_signals=cls.signals,
+        detected_language=detect_language(file_name, sample_text, fallback_language),
+        subject_name=extract_subject_name(file_name, sample_text),
+        topic_area=match_topic_area(sample_text, course_topics),
+        content_flags=detect_content_flags(sample_text),
+    )
+
+
+def effective_document_type(
+    classifier_type: str | None,
+    user_override: str | None,
+    source_type: str | None = None,
+) -> str:
+    """Authoritative type for downstream AI behaviour:
+    user override → classifier → legacy source_type → 'unknown'."""
+    if user_override:
+        return user_override
+    if classifier_type and classifier_type != "unknown":
+        return classifier_type
+    if source_type:
+        return source_type
+    return "unknown"
 
 
 # ── extraction-quality rollup ───────────────────────────────────────────────
@@ -423,10 +676,21 @@ def measure_ocr_need(pages: list[str]) -> OcrAssessment:
 
 __all__ = (
     "DOCUMENT_TYPES",
+    "REFERENCE_TYPES",
     "EXTRACTION_QUALITIES",
+    "LOW_CONFIDENCE_THRESHOLD",
+    "ContentFlags",
+    "DocumentUnderstanding",
     "OcrAssessment",
     "QualityRollup",
+    "analyze_document",
     "classify_document",
+    "classify_document_with_confidence",
+    "detect_content_flags",
+    "detect_language",
+    "effective_document_type",
+    "extract_subject_name",
+    "match_topic_area",
     "measure_ocr_need",
     "rollup_extraction_quality",
 )
