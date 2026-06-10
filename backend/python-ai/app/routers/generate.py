@@ -188,7 +188,7 @@ class GenerateDeepLearnResponse(BaseModel):
 
 
 @router.post("/generate-quiz", response_model=GenerateQuizResponse)
-async def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizResponse:
+def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -234,7 +234,7 @@ async def generate_quiz_endpoint(payload: GenerateQuizRequest) -> GenerateQuizRe
 
 
 @router.post("/generate-examforge", response_model=GenerateExamForgeResponse)
-async def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> GenerateExamForgeResponse:
+def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> GenerateExamForgeResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -269,7 +269,7 @@ async def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> Gene
 
 
 @router.post("/grade-examforge-answer", response_model=GradeExamForgeAnswerResponse)
-async def grade_examforge_answer_endpoint(payload: GradeExamForgeAnswerRequest) -> GradeExamForgeAnswerResponse:
+def grade_examforge_answer_endpoint(payload: GradeExamForgeAnswerRequest) -> GradeExamForgeAnswerResponse:
     _require_uuid(payload.userId, "userId")
     _require_uuid(payload.examSessionId, "examSessionId")
     _require_uuid(payload.examQuestionId, "examQuestionId")
@@ -286,7 +286,7 @@ async def grade_examforge_answer_endpoint(payload: GradeExamForgeAnswerRequest) 
 
 
 @router.post("/generate-cheatsheet", response_model=GenerateCheatsheetResponse)
-async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> GenerateCheatsheetResponse:
+def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> GenerateCheatsheetResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -324,7 +324,7 @@ async def generate_cheatsheet_endpoint(payload: GenerateCheatsheetRequest) -> Ge
 
 
 @router.post("/generate-deep-learn", response_model=GenerateDeepLearnResponse)
-async def generate_deep_learn_endpoint(payload: GenerateDeepLearnRequest) -> GenerateDeepLearnResponse:
+def generate_deep_learn_endpoint(payload: GenerateDeepLearnRequest) -> GenerateDeepLearnResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -387,7 +387,7 @@ class GenerateFlashcardsResponse(BaseModel):
 
 
 @router.post("/generate-flashcards", response_model=GenerateFlashcardsResponse)
-async def generate_flashcards_endpoint(payload: GenerateFlashcardsRequest) -> GenerateFlashcardsResponse:
+def generate_flashcards_endpoint(payload: GenerateFlashcardsRequest) -> GenerateFlashcardsResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -450,7 +450,7 @@ class GenerateNotesResponse(BaseModel):
 
 
 @router.post("/generate-notes", response_model=GenerateNotesResponse)
-async def generate_notes_endpoint(payload: GenerateNotesRequest) -> GenerateNotesResponse:
+def generate_notes_endpoint(payload: GenerateNotesRequest) -> GenerateNotesResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:

@@ -26,7 +26,7 @@ class SuggestionValidationRequest(BaseModel):
 
 
 @router.post("/validate")
-async def validate_endpoint(payload: SuggestionValidationRequest) -> dict[str, Any]:
+def validate_endpoint(payload: SuggestionValidationRequest) -> dict[str, Any]:
     return validate_suggestion(
         kind=payload.kind,
         parent=payload.parent,

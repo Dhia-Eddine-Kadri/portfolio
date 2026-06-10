@@ -19,6 +19,7 @@ dependencies = [
   "pypdfium2>=4.30",
   # pypdfium2.to_pil() lazy-imports PIL — Pillow must be installed at runtime.
   "Pillow>=10.4",
+  "gunicorn>=21.2",
 ]
 
 [project.optional-dependencies]

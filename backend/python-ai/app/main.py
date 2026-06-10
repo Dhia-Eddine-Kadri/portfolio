@@ -8,6 +8,7 @@ phases.
 import logging
 from typing import Any
 
+import anyio
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -81,6 +82,11 @@ app.include_router(study_planner_router.router)
 app.include_router(suggestions_router.router)
 
 
+@app.on_event("startup")
+async def _raise_threadpool_limit() -> None:
+    anyio.to_thread.current_default_thread_limiter().total_tokens = 64
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Liveness probe. Unauthenticated on purpose — used by Fly/Netlify."""
@@ -93,7 +99,7 @@ async def health() -> dict[str, Any]:
 
 
 @app.get("/internal/db-smoke", dependencies=[Depends(require_internal_token)])
-async def db_smoke() -> dict[str, Any]:
+def db_smoke() -> dict[str, Any]:
     """Tiny read against `documents` to confirm Supabase wiring works.
 
     Returns the count only — no row data. Used during deploy to verify

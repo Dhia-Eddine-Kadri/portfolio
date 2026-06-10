@@ -200,7 +200,7 @@ class RetrieveContextResponse(BaseModel):
 
 
 @router.post("/retrieve-context", response_model=RetrieveContextResponse)
-async def retrieve_context_endpoint(payload: RetrieveContextRequest) -> RetrieveContextResponse:
+def retrieve_context_endpoint(payload: RetrieveContextRequest) -> RetrieveContextResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:
@@ -331,7 +331,7 @@ def _simple_source_answer(text: str, decision: SourceDecision) -> dict[str, Any]
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_endpoint(payload: AskRequest) -> AskResponse:
+def ask_endpoint(payload: AskRequest) -> AskResponse:
     _require_uuid(payload.userId, "userId")
     if payload.documentIds:
         for did in payload.documentIds:

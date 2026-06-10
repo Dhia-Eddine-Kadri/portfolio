@@ -87,7 +87,7 @@ class GenerateWeekPlanRequest(BaseModel):
 
 
 @router.post("/study-planner/generate-week")
-async def generate_week(payload: GenerateWeekPlanRequest) -> dict:
+def generate_week(payload: GenerateWeekPlanRequest) -> dict:
     """Generate (or retrieve) the AI-powered weekly study plan.
 
     For course_week scope, verifies that the requesting user owns the given

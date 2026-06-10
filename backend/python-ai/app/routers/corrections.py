@@ -104,7 +104,7 @@ class CorrectPageResponse(BaseModel):
 
 
 @router.post("/document-review-pages", response_model=ReviewPagesResponse)
-async def review_pages_endpoint(payload: ReviewPagesRequest) -> ReviewPagesResponse:
+def review_pages_endpoint(payload: ReviewPagesRequest) -> ReviewPagesResponse:
     """List the OCR'd pages that still need a student's review/correction."""
     _verify_owner(payload.documentId, payload.userId)
     pages = list_review_pages(payload.documentId)
@@ -115,7 +115,7 @@ async def review_pages_endpoint(payload: ReviewPagesRequest) -> ReviewPagesRespo
 
 
 @router.post("/correct-document-page", response_model=CorrectPageResponse)
-async def correct_page_endpoint(
+def correct_page_endpoint(
     payload: CorrectPageRequest,
     background: BackgroundTasks,
 ) -> CorrectPageResponse:

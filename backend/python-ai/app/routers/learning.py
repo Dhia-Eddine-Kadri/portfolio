@@ -78,7 +78,7 @@ class NextActionResponse(BaseModel):
 
 
 @router.post("/course-topic-map/generate", response_model=TopicMapResponse)
-async def generate_topic_map(payload: CourseRequest, background: BackgroundTasks) -> TopicMapResponse:
+def generate_topic_map(payload: CourseRequest, background: BackgroundTasks) -> TopicMapResponse:
     """(Re)build the course topic map in the background; returns the current
     (possibly stale) map immediately so the caller can poll for the refresh."""
     _verify_course_owner(payload.userId, payload.courseId)
@@ -95,7 +95,7 @@ async def generate_topic_map(payload: CourseRequest, background: BackgroundTasks
 
 
 @router.post("/course-topic-map", response_model=TopicMapResponse)
-async def read_topic_map(payload: CourseRequest) -> TopicMapResponse:
+def read_topic_map(payload: CourseRequest) -> TopicMapResponse:
     _verify_course_owner(payload.userId, payload.courseId)
     return TopicMapResponse(
         courseId=payload.courseId,
@@ -104,6 +104,6 @@ async def read_topic_map(payload: CourseRequest) -> TopicMapResponse:
 
 
 @router.post("/learning/next-action", response_model=NextActionResponse)
-async def next_action(payload: CourseRequest) -> NextActionResponse:
+def next_action(payload: CourseRequest) -> NextActionResponse:
     _verify_course_owner(payload.userId, payload.courseId)
     return NextActionResponse(**get_next_best_action(payload.userId, payload.courseId))

@@ -25,7 +25,7 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat")
-async def chat_endpoint(payload: ChatRequest) -> dict[str, Any]:
+def chat_endpoint(payload: ChatRequest) -> dict[str, Any]:
     try:
         return run_chat(payload.model_dump(exclude_none=True))
     except ChatValidationError as e:

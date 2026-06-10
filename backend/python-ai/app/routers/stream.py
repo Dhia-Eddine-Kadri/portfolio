@@ -16,6 +16,7 @@ from dataclasses import replace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -316,14 +317,16 @@ def _web_sources_to_js(sources: list[dict[str, Any]] | None) -> list[dict[str, A
 async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(verify_supabase_jwt)):
     user_id = user["id"]
     # Paid feature — verify subscription before doing anything expensive.
-    require_active_subscription(user_id, "ask_stream")
-    enforce_interactive_cap(user_id, _INTERACTIVE_MONTHLY_CAP)
-    enforce_rate_limit(
-        user_id,
-        "ask_stream",
-        _ASK_STREAM_RATE_LIMIT_MAX,
-        _ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS,
-        "AI request limit reached. Please try again later.",
+    await run_in_threadpool(lambda: require_active_subscription(user_id, "ask_stream"))
+    await run_in_threadpool(lambda: enforce_interactive_cap(user_id, _INTERACTIVE_MONTHLY_CAP))
+    await run_in_threadpool(
+        lambda: enforce_rate_limit(
+            user_id,
+            "ask_stream",
+            _ASK_STREAM_RATE_LIMIT_MAX,
+            _ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS,
+            "AI request limit reached. Please try again later.",
+        )
     )
 
     if payload.documentIds:
@@ -347,8 +350,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # ids), so resolve them to ids here. Fall back to ids the client did send.
     resolved_document_ids = list(payload.documentIds) if payload.documentIds else []
     if not resolved_document_ids and payload.documentNames:
-        resolved_document_ids = _resolve_document_ids_by_name(
-            user_id, payload.courseId, payload.documentNames
+        resolved_document_ids = await run_in_threadpool(
+            lambda: _resolve_document_ids_by_name(user_id, payload.courseId, payload.documentNames)
         )
     # If the chat asked for specific files but none resolved, don't dead-end on
     # a "which file?" clarification — search the whole course instead (it still
@@ -357,10 +360,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     if (payload.courseFileScope or "").strip().lower() == "specific_files" and not resolved_document_ids:
         effective_scope = "all_course_files"
 
-    doc_name_map = _verify_user_owns_documents(user_id, payload.courseId, resolved_document_ids)
+    doc_name_map = await run_in_threadpool(
+        lambda: _verify_user_owns_documents(user_id, payload.courseId, resolved_document_ids)
+    )
     if payload.activeDocumentId:
-        doc_name_map.update(_verify_user_owns_documents(
-            user_id, payload.courseId, [payload.activeDocumentId]
+        doc_name_map.update(await run_in_threadpool(
+            lambda: _verify_user_owns_documents(user_id, payload.courseId, [payload.activeDocumentId])
         ))
 
     source_decision = classify_source_scope(
@@ -393,9 +398,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         )
 
     if source_decision.source_scope == SourceScope.INTERNET and not app_question:
-        web_answer = generate_web_answer(
-            question,
-            query=source_decision.sanitized_web_query or question,
+        web_answer = await run_in_threadpool(
+            lambda: generate_web_answer(question, query=source_decision.sanitized_web_query or question)
         )
         source_decision = replace(source_decision, web_search_used=bool(web_answer.get("webSources")))
         return _stream_static_answer(
@@ -410,7 +414,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
 
     if source_decision.source_scope == SourceScope.GENERAL_KNOWLEDGE and not app_question:
         prefix = auto_general_prefix() if source_decision.selected_source_mode.value == "auto" else ""
-        general = generate_general_answer(question, prefix=prefix)
+        general = await run_in_threadpool(lambda: generate_general_answer(question, prefix=prefix))
         return _stream_static_answer(
             text=general["answer"],
             decision=source_decision,
@@ -468,12 +472,14 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         "selected_document_ids": retrieval_document_ids,
     }
     if cacheable:
-        version_hash = fetch_course_version_hash(user_id, payload.courseId)
+        version_hash = await run_in_threadpool(lambda: fetch_course_version_hash(user_id, payload.courseId))
         if version_hash:
-            cached = lookup_answer(
-                user_id=user_id, course_id=payload.courseId,
-                question=question, version_hash=version_hash,
-                **cache_key_kwargs,
+            cached = await run_in_threadpool(
+                lambda: lookup_answer(
+                    user_id=user_id, course_id=payload.courseId,
+                    question=question, version_hash=version_hash,
+                    **cache_key_kwargs,
+                )
             )
 
     def cached_stream():
@@ -609,18 +615,22 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         formula_hits = []
     else:
         try:
-            exercise_hit = retrieve_exercise_block(
-                user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-                document_ids=retrieval_document_ids,
-                active_document_id=payload.activeDocumentId,
+            exercise_hit = await run_in_threadpool(
+                lambda: retrieve_exercise_block(
+                    user_id=user_id, course_id=payload.courseId, query=retrieval_query,
+                    document_ids=retrieval_document_ids,
+                    active_document_id=payload.activeDocumentId,
+                )
             )
-            chunks = retrieve_chunks(
-                user_id=user_id, course_id=payload.courseId,
-                query=retrieval_query, document_ids=retrieval_document_ids,
-                preferred_document_ids=retrieval_document_ids,
-                active_document_id=payload.activeDocumentId,
-                document_name_query=question,
-                top_k=18,
+            chunks = await run_in_threadpool(
+                lambda: retrieve_chunks(
+                    user_id=user_id, course_id=payload.courseId,
+                    query=retrieval_query, document_ids=retrieval_document_ids,
+                    preferred_document_ids=retrieval_document_ids,
+                    active_document_id=payload.activeDocumentId,
+                    document_name_query=question,
+                    top_k=18,
+                )
             )
         except EmbeddingServiceUnavailable as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -629,10 +639,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             chunks = _prepend_exercise_chunks(exercise_hit, chunks)
 
         try:
-            formula_hits = retrieve_formula_block(
-                user_id=user_id, course_id=payload.courseId, query=retrieval_query,
-                document_ids=retrieval_document_ids,
-                active_document_id=payload.activeDocumentId,
+            formula_hits = await run_in_threadpool(
+                lambda: retrieve_formula_block(
+                    user_id=user_id, course_id=payload.courseId, query=retrieval_query,
+                    document_ids=retrieval_document_ids,
+                    active_document_id=payload.activeDocumentId,
+                )
             )
         except EmbeddingServiceUnavailable as exc:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -644,7 +656,9 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     if missing_ids:
         sb = get_supabase()
         try:
-            resp = sb.table("documents").select("id, file_name").in_("id", list(set(missing_ids))).execute()
+            resp = await run_in_threadpool(
+                lambda: sb.table("documents").select("id, file_name").in_("id", list(set(missing_ids))).execute()
+            )
             for row in resp.data or []:
                 doc_name_map[row["id"]] = row["file_name"]
         except Exception:
@@ -669,7 +683,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             source_scope=SourceScope.GENERAL_KNOWLEDGE,
             source_label="Using: General knowledge",
         )
-        general = generate_general_answer(question, prefix=auto_general_prefix())
+        general = await run_in_threadpool(lambda: generate_general_answer(question, prefix=auto_general_prefix()))
         return _stream_static_answer(
             text=general["answer"],
             decision=general_decision,
@@ -686,7 +700,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # Phase 3: per-student weak-topic coaching note. Best-effort; failure
     # here must never block answering.
     from ..services.mastery import fetch_weak_topics  # noqa: WPS433
-    weak_topics = fetch_weak_topics(user_id, payload.courseId)
+    weak_topics = await run_in_threadpool(lambda: fetch_weak_topics(user_id, payload.courseId))
 
     def gen():
         import json

@@ -13,9 +13,10 @@ import { optionalEnv } from './env';
 import type { PythonProxyResult } from './types';
 
 // Grounded generation (cheatsheet, structured Deep Learn) runs ~40 tok/s and a
-// dense sheet can take 45–55s. 45s aborted real requests ("Upstream AI service
-// error"); 60s gives margin. Override per-env with AI_UPSTREAM_TIMEOUT_MS.
-const _UPSTREAM_TIMEOUT_MS = parseInt(optionalEnv('AI_UPSTREAM_TIMEOUT_MS', '60000'), 10);
+// dense sheet can take 45–55s. 120s default gives comfortable margin for heavy
+// grounded generation that can approach ~50s; still overridable per-env via
+// AI_UPSTREAM_TIMEOUT_MS (e.g. set lower in staging to fail fast).
+const _UPSTREAM_TIMEOUT_MS = parseInt(optionalEnv('AI_UPSTREAM_TIMEOUT_MS', '120000'), 10);
 
 function _config(): { serviceUrl: string; internalToken: string } {
   return {

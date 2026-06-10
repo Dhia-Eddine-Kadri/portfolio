@@ -65,7 +65,7 @@ class AnalyseResponse(BaseModel):
 
 
 @router.post("/writing-coach-analyse", response_model=AnalyseResponse)
-async def writing_coach_analyse(payload: AnalyseRequest) -> AnalyseResponse:
+def writing_coach_analyse(payload: AnalyseRequest) -> AnalyseResponse:
     if not payload.userId or not _UUID_RE.match(payload.userId):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="userId must be a UUID")
     if payload.profileLevel not in ALLOWED_LEVELS:

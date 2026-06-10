@@ -43,7 +43,7 @@ class FeedbackRequest(BaseModel):
 
 
 @router.post("/feedback")
-async def feedback_endpoint(payload: FeedbackRequest) -> dict[str, Any]:
+def feedback_endpoint(payload: FeedbackRequest) -> dict[str, Any]:
     if payload.rating not in _VALID_RATINGS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,7 +108,7 @@ def _judge(ev: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.post("/evaluate-retrieval")
-async def evaluate_endpoint(payload: EvaluateRequest) -> dict[str, Any]:
+def evaluate_endpoint(payload: EvaluateRequest) -> dict[str, Any]:
     sb = get_supabase()
     q = sb.table("ai_evaluations").select(
         "id, test_question, expected_behavior, expected_sources"

@@ -846,7 +846,7 @@ class NotesGenerateRequest(BaseModel):
 
 
 @router.post("/notes-generate")
-async def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
+def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
     if payload.tool not in ("notes", "summary"):
         raise HTTPException(status_code=400, detail="tool must be notes or summary")
     if payload.mode not in ("generate", "section", "merge", "analyze"):

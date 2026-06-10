@@ -75,7 +75,7 @@ def _verify_owner(document_id: str, user_id: str) -> dict:
 
 
 @router.post("/index-document", response_model=IndexDocumentResponse)
-async def index_document_endpoint(
+def index_document_endpoint(
     payload: IndexDocumentRequest,
     background: BackgroundTasks,
 ) -> IndexDocumentResponse:
@@ -112,7 +112,7 @@ async def index_document_endpoint(
 
 
 @router.get("/document-index-status", response_model=IndexDocumentResponse)
-async def index_status_endpoint(
+def index_status_endpoint(
     documentId: str,
     userId: str,
 ) -> IndexDocumentResponse:
