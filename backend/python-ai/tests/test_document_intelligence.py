@@ -27,9 +27,16 @@ from app.services.document_intelligence import (
         ("Midterm-Spring.pdf", "exam"),
         ("Zusammenfassung_Kapitel5.pdf", "summary"),
         ("Vorlesung_03.pdf", "lecture"),
-        ("Lecture-12-Slides.pdf", "lecture"),
-        ("Cheatsheet_Final.pdf", "formula_sheet"),
+        # "Slides" is now its own type (still Lecture-Learning behaviour downstream).
+        ("Lecture-12-Slides.pdf", "slides"),
+        # Cheatsheet is now cheat_sheet (treated like formula_sheet downstream).
+        ("Cheatsheet_Final.pdf", "cheat_sheet"),
         ("Übung_2.pdf", "exercise_sheet"),
+        # New types from the Understanding Layer.
+        ("Hausaufgabe_4.pdf", "assignment"),
+        ("ML_Homework2.pdf", "assignment"),
+        ("Vorlesung_Folien_05.pdf", "slides"),
+        ("Lehrbuch_Kapitel3.pdf", "textbook_chapter"),
         # Abbreviated "ExN" exercise marker (EngMec2 series).
         ("EngMec2_Ex2.pdf", "exercise_sheet"),
         ("EngMec2_Ex10.pdf", "exercise_sheet"),
@@ -343,3 +350,144 @@ def test_keep_original_when_ocr_is_mostly_unclear() -> None:
     )
     ocr = "[unclear]\n[unclear]\n[unclear]\n[unclear]\nFragment"
     assert not prefer_ocr_text(original, ocr)
+
+
+# ── Document Understanding Layer (Stage 1) ──────────────────────────────────
+
+from app.services.document_intelligence import (  # noqa: E402
+    analyze_document,
+    detect_content_flags,
+    detect_language,
+    effective_document_type,
+    extract_subject_name,
+    match_topic_area,
+)
+
+
+def test_exam_strong_admin_markers_classify_as_exam() -> None:
+    body = (
+        "Klausur Ingenieurmathematik. Bearbeitungszeit: 90 Minuten. "
+        "Zugelassene Hilfsmittel: keine. Aufgabe 1 (10 Punkte). "
+        "Teilaufgabe a) Berechnen Sie. Aufgabe 2 (15 Punkte)."
+    )
+    assert classify_document("scan.pdf", body) == "exam"
+
+
+def test_numbered_tasks_without_exam_markers_are_not_exam() -> None:
+    # Pure exercise sheet — many tasks, NO Bearbeitungszeit/Punkte/exam words.
+    body = "Aufgabe 1. Zeigen Sie. Aufgabe 2. Berechnen Sie. Aufgabe 3. Diskutieren Sie."
+    assert classify_document("blatt.pdf", body) == "exercise_sheet"
+
+
+def test_content_flags_exam_has_tasks_not_theory_not_solutions() -> None:
+    body = "Aufgabe 1 (5 Punkte). Aufgabe 2 (5 Punkte). Aufgabe 3 (10 Punkte)."
+    flags = detect_content_flags(body)
+    assert flags.has_tasks is True
+    assert flags.has_solutions is False
+    assert flags.has_theory is False
+    assert flags.is_mixed is False
+
+
+def test_content_flags_lecture_has_theory_and_examples() -> None:
+    body = (
+        "Definition: Eine Gruppe ist... Satz 1: ... Beweis: ... "
+        "Zum Beispiel betrachten wir die Menge. Lecture 3 covers groups."
+    )
+    flags = detect_content_flags(body)
+    assert flags.has_theory is True
+    assert flags.has_examples is True
+    assert flags.has_tasks is False
+
+
+def test_content_flags_mixed_when_tasks_and_theory() -> None:
+    body = (
+        "Definition: stetige Funktion. Satz: Zwischenwertsatz. Beweis folgt. "
+        "Aufgabe 1. Zeigen Sie die Stetigkeit. Aufgabe 2. Berechnen Sie."
+    )
+    flags = detect_content_flags(body)
+    assert flags.has_tasks is True
+    assert flags.has_theory is True
+    assert flags.is_mixed is True
+
+
+def test_content_flags_empty_text_all_false() -> None:
+    flags = detect_content_flags("")
+    assert (flags.has_tasks, flags.has_theory, flags.has_solutions,
+            flags.has_examples, flags.is_mixed) == (False, False, False, False, False)
+
+
+def test_language_detection_german_from_umlauts_and_stopwords() -> None:
+    body = "Die Lösung der Aufgabe ist für die Übung mit den Funktionen über R."
+    assert detect_language("anon.pdf", body) == "de"
+
+
+def test_language_detection_english_from_stopwords() -> None:
+    body = "The solution of the exercise is computed with these functions and that rule."
+    assert detect_language("anon.pdf", body) == "en"
+
+
+def test_language_detection_filename_hint_breaks_tie() -> None:
+    assert detect_language("Loesung_3.pdf", "") == "de"
+    assert detect_language("Exam_Final.pdf", "") == "en"
+
+
+def test_language_detection_falls_back_when_no_signal() -> None:
+    assert detect_language("scan.pdf", "", fallback="de") == "de"
+    assert detect_language("scan.pdf", "") == "unknown"
+
+
+def test_effective_document_type_override_wins() -> None:
+    assert effective_document_type("lecture", "exam") == "exam"
+    assert effective_document_type("unknown", "solution_sheet") == "solution_sheet"
+
+
+def test_effective_document_type_classifier_then_source_then_unknown() -> None:
+    assert effective_document_type("lecture", None) == "lecture"
+    assert effective_document_type("unknown", None, source_type="formula_sheet") == "formula_sheet"
+    assert effective_document_type(None, None) == "unknown"
+    assert effective_document_type("unknown", None) == "unknown"
+
+
+def test_extract_subject_name_from_filename_stem() -> None:
+    # Type/term noise stripped; the real subject survives.
+    assert extract_subject_name("Ingenieurmathematik_Klausur_WS23.pdf", "") == "Ingenieurmathematik"
+    # Pure noise → None.
+    assert extract_subject_name("Loesung_3.pdf", "") is None
+
+
+def test_match_topic_area_picks_most_mentioned() -> None:
+    text = "Taylor series. Taylor expansion. The Taylor polynomial. Limits appear once."
+    assert match_topic_area(text, ["Limits", "Taylor", "Integrals"]) == "Taylor"
+    assert match_topic_area(text, None) is None
+    assert match_topic_area("nothing relevant", ["Taylor"]) is None
+
+
+def test_analyze_document_end_to_end_exam() -> None:
+    u = analyze_document(
+        "Klausur_Analysis1_2023.pdf",
+        "Bearbeitungszeit: 120 Minuten. Aufgabe 1 (10 Punkte). Teilaufgabe a).",
+        fallback_language="en",
+        course_topics=["Analysis", "Algebra"],
+    )
+    assert u.document_type == "exam"
+    assert u.document_type_confidence > 0.5
+    assert u.detected_language == "de"
+    assert u.content_flags.has_tasks is True
+    payload = u.to_json()
+    assert set(payload) == {
+        "document_type", "document_type_confidence", "document_type_signals",
+        "detected_language", "subject_name", "topic_area", "content_flags",
+    }
+    assert set(payload["content_flags"]) == {
+        "has_tasks", "has_theory", "has_solutions", "has_examples", "is_mixed",
+    }
+
+
+def test_analyze_document_result_type_in_enum() -> None:
+    from app.services.document_intelligence import DOCUMENT_TYPES
+    for fn, body in [
+        ("Folien_03.pdf", "slides about graphs"),
+        ("Hausaufgabe.pdf", "Aufgabe 1. Aufgabe 2."),
+        ("random.pdf", ""),
+    ]:
+        assert analyze_document(fn, body).document_type in DOCUMENT_TYPES
