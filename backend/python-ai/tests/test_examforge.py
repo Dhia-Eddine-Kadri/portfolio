@@ -181,3 +181,146 @@ def test_record_course_topic_attempt_blank_noop(monkeypatch):
     monkeypatch.setattr(ms, "get_supabase", _boom)
     ms.record_course_topic_attempt("u1", "course-1", "  ", correct=True)
     assert called["n"] == 0
+
+
+# ── persistence hardening (Stage 5) ─────────────────────────────────────────────
+#
+# An ExamForge exam must be genuinely persisted before it can be graded:
+#   - success  → every returned question carries a DB id + a sessionId is present
+#   - failure  → a CLEAR error, and NO gradeable questions (so the UI can't start
+#                an exam that can never be graded/tracked).
+
+
+class _InsertQ:
+    """Minimal fake table query that records inserts and returns canned rows."""
+
+    def __init__(self, table, store, behaviour):
+        self.t = table
+        self.s = store
+        self.b = behaviour
+        self._payload = None
+
+    def insert(self, payload, **k):
+        self._payload = payload
+        self.s.setdefault(self.t, []).append(payload)
+        return self
+
+    def execute(self):
+        if self.t == "exam_sessions":
+            mode = self.b.get("session", "ok")
+            if mode == "raise":
+                raise RuntimeError("db down")
+            if mode == "no_id":
+                return _Res([{}])
+            return _Res([{"id": "sess-1"}])
+        if self.t == "exam_questions":
+            mode = self.b.get("questions", "ok")
+            n = len(self._payload) if isinstance(self._payload, list) else 1
+            if mode == "raise":
+                raise RuntimeError("db down")
+            if mode == "empty":
+                return _Res([])
+            if mode == "missing_id":
+                # one row comes back without an id
+                return _Res([{"id": f"q-{i}"} if i else {} for i in range(n)])
+            return _Res([{"id": f"q-{i}"} for i in range(n)])
+        return _Res([])
+
+
+class _InsertSB:
+    def __init__(self, store, behaviour):
+        self.s = store
+        self.b = behaviour
+
+    def table(self, name):
+        return _InsertQ(name, self.s, self.b)
+
+
+def _stub_generation(monkeypatch, questions):
+    """Bypass retrieval/LLM so generate_examforge runs straight to persistence."""
+    monkeypatch.setattr(ef, "get_course_topic_map", lambda *a, **k: [])
+    monkeypatch.setattr(ef, "_pool_evidence", lambda **k: [{"chunkId": "c1", "documentId": "d1"}])
+    monkeypatch.setattr(
+        ef, "_grounded_questions",
+        lambda **k: (questions, {"model": "m", "promptTokens": 1, "completionTokens": 2}),
+    )
+    monkeypatch.setattr(ef, "_fetch_course_topics", lambda *a, **k: ["Friction"])
+
+
+_SAMPLE_QS = [
+    {"id": None, "type": "mcq", "question": "Q1?", "options": ["a", "b", "c", "d"],
+     "answer": "A", "explanation": "", "difficulty": "medium", "topic": "Friction",
+     "points": 1, "sources": [{"fileName": "d.pdf", "pages": "4"}],
+     "validation": {"status": "grounded", "score": 1}},
+    {"id": None, "type": "true_false", "question": "Q2?", "options": ["True", "False"],
+     "answer": "true", "explanation": "", "difficulty": "easy", "topic": "Friction",
+     "points": 1, "sources": [], "validation": {"status": "grounded", "score": 1}},
+]
+
+
+def test_generate_examforge_success_persists_ids_and_session(monkeypatch):
+    _stub_generation(monkeypatch, [dict(q) for q in _SAMPLE_QS])
+    monkeypatch.setattr(ef, "get_supabase", lambda: _InsertSB({}, {}))
+    out = ef.generate_examforge(
+        user_id="u1", course_id="c1", document_ids=["d1"], requested_count=2,
+        difficulty="medium", topic=None, question_types=["mcq", "true_false"],
+        doc_names={"d1": "d.pdf"},
+    )
+    assert out["error"] is None
+    assert out["sessionId"] == "sess-1"
+    assert out["actualCount"] == 2
+    assert len(out["questions"]) == 2
+    # every returned question carries its persisted DB id
+    assert all(q.get("id") for q in out["questions"])
+    assert [q["id"] for q in out["questions"]] == ["q-0", "q-1"]
+
+
+def test_generate_examforge_session_insert_failure_returns_error(monkeypatch):
+    _stub_generation(monkeypatch, [dict(q) for q in _SAMPLE_QS])
+    monkeypatch.setattr(ef, "get_supabase", lambda: _InsertSB({}, {"session": "raise"}))
+    out = ef.generate_examforge(
+        user_id="u1", course_id="c1", document_ids=["d1"], requested_count=2,
+        difficulty="medium", topic=None, question_types=["mcq", "true_false"],
+        doc_names={"d1": "d.pdf"},
+    )
+    assert out["error"]  # clear error message present
+    assert out["sessionId"] is None
+    assert out["questions"] == []      # no gradeable exam returned
+    assert out["actualCount"] == 0
+
+
+def test_generate_examforge_session_no_id_returns_error(monkeypatch):
+    _stub_generation(monkeypatch, [dict(q) for q in _SAMPLE_QS])
+    monkeypatch.setattr(ef, "get_supabase", lambda: _InsertSB({}, {"session": "no_id"}))
+    out = ef.generate_examforge(
+        user_id="u1", course_id="c1", document_ids=["d1"], requested_count=2,
+        difficulty="medium", topic=None, question_types=["mcq"],
+        doc_names={"d1": "d.pdf"},
+    )
+    assert out["error"]
+    assert out["sessionId"] is None
+    assert out["questions"] == []
+
+
+def test_generate_examforge_question_insert_empty_returns_error(monkeypatch):
+    _stub_generation(monkeypatch, [dict(q) for q in _SAMPLE_QS])
+    monkeypatch.setattr(ef, "get_supabase", lambda: _InsertSB({}, {"questions": "empty"}))
+    out = ef.generate_examforge(
+        user_id="u1", course_id="c1", document_ids=["d1"], requested_count=2,
+        difficulty="medium", topic=None, question_types=["mcq"],
+        doc_names={"d1": "d.pdf"},
+    )
+    assert out["error"]
+    assert out["questions"] == []
+
+
+def test_generate_examforge_question_missing_id_returns_error(monkeypatch):
+    _stub_generation(monkeypatch, [dict(q) for q in _SAMPLE_QS])
+    monkeypatch.setattr(ef, "get_supabase", lambda: _InsertSB({}, {"questions": "missing_id"}))
+    out = ef.generate_examforge(
+        user_id="u1", course_id="c1", document_ids=["d1"], requested_count=2,
+        difficulty="medium", topic=None, question_types=["mcq"],
+        doc_names={"d1": "d.pdf"},
+    )
+    assert out["error"]
+    assert out["questions"] == []  # partially-saved exam is rejected wholesale

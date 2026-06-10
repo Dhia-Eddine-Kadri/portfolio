@@ -146,6 +146,7 @@ class GenerateExamForgeResponse(BaseModel):
     topicMap: list[dict[str, Any]] = []
     groundedSources: list[dict[str, Any]] = []
     warning: str | None = None
+    error: str | None = None
     model: str | None = None
     promptTokens: int | None = None
     completionTokens: int | None = None
@@ -312,6 +313,7 @@ def generate_examforge_endpoint(payload: GenerateExamForgeRequest) -> GenerateEx
         topicMap=out.get("topicMap", []),
         groundedSources=out.get("groundedSources", []),
         warning=out.get("warning"),
+        error=out.get("error"),
         model=out.get("model"),
         promptTokens=out.get("promptTokens"),
         completionTokens=out.get("completionTokens"),

@@ -141,19 +141,19 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         save: false,
       });
       if (fallback.ok) {
-        const py = fallback.body as PyQuizFallbackResponse;
+        // The quiz fallback produces questions that were never persisted to
+        // exam_sessions/exam_questions, so they have no gradeable ids. Return
+        // an error (not a fake-working exam) so the UI does not let the user
+        // start an exam that can never be graded or tracked.
         return jsonResponse(200, {
           sessionId: null,
           title: typeof topic === 'string' && topic.trim() ? topic.trim() : 'ExamForge',
-          requestedCount: py.requestedCount ?? requestedCount,
-          actualCount: py.actualCount ?? (py.questions || []).length,
-          questions: py.questions || [],
+          requestedCount,
+          actualCount: 0,
+          questions: [],
           topicMap: [],
-          groundedSources: py.groundedSources || [],
-          warning: py.warning,
-          model: py.model,
-          promptTokens: py.promptTokens,
-          completionTokens: py.completionTokens,
+          groundedSources: [],
+          error: 'ExamForge could not save this exam, so it cannot be graded. Please try again.',
         });
       }
     }

@@ -22,11 +22,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from openai import OpenAI
 from pydantic import BaseModel
 
 from ..auth import require_internal_token
 from ..config import get_settings
+from ..services.openai_client import get_openai_client
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -67,6 +67,17 @@ def _lang_instr(lang: str) -> str:
     return "Match the language of the source material."
 
 
+def _math_format_rules() -> str:
+    # The Notes/Summary renderer only displays math wrapped in $…$ / $$…$$.
+    # Bare LaTeX commands and \[…\] / \(…\) delimiters showed up as raw
+    # backslashes for users, so spell the contract out explicitly.
+    return """## MATH FORMATTING (STRICT — the renderer ONLY displays delimited math)
+- Wrap EVERY mathematical expression in $...$ (inline) or $$...$$ (display). This includes simple ones: variables ($x$, $a_0$), function definitions ($f(x)=\\frac{x}{1+x^2}$), limits, sums, integrals, fractions, roots and Greek letters.
+- NEVER write a LaTeX command (\\frac, \\sum, \\lim, \\sqrt, \\in, \\R, \\quad, \\infty, \\varphi, …) outside $...$ — bare commands render as literal backslashes.
+- NEVER use \\[ … \\] or \\( … \\) delimiters. Use ONLY $$ … $$ (display) and $ … $ (inline).
+- Keep the page citation OUTSIDE the math: write $f(x)=\\frac{x}{1+x^2}$ *(S. 1)*, never $f(x)=\\frac{x}{1+x^2} (S. 1)$."""
+
+
 def _notes_prompt(lang: str) -> str:
     return f"""You are generating detailed, exam-ready study notes from university lecture PDF slides.
 
@@ -91,7 +102,9 @@ STRUCTURE:
 ## Vergleiche / Comparisons
 ## Prüfungsrelevanz / Exam Focus
 
-Cite page numbers throughout. No filler sentences."""
+Cite page numbers throughout. No filler sentences.
+
+{_math_format_rules()}"""
 
 
 _DETAIL_ALIASES: dict[str, str] = {
@@ -434,7 +447,9 @@ Do NOT create empty sections. Keep it to 3-5 lines maximum.
 - Prefer $\\varphi = \\ln(1+\\varepsilon) = \\ln\\left(\\frac{{l_1}}{{l_0}}\\right)$ when the source discusses logarithmic strain / Umformgrad.
 - Tables with markdown for comparisons.
 - Do NOT force the full template on content-light pages.
-- If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content."""
+- If mixed-content, begin with one brief "Context" line about the organizational info, then focus on study content.
+
+{_math_format_rules()}"""
 
 
 def _exam_page_group_instructions(page_ref: str) -> str:
@@ -486,7 +501,9 @@ Your FIRST line of output MUST be exactly one of:
 
 {_exam_page_group_instructions(page_ref)}
 
-If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections."""
+If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note about what is on the page. Do NOT create empty study sections.
+
+{_math_format_rules()}"""
         return f"""You are generating a study summary for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
@@ -505,7 +522,9 @@ If the pages contain study content:
 - Reproduce every list in full.
 - KaTeX for formulas.
 - OMIT sections that would be empty — never write "keine vorhanden".
-- No filler. Every bullet must add information."""
+- No filler. Every bullet must add information.
+
+{_math_format_rules()}"""
     return f"""You are generating detailed study notes for ONE specific page group from a university lecture PDF.
 
 {_lang_instr(lang)}
@@ -518,7 +537,9 @@ Your FIRST line of output MUST be exactly one of:
 If the pages are content-light (title, cover, ToC, org info, empty): output a brief 2-3 line note. Do NOT create empty study sections.
 
 If the pages contain study content:
-Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty."""
+Extract everything worth studying from {page_ref}. For each named method create a ### subsection with what/advantages/disadvantages/applications. Quote definitions verbatim. KaTeX formulas. Cite *(S. X)* throughout. OMIT sections that would be empty.
+
+{_math_format_rules()}"""
 
 
 def _exam_merge_prompt(lang: str) -> str:
@@ -572,7 +593,9 @@ Coverage transparency:
   Use the page ranges from the input section headers to determine X–Y. If total pages is unknown, omit "von Z".
 - If the merged content clearly does not cover the entire PDF (e.g. early pages only, or a table of contents mentions topics not found in any input section), add:
   > Wichtige Themen ab S. [first uncovered page] (z. B. [topic names visible in ToC/headings]) sind in diesem Bereich nicht enthalten.
-  Only name topics that appear in a table of contents, chapter heading, or cross-reference within the input. Do NOT guess."""
+  Only name topics that appear in a table of contents, chapter heading, or cross-reference within the input. Do NOT guess.
+
+{_math_format_rules()}"""
 
 
 def _merge_prompt(lang: str, tool: str, detail_level: str = "detailed") -> str:
@@ -601,7 +624,9 @@ Rules:
 - Group related content under ## headings.
 - OMIT sections that would be empty — do NOT create empty headings.
 - End with a ## Prüfungsrelevanz section with the 5–10 most exam-relevant points (only if study content exists).
-- Do NOT invent new information."""
+- Do NOT invent new information.
+
+{_math_format_rules()}"""
     return f"""You are merging multiple section notes into one final structured study note.
 
 {_lang_instr(lang)}
@@ -626,7 +651,9 @@ Rules:
 - Every method/process keeps its own ### subsection.
 - OMIT sections that would be empty.
 - End with ## Prüfungsrelevanz (only if study content exists).
-- Do NOT invent new information."""
+- Do NOT invent new information.
+
+{_math_format_rules()}"""
 
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
@@ -705,9 +732,133 @@ def _build_context(chunks: list[dict[str, Any]], file_name: str | None) -> tuple
     return ctx, sources
 
 
+# ── ANALYZE: deterministic page grouping (no LLM) ────────────────────────────
+#
+# The frontend's analyze step asks the backend to split a document into section
+# groups, then generates+merges one section at a time. We do this WITHOUT an LLM
+# call: we group from the indexed chunk metadata (page_start/page_end/
+# section_title). When real headings exist we follow those natural boundaries;
+# otherwise we fall back to stable fixed page windows. This keeps long/full-
+# document summaries comprehensive (every page is covered by some group) while
+# adding zero latency/token cost to the analyze step.
+
+_MAX_GROUPS = 14          # cap section calls so huge docs don't fan out unbounded
+_MAX_GROUP_PAGES = 6      # split an oversized heading-section into page windows
+
+
+def _group_size(page_count: int) -> int:
+    # Mirrors notes-panel.js `_groupSize` so backend + fallback behave alike.
+    if page_count <= 3:
+        return max(1, page_count)
+    if page_count <= 10:
+        return 3
+    return 5
+
+
+def _fetch_page_structure(user_id: str, course_id: str, document_id: str) -> list[dict[str, Any]]:
+    sb = get_supabase()
+    rows = (
+        sb.table("document_chunks")
+        .select("page_start, page_end, section_title")
+        .eq("user_id", user_id)
+        .eq("course_id", course_id)
+        .eq("document_id", document_id)
+        .order("page_start")
+        .order("id")
+        .limit(2000)
+        .execute()
+        .data
+    ) or []
+    return rows
+
+
+def _group_pages(
+    rows: list[dict[str, Any]],
+    range_start: int | None = None,
+    range_end: int | None = None,
+) -> tuple[list[dict[str, Any]], int | None]:
+    """Group indexed chunk metadata into section page ranges.
+
+    Returns ``(groups, effective_pages)`` where each group is
+    ``{"title", "pageStart", "pageEnd"}``. ``effective_pages`` is the highest
+    page seen across the whole document (NOT clamped to the requested range), so
+    the frontend can report coverage. Grouping itself is clamped to
+    ``[range_start, range_end]`` when those are given.
+    """
+    pages: list[tuple[int, int, str]] = []
+    for r in rows:
+        ps = r.get("page_start")
+        if ps is None:
+            continue
+        pe = r.get("page_end")
+        title = (r.get("section_title") or "").strip()
+        pages.append((int(ps), int(pe) if pe is not None else int(ps), title))
+    if not pages:
+        return [], None
+
+    pages.sort(key=lambda x: (x[0], x[1]))
+    min_page = min(p[0] for p in pages)
+    effective = max(p[1] for p in pages)
+    lo = range_start if range_start is not None else min_page
+    hi = range_end if range_end is not None else effective
+    if hi < lo:
+        lo, hi = min_page, effective
+
+    # Use natural heading boundaries only when there are at least two distinct
+    # section titles — a single repeated chapter title carries no structure.
+    distinct = {t for _, _, t in pages if t}
+    groups: list[tuple[str | None, int, int]] = []
+
+    if len(distinct) >= 2:
+        cur_title: str | None = None
+        cur_start: int | None = None
+        cur_end: int | None = None
+        for ps, pe, title in pages:
+            if pe < lo or ps > hi:
+                continue
+            ps, pe = max(ps, lo), min(pe, hi)
+            if cur_start is None:
+                cur_title, cur_start, cur_end = (title or None), ps, pe
+                continue
+            # A new non-empty heading starts a new group; untitled chunks extend
+            # the current section.
+            if title and title != cur_title:
+                groups.append((cur_title, cur_start, cur_end))
+                cur_title, cur_start, cur_end = title, ps, pe
+            else:
+                cur_end = max(cur_end or pe, pe)
+        if cur_start is not None:
+            groups.append((cur_title, cur_start, cur_end))
+
+        # Split any section that grew too large into bounded page windows.
+        bounded: list[tuple[str | None, int, int]] = []
+        for title, s, e in groups:
+            if e - s + 1 > _MAX_GROUP_PAGES:
+                p = s
+                while p <= e:
+                    bounded.append((title, p, min(p + _MAX_GROUP_PAGES - 1, e)))
+                    p += _MAX_GROUP_PAGES
+            else:
+                bounded.append((title, s, e))
+        groups = bounded
+
+    # Fall back to stable page windows when there are no usable headings, or so
+    # many heading groups that we'd fan out into too many section calls.
+    if not groups or len(groups) > _MAX_GROUPS:
+        groups = []
+        gs = _group_size(hi - lo + 1)
+        p = lo
+        while p <= hi:
+            groups.append((None, p, min(p + gs - 1, hi)))
+            p += gs
+
+    out = [{"title": t, "pageStart": s, "pageEnd": e} for t, s, e in groups]
+    return out, effective
+
+
 def _call_openai(system_prompt: str, user_message: str, max_tokens: int = 4000) -> str:
     settings = get_settings()
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = get_openai_client()
     from ..services.llm_json import _token_limit_param
     token_param = _token_limit_param(settings.openai_generate_model_strong, max_tokens)
     resp = client.chat.completions.create(
@@ -855,9 +1006,23 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="scope is invalid")
     _verify_document_owner(payload.userId, payload.courseId, payload.documentId)
 
-    # ── ANALYZE: short-circuit so the frontend uses its fixed-page splits ───
+    # ── ANALYZE: deterministic page grouping from indexed chunk metadata ────
+    # No LLM call — group by natural heading boundaries when present, else stable
+    # page windows. On any failure return empty groups so the frontend falls back
+    # to its own fixed-page splits (preserves the old UX).
     if payload.mode == "analyze":
-        return {"groups": [], "effectivePages": None}
+        if not payload.documentId:
+            return {"groups": [], "effectivePages": None}
+        rng = payload.pageRange or {}
+        r_start = int(rng["start"]) if rng.get("start") is not None else None
+        r_end = int(rng["end"]) if rng.get("end") is not None else None
+        try:
+            rows = _fetch_page_structure(payload.userId, payload.courseId, payload.documentId)
+        except Exception:
+            log.exception("analyze fetch_page_structure failed")
+            return {"groups": [], "effectivePages": None}
+        groups, effective = _group_pages(rows, r_start, r_end)
+        return {"groups": groups, "effectivePages": effective}
 
     # ── MERGE ───────────────────────────────────────────────────────────────
     if payload.mode == "merge":

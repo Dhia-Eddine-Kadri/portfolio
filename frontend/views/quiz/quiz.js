@@ -202,6 +202,101 @@
     });
   }
 
+  // ── Item normalisation + scoring (shared by generate + DB-load + render) ────
+  var _QZ_LETTERS = ['A', 'B', 'C', 'D'];
+
+  // Convert a raw item (from the generator proxy or a saved DB row) into the
+  // canonical frontend shape for its type. Returns null for unusable items.
+  // Backward-compat: legacy saved MCQ items (no `type`, options array, numeric
+  // or letter answer) normalise to a modern mcq item unchanged in behaviour.
+  function _normalizeQuizItem(item) {
+    if (!item) return null;
+    var type = (item.type || 'mcq').toString().trim().toLowerCase();
+    var base = {
+      question: item.question || '',
+      explanation: item.explanation || '',
+      source: item.source || '',
+      topic: (typeof item.topic === 'string' && item.topic.trim()) ? item.topic.trim() : null
+    };
+
+    if (type === 'true_false') {
+      var tfAns = item.answer;
+      if (typeof tfAns === 'string') {
+        var v = tfAns.trim().toLowerCase();
+        tfAns = ['true', 'wahr', 'yes', 'ja', 't', '1'].indexOf(v) !== -1;
+      } else { tfAns = !!tfAns; }
+      base.type = 'true_false';
+      base.answer = tfAns;
+      return base;
+    }
+
+    if (type === 'short_answer') {
+      var primary = (item.answer == null ? '' : String(item.answer)).trim();
+      if (!primary) return null;
+      var accepted = [];
+      var seen = {};
+      var pushAcc = function (s) {
+        if (typeof s === 'string' && s.trim()) {
+          var k = s.trim().toLowerCase();
+          if (!seen[k]) { seen[k] = true; accepted.push(s.trim()); }
+        }
+      };
+      pushAcc(primary);
+      var rawAcc = item.acceptableAnswers || item.accepted || item.alternatives;
+      if (Array.isArray(rawAcc)) rawAcc.forEach(pushAcc);
+      base.type = 'short_answer';
+      base.answer = primary;
+      base.acceptableAnswers = accepted;
+      return base;
+    }
+
+    // mcq (default / legacy)
+    var optsRaw = item.options;
+    var opts;
+    if (Array.isArray(optsRaw)) {
+      opts = optsRaw.map(function (o) { return (o == null ? '' : String(o)); });
+    } else if (optsRaw && typeof optsRaw === 'object') {
+      opts = _QZ_LETTERS.map(function (L) { return (optsRaw[L] == null ? '' : String(optsRaw[L])); });
+    } else {
+      return null;
+    }
+    if (!opts.some(function (v) { return (v || '').toString().trim(); })) return null;
+    var ansIdx = 0;
+    if (typeof item.answer === 'number') {
+      ansIdx = item.answer;
+    } else if (typeof item.answer === 'string') {
+      var m = item.answer.trim().toUpperCase().match(/^([A-D])/);
+      if (m) { ansIdx = _QZ_LETTERS.indexOf(m[1]); }
+      else {
+        var hit = opts.map(function (o) { return o.trim().toLowerCase(); }).indexOf(item.answer.trim().toLowerCase());
+        ansIdx = hit >= 0 ? hit : 0;
+      }
+    }
+    base.type = 'mcq';
+    base.options = opts;
+    base.answer = ansIdx;
+    return base;
+  }
+
+  // True if the learner's stored answer for `item` is correct. `ans` is the
+  // per-type stored answer: option index (mcq), boolean (true_false), or the
+  // typed string (short_answer).
+  function _isAnswerCorrect(item, ans) {
+    if (!item) return false;
+    var type = item.type || 'mcq';
+    if (type === 'true_false') return !!ans === !!item.answer;
+    if (type === 'short_answer') {
+      if (typeof ans !== 'string') return false;
+      var norm = function (s) { return String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' '); };
+      var got = norm(ans);
+      if (!got) return false;
+      var accepted = (item.acceptableAnswers && item.acceptableAnswers.length)
+        ? item.acceptableAnswers : [item.answer];
+      return accepted.some(function (a) { return norm(a) === got; });
+    }
+    return ans === item.answer;
+  }
+
   function _statusLabel(quiz) {
     if (!quiz.lastTaken) return { cls: 'never', text: 'Not started' };
     var diff = Date.now() - new Date(quiz.lastTaken).getTime();
@@ -634,6 +729,12 @@
       var s = _loadSettings();
       var count = s.count || 10;
       var diff  = s.difficulty || 'medium';
+      var ALL_TYPES = ['mcq', 'true_false', 'short_answer'];
+      var TYPE_LABELS = { mcq: 'Multiple choice', true_false: 'True / False', short_answer: 'Short answer' };
+      var selTypes = (Array.isArray(s.questionTypes) && s.questionTypes.length)
+        ? s.questionTypes.filter(function (t) { return ALL_TYPES.indexOf(t) !== -1; })
+        : ALL_TYPES.slice();
+      if (!selTypes.length) selTypes = ALL_TYPES.slice();
 
       var overlay = document.createElement('div');
       overlay.id = 'qzSettingsOverlay';
@@ -659,6 +760,15 @@
                 '</label>';
               }).join('') +
             '</div>' +
+            '<label class="qzsp-label">Question types</label>' +
+            '<div class="qzsp-types-row">' +
+              ALL_TYPES.map(function(t) {
+                return '<label class="qzsp-type-opt' + (selTypes.indexOf(t) !== -1 ? ' active' : '') + '">' +
+                  '<input type="checkbox" name="qzType" value="' + t + '"' + (selTypes.indexOf(t) !== -1 ? ' checked' : '') + '>' +
+                  TYPE_LABELS[t] +
+                '</label>';
+              }).join('') +
+            '</div>' +
             '<button class="qzsp-btn-ghost qzsp-reset-btn" id="qzResetHistory" type="button">&#x1F504; Reset question history</button>' +
             '<p class="qzsp-reset-hint">Allows the AI to regenerate questions you\'ve already seen.</p>' +
           '</div>' +
@@ -680,6 +790,18 @@
         });
       });
 
+      overlay.querySelectorAll('.qzsp-type-opt').forEach(function(lbl) {
+        lbl.addEventListener('click', function(e) {
+          // Let the native checkbox toggle, then mirror its state on the label.
+          if (e.target.tagName !== 'INPUT') {
+            var cb = lbl.querySelector('input');
+            if (cb) cb.checked = !cb.checked;
+          }
+          var cb2 = lbl.querySelector('input');
+          lbl.classList.toggle('active', !!(cb2 && cb2.checked));
+        });
+      });
+
       overlay.querySelector('#qzResetHistory').addEventListener('click', function() {
         _resetHistory();
         _toast('History reset', 'The AI will generate fresh questions next time.');
@@ -690,9 +812,13 @@
 
       overlay.querySelector('#qzSettingsConfirm').onclick = function() {
         var selDiff = overlay.querySelector('input[name="qzDiff"]:checked');
+        var chosenTypes = [];
+        overlay.querySelectorAll('input[name="qzType"]:checked').forEach(function(cb) { chosenTypes.push(cb.value); });
+        if (!chosenTypes.length) chosenTypes = ALL_TYPES.slice();
         var settings = {
           count: parseInt(slider.value, 10),
-          difficulty: selDiff ? selDiff.value : 'medium'
+          difficulty: selDiff ? selDiff.value : 'medium',
+          questionTypes: chosenTypes
         };
         _saveSettings(settings);
         overlay.remove();
@@ -899,7 +1025,10 @@
         count: Math.min(settings.count || 10, 10),
         difficulty: settings.difficulty || 'medium',
         topic: null,
-        seenItems: _seenQuestions()
+        seenItems: _seenQuestions(),
+        questionTypes: (Array.isArray(settings.questionTypes) && settings.questionTypes.length)
+          ? settings.questionTypes
+          : ['mcq', 'true_false', 'short_answer']
       };
       if (documentIds && documentIds.length) genOpts.documentIds = documentIds;
       options.generate(courseId, 'quiz', genOpts)

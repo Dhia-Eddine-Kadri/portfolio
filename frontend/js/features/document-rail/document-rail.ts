@@ -564,7 +564,11 @@ function mountNotesPanel(mode: 'notes' | 'summary'): void {
   panel.style.border = 'none';
   panel.style.boxShadow = 'none';
   panel.style.background = 'transparent';
-  content.appendChild(panel);
+  // If the notes feature was lazy-loaded, this drawer may still contain the
+  // temporary "Open a PDF first" placeholder from the first mount attempt.
+  // Replace the content instead of appending so the hosted panel always starts
+  // directly below the drawer header.
+  content.replaceChildren(panel);
   // Switch to the relevant tab (Notes drawer → notes tab; Summary drawer →
   // summary tab). Simulating a click drives the legacy state machine
   // correctly (tabs, detail-row visibility, content render).

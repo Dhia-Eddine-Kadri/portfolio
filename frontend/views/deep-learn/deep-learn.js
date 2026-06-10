@@ -636,6 +636,16 @@
       _bindSourceClicks(sourceHost);
     }
 
+    // Many fields above (worked examples, adaptive items, practice tasks, check
+    // questions, formula variables…) are built with _esc() and never went through
+    // _renderMarkdown, so their $…$ / $$…$$ / \[…\] math stayed raw. _esc leaves
+    // those delimiters intact, so one KaTeX pass over the whole card renders the
+    // math everywhere in a single shot (idempotent — already-rendered fields have
+    // no raw delimiters left).
+    _ensureRenderers().then(function () {
+      if (typeof window._renderMath === 'function') window._renderMath(els.result);
+    }).catch(function () {});
+
     var dlBtn = els.result.querySelector('[data-dl-print]');
     if (dlBtn) dlBtn.addEventListener('click', function () { _openPrint(els._print); });
   }

@@ -125,6 +125,7 @@ Return ONLY valid JSON in this exact shape (no markdown fence, no commentary):
       "type": "short_answer",
       "question": "...",
       "answer": "expected key answer",
+      "acceptableAnswers": ["other accepted phrasings or synonyms a marker would accept"],
       "explanation": "...",
       "difficulty": "easy|medium|hard",
       "topic": "one of KNOWN TOPICS or null",
@@ -214,10 +215,23 @@ def _normalize(item: Any, known_topics: set[str] | None = None) -> dict[str, Any
     if qtype == "short_answer":
         if not isinstance(answer, str) or not answer.strip():
             return None
+        primary = answer.strip()
+        # Collect the canonical answer plus any model-supplied acceptable
+        # phrasings into a de-duplicated (case-insensitive) list the frontend
+        # scores against. The canonical answer always leads the list.
+        acceptable: list[str] = []
+        seen_acc: set[str] = set()
+        for cand in [primary, *([v for v in item.get("acceptableAnswers", [])] if isinstance(item.get("acceptableAnswers"), list) else [])]:
+            if isinstance(cand, str) and cand.strip():
+                k = cand.strip().lower()
+                if k not in seen_acc:
+                    seen_acc.add(k)
+                    acceptable.append(cand.strip())
         return {
             "type": "short_answer",
             "question": question,
-            "answer": answer.strip(),
+            "answer": primary,
+            "acceptableAnswers": acceptable,
             "explanation": explanation,
             "difficulty": difficulty,
             "topic": topic,
