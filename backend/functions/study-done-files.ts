@@ -10,16 +10,13 @@
 import { fail, handleOptions, jsonResponse } from '../lib/responses';
 import { bodyJson, requireStudyAuth, validateCourseId, writeStudyEvent } from '../lib/study-planner';
 import { supaRequest } from '../lib/supabase-admin';
+import {
+  candidateRevertTopics,
+  selectMarkableTopics,
+  topicsForDocuments,
+  topicsToRevert,
+} from '../lib/study-done-files-logic';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
-
-// Topic progress states a file-mark may write 'studied' onto. Marking a file done
-// means "I finished it", so a topic still 'not_started' or 'in_progress' (both
-// rank below 'studied') is promoted. A topic already at 'studied' is left
-// untouched (re-writing would flatten its last_studied_at / study_sessions).
-// 'weak' is deliberately NOT promoted — it carries a distinct "studied but
-// struggling" signal worth keeping — and practiced/mastered must never be
-// downgraded.
-const _MARKABLE_STATES = new Set(['', 'not_started', 'in_progress']);
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
@@ -169,32 +166,22 @@ async function markFileTopicsStudied(
 
   // Which of the done files actually map to at least one topic? Files with no
   // topic-map link can't change planner behaviour — report them back.
-  const docsWithTopics = new Set<string>();
-  const topicIds = new Set<string>();
-  for (const t of topics) {
-    const docs = Array.isArray(t.source_document_ids) ? t.source_document_ids : [];
-    const hit = docs.map((d) => String(d)).filter((d) => documentIds.includes(d));
-    if (hit.length) {
-      topicIds.add(t.id);
-      hit.forEach((d) => docsWithTopics.add(d));
-    }
-  }
+  const { topicIds, docsWithTopics } = topicsForDocuments(topics, documentIds);
   const filesWithoutTopics = documentIds.filter((d) => !docsWithTopics.has(d));
 
-  if (topicIds.size === 0) {
+  if (topicIds.length === 0) {
     return { topicsMarked: 0, ok: true, filesWithoutTopics };
   }
 
-  // Only write 'studied' onto topics with no row yet or at 'not_started'. Topics
-  // already 'studied' need no change (and rewriting them would flatten their
-  // metadata); anything more advanced (practiced/mastered/weak) must not be
-  // downgraded. Fetch current states and filter first — the upsert would
-  // otherwise blindly overwrite progress_state back to 'studied'.
-  const idArr = [...topicIds];
+  // Only write 'studied' onto topics with no row yet or at 'not_started'/
+  // 'in_progress'. Topics already 'studied' need no change (and rewriting them
+  // would flatten their metadata); anything more advanced (practiced/mastered/
+  // weak) must not be downgraded. Fetch current states and filter first — the
+  // upsert would otherwise blindly overwrite progress_state back to 'studied'.
   const stateRes = await supaRequest<Array<{ topic_id: string; progress_state: string }>>(
     'GET',
     'student_topic_state?user_id=eq.' + encodeURIComponent(userId) +
-      '&topic_id=in.(' + idArr.map((id) => encodeURIComponent(id)).join(',') + ')' +
+      '&topic_id=in.(' + topicIds.map((id) => encodeURIComponent(id)).join(',') + ')' +
       '&select=topic_id,progress_state',
     null,
     serviceKey
@@ -202,7 +189,7 @@ async function markFileTopicsStudied(
   const currentState = new Map(
     (Array.isArray(stateRes.body) ? stateRes.body : []).map((r) => [r.topic_id, String(r.progress_state || '')])
   );
-  const writeIds = idArr.filter((id) => _MARKABLE_STATES.has(currentState.get(id) ?? ''));
+  const writeIds = selectMarkableTopics(topicIds, currentState);
 
   if (writeIds.length === 0) {
     // Every covered topic is already at or beyond 'studied' — nothing to write.
@@ -250,21 +237,11 @@ async function revertUnmarkedFileTopics(
     serviceKey
   );
   const topics = Array.isArray(topicsRes.body) ? topicsRes.body : [];
-  const removedSet = new Set(removedDocs);
-  const stillDoneSet = new Set(stillDoneDocs);
-
-  const candidates: string[] = [];
-  const candidateDocs = new Map<string, string[]>();
-  for (const t of topics) {
-    const docs = Array.isArray(t.source_document_ids) ? t.source_document_ids.map((d) => String(d)) : [];
-    const coveredByRemoved = docs.some((d) => removedSet.has(d));
-    if (!coveredByRemoved) continue;
-    const coveredByStillDone = docs.some((d) => stillDoneSet.has(d));
-    if (!coveredByStillDone) {
-      candidates.push(t.id);
-      candidateDocs.set(t.id, docs);
-    }
-  }
+  const { ids: candidates, docsById: candidateDocs } = candidateRevertTopics(
+    topics,
+    new Set(removedDocs),
+    new Set(stillDoneDocs)
+  );
   if (candidates.length === 0) return;
 
   // Provenance guard. A candidate topic's 'studied' state may have been earned by
@@ -309,12 +286,7 @@ async function revertUnmarkedFileTopics(
     if (r.solution_file_id) completedFiles.add(String(r.solution_file_id));
   });
 
-  const toRevert = candidates.filter((id) => {
-    if (earned.has(id)) return false;
-    const docs = candidateDocs.get(id) ?? [];
-    if (docs.some((d) => completedFiles.has(d))) return false; // studied via a completed task
-    return true;
-  });
+  const toRevert = topicsToRevert(candidates, candidateDocs, earned, completedFiles);
   if (toRevert.length === 0) return;
 
   await supaRequest(
