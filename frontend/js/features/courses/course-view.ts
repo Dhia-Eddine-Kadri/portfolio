@@ -581,8 +581,8 @@ export function openCourse(course: LegacyCourse): void {
   // the data is usually already resolved by the time the tab mounts.
   void import('../../services/ai-service.js')
     .then((svc) => {
-      void svc.getCourseTopicMap?.(course.id);
-      void svc.listCourseNotes?.(course.id);
+      void svc.getCourseTopicMap?.(course.id).catch(() => undefined);
+      void svc.listCourseNotes?.(course.id).catch(() => undefined);
     })
     .catch(() => undefined);
 }
@@ -609,8 +609,8 @@ function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {
       void (async () => {
         try {
           const [{ listCourseDocuments }, { decorateFileTypeBadges }] = await Promise.all([
-            import('../../services/ai-service'),
-            import('./document-type-badge'),
+            import('../../services/ai-service.js'),
+            import('./document-type-badge.js'),
           ]);
           const docs = await listCourseDocuments(course.id);
           decorateFileTypeBadges(filesList, docs);
