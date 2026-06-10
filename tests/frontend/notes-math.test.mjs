@@ -25,6 +25,16 @@ test('bare formula line gets wrapped, page ref preserved outside math', () => {
   assert.equal(out, '$f(x)=\\frac{x}{1+x^2},\\quad x\\in\\R$ (S. 1)');
 });
 
+test('markdown-italic page ref *(S. 1)* stays OUTSIDE the math wrap', () => {
+  const out = normalize('f(x)=\\frac{x}{1+x^2},\\quad x\\in\\R *(S. 1)*');
+  assert.equal(out, '$f(x)=\\frac{x}{1+x^2},\\quad x\\in\\R$ *(S. 1)*');
+});
+
+test('underscore-emphasized page ref _(S. 3–4)_ stays outside the math wrap', () => {
+  const out = normalize('c_n=\\frac{1}{n^a},\\quad a>0 _(S. 3–4)_');
+  assert.equal(out, '$c_n=\\frac{1}{n^a},\\quad a>0$ _(S. 3–4)_');
+});
+
 test('bare formula line with a leading bullet keeps the bullet outside math', () => {
   const out = normalize('– c_n=\\frac{1}{n^a},\\quad a>0 (S. 1)');
   assert.equal(out, '– $c_n=\\frac{1}{n^a},\\quad a>0$ (S. 1)');

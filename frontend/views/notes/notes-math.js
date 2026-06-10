@@ -29,8 +29,11 @@
   // the common unicode math glyphs the model mixes in (ℝ ℂ π → ∞ √ ≤ ≥ ≠ ± · × ÷).
   var MATH_BODY = /^[\sA-Za-z0-9\\^_{}()[\]+\-*/=,.;:'|<>!?√πℝℂ→∞≤≥≠±·×÷…]+$/;
 
-  // Trailing source citation the generators append, e.g. " (S. 1)" / "(p. 12)".
-  var PAGE_REF = /\s*\((?:S\.|p\.|pp\.)\s*[^)]*\)\s*$/i;
+  // Trailing source citation the generators append — often wrapped in markdown
+  // emphasis: " *(S. 1)*", " (S. 1)", " _(S. 3–4)_", " *(p. 12)*". The emphasis
+  // markers MUST stay outside the math wrap, otherwise KaTeX renders them as
+  // literal asterisks (e.g. "∗(S.1)∗").
+  var PAGE_REF = /\s*[*_]{0,2}\s*\((?:S\.|p\.|pp\.|Seite|Seiten|page)\s*[^)]*\)\s*[*_]{0,2}\s*$/i;
 
   // Leading list bullet on a formula line.
   var BULLET = /^\s*(?:[–—\-*•]\s+)?/;
