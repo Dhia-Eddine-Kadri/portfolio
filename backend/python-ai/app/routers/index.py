@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from ..auth import require_internal_token
 from ..services.indexing import IndexingError, get_index_status, run_document_indexing
+from ..services.understanding_backfill import backfill_document, backfill_pending
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
@@ -119,3 +120,25 @@ def index_status_endpoint(
     """Poll-friendly status lookup. Same owner check as the trigger endpoint."""
     _verify_owner(documentId, userId)
     return IndexDocumentResponse(**get_index_status(documentId))
+
+
+class BackfillUnderstandingRequest(BaseModel):
+    userId: str | None = None
+    courseId: str | None = None
+    documentId: str | None = None
+    limit: int = 200
+    force: bool = False
+
+
+@router.post("/backfill-understanding")
+def backfill_understanding_endpoint(payload: BackfillUnderstandingRequest) -> dict:
+    """Recompute the Document Understanding Layer from stored page text WITHOUT
+    re-embedding. Either one documentId, or a batch scoped by user/course."""
+    if payload.documentId:
+        return backfill_document(payload.documentId, force=payload.force)
+    return backfill_pending(
+        user_id=payload.userId,
+        course_id=payload.courseId,
+        limit=max(1, min(int(payload.limit or 200), 1000)),
+        force=payload.force,
+    )
