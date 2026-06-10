@@ -625,6 +625,27 @@ async function generateWeeklyPlanViaAI(
     return { planId: existingPlanId, taskCount: 0, subjects: [], urgency: null };
   }
 
+  // Source the user's real availability. An empty map makes the Python planner
+  // drop EVERY task on its unavailable-day check (returning 0 tasks), which
+  // silently forces a fall-through to the deterministic planner — so the AI
+  // planner's pairing/role fixes never run and tasks pile onto a single day.
+  // Keys are Python day indices (0=Monday); study_days uses JS getUTCDay
+  // (0=Sunday), so convert with (dow + 6) % 7.
+  const availPrefRes = await supaRequest<StudyPreferences[]>(
+    'GET',
+    'study_preferences?user_id=eq.' + encodeURIComponent(userId) + '&select=study_days,daily_study_minutes&limit=1',
+    null,
+    serviceKey
+  );
+  const availPrefs = Array.isArray(availPrefRes.body) ? availPrefRes.body[0] : undefined;
+  const studyDays = availPrefs?.study_days && availPrefs.study_days.length ? availPrefs.study_days : [1, 2, 3, 4, 5];
+  const dailyMinutes = Math.max(15, availPrefs?.daily_study_minutes ?? 120);
+  const dailyAvailabilityMinutes: Record<string, number> = {};
+  for (const jsDow of studyDays) {
+    const pyIdx = ((Number(jsDow) % 7) + 6) % 7;
+    dailyAvailabilityMinutes[String(pyIdx)] = dailyMinutes;
+  }
+
   // Call the Python AI planner FIRST — before any DB write.
   const proxyResult = await forwardToPython<PythonPlanResponse>('study-planner/generate-week', {
     userId,
@@ -632,7 +653,7 @@ async function generateWeeklyPlanViaAI(
     planScope: scope,
     courseId,
     timezone: 'UTC',
-    dailyAvailabilityMinutes: {},
+    dailyAvailabilityMinutes,
     regenerate: regenerateExisting,
   });
 
