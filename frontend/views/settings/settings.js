@@ -161,25 +161,55 @@ function bindSettingsControls() {
   if (dangerBtn) {
     dangerBtn.addEventListener('click', function () {
       if (!confirm(_t('settings_clear_confirm'))) return;
-      // Clear BOTH chat stores: the legacy per-PDF history (ss_chat_*) AND the
-      // current AI chatbot, which keeps its conversations under ss_ncb_* keys
-      // (ss_ncb_chats_v1 / _active_v1 / _sources_v1). The old filter only matched
-      // ss_chat_, so the chatbot's history was never cleared — the reported bug.
+      // Clear ALL chat stores: the legacy per-PDF history (ss_chat_*), the
+      // standalone chatbot (ss_ncb_*), AND the course document-rail Q&A
+      // (ss_course_qa_*). The rail keys were missed before, so "Ask this
+      // document" conversations survived a clear — the reported bug.
       Object.keys(localStorage)
         .filter(function (k) {
-          return k.indexOf('ss_chat_') === 0 || k.indexOf('ss_ncb_') === 0;
+          return (
+            k.indexOf('ss_chat_') === 0 ||
+            k.indexOf('ss_ncb_') === 0 ||
+            k.indexOf('ss_course_qa_') === 0
+          );
         })
         .forEach(function (k) {
           localStorage.removeItem(k);
         });
       if (typeof aiMsgs !== 'undefined') aiMsgs.innerHTML = '';
+      // The rail also syncs every turn to the chat_history table and restores
+      // from it first (restoreCourseHistory) — without this server-side delete
+      // the "cleared" chat comes straight back from Supabase after the reload.
+      var serverDelete = Promise.resolve();
+      try {
+        var supaUrl = window._SUPA || '';
+        var tok = window._sbToken || '';
+        var uid =
+          (window._currentUser && (window._currentUser.id || window._currentUser.sub)) || '';
+        if (supaUrl && tok && uid) {
+          serverDelete = fetch(
+            supaUrl + '/rest/v1/chat_history?user_id=eq.' + encodeURIComponent(uid),
+            {
+              method: 'DELETE',
+              headers: {
+                apikey: window._SAKEY || '',
+                Authorization: 'Bearer ' + tok,
+                Prefer: 'return=minimal',
+              },
+            }
+          ).catch(function () {});
+        }
+      } catch (e) { /* best-effort — local stores are already cleared */ }
       showToast(_t('toast_chat_cleared'), _t('toast_chat_cleared_sub'));
       // The chatbot caches its conversations in memory after first load, so a
-      // storage wipe alone won't update an already-open chatbot. Reload so it
-      // re-initialises from the now-empty store.
-      setTimeout(function () {
+      // storage wipe alone won't update an already-open chatbot. Reload once
+      // the server delete finishes (capped at 2.5s) — reloading earlier could
+      // race the DELETE and let the rail restore the rows mid-flight.
+      var minToastTime = new Promise(function (r) { setTimeout(r, 700); });
+      var deleteCap = new Promise(function (r) { setTimeout(r, 2500); });
+      Promise.all([minToastTime, Promise.race([serverDelete, deleteCap])]).then(function () {
         location.reload();
-      }, 700);
+      });
     });
   }
 
