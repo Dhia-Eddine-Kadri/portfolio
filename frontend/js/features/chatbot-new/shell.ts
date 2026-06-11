@@ -3443,6 +3443,91 @@ function initContextTabs(root: HTMLElement): void {
   });
 }
 
+// ---- Saved replies: server persistence ----
+// localStorage is the instant read/write cache; the chat_saved_replies table
+// is the durable copy (survives cleared browser data / other devices). All
+// pushes are fire-and-forget; renderNotesTab does a one-shot two-way merge
+// per chat per page load, which also re-pushes anything a failed POST missed.
+
+const SAVED_REPLIES_API = '/api/chat-saved-replies';
+
+function syncSavedReplyCreate(chatId: string, r: SavedReply): void {
+  const token = getSbToken();
+  if (!token) return;
+  void fetch(SAVED_REPLIES_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ id: r.id, chatId, text: r.text, createdAt: r.createdAt }),
+  }).catch(() => {
+    /* offline — the local copy is intact; the next Notes-tab merge re-pushes it */
+  });
+}
+
+function syncSavedReplyDelete(id: string): void {
+  const token = getSbToken();
+  if (!token) return;
+  void fetch(SAVED_REPLIES_API + '?id=' + encodeURIComponent(id), {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + token },
+  }).catch(() => {
+    /* offline — worst case the reply resurfaces on a later merge */
+  });
+}
+
+const _savedRepliesSyncedChats = new Set<string>();
+
+async function mergeSavedRepliesFromServer(root: HTMLElement, chatId: string): Promise<void> {
+  if (_savedRepliesSyncedChats.has(chatId)) return;
+  const token = getSbToken();
+  if (!token) return;
+  _savedRepliesSyncedChats.add(chatId);
+  try {
+    const resp = await fetch(SAVED_REPLIES_API + '?chatId=' + encodeURIComponent(chatId), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!resp.ok) {
+      _savedRepliesSyncedChats.delete(chatId);
+      return;
+    }
+    const data = (await resp.json()) as {
+      replies?: Array<{ id?: string; reply_text?: string; created_at?: string }>;
+    };
+    const serverRows = Array.isArray(data.replies) ? data.replies : [];
+    const chat = chatStore.chats.find((c) => c.id === chatId);
+    if (!chat) return;
+
+    // Server → local: adopt rows this browser doesn't have.
+    const localIds = new Set(chat.savedReplies.map((r) => r.id));
+    let changed = false;
+    for (const row of serverRows) {
+      if (!row.id || typeof row.reply_text !== 'string' || localIds.has(row.id)) continue;
+      chat.savedReplies.push({
+        id: row.id,
+        text: row.reply_text,
+        createdAt: Date.parse(row.created_at || '') || Date.now(),
+      });
+      changed = true;
+    }
+
+    // Local → server: re-push rows a failed/pre-feature save never uploaded.
+    const serverIds = new Set(serverRows.map((r) => r.id));
+    chat.savedReplies.forEach((r) => {
+      if (!serverIds.has(r.id)) syncSavedReplyCreate(chatId, r);
+    });
+
+    if (changed) {
+      chat.savedReplies.sort((a, b) => b.createdAt - a.createdAt);
+      saveChatStore();
+      // Re-render only if the Notes tab for this chat is still on screen.
+      // Safe from loops: the synced-chats set short-circuits the next call.
+      const notesCard = root.querySelector<HTMLElement>('.ncb-notes-card');
+      if (notesCard && !notesCard.hidden && chatStore.activeId === chatId) renderNotesTab(root);
+    }
+  } catch {
+    _savedRepliesSyncedChats.delete(chatId); // network error — retry on next open
+  }
+}
+
 function saveReplyToNotes(aiRow: HTMLElement, raw: string, btn: HTMLElement): void {
   const chat = chatStore.getActive();
 
@@ -3453,13 +3538,15 @@ function saveReplyToNotes(aiRow: HTMLElement, raw: string, btn: HTMLElement): vo
     return;
   }
 
-  chat.savedReplies.unshift({
+  const reply: SavedReply = {
     id: 'rep_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
     text: raw,
     createdAt: Date.now(),
-  });
+  };
+  chat.savedReplies.unshift(reply);
   touchActiveChat();
   saveChatStore();
+  syncSavedReplyCreate(chat.id, reply);
   flashAck(btn, tStr('cb_act_saved', 'Saved'));
 
   // If the Notes tab is currently visible, refresh it inline.
@@ -3484,6 +3571,10 @@ function renderNotesTab(root: HTMLElement): void {
 
   const chat = chatStore.getActive();
   if (count) count.textContent = String(chat.savedReplies.length);
+
+  // Pull the durable server copy in the background (once per chat per page
+  // load); re-renders this tab if it brings anything new.
+  void mergeSavedRepliesFromServer(root, chat.id);
 
   if (chat.savedReplies.length === 0) {
     list.innerHTML =
@@ -3519,6 +3610,7 @@ function renderNotesTab(root: HTMLElement): void {
       chat.savedReplies = chat.savedReplies.filter((r) => r.id !== id);
       touchActiveChat();
       saveChatStore();
+      syncSavedReplyDelete(id);
       renderNotesTab(root);
     });
     card.querySelector<HTMLButtonElement>('.ncb-saved-copy')?.addEventListener('click', (ev) => {
