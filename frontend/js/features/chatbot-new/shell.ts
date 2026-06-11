@@ -526,6 +526,9 @@ interface PendingFile {
   mediaType?: string; // for image
   base64?: string; // for image
   textContent?: string; // for text/extracted-pdf
+  /** Scanned/image-only PDFs have no text layer — the first pages are
+   *  rendered to JPEGs instead so the model can read them visually. */
+  pageImages?: Array<{ mediaType: string; base64: string }>;
   size?: number;
 }
 
@@ -816,10 +819,11 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      // A cheatsheet/summary generated earlier in this chat rides along as
-      // openFileContext — the backend truncates history turns to ~1.2k chars,
-      // so the doc would never survive inside previousTurns.
-      const followUpDoc = generatedDocForFollowUp(state.messages);
+      // A cheatsheet/summary generated earlier (this chat, an older chat, or
+      // before a refresh) rides along as openFileContext — the backend
+      // truncates history turns to ~1.2k chars, so the doc would never
+      // survive inside previousTurns.
+      const followUpDoc = await resolveFollowUpDoc(state.messages, rag.courseId || null);
       const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames, followUpDoc);
       raw = streamed.text;
       state.messages.push({
@@ -847,7 +851,8 @@ async function streamAiReply(
       state.messages.push({ role: 'assistant', text: raw });
       setBubbleSubtitle(aiRow, 'course_files');
     } else {
-      raw = await callGenericAi(state.messages, bubble, controller, thinking);
+      const followUpDoc = await resolveFollowUpDoc(state.messages, null);
+      raw = await callGenericAi(state.messages, bubble, controller, thinking, followUpDoc);
       state.messages.push({ role: 'assistant', text: raw });
       // Generic chat path — no course retrieval ran, so don't claim otherwise.
       setBubbleSubtitle(aiRow, 'general_knowledge');
@@ -1992,6 +1997,94 @@ function generatedDocLabel(doc: GeneratedDoc): string {
   return doc.title && doc.title !== kind ? kind + ' — ' + doc.title : kind;
 }
 
+// Stricter gates for the cross-chat restore below: a kind word or a "you
+// made/created it" phrase. The broad REF regex (which also matches a bare
+// "pdf") is fine when the doc demonstrably exists in THIS chat, but too loose
+// to justify fetching a note and attaching 20k chars on a hunch.
+const GENERATED_DOC_KIND_RE =
+  /\b(cheat\s*-?\s*sheets?|spickzettel|formelsammlung|formula sheets?|summar(y|ies)|zusammenfassung(en)?)\b/i;
+const GENERATED_DOC_MADE_RE =
+  /\b(you|du) (just )?(made|created|generated|erstellt|generiert)\b/i;
+
+/** Restore the last generated cheatsheet/summary for a course from the
+ *  pointers written at generation time: `minallo_cs_last_<courseId>` holds a
+ *  noteId (the content lives in the saved note), `minallo_sum_last_<courseId>`
+ *  holds the markdown inline. */
+async function restoreGeneratedDocForCourse(
+  courseId: string,
+  userText: string
+): Promise<GeneratedDoc | null> {
+  const mentionsSummary = /\b(summar|zusammenfassung)/i.test(userText);
+  const mentionsCheatsheet = /\b(cheat|spickzettel|formelsammlung|formula sheet)/i.test(userText);
+
+  const tryCheatsheet = async (): Promise<GeneratedDoc | null> => {
+    let stored: { noteId?: string; title?: string } | null = null;
+    try {
+      stored = JSON.parse(localStorage.getItem('minallo_cs_last_' + courseId) || 'null') as
+        { noteId?: string; title?: string } | null;
+    } catch { return null; }
+    if (!stored?.noteId) return null;
+    try {
+      const svc = await import('../../services/ai-service.js');
+      const note = await svc.getNoteById(stored.noteId);
+      if (!note?.content_markdown) return null;
+      return {
+        kind: 'cheatsheet',
+        title: note.title || stored.title || 'Cheatsheet',
+        markdown: note.content_markdown,
+        courseId,
+        noteId: stored.noteId,
+      };
+    } catch { return null; }
+  };
+
+  const trySummary = (): GeneratedDoc | null => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('minallo_sum_last_' + courseId) || 'null') as
+        { markdown?: string; title?: string } | null;
+      if (!stored?.markdown) return null;
+      return { kind: 'summary', title: stored.title || 'Summary', markdown: stored.markdown, courseId };
+    } catch { return null; }
+  };
+
+  if (mentionsSummary && !mentionsCheatsheet) return trySummary() ?? await tryCheatsheet();
+  return (await tryCheatsheet()) ?? trySummary();
+}
+
+/** The generated doc the latest user message asks about. In-chat generatedDoc
+ *  first; otherwise restore from the per-course pointers — that also covers
+ *  chats whose cheatsheet message predates generatedDoc (shipped 2026-06-11)
+ *  and docs generated in a different chat or before a page refresh trimmed
+ *  them from storage. */
+async function resolveFollowUpDoc(
+  messages: ChatMessage[],
+  preferredCourseId: string | null
+): Promise<GeneratedDoc | null> {
+  const inChat = generatedDocForFollowUp(messages);
+  if (inChat) return inChat;
+
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user' || !last.text) return null;
+  if (!GENERATED_DOC_KIND_RE.test(last.text) && !GENERATED_DOC_MADE_RE.test(last.text)) return null;
+
+  // Most plausible course first; first pointer hit wins. The loop is cheap:
+  // a network fetch only happens for courses that actually have a pointer.
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  const push = (id: string | null | undefined): void => {
+    const v = (id || '').trim();
+    if (v && !seen.has(v)) { seen.add(v); candidates.push(v); }
+  };
+  push(preferredCourseId);
+  push(String((window as unknown as { activeCourseId?: string | null }).activeCourseId || ''));
+  listAllCourses().forEach((c) => push(c.id));
+  for (const cid of candidates) {
+    const doc = await restoreGeneratedDocForCourse(cid, last.text);
+    if (doc) return doc;
+  }
+  return null;
+}
+
 /** Decide whether the latest user turn should go through RAG (`/ask-stream`)
  * or the generic chat endpoint. Returns the resolved RAG payload when
  * eligible, else null. */
@@ -2450,9 +2543,10 @@ async function callGenericAi(
   messages: ChatMessage[],
   bubble: HTMLElement | null,
   controller: AbortController,
-  thinking?: AIThinkingStatus | null
+  thinking?: AIThinkingStatus | null,
+  followUpDoc: GeneratedDoc | null = null
 ): Promise<string> {
-  const apiMessages = buildApiMessages(messages);
+  const apiMessages = buildApiMessages(messages, followUpDoc);
   const resp = await fetch('/api/ai', {
     method: 'POST',
     signal: controller.signal,
@@ -2632,7 +2726,8 @@ function scrollMsgsToBottom(msgs: HTMLElement): void {
 }
 
 function buildApiMessages(
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  resolvedFollowUpDoc: GeneratedDoc | null = null
 ): Array<{ role: 'user' | 'assistant'; content: unknown }> {
   // Mirror chatbot.js: keep last ~20 messages, and inline images as Claude-shaped image blocks.
   const trimmed = messages.slice(-20);
@@ -2648,12 +2743,13 @@ function buildApiMessages(
   for (let i = trimmed.length - 1; i >= 0; i--) {
     if (trimmed[i]!.role === 'user') { lastUserIdx = i; break; }
   }
-  // A cheatsheet/summary generated earlier in this chat that the latest user
-  // message refers to — injected like an attached document so the model can
-  // actually see what it "created" (the visible reply only says it's ready).
-  const followUpDoc = generatedDocForFollowUp(trimmed);
-  return trimmed.map((m, idx) => {
-    if (m.role === 'assistant') return { role: 'assistant', content: m.text };
+  // A cheatsheet/summary the latest user message refers to — injected like an
+  // attached document so the model can actually see what it "created" (the
+  // visible reply only says it's ready). The caller resolves it (async note
+  // restore for old chats); the in-chat scan is the synchronous fallback.
+  const followUpDoc = resolvedFollowUpDoc ?? generatedDocForFollowUp(trimmed);
+  const result: Array<{ role: 'user' | 'assistant'; content: unknown }> = trimmed.map((m, idx) => {
+    if (m.role === 'assistant') return { role: 'assistant' as const, content: m.text };
     const blocks: Array<unknown> = [];
     if (idx === lastUserIdx && followUpDoc) {
       blocks.push({
@@ -2693,6 +2789,20 @@ function buildApiMessages(
           type: 'image',
           source: { type: 'base64', media_type: f.mediaType, data: f.base64 },
         });
+      } else if (f.pageImages && f.pageImages.length) {
+        // Scanned PDF — no text layer, so the pages travel as images.
+        blocks.push({
+          type: 'text',
+          text:
+            '(The file "' + f.name + '" is a scanned PDF without a text layer. ' +
+            'Its first ' + f.pageImages.length + ' page(s) are attached as images below — read them visually.)',
+        });
+        f.pageImages.forEach((pi) => {
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: pi.mediaType, data: pi.base64 },
+          });
+        });
       } else if (f.kind === 'text' && f.textContent) {
         blocks.push({
           type: 'text',
@@ -2707,12 +2817,32 @@ function buildApiMessages(
     });
     if (m.text) blocks.push({ type: 'text', text: m.text });
     return {
-      role: 'user',
+      role: 'user' as const,
       content: blocks.length === 1 && (blocks[0] as { type?: string }).type === 'text'
         ? (blocks[0] as { text: string }).text
         : blocks,
     };
   });
+
+  // The backend /chat endpoint REJECTS the whole request above 5 image blocks
+  // (counted across all messages). Keep the newest images — the ones the
+  // latest question is most likely about — and stub out the older overflow.
+  const MAX_IMAGES_PER_REQUEST = 5;
+  let imageBudget = MAX_IMAGES_PER_REQUEST;
+  for (let i = result.length - 1; i >= 0; i--) {
+    const content = result[i]!.content;
+    if (!Array.isArray(content)) continue;
+    for (let j = content.length - 1; j >= 0; j--) {
+      const block = content[j] as { type?: string };
+      if (block.type !== 'image') continue;
+      if (imageBudget > 0) {
+        imageBudget--;
+      } else {
+        content[j] = { type: 'text', text: '(an earlier attached image was omitted to keep this request within limits)' };
+      }
+    }
+  }
+  return result;
 }
 
 function buildSystemPrompt(): string {
@@ -4491,6 +4621,9 @@ function renderConversationMessages(msgs: HTMLElement, messages: ChatMessage[]):
 const NCB_FILE_LIMIT = 10;
 const NCB_TEXT_CHAR_LIMIT = 60000;
 const NCB_PDF_PAGE_LIMIT = 80;
+// /api/ai accepts at most 5 images per request (config.ai.imageMax) — keep
+// one slot free for a pasted screenshot riding the same message.
+const NCB_PDF_IMAGE_PAGE_LIMIT = 4;
 
 function initUploads(root: HTMLElement): void {
   const trigger = root.querySelector<HTMLButtonElement>('.ncb-upload-btn');
@@ -4560,11 +4693,26 @@ function readUploadedFile(f: File): Promise<PendingFile | null> {
 
   // PDF — pdfjsLib + the same page/char limits the existing chatbot uses.
   if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
-    return extractPdfText(f).then((text) => ({
-      ...baseMeta,
-      kind: 'text' as const,
-      textContent: text,
-    }));
+    return extractPdfText(f).then(async (text) => {
+      // A scanned/image-only PDF extracts to (nearly) nothing. Before this
+      // check an empty textContent fell through buildApiMessages' binary
+      // branch and the AI told the user it "can't view binary files".
+      const contentChars = text.startsWith('(could not extract')
+        ? 0
+        : text.replace(/--- Page \d+ ---/g, '').replace(/\s+/g, '').length;
+      if (contentChars >= 40) {
+        return { ...baseMeta, kind: 'text' as const, textContent: text };
+      }
+      const pageImages = await renderPdfPagesAsImages(f, NCB_PDF_IMAGE_PAGE_LIMIT);
+      if (pageImages.length) {
+        return { ...baseMeta, kind: 'text' as const, textContent: '', pageImages };
+      }
+      return {
+        ...baseMeta,
+        kind: 'text' as const,
+        textContent: '(could not extract text from this PDF)',
+      };
+    });
   }
 
   // Anything else — store as binary stub so the user sees the chip but the AI
@@ -4621,6 +4769,74 @@ function extractPdfText(f: File): Promise<string> {
         return full + (truncated ? '\n\n[Content truncated — document is very large]' : '');
       } catch {
         return '(could not extract text from this PDF)';
+      }
+    });
+}
+
+/** Render the first pages of a PDF to JPEGs — the fallback for scanned PDFs
+ *  whose text layer is empty, so the model reads the pages visually instead
+ *  of being told the file is unreadable. */
+function renderPdfPagesAsImages(
+  f: File,
+  maxPages: number
+): Promise<Array<{ mediaType: string; base64: string }>> {
+  const ensurePdf = (window as unknown as { _ssEnsurePdfJs?: () => Promise<void> })._ssEnsurePdfJs;
+  const ensure = typeof ensurePdf === 'function' ? ensurePdf() : Promise.resolve();
+  return ensure
+    .then(
+      () =>
+        new Promise<ArrayBuffer | null>((resolve) => {
+          try {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = () => resolve(null);
+            reader.readAsArrayBuffer(f);
+          } catch {
+            resolve(null);
+          }
+        })
+    )
+    .then(async (buf) => {
+      const pdfjs = (window as unknown as {
+        pdfjsLib?: {
+          getDocument: (o: unknown) => { promise: Promise<{
+            numPages: number;
+            getPage: (n: number) => Promise<{
+              getViewport: (o: { scale: number }) => { width: number; height: number };
+              render: (o: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> };
+            }>;
+          }> };
+        };
+      }).pdfjsLib;
+      if (!buf || !pdfjs) return [];
+      try {
+        const pdf = await pdfjs.getDocument({
+          data: new Uint8Array(buf),
+          cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+          cMapPacked: true,
+        }).promise;
+        const pages = Math.min(pdf.numPages, maxPages);
+        const out: Array<{ mediaType: string; base64: string }> = [];
+        for (let p = 1; p <= pages; p++) {
+          const page = await pdf.getPage(p);
+          const base = page.getViewport({ scale: 1 });
+          // ~1280px wide is plenty for the model to read a scanned page while
+          // keeping each JPEG small enough for the /api/ai payload.
+          const scale = Math.min(2, 1280 / Math.max(base.width, 1));
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) continue;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const base64 = dataUrl.replace(/^data:[^;]+;base64,/, '');
+          if (base64) out.push({ mediaType: 'image/jpeg', base64 });
+        }
+        return out;
+      } catch {
+        return [];
       }
     });
 }
