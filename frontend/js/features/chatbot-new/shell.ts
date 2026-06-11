@@ -565,6 +565,9 @@ interface ChatMessage {
   missionMarker?: MissionMarker;
   /** Set on the "Your cheatsheet/summary is ready" assistant reply. */
   generatedDoc?: GeneratedDoc;
+  /** Chatbot-only gate: diagram fences render only for answers whose user turn
+   *  explicitly asked for a diagram/visual artifact. */
+  allowDiagrams?: boolean;
 }
 
 interface ConversationState {
@@ -790,6 +793,8 @@ async function streamAiReply(
   state.controller = controller;
 
   try {
+    const allowDiagrams = latestUserAllowsDiagrams(state.messages);
+    const latestFileLabel = latestUserFileLabel(state.messages);
     // Phase 12 wiring: when the active chat has ≥1 course-imported source
     // selected AND the latest user message is text-only (no images, no
     // file uploads), route to the Python /ask-stream so plan-v2's RAG +
@@ -818,17 +823,21 @@ async function streamAiReply(
       const priorTurns = state.messages
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
-        .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
+        .map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          text: m.role === 'assistant' ? sanitizeChatbotDiagrams(m.text, !!m.allowDiagrams) : m.text
+        }));
       // A cheatsheet/summary generated earlier (this chat, an older chat, or
       // before a refresh) rides along as openFileContext — the backend
       // truncates history turns to ~1.2k chars, so the doc would never
       // survive inside previousTurns.
       const followUpDoc = await resolveFollowUpDoc(state.messages, rag.courseId || null);
-      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames, followUpDoc);
-      raw = streamed.text;
+      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames, followUpDoc, allowDiagrams);
+      raw = sanitizeChatbotDiagrams(streamed.text, allowDiagrams);
       state.messages.push({
         role: 'assistant',
         text: raw,
+        allowDiagrams,
         selectedSourceMode: streamed.meta?.selectedSourceMode as SourceMode | undefined,
         sourceScope: streamed.meta?.sourceScope as string | undefined,
         sourceLabel: streamed.meta?.sourceLabel as string | undefined,
@@ -847,15 +856,16 @@ async function streamAiReply(
         'cb_course_files_none',
         "You're in **Course Files** mode, but no course files are attached to this chat yet, so there's nothing for me to search. Click the **import** button (the folder icon next to the message box) to add files from one of your courses, then ask again — or switch the source selector to **Auto** or **Internet**."
       );
-      if (bubble) renderRichBubble(bubble, raw);
-      state.messages.push({ role: 'assistant', text: raw });
+      if (bubble) renderRichBubble(bubble, raw, false);
+      state.messages.push({ role: 'assistant', text: raw, allowDiagrams: false });
       setBubbleSubtitle(aiRow, 'course_files');
     } else {
       const followUpDoc = await resolveFollowUpDoc(state.messages, null);
-      raw = await callGenericAi(state.messages, bubble, controller, thinking, followUpDoc);
-      state.messages.push({ role: 'assistant', text: raw });
+      raw = await callGenericAi(state.messages, bubble, controller, thinking, followUpDoc, allowDiagrams);
+      raw = sanitizeChatbotDiagrams(raw, allowDiagrams);
+      state.messages.push({ role: 'assistant', text: raw, allowDiagrams });
       // Generic chat path — no course retrieval ran, so don't claim otherwise.
-      setBubbleSubtitle(aiRow, 'general_knowledge');
+      setBubbleSubtitle(aiRow, latestFileLabel ? 'file:' + latestFileLabel : 'general_knowledge');
     }
     touchActiveChat();
     saveChatStore();
@@ -2153,12 +2163,13 @@ async function streamFromAskStream(
   thinking?: AIThinkingStatus | null,
   documentIds: string[] = [],
   documentNames: string[] = [],
-  generatedDoc: GeneratedDoc | null = null
+  generatedDoc: GeneratedDoc | null = null,
+  allowDiagrams = true
 ): Promise<{ text: string; meta: Record<string, unknown> | null }> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
     // Misconfigured: graceful fallback to the generic path.
-    const text = await callGenericAi([{ role: 'user', text: question }], bubble, controller, thinking);
+    const text = await callGenericAi([{ role: 'user', text: question }], bubble, controller, thinking, null, allowDiagrams);
     return { text, meta: null };
   }
   const token = getSbToken() || '';
@@ -2207,7 +2218,7 @@ async function streamFromAskStream(
     if (liveReveal) return liveReveal;
     if (thinking) await thinking.waitMinimum();
     thinking?.remove(true);
-    liveReveal = createSoftStreamReveal(bubble);
+    liveReveal = createSoftStreamReveal(bubble, { allowDiagrams });
     hasLiveReveal = true;
     return liveReveal;
   };
@@ -2238,7 +2249,10 @@ async function streamFromAskStream(
   // Re-render with full markdown now that we have the complete text. Inline
   // [Source N] markers are internal grounding anchors; the user sees sources
   // only in the collapsible footer appended below.
-  const displayAnswer = stripSourceMarkers(answerBuf || tStr('cb_no_response', 'No response.'));
+  const displayAnswer = sanitizeChatbotDiagrams(
+    stripSourceMarkers(answerBuf || tStr('cb_no_response', 'No response.')),
+    allowDiagrams
+  );
   const revealToFinish = liveReveal as ReturnType<typeof createSoftStreamReveal> | null;
   if (hasLiveReveal && revealToFinish) {
     await revealToFinish.finish();
@@ -2246,7 +2260,7 @@ async function streamFromAskStream(
     if (thinking) await thinking.waitMinimum();
     thinking?.remove(true);
   }
-  if (bubble) renderRichBubble(bubble, displayAnswer);
+  if (bubble) renderRichBubble(bubble, displayAnswer, allowDiagrams);
 
   // Append sources if the server included them. Verification stays internal.
   if (doneMeta && bubble) appendAskStreamMeta(bubble, doneMeta);
@@ -2438,7 +2452,10 @@ function streamStableLen(text: string): number {
   return lastSafe;
 }
 
-function createSoftStreamReveal(bubble: HTMLElement | null): {
+function createSoftStreamReveal(
+  bubble: HTMLElement | null,
+  options: { allowDiagrams?: boolean } = {}
+): {
   push: (text: string) => void;
   finish: () => Promise<void>;
 } {
@@ -2478,7 +2495,11 @@ function createSoftStreamReveal(bubble: HTMLElement | null): {
     const safe = streamStableLen(rawText);
     if (safe <= stableLen) return;
     stableLen = safe;
-    renderRichBubble(rendered, stripSourceMarkersLive(rawText.slice(0, stableLen)).trim());
+    renderRichBubble(
+      rendered,
+      stripSourceMarkersLive(rawText.slice(0, stableLen)).trim(),
+      options.allowDiagrams !== false
+    );
     live.textContent = '';
     visibleTail = '';
     scroll();
@@ -2544,7 +2565,8 @@ async function callGenericAi(
   bubble: HTMLElement | null,
   controller: AbortController,
   thinking?: AIThinkingStatus | null,
-  followUpDoc: GeneratedDoc | null = null
+  followUpDoc: GeneratedDoc | null = null,
+  allowDiagrams = true
 ): Promise<string> {
   const apiMessages = buildApiMessages(messages, followUpDoc);
   const resp = await fetch('/api/ai', {
@@ -2566,15 +2588,16 @@ async function callGenericAi(
     throw new Error('Server ' + resp.status + ': ' + errText.slice(0, 200));
   }
   const data = (await resp.json()) as { content?: Array<{ text?: string }>; error?: { message?: string } };
-  const raw = data.error
+  const rawResponse = data.error
     ? tStr('cb_error_prefix', '❌ Error: ') + (data.error.message || JSON.stringify(data.error))
     : data.content
       ? data.content.map((b) => b.text || '').join('')
       : tStr('cb_no_response', 'No response.');
+  const raw = sanitizeChatbotDiagrams(rawResponse, allowDiagrams);
   // Type into the bubble for the same UX as before.
   if (thinking) await thinking.waitMinimum();
   thinking?.remove(true);
-  await typeIntoBubble(bubble, raw, () => controller.signal.aborted);
+  await typeIntoBubble(bubble, raw, () => controller.signal.aborted, allowDiagrams);
   return raw;
 }
 
@@ -2653,6 +2676,14 @@ function setBubbleSubtitle(aiRow: HTMLElement, sourceScope: string | undefined):
   const el = aiRow.querySelector<HTMLElement>('.ncb-bubble-subtitle');
   if (!el) return;
   let label: string;
+  if (sourceScope && sourceScope.startsWith('file:')) {
+    const name = sourceScope.slice(5).trim();
+    label = name
+      ? tStr('cb_subtitle_file_named', 'Answered from {file}').replace('{file}', name)
+      : tStr('cb_subtitle_file', 'Answered using file context');
+    el.textContent = label;
+    return;
+  }
   switch (sourceScope) {
     case 'course_files':
       label = tStr('cb_subtitle_course', 'Answered using your course files');
@@ -2669,25 +2700,26 @@ function setBubbleSubtitle(aiRow: HTMLElement, sourceScope: string | undefined):
 function typeIntoBubble(
   bubble: HTMLElement | null,
   raw: string,
-  isAborted: () => boolean
+  isAborted: () => boolean,
+  allowDiagrams = true
 ): Promise<void> {
   return new Promise((resolve) => {
     if (!bubble) {
       resolve();
       return;
     }
-    const liveReveal = createSoftStreamReveal(bubble);
+    const liveReveal = createSoftStreamReveal(bubble, { allowDiagrams });
     let index = 0;
 
     const tick = (): void => {
       if (isAborted()) {
-        renderRichBubble(bubble, raw.slice(0, index) || raw);
+        renderRichBubble(bubble, raw.slice(0, index) || raw, allowDiagrams);
         resolve();
         return;
       }
       if (index >= raw.length) {
         liveReveal.finish().then(() => {
-          renderRichBubble(bubble, raw);
+          renderRichBubble(bubble, raw, allowDiagrams);
           resolve();
         });
         return;
@@ -2749,7 +2781,9 @@ function buildApiMessages(
   // restore for old chats); the in-chat scan is the synchronous fallback.
   const followUpDoc = resolvedFollowUpDoc ?? generatedDocForFollowUp(trimmed);
   const result: Array<{ role: 'user' | 'assistant'; content: unknown }> = trimmed.map((m, idx) => {
-    if (m.role === 'assistant') return { role: 'assistant' as const, content: m.text };
+    if (m.role === 'assistant') {
+      return { role: 'assistant' as const, content: sanitizeChatbotDiagrams(m.text, !!m.allowDiagrams) };
+    }
     const blocks: Array<unknown> = [];
     if (idx === lastUserIdx && followUpDoc) {
       blocks.push({
@@ -2899,6 +2933,7 @@ function buildSystemPrompt(): string {
     'Help them understand it: read the text, transcribe equations, explain diagrams, work through the exercise, identify the concept, summarise the slide. Do NOT refuse with "I cannot help with identifying or analyzing the content of images" — that\'s wrong for this product. ' +
     'If the image is unclear, ask what specifically the student wants help with rather than refusing.\n\n' +
     'DOCUMENT TAGS: When the user\'s message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags.\n\n' +
+    'DIAGRAMS: Do not include ```diagram``` or ```minallo-diagram``` blocks unless the user explicitly asks for a diagram, mind map, flowchart, concept map, graph, or visual overview. For ordinary file questions like "what is this file about?", summarize the file in text only.\n\n' +
     'WEB ACCESS: In this mode you are not browsing the web, so you do not have live or current information (today\'s news, prices, recent releases, latest events). Do not pretend you searched the web. When the user needs current or internet information, tell them Minallo CAN do this: ask them to switch the source selector (the button above the message box) to **Internet** mode, which runs a live web search. Do not claim Minallo has no internet access at all — it does, via Internet mode.'
   );
 }
@@ -2927,6 +2962,32 @@ function renderInlineMarkdown(raw: string): string {
   return renderMarkdown(raw);
 }
 
+const CHATBOT_DIAGRAM_INTENT_RE =
+  /\b(diagram|mind\s*map|concept\s*map|flow\s*chart|flowchart|visual(?:ly| overview)?|map this out|show (?:me )?(?:this )?(?:as|in) (?:a )?(?:diagram|chart|map)|graph)\b/i;
+const CHATBOT_DIAGRAM_FENCE_RE =
+  /```(?:minallo-)?diagram[^\n]*\n[\s\S]*?```/gi;
+
+function latestUserAllowsDiagrams(messages: ChatMessage[]): boolean {
+  const last = messages[messages.length - 1];
+  return !!(last?.role === 'user' && CHATBOT_DIAGRAM_INTENT_RE.test(last.text || ''));
+}
+
+function latestUserFileLabel(messages: ChatMessage[]): string | null {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user') return null;
+  const files = (last.files || []).filter((f) => f.name);
+  if (!files.length) return null;
+  return files.length === 1 ? files[0]!.name : files.map((f) => f.name).join(', ');
+}
+
+function sanitizeChatbotDiagrams(raw: string, allowDiagrams: boolean): string {
+  if (allowDiagrams || !raw) return raw || '';
+  return raw
+    .replace(CHATBOT_DIAGRAM_FENCE_RE, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Render markdown into a chatbot bubble AND finish the KaTeX pass.
 // `renderMarkdown` only renders math synchronously when `window.katex` is
 // already loaded; otherwise it emits literal `\(…\)` / `\[…\]` fallbacks and
@@ -2937,8 +2998,8 @@ function renderInlineMarkdown(raw: string): string {
 // on screen permanently. We ensure KaTeX, then convert the fallback
 // delimiters in THIS bubble. Only `\[ \]` / `\( \)` are processed — those are
 // exactly the forms renderMarkdown leaves behind, so no stray `$` can desync.
-function renderRichBubble(bubble: HTMLElement, raw: string): void {
-  bubble.innerHTML = renderInlineMarkdown(raw);
+function renderRichBubble(bubble: HTMLElement, raw: string, allowDiagrams = true): void {
+  bubble.innerHTML = renderInlineMarkdown(sanitizeChatbotDiagrams(raw, allowDiagrams));
   const w = window as Window &
     typeof globalThis & {
       _ssEnsureKatex?: () => Promise<unknown>;
@@ -4109,6 +4170,7 @@ function compactMessageForStorage(m: ChatMessage): ChatMessage {
     compact.sourceLabel = m.sourceLabel;
     compact.courseFileScope = m.courseFileScope;
     compact.sources = m.sources;
+    compact.allowDiagrams = !!m.allowDiagrams;
     // Preserve the mission marker verbatim — it's tiny and must survive
     // the storage round-trip so appendStoredMessage can re-fetch the cards.
     if (m.missionMarker) compact.missionMarker = m.missionMarker;
@@ -4542,7 +4604,7 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
         })
         .catch(() => {
           bubble.innerHTML = '';
-          renderRichBubble(bubble, m.text);
+          renderRichBubble(bubble, m.text, !!m.allowDiagrams);
         });
     } else {
       // Past day — show an expired notice with a button to load today's mission.
@@ -4565,7 +4627,7 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
           })
           .catch(() => {
             bubble.innerHTML = '';
-            renderRichBubble(bubble, m.text);
+            renderRichBubble(bubble, m.text, !!m.allowDiagrams);
           });
       });
     }
@@ -4573,7 +4635,7 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
     return;
   }
 
-  if (bubble) renderRichBubble(bubble, m.text);
+  if (bubble) renderRichBubble(bubble, m.text, !!m.allowDiagrams);
   if (bubble && (m.sourceLabel || m.sources?.length)) {
     appendAskStreamMeta(bubble, {
       sourceLabel: m.sourceLabel,
