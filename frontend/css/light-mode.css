@@ -89,6 +89,21 @@ body:not(.night) {
   --badge-border: rgba(37, 99, 235, 0.22);
   --badge-color: #1d4ed8;
   --slot-bg: var(--lm-nested-bg);
+
+  --study-light-panel: rgba(255, 255, 255, 0.86);
+  --study-light-panel-strong: rgba(255, 255, 255, 0.96);
+  --study-light-text: #1f2a3d;
+  --study-light-title: #111827;
+  --study-light-muted: #697895;
+  --study-light-soft-muted: #8b9ab4;
+  --study-light-border: rgba(110, 145, 205, 0.26);
+  --study-light-border-strong: rgba(73, 128, 220, 0.42);
+  --study-light-blue: #4f8dff;
+  --study-light-blue-deep: #2467d6;
+  --study-light-blue-soft: rgba(79, 141, 255, 0.12);
+  --study-light-cyan-soft: rgba(72, 217, 233, 0.13);
+  --study-light-shadow: 0 28px 80px rgba(49, 86, 140, 0.22);
+  --study-light-card-shadow: 0 12px 28px rgba(58, 93, 145, 0.12);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -713,7 +728,7 @@ body:not(.night) #profileEmail:focus {
  *
  * Anything that isn't a primary CTA (next block) gets white + blue border.
  * ────────────────────────────────────────────────────────────────────────── */
-body:not(.night) button:not([disabled]):not(.primary):not(.brand-btn):not(.danger-btn):not(.nl-btn--primary):not(.nl-btn--dark):not(.na-submit):not(.na-google):not(.gl-start-btn):not(.gl-skill-open-btn):not(.sub-btn-upgrade):not(.sub-btn-danger):not(.settings-save-btn):not(.profile-save-btn):not(.editor-export-btn):not(.editor-save-doc-btn):not(.tetris-start-btn):not(.chess-big-btn):not(.dc-send-btn):not(.msm-save-btn):not(.ncb-new-chat-btn):not(.ncb-send-btn):not(.ed-hub-action-primary):not(.qz-option):not(#authSubmit):not(#paywallUpgradeBtn):not(#subPauseBtn):not(#subResumeBtn):not(#subCancelBtn):not(.sb-night-btn):not(.psb),
+body:not(.night) button:not([disabled]):not(.primary):not(.brand-btn):not(.danger-btn):not(.nl-btn--primary):not(.nl-btn--dark):not(.na-submit):not(.na-google):not(.gl-start-btn):not(.gl-skill-open-btn):not(.sub-btn-upgrade):not(.sub-btn-danger):not(.settings-save-btn):not(.profile-save-btn):not(.editor-export-btn):not(.editor-save-doc-btn):not(.tetris-start-btn):not(.chess-big-btn):not(.dc-send-btn):not(.msm-save-btn):not(.ncb-new-chat-btn):not(.ncb-send-btn):not(.ed-hub-action-primary):not(.qz-option):not(#authSubmit):not(#paywallUpgradeBtn):not(#subPauseBtn):not(#subResumeBtn):not(#subCancelBtn):not(.sb-night-btn):not(.psb):not(.st-popup-close):not(.st-tech-card):not(.st-step-btn):not(.st-music-src):not(.st-save-default-btn),
 body:not(.night) .btn:not(.primary),
 body:not(.night) .btn-secondary,
 body:not(.night) .back-btn,
@@ -747,7 +762,7 @@ body:not(.night) .ncb-input-action-btn {
   box-shadow: var(--lm-btn-shadow) !important;
   transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.18s;
 }
-body:not(.night) button:not([disabled]):not(.primary):not(.brand-btn):not(.danger-btn):not(.nl-btn--primary):not(.gl-start-btn):not(.gl-skill-open-btn):not(.sub-btn-upgrade):not(.ncb-new-chat-btn):not(.ncb-send-btn):not(.qz-option):not(.sb-night-btn):not(.psb):hover,
+body:not(.night) button:not([disabled]):not(.primary):not(.brand-btn):not(.danger-btn):not(.nl-btn--primary):not(.gl-start-btn):not(.gl-skill-open-btn):not(.sub-btn-upgrade):not(.ncb-new-chat-btn):not(.ncb-send-btn):not(.qz-option):not(.sb-night-btn):not(.psb):not(.st-popup-close):not(.st-tech-card):not(.st-step-btn):not(.st-music-src):not(.st-save-default-btn):hover,
 body:not(.night) .btn-secondary:hover,
 body:not(.night) .back-btn:hover,
 body:not(.night) .manage-layout-btn:hover,
@@ -3076,4 +3091,177 @@ body:not(.night) #portal .dr-drawer.dr-mode-ai .chip-drawer {
 }
 body:not(.night) #portal .dr-drawer.dr-mode-ai .chip-drawer-label {
   color: #8794ad !important;
+}
+
+/* Focus Session popup: dedicated light-mode glass treatment. */
+body:not(.night) #portal .st-popup.st-popup-v2 {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.91), rgba(248, 252, 255, 0.84)),
+    radial-gradient(circle at 14% 4%, rgba(79, 141, 255, 0.16), transparent 35%) !important;
+  border: 1px solid var(--study-light-border) !important;
+  box-shadow: var(--study-light-shadow) !important;
+  color: var(--study-light-text) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-head-v2,
+body:not(.night) #portal .st-popup.st-popup-v2 .st-settings,
+body:not(.night) #portal .st-popup.st-popup-v2 .st-footer-row {
+  border-color: rgba(110, 145, 205, 0.22) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-pill {
+  background: linear-gradient(135deg, rgba(79, 141, 255, 0.14), rgba(72, 217, 233, 0.10)) !important;
+  border: 1px solid rgba(79, 141, 255, 0.24) !important;
+  color: #2f5d9f !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-title {
+  color: var(--study-light-title) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-sub {
+  color: var(--study-light-muted) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-close {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid rgba(104, 139, 197, 0.24) !important;
+  color: #243047 !important;
+  box-shadow: 0 8px 18px rgba(64, 92, 139, 0.12) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-popup-close:hover {
+  background: #ffffff !important;
+  border-color: var(--study-light-border-strong) !important;
+  color: #111827 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-card {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 17px;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid rgba(104, 139, 197, 0.24) !important;
+  box-shadow: 0 10px 22px rgba(58, 93, 145, 0.08) !important;
+  color: #162235 !important;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--study-light-border-strong) !important;
+  box-shadow: var(--study-light-card-shadow) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-card.active {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(236, 245, 255, 0.96)),
+    radial-gradient(circle at 18% 12%, rgba(79, 141, 255, 0.18), transparent 45%) !important;
+  border-color: rgba(79, 141, 255, 0.58) !important;
+  box-shadow: 0 14px 32px rgba(79, 141, 255, 0.15) !important;
+  color: #162235 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-card.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--study-light-blue), #48d9e9);
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-name {
+  color: #162235 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-tech-desc {
+  color: #5d6d89 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-setting-label {
+  color: #4f5f78 !important;
+  font-weight: 700 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-stepper {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-step-btn {
+  background: linear-gradient(180deg, #ffffff, #f3f8ff) !important;
+  border: 1px solid rgba(104, 139, 197, 0.28) !important;
+  color: #1b2b48 !important;
+  box-shadow: 0 6px 14px rgba(62, 90, 139, 0.12) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-step-btn:hover {
+  background: linear-gradient(180deg, #ffffff, #eaf3ff) !important;
+  border-color: var(--study-light-border-strong) !important;
+  color: var(--study-light-blue-deep) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-step-val {
+  color: #172033 !important;
+  font-weight: 800 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-section {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(104, 139, 197, 0.22) !important;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(241, 247, 255, 0.74)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-label {
+  color: #5c6b84 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-src {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid rgba(104, 139, 197, 0.27) !important;
+  color: #192337 !important;
+  box-shadow: 0 8px 16px rgba(65, 93, 139, 0.08) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-src:hover {
+  border-color: var(--study-light-border-strong) !important;
+  background: #ffffff !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-src.active {
+  border-color: rgba(79, 141, 255, 0.48) !important;
+  background: linear-gradient(180deg, #ffffff, #eff6ff) !important;
+  box-shadow: 0 10px 20px rgba(79, 141, 255, 0.12) !important;
+  color: #192337 !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-music-src-hint {
+  color: var(--study-light-muted) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-playlist-select,
+body:not(.night) #portal .st-popup.st-popup-v2 .st-save-default-btn {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid rgba(104, 139, 197, 0.27) !important;
+  color: #192337 !important;
+  box-shadow: 0 8px 16px rgba(65, 93, 139, 0.08) !important;
+}
+
+body:not(.night) #portal .st-popup.st-popup-v2 .st-save-default-btn:hover {
+  background: #ffffff !important;
+  border-color: var(--study-light-border-strong) !important;
+  color: var(--study-light-blue-deep) !important;
 }
