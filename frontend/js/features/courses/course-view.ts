@@ -587,6 +587,33 @@ export function openCourse(course: LegacyCourse): void {
     .catch(() => undefined);
 }
 
+/** Fetch the course's document-understanding data and decorate ready file rows
+ *  with the source-type badge + correction selector. Additive + silent so it
+ *  never blocks or breaks the list render. Called on BOTH the full course render
+ *  and the lighter files-panel refresh, so the badges survive navigating away
+ *  (e.g. opening a PDF) and coming back. */
+function _decorateDocTypeBadges(filesList: HTMLElement | null, course: LegacyCourse): void {
+  if (!filesList || !course.id || !window._sbToken) return;
+  void (async () => {
+    try {
+      // Silent direct fetch on purpose: do NOT go through listCourseDocuments,
+      // which dispatches a `session-expired` event on 401. Badges are cosmetic
+      // and must never log the user out or add auth noise — swallow any error.
+      const res = await fetch(
+        (window.BACKEND_URL || '') + '/api/documents/list?courseId=' + encodeURIComponent(course.id),
+        { headers: { Authorization: 'Bearer ' + (window._sbToken || '') } }
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { documents?: unknown[] };
+      if (!data.documents || !data.documents.length) return;
+      const { decorateFileTypeBadges } = await import('./document-type-badge.js');
+      decorateFileTypeBadges(filesList, data.documents as Parameters<typeof decorateFileTypeBadges>[1]);
+    } catch {
+      /* badges are optional — ignore */
+    }
+  })();
+}
+
 function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {
   const { totalFiles, studiedTotal, unreadTotal } = _computeFileStats(course);
   const sub = co.querySelector<HTMLElement>('#coFilesPanel .co-panel-sub');
@@ -603,28 +630,8 @@ function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {
     bindFileEvents(co, course);
     bindFolderEvents(co, course);
     // Document Understanding Layer: decorate ready file rows with the detected
-    // source-type badge + low-confidence correction selector. Additive + async
-    // so it never blocks or breaks the list render.
-    if (course.id && window._sbToken) {
-      void (async () => {
-        try {
-          // Silent direct fetch on purpose: do NOT go through listCourseDocuments,
-          // which dispatches a `session-expired` event on 401. Badges are cosmetic
-          // and must never log the user out or add auth noise — swallow any error.
-          const res = await fetch(
-            (window.BACKEND_URL || '') + '/api/documents/list?courseId=' + encodeURIComponent(course.id),
-            { headers: { Authorization: 'Bearer ' + (window._sbToken || '') } }
-          );
-          if (!res.ok) return;
-          const data = (await res.json()) as { documents?: unknown[] };
-          if (!data.documents || !data.documents.length) return;
-          const { decorateFileTypeBadges } = await import('./document-type-badge.js');
-          decorateFileTypeBadges(filesList, data.documents as Parameters<typeof decorateFileTypeBadges>[1]);
-        } catch {
-          /* badges are optional — ignore */
-        }
-      })();
-    }
+    // source-type badge + low-confidence correction selector.
+    _decorateDocTypeBadges(filesList, course);
     co.querySelectorAll<HTMLButtonElement>('.co-folder-more-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -914,6 +921,11 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
 
   bindFileEvents(co, course);
   bindFolderEvents(co, course);
+
+  // Re-apply the source-type badges on every full render too (not just the
+  // lighter refresh path), so they don't vanish after opening a PDF and
+  // returning to the course.
+  _decorateDocTypeBadges(co.querySelector<HTMLElement>('#coFilesPanel .co-files-list'), course);
 
   // Files panel search: filter folders + file rows by name as the user types.
   const filesSearchInput = co.querySelector<HTMLInputElement>('#coFilesSearchInput');

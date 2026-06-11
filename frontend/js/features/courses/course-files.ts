@@ -246,7 +246,10 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
         target?.closest('.co-dl-btn') ||
         target?.closest('.co-del-btn') ||
         target?.closest('.co-reindex-btn') ||
-        target?.closest('.co-rag-status')
+        target?.closest('.co-rag-status') ||
+        // The source-type badge + correction selector live inside the row;
+        // interacting with them must NOT open the file.
+        target?.closest('.co-file-doctype')
       ) {
         return;
       }
