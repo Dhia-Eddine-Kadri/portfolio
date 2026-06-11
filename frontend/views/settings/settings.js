@@ -340,6 +340,7 @@ function bindSettingsControls() {
         // Supabase Auth Admin API to return a 500 here; surface it instead of
         // silently pretending the account was deleted).
         var deleteOk = false;
+        var delStatus = 0;
         try {
           var delRes = await fetch('/api/admin-users', {
             method: 'POST',
@@ -347,7 +348,20 @@ function bindSettingsControls() {
             body: JSON.stringify({ action: 'deleteself', token: token })
           });
           deleteOk = delRes.ok;
+          delStatus = delRes.status;
         } catch (e) { deleteOk = false; }
+        // 401 = the session's user no longer exists (e.g. deleted from the
+        // dashboard) or the token is dead. Sitting in a ghost session keeps
+        // every background sync failing (study_lounge_stats 409s on the FK,
+        // deleteself can never succeed) — treat it as "already gone": wipe
+        // local state and reload to the login screen.
+        if (delStatus === 401) {
+          try { if (window._sb && window._sb.auth) await window._sb.auth.signOut(); } catch (e) {}
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.reload();
+          return;
+        }
         if (!deleteOk) {
           btn.textContent = _t('set_yes_delete');
           btn.disabled = false;
