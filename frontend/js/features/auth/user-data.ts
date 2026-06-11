@@ -32,6 +32,15 @@ interface SubscriptionRow {
 let _presenceTimer: ReturnType<typeof setInterval> | null = null;
 let _courseLoadTimer: ReturnType<typeof setTimeout> | null = null;
 
+function stopPresenceHeartbeat(): void {
+  if (_presenceTimer) clearInterval(_presenceTimer);
+  _presenceTimer = null;
+}
+
+function stopHeartbeatOnUnauthorized(response: Response): void {
+  if (response.status === 401) stopPresenceHeartbeat();
+}
+
 function scheduleUserCoursesLoad(courses: unknown, delay = 1200): void {
   if (!courses || !window._loadUserCourses) return;
   if (_courseLoadTimer) clearTimeout(_courseLoadTimer);
@@ -42,7 +51,7 @@ function scheduleUserCoursesLoad(courses: unknown, delay = 1200): void {
 }
 
 export function startPresenceHeartbeat(uid: string): void {
-  if (_presenceTimer) clearInterval(_presenceTimer);
+  stopPresenceHeartbeat();
   function _beat(): void {
     const token = window._sbToken;
     if (!uid || !token) return;
@@ -51,7 +60,7 @@ export function startPresenceHeartbeat(uid: string): void {
       method: 'PATCH',
       headers: { ...(window._sbHeaders ? window._sbHeaders() : {}), Prefer: 'return=minimal' },
       body: JSON.stringify({ last_seen: new Date().toISOString() }),
-    }).catch(() => {});
+    }).then(stopHeartbeatOnUnauthorized).catch(() => {});
   }
   _beat();
   _presenceTimer = setInterval(_beat, 60000);
@@ -125,7 +134,7 @@ export async function loadUserData(uid: string): Promise<void> {
         method: 'PATCH',
         headers: { ...(window._sbHeaders ? window._sbHeaders() : {}), Prefer: 'return=minimal' },
         body: JSON.stringify({ auth_email: currentUser.email }),
-      }).catch(() => {});
+      }).then(stopHeartbeatOnUnauthorized).catch(() => {});
     }
 
     startPresenceHeartbeat(uid);

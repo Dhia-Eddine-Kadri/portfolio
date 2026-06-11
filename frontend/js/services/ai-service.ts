@@ -16,6 +16,19 @@ function _authJsonHeaders(): Record<string, string> {
   };
 }
 
+function _markSessionExpired(): void {
+  try {
+    window.dispatchEvent(new CustomEvent('minallo:session-expired'));
+  } catch {
+    /* ignore */
+  }
+}
+
+function _throwSessionExpired(): never {
+  _markSessionExpired();
+  throw new Error('SESSION_EXPIRED');
+}
+
 async function _detectAiCapError(response: Response): Promise<boolean> {
   const mod = await import(/* @vite-ignore */ atob('Li9haS11c2FnZS5qcw=='));
   return mod.detectAiCapError(response);
@@ -187,6 +200,8 @@ export async function listCourseDocuments(courseId: string): Promise<CourseDocum
     _backendUrl() + '/api/documents/list?courseId=' + encodeURIComponent(courseId),
     { headers: { Authorization: 'Bearer ' + _token() } }
   );
+  if (response.status === 401) _throwSessionExpired();
+  if (!response.ok) return [];
   const data = (await response.json()) as { documents?: CourseDocument[] };
   return data.documents || [];
 }
@@ -258,7 +273,7 @@ export async function indexExistingDocument(
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    if (response.status === 401) throw new Error('SESSION_EXPIRED');
+    if (response.status === 401) _throwSessionExpired();
     const text = await response.text();
     try {
       return JSON.parse(text);
@@ -299,7 +314,7 @@ export async function getDocumentReviewPages(
     headers: _authJsonHeaders(),
     body: JSON.stringify({ documentId }),
   });
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (response.status === 401) _throwSessionExpired();
   if (!response.ok) throw new Error('Failed to load review pages (' + response.status + ')');
   const data = (await response.json()) as { pages?: OcrReviewPage[] };
   return data.pages || [];
@@ -318,7 +333,7 @@ export async function correctDocumentPage(
     headers: _authJsonHeaders(),
     body: JSON.stringify({ courseId, documentId, pageNumber, correctedText }),
   });
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (response.status === 401) _throwSessionExpired();
   if (!response.ok) {
     const text = await response.text();
     let detail = 'Failed to save correction (' + response.status + ')';
@@ -354,7 +369,7 @@ export async function getCourseTopicMap(courseId: string): Promise<CourseTopic[]
       headers: _authJsonHeaders(),
       body: JSON.stringify({ courseId }),
     });
-    if (response.status === 401) throw new Error('SESSION_EXPIRED');
+    if (response.status === 401) _throwSessionExpired();
     if (!response.ok) return [];
     const data = (await response.json()) as { topics?: CourseTopic[] };
     return data.topics || [];
@@ -372,7 +387,7 @@ export async function generateCourseTopicMap(courseId: string): Promise<CourseTo
     headers: _authJsonHeaders(),
     body: JSON.stringify({ courseId }),
   });
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (response.status === 401) _throwSessionExpired();
   if (!response.ok) return [];
   const data = (await response.json()) as { topics?: CourseTopic[] };
   return data.topics || [];
@@ -625,7 +640,7 @@ export async function listCourseNotes(courseId: string): Promise<SavedNote[]> {
       _backendUrl() + '/api/notes?courseId=' + encodeURIComponent(courseId),
       { headers: _authJsonHeaders() }
     );
-    if (response.status === 401) throw new Error('SESSION_EXPIRED');
+    if (response.status === 401) _throwSessionExpired();
     if (!response.ok) return [];
     const data = (await response.json()) as { notes?: SavedNote[] };
     return data.notes || [];
@@ -648,7 +663,7 @@ export async function getNoteById(
     _backendUrl() + '/api/notes?id=' + encodeURIComponent(id),
     { headers: _authJsonHeaders() }
   );
-  if (response.status === 401) throw new Error('SESSION_EXPIRED');
+  if (response.status === 401) _throwSessionExpired();
   if (!response.ok) return null;
   const data = (await response.json()) as {
     note?: { id: string; title: string; content_markdown: string; note_sources?: unknown[] } | null;

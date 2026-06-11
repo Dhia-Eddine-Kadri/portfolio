@@ -856,14 +856,35 @@ function _guessDocMeta(fileName: string): DocMeta {
 // anyway, and parallel triggers cause Supabase statement_timeout cascades.
 const _ragQueue: Array<() => void> = [];
 let _ragRunning = 0;
+let _ragAuthBlocked = false;
 const _RAG_CONCURRENCY = 1;
+
+function _isSessionExpiredError(err: unknown): boolean {
+  return err instanceof Error && err.message === 'SESSION_EXPIRED';
+}
+
+function _blockRagForExpiredSession(): void {
+  _ragAuthBlocked = true;
+  _ragQueue.length = 0;
+}
+
 function _ragEnqueue(fn: () => unknown): Promise<void> {
   return new Promise<void>((resolve) => {
+    if (_ragAuthBlocked) {
+      resolve();
+      return;
+    }
     _ragQueue.push(() => {
+      if (_ragAuthBlocked) {
+        resolve();
+        return;
+      }
       _ragRunning++;
       Promise.resolve()
         .then(fn)
-        .catch(() => {})
+        .catch((err: unknown) => {
+          if (_isSessionExpiredError(err)) _blockRagForExpiredSession();
+        })
         .then(() => {
           _ragRunning--;
           resolve();
@@ -874,6 +895,10 @@ function _ragEnqueue(fn: () => unknown): Promise<void> {
   });
 }
 function _ragDrain(): void {
+  if (_ragAuthBlocked) {
+    _ragQueue.length = 0;
+    return;
+  }
   while (_ragRunning < _RAG_CONCURRENCY && _ragQueue.length) {
     const next = _ragQueue.shift();
     if (next) next();
@@ -891,7 +916,12 @@ async function _bindRagStatus(co: HTMLElement, course: LegacyCourse): Promise<vo
   if (!window._sbToken) return;
 
   let ragDocs: CourseDocument[] = [];
-  try { ragDocs = await listCourseDocuments(courseId); } catch { /* ignore */ }
+  try {
+    ragDocs = await listCourseDocuments(courseId);
+  } catch (err: unknown) {
+    if (_isSessionExpiredError(err)) _blockRagForExpiredSession();
+    return;
+  }
 
   function _statusRank(s: string | undefined): number {
     if (s === 'ready') return 0;
@@ -1042,7 +1072,12 @@ async function _triggerRagIndex(
         _pollRagStatus(el, courseId, updated.id, cacheKey);
       }
     }
-  } catch {
+  } catch (err: unknown) {
+    if (_isSessionExpiredError(err)) {
+      _blockRagForExpiredSession();
+      _setRagStatus(el, 'auth_expired');
+      return;
+    }
     _setRagStatus(el, 'failed');
   }
 }
@@ -1051,6 +1086,7 @@ const RAG_TITLES: Record<string, string> = {
   ready: 'Ready for AI ✓',
   ocr_weak: 'AI index ready, but OCR/text quality is weak — click to re-index',
   failed: 'Indexing failed — click to retry',
+  auth_expired: 'Session expired — refresh or sign in again',
   uploading: 'Sending to AI…',
   uploaded: 'Processing…',
   extracting_text: 'Extracting text… (click to retry if stuck)',
@@ -1061,6 +1097,7 @@ const RAG_ICONS: Record<string, string> = {
   ready: '🟢',
   ocr_weak: '🟡',
   failed: '🔴',
+  auth_expired: '🔒',
   uploading: '⏳',
   uploaded: '🔵',
   extracting_text: '🔵',
@@ -1111,5 +1148,10 @@ async function _pollRagStatus(
     }
     if (doc.processing_status === 'failed') return;
     _pollRagStatus(el, courseId, docId, cacheKey, attempts);
-  } catch { /* ignore */ }
+  } catch (err: unknown) {
+    if (_isSessionExpiredError(err)) {
+      _blockRagForExpiredSession();
+      _setRagStatus(el, 'auth_expired');
+    }
+  }
 }
