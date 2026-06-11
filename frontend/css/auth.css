@@ -393,6 +393,9 @@
   gap: 1rem;
   font-size: 0.875rem;
 }
+.na-signin-row[hidden] {
+  display: none !important;
+}
 
 .na-stay {
   display: inline-flex;
@@ -683,4 +686,119 @@
   .na-form-col { padding: 1.5rem 1.25rem; }
   .na-brand { margin-bottom: 1.5rem; }
   .na-hero { margin-bottom: 1.5rem; }
+}
+
+/* Signup has one extra field plus the password-strength meter. On laptop
+   height viewports, keep the whole two-column card inside the auth frame
+   instead of letting the card spill below the viewport. */
+@media (min-width: 900px) and (max-height: 960px) {
+  #authModal.na-mode-signup {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  #authModal.na-mode-signup .na-card {
+    max-height: calc(100dvh - 28px);
+  }
+
+  #authModal.na-mode-signup .na-form-col {
+    padding-top: 1.35rem;
+    padding-bottom: 1.35rem;
+  }
+
+  #authModal.na-mode-signup .na-brand {
+    display: none;
+  }
+
+  #authModal.na-mode-signup .na-hero {
+    margin-bottom: 0.9rem;
+  }
+
+  #authModal.na-mode-signup .na-badge {
+    margin-bottom: 0.55rem;
+    padding: 0.32rem 0.75rem;
+  }
+
+  #authModal.na-mode-signup .na-heading {
+    font-size: 1.65rem;
+  }
+
+  #authModal.na-mode-signup .na-body {
+    margin-top: 0.5rem;
+    line-height: 1.45;
+  }
+
+  #authModal.na-mode-signup .na-form {
+    gap: 0.62rem;
+  }
+
+  #authModal.na-mode-signup .na-field-label {
+    margin-bottom: 0.38rem;
+  }
+
+  #authModal.na-mode-signup .na-input-wrap {
+    padding: 0.58rem 0.85rem;
+  }
+
+  #authModal.na-mode-signup .na-strength {
+    margin-top: 0.4rem;
+  }
+
+  #authModal.na-mode-signup .na-confirm-hint {
+    margin-top: 0.25rem;
+    min-height: 0.8em;
+  }
+
+  #authModal.na-mode-signup .na-submit,
+  #authModal.na-mode-signup .na-google {
+    padding-top: 0.72rem;
+    padding-bottom: 0.72rem;
+  }
+
+  #authModal.na-mode-signup .na-divider {
+    margin: 0.7rem 0;
+  }
+
+  #authModal.na-mode-signup .na-switch-row {
+    margin-top: 0.7rem;
+  }
+
+  #authModal.na-mode-signup .na-buddy {
+    padding: 1.2rem;
+  }
+
+  #authModal.na-mode-signup .na-buddy-inner {
+    gap: 0.75rem;
+  }
+
+  #authModal.na-mode-signup .na-owl-wrap {
+    margin-bottom: 0.55rem;
+  }
+
+  #authModal.na-mode-signup .na-owl-circle {
+    width: clamp(7.5rem, 17vh, 10.5rem);
+    height: clamp(7.5rem, 17vh, 10.5rem);
+  }
+
+  #authModal.na-mode-signup .na-owl-emoji {
+    font-size: clamp(2.6rem, 7vh, 3.6rem);
+  }
+
+  #authModal.na-mode-signup .na-buddy-title {
+    font-size: clamp(1.35rem, 2.6vh, 1.75rem);
+  }
+
+  #authModal.na-mode-signup .na-buddy-body {
+    margin-top: 0.5rem;
+    line-height: 1.45;
+  }
+
+  #authModal.na-mode-signup .na-mini-grid {
+    gap: 0.7rem;
+  }
+
+  #authModal.na-mode-signup .na-mini-card {
+    padding: 0.62rem 0.75rem;
+    border-radius: 0.95rem;
+  }
 }
