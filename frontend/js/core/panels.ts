@@ -44,6 +44,11 @@ export function showFilesView(stRunning?: boolean): void {
   if (stBtn) stBtn.style.display = 'flex';
   const stMini = document.getElementById('stMiniTimer');
   if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
+  // The PDF view has its own self-contained toolbar (back, filename, study,
+  // tabs, page controls). Hide the global topbar so it doesn't stack a second,
+  // redundant header above it.
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (topbar) topbar.style.display = 'none';
   _notifyDocRail('pdf');
 }
 
@@ -92,9 +97,14 @@ function _applyFileChrome(stRunning: boolean): void {
   if (stBtn) stBtn.style.display = 'flex';
   const stMini = document.getElementById('stMiniTimer');
   if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
+  // PDF view owns its toolbar — hide the global topbar to avoid a duplicate header.
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (topbar) topbar.style.display = 'none';
 }
 
 function _applyPortalChrome(): void {
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (topbar) topbar.style.display = '';
   const back = document.getElementById('goPortal');
   if (back) back.style.display = 'none';
   const title = document.getElementById('topTitle');
@@ -109,6 +119,8 @@ function _applyPortalChrome(): void {
 
 export function hideFilesView(): void {
   _notifyDocRail('other');
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (topbar) topbar.style.display = '';
   const ms = document.querySelector<HTMLElement>('#portal .main-scroll');
   if (ms) ms.style.display = '';
   const app = document.getElementById('app');
