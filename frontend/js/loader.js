@@ -403,6 +403,10 @@
         // On timeout we resolve (not reject) so the chain continues — downstream
         // code may run degraded, but the splash hides and the user can recover.
         const SCRIPT_TIMEOUT_MS = 10000;
+        // Scripts whose last load attempt errored/timed out. loadScript resolves
+        // either way (boot must not hang), so this set is how lazy-feature loading
+        // knows a "completed" chain actually has holes and must not be cached.
+        const failedScripts = new Set();
         function loadScript(src, readyKey, options) {
             return new Promise((resolve) => {
                 const opts = options || {};
@@ -417,10 +421,15 @@
                     settled = true;
                     clearTimeout(timer);
                     if (reason === 'load') {
+                        failedScripts.delete(src);
                         if (SS && readyKey)
                             SS.markReady(readyKey, { file: src });
                     }
                     else {
+                        // Drop the dead tag so a retry appends a fresh one that refetches.
+                        failedScripts.add(src);
+                        if (script.parentNode)
+                            script.parentNode.removeChild(script);
                         console.error('[loader] ' + reason + ': ' + src, err || '');
                         if (SS)
                             SS.emit('loader:script:' + reason, { file: src });
@@ -603,6 +612,9 @@
                     const link = document.createElement('link');
                     link.rel = 'stylesheet';
                     link.href = hrefWithVersion;
+                    // A failed link left in the DOM passes the `exists` check above
+                    // forever, so the feature's CSS would never be retried. Drop it.
+                    link.onerror = () => { link.remove(); };
                     document.head.appendChild(link);
                 }
                 function keepLightModeLast() {
@@ -621,7 +633,15 @@
                         return lazyPromises[name];
                     css.forEach(ensureStylesheet);
                     keepLightModeLast();
-                    lazyPromises[name] = srcs.reduce((p, src) => p.then(() => loadScript(src, 'lazy-' + name)), Promise.resolve());
+                    lazyPromises[name] = srcs
+                        .reduce((p, src) => p.then(() => loadScript(src, 'lazy-' + name)), Promise.resolve())
+                        .then(() => {
+                        // loadScript resolves even on error/timeout; if any script in
+                        // this feature failed, evict the cache so the next visit
+                        // retries instead of running the feature half-loaded forever.
+                        if (srcs.some((src) => failedScripts.has(src)))
+                            delete lazyPromises[name];
+                    });
                     return lazyPromises[name];
                 };
                 function loadPortalRoute(name) {
@@ -751,12 +771,15 @@
         const cached = loadedFeatureSections[section.id];
         if (cached)
             return cached;
-        const promise = _fetchTimeout(section.file, 10000)
-            .then((r) => {
+        const fetchOnce = () => _fetchTimeout(section.file, 10000).then((r) => {
             if (!r.ok)
                 throw new Error('HTTP ' + r.status + ' loading ' + section.file);
             return r.text();
-        })
+        });
+        const promise = fetchOnce()
+            // One immediate retry: a single DNS blip / slow first byte otherwise
+            // blanks the section (observed: settings.html AbortError on flaky DNS).
+            .catch(() => fetchOnce())
             .then((html) => {
             const target = document.getElementById(section.id);
             if (!target) {
@@ -769,6 +792,10 @@
         })
             .catch((err) => {
             console.error('Error loading ' + section.file + ':', err);
+            // Do NOT cache the failure — with it cached, every later visit to the
+            // section returned this settled promise and the page stayed blank for
+            // the rest of the session. Evict so the next navigation refetches.
+            delete loadedFeatureSections[section.id];
         });
         loadedFeatureSections[section.id] = promise;
         return promise;

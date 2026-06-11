@@ -16,7 +16,6 @@ import {
 import { routeStudyIntent } from '../ai-chat/intent-router.js';
 import type { DailyMissionPanelHandlers } from '../daily-mission/daily-mission-ui.js';
 import {
-  findPrimaryCourseId,
   generateDailyMission,
   getDailyMission,
   todayLocalDate as _studyServiceToday,
@@ -1057,6 +1056,53 @@ function ensureCheatsheetScripts(): Promise<void> {
   return w._csScriptsLoading;
 }
 
+/** All of the student's courses across every semester (id + display name). */
+function listAllCourses(): Array<{ id: string; name: string }> {
+  const w = window as unknown as {
+    SEMS?: Record<string, { courses?: Array<{ id?: string; name?: string; title?: string }> }>;
+  };
+  const all: Array<{ id: string; name: string }> = [];
+  Object.values(w.SEMS || {}).forEach((sem) => {
+    (sem?.courses || []).forEach((c) => {
+      if (c?.id) all.push({ id: c.id, name: String(c.name || c.title || '').trim() });
+    });
+  });
+  return all;
+}
+
+/** Resolve which course a study-intent message (cheatsheet/summary/notes…)
+ *  targets. Priority: a course NAME mentioned in the message → the course the
+ *  student has open right now → the only course that exists. Deliberately NOT
+ *  "first course of the semester" (the old findPrimaryCourseId fallback): with
+ *  several courses that silently generated from an arbitrary one the student
+ *  never asked for. Returns null when the choice is genuinely ambiguous so the
+ *  router's clarification question fires instead. */
+function resolveIntentCourse(messageText: string): {
+  courseId: string | null;
+  courseName: string | null;
+  allNames: string[];
+} {
+  const all = listAllCourses();
+  const allNames = all.map((c) => c.name).filter(Boolean);
+  const msg = (messageText || '').toLowerCase();
+  // Longest matching name wins ("Mechanik 2" over "Mechanik").
+  const named = all
+    .filter((c) => c.name.length >= 3 && msg.includes(c.name.toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  if (named) return { courseId: named.id, courseName: named.name, allNames };
+  const w = window as unknown as {
+    activeCourseId?: string | null;
+    activeCourseRef?: { id?: string; name?: string } | null;
+  };
+  const activeId = w.activeCourseRef?.id || w.activeCourseId || null;
+  if (activeId) {
+    const match = all.find((c) => c.id === activeId);
+    return { courseId: activeId, courseName: match?.name || w.activeCourseRef?.name || null, allNames };
+  }
+  if (all.length === 1 && all[0]) return { courseId: all[0].id, courseName: all[0].name, allNames };
+  return { courseId: null, courseName: null, allNames };
+}
+
 async function handleIntentRoute(
   state: ConversationState,
   bubble: HTMLElement | null,
@@ -1066,14 +1112,21 @@ async function handleIntentRoute(
   if (!last || last.role !== 'user' || !last.text) return null;
   if ((last.images && last.images.length) || (last.files && last.files.length)) return null;
 
-  const courseId = findPrimaryCourseId();
+  const resolvedCourse = resolveIntentCourse(last.text);
+  const courseId = resolvedCourse.courseId;
   const route = routeStudyIntent(last.text, courseId);
   if (!route) return null;
 
   if (route.needsClarification || !route.target.courseId) {
     if (thinking) await thinking.waitMinimum();
     thinking?.remove(true);
-    const text = 'Which course should I create this for? Open a course first, then ask again.';
+    const names = resolvedCourse.allNames.slice(0, 10);
+    const exampleName = names[0] || 'Course name';
+    const text = names.length
+      ? 'Which course should I use? You have:\n\n' +
+        names.map((n) => '• ' + n).join('\n') +
+        '\n\nAsk again with the course name — e.g. "make a cheatsheet for ' + exampleName + '".'
+      : 'Which course should I create this for? Open a course first, then ask again.';
     if (bubble) renderRichBubble(bubble, text);
     return { text };
   }
