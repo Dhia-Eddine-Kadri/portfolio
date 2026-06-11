@@ -1088,7 +1088,9 @@ export function initAskAI(
               ]);
               ready.then(() => {
                 _streamStartScheduled = false;
-                if (ansWrap || _finalized) return;
+                // signal.aborted: the user stopped the stream while the dots
+                // were still up — don't materialise a bubble for a dead answer.
+                if (ansWrap || _finalized || _streamController.signal.aborted) return;
                 if (!rawText) return;
                 ensureBubble();
                 paintStreaming();
