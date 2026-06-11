@@ -2911,12 +2911,22 @@
       });
     })();
 
-    // Stop polling when leaving chat section
+    // Stop polling when leaving chat section. Both pollers must be cleared:
+    // the 3s message poll (_chatPollTimer) AND the 90s presence poll
+    // (window._presencePollTimer). The presence poll used to be left running,
+    // so it kept hitting the network/DB every 90s forever on every other page.
+    // _chatInit() re-creates both on re-entry, so clearing here is safe.
     var _origShowPortalSectionForChat = window.showPortalSection;
     window.showPortalSection = function (sec) {
-      if (sec !== 'chat' && _chatPollTimer) {
-        clearInterval(_chatPollTimer);
-        _chatPollTimer = null;
+      if (sec !== 'chat') {
+        if (_chatPollTimer) {
+          clearInterval(_chatPollTimer);
+          _chatPollTimer = null;
+        }
+        if (window._presencePollTimer) {
+          clearInterval(window._presencePollTimer);
+          window._presencePollTimer = null;
+        }
       }
       if (typeof _origShowPortalSectionForChat === 'function') _origShowPortalSectionForChat(sec);
     };
