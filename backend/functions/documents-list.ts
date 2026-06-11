@@ -23,22 +23,33 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     'documents?user_id=eq.' + encodeURIComponent(user.id) +
     '&course_id=eq.' + encodeURIComponent(courseId);
   const order = '&order=created_at.desc';
-  const BASE_COLS =
+  // Columns guaranteed by the original documents table (migration
+  // 20260505_000001 rag_foundation + 20260506_000001 processing_error). Always
+  // present, so this is the last-resort fallback that never 400s on a stale DB.
+  const MINIMAL_COLS =
     'id,file_name,file_type,source_type,processing_status,processing_error,' +
-    'page_count,extraction_quality,ocr_assessment,document_type,created_at,updated_at';
+    'page_count,created_at,updated_at';
+  // Document classification fields (migrations 20260518_000004 / _000005).
+  const CLASSIFICATION_COLS = ',extraction_quality,ocr_assessment,document_type';
   // Document Understanding Layer fields (migration 20260610_000004).
   const UNDERSTANDING_COLS =
     ',document_type_confidence,user_document_type_override,document_understanding';
 
-  // Try with the understanding columns; if they don't exist yet (migration not
-  // applied) PostgREST 400s → body isn't an array → fall back to base columns so
-  // the file list never breaks.
+  // Progressive column fallback: try the richest set first, then drop the
+  // newest migration's columns each time they 400 (migration not applied yet),
+  // so a stale production DB degrades gracefully instead of failing the whole
+  // list. PostgREST 400s on an unknown column → body isn't an array → retry.
+  const selects = [
+    MINIMAL_COLS + CLASSIFICATION_COLS + UNDERSTANDING_COLS,
+    MINIMAL_COLS + CLASSIFICATION_COLS,
+    MINIMAL_COLS,
+  ];
   let result = await supaRequest<unknown[]>(
-    'GET', base + '&select=' + BASE_COLS + UNDERSTANDING_COLS + order, null, serviceKey
+    'GET', base + '&select=' + selects[0] + order, null, serviceKey
   );
-  if (!Array.isArray(result.body)) {
+  for (let i = 1; i < selects.length && !Array.isArray(result.body); i++) {
     result = await supaRequest<unknown[]>(
-      'GET', base + '&select=' + BASE_COLS + order, null, serviceKey
+      'GET', base + '&select=' + selects[i] + order, null, serviceKey
     );
   }
   if (!Array.isArray(result.body)) return fail(500, 'Failed to fetch documents');
