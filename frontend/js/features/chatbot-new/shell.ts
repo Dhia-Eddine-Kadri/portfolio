@@ -1010,21 +1010,30 @@ function ensureCheatsheetScripts(): Promise<void> {
   if (typeof w.openCheatsheetPaper === 'function') return Promise.resolve();
   if (w._csScriptsLoading) return w._csScriptsLoading;
 
+  // Cache-bust with the same assetVersion the loader uses — without it the
+  // browser keeps serving a stale cheatsheet.js/css from this unversioned URL.
+  const assetVersion = String(
+    (window as unknown as { MinalloConfig?: { assetVersion?: string } }).MinalloConfig
+      ?.assetVersion || '1'
+  );
+  const versioned = (src: string): string =>
+    src + (src.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(assetVersion);
+
   const loadScript = (src: string): Promise<void> =>
     new Promise((resolve, reject) => {
-      if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+      if (document.querySelector(`script[src^="${src}"]`)) { resolve(); return; }
       const s = document.createElement('script');
-      s.src = src;
+      s.src = versioned(src);
       s.onload = () => resolve();
       s.onerror = () => reject(new Error('Failed to load: ' + src));
       document.head.appendChild(s);
     });
 
   const loadStyle = (href: string): void => {
-    if (document.querySelector(`link[href="${href}"]`)) return;
+    if (document.querySelector(`link[href^="${href}"]`)) return;
     const l = document.createElement('link');
     l.rel = 'stylesheet';
-    l.href = href;
+    l.href = versioned(href);
     document.head.appendChild(l);
   };
 
@@ -1158,6 +1167,7 @@ async function handleIntentRoute(
     const sumLayout = buildLayoutSettings(chatSettings);
     const sumLsKey = 'minallo_sum_last_' + route.target.courseId;
     let sumPaperOpts: Record<string, unknown> | null = sumResult && sumResult.text ? {
+      kind: 'summary',
       course: route.target.courseId,
       title: sumResult.title || 'Summary',
       scope: sumResult.title || 'Course summary',
@@ -1190,6 +1200,7 @@ async function handleIntentRoute(
             { markdown: string; title: string; settings: Record<string, unknown> } | null;
           if (stored?.markdown) {
             sumPaperOpts = {
+              kind: 'summary',
               course: route.target.courseId,
               title: stored.title,
               scope: stored.title,
@@ -1255,6 +1266,7 @@ async function handleIntentRoute(
     // 4. Build opts and persist
     const csLayoutSettings = buildLayoutSettings(chatSettings, (result.settings && result.settings.style as string) || 'academic');
     let paperOpts: Record<string, unknown> | null = result && result.text ? {
+      kind: 'cheatsheet',
       course: route.target.courseId,
       title: result.title || 'Cheatsheet',
       scope: result.title || 'Course cheatsheet',
@@ -1293,6 +1305,7 @@ async function handleIntentRoute(
             // Async load — we return null here and the button retries via the click handler
             import('../../services/ai-service.js').then(svc => svc.getNoteById(noteId)).then(note => {
               if (note) paperOpts = {
+                kind: 'cheatsheet',
                 course: route.target.courseId,
                 title: note.title || stored?.title || 'Cheatsheet',
                 scope: note.title || 'Course cheatsheet',

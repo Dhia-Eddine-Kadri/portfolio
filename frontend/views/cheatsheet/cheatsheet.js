@@ -626,6 +626,11 @@
 
     // Re-enable drag-to-reorder on the freshly built columns/bands.
     _initSortables(paper);
+
+    // A re-pack destroys and rebuilds the page DOM: put the user's images back on
+    // their pages and restore the contentEditable state of the (reused) blocks.
+    _attachPaperImages(paper);
+    _applyEditable(paper);
   }
 
   // Re-pack on column/font/padding change or after a drag/break edit (geometry or
@@ -653,13 +658,14 @@
     }
   }
 
-  function _renderMarkdown(el, md, paper) {
+  function _renderMarkdown(el, md, paper, onDone) {
     var doRender = function () {
       el.innerHTML = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(md) : _esc(md);
       if (typeof window._renderMath === 'function') window._renderMath(el);
       if (typeof window._renderCode === 'function') window._renderCode(el);
       _decorate(el);
       if (paper) _paginatePaper(el);
+      if (typeof onDone === 'function') onDone();
     };
     _ensureRenderers().then(doRender).catch(doRender);
   }
@@ -813,6 +819,7 @@
           '<h3>' + _esc(res.title || 'Cheatsheet') + '</h3>' +
           (res.noteId ? '<span class="cs-saved">Saved to your notes</span>' : '') +
           '<button type="button" class="cs-btn cs-view-print" data-cs-view disabled>View / Print</button>' +
+          '<button type="button" class="cs-btn cs-sheet-edit" data-cs-edit disabled>✎ Edit</button>' +
         '</div>' +
         '<div class="cs-writing-line">Writing section 1 of ' + sections.length + '</div>' +
         '<div class="cs-sheet-body"></div>' +
@@ -825,8 +832,10 @@
     var body = els.result.querySelector('.cs-sheet-body');
     var line = els.result.querySelector('.cs-writing-line');
     var viewBtn = els.result.querySelector('[data-cs-view]');
+    var editBtn = els.result.querySelector('[data-cs-edit]');
     var after = els.result.querySelector('.cs-after');
     if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
+    _wireInlineEdit(els, res.noteId || null);
     (async function () {
       for (var i = 0; i < sections.length; i += 1) {
         if (runId !== _csRun || !body || !body.isConnected) return;
@@ -848,6 +857,7 @@
       if (line) line.textContent = _completionLabel(res);
       if (after) after.removeAttribute('hidden');
       if (viewBtn) viewBtn.disabled = false;
+      if (editBtn) editBtn.disabled = false;
       _bindSourceClicks(els.result);
     })();
   }
@@ -898,7 +908,7 @@
           useCORS: true,
           backgroundColor: '#ffffff',
           onclone: function (doc) {
-            Array.prototype.slice.call(doc.querySelectorAll('.cs-block-tools'))
+            Array.prototype.slice.call(doc.querySelectorAll('.cs-block-tools, .cs-img-del, .cs-img-resize'))
               .forEach(function (n) { n.parentNode && n.parentNode.removeChild(n); });
           },
         },
@@ -951,9 +961,178 @@
     });
   }
 
+  // ── Canvas edit mode: in-place text editing + (cheatsheet only) images ─────
+  // Edits live on the open canvas and flow into the downloaded PDF. Text edits
+  // mutate the section blocks themselves, so they survive every re-pack; images
+  // are kept in paper._csImages and re-attached after each layout rebuild.
+
+  // Toggle contentEditable on the section blocks + header. KaTeX formulas are
+  // pinned non-editable so a stray keystroke can't shred a rendered formula —
+  // they move/delete as one unit instead.
+  function _applyEditable(paper) {
+    if (!paper) return;
+    var on = !!paper._csEditing;
+    Array.prototype.slice.call(paper.querySelectorAll('.cs-block, .cs-paper-head'))
+      .forEach(function (el) {
+        if (on) el.setAttribute('contenteditable', 'true');
+        else el.removeAttribute('contenteditable');
+      });
+    Array.prototype.slice.call(paper.querySelectorAll('.katex'))
+      .forEach(function (el) {
+        if (on) el.setAttribute('contenteditable', 'false');
+        else el.removeAttribute('contenteditable');
+      });
+  }
+
+  function _setPaperEditing(ov, paper, on) {
+    if (!paper) return;
+    paper._csEditing = !!on;
+    paper.classList.toggle('is-editing', !!on);
+    _applyEditable(paper);
+    var imgBtn = ov.querySelector('[data-act="img"]');
+    if (imgBtn) imgBtn.hidden = !on;
+    var editBtn = ov.querySelector('[data-act="edit"]');
+    if (editBtn) {
+      editBtn.textContent = on ? '✓ Done' : '✎ Edit';
+      editBtn.classList.toggle('is-on', !!on);
+    }
+    var hint = ov.querySelector('.cs-paper-hint');
+    if (hint) {
+      hint.textContent = on
+        ? 'Editing: click any text to change it' + (imgBtn ? ' · 🖼 Image adds a picture (drag to move, corner to resize)' : '')
+        : 'Edit: drag ⠿ to move · ⤓ break = new page';
+    }
+    // Leaving edit mode: edited text changed block heights → re-measure + re-pack.
+    if (!on) _repaginate(paper);
+  }
+
+  // Which page is in the middle of the viewport (new images land there).
+  function _visiblePageIndex(ov, paper) {
+    var scroll = ov.querySelector('.cs-paper-scroll');
+    var pages = paper.querySelectorAll('.cs-page');
+    if (!scroll || !pages.length) return 0;
+    var rect = scroll.getBoundingClientRect();
+    var mid = rect.top + rect.height / 2;
+    for (var i = 0; i < pages.length; i++) {
+      var r = pages[i].getBoundingClientRect();
+      if (r.top <= mid && r.bottom >= mid) return i;
+    }
+    return 0;
+  }
+
+  function _wirePaperImage(paper, im, fig, page) {
+    function apply() {
+      var pw = page.clientWidth, ph = page.clientHeight;
+      im.w = Math.max(36, Math.min(im.w, pw));
+      fig.style.width = im.w + 'px';
+      var fw = fig.offsetWidth, fh = fig.offsetHeight;
+      im.x = Math.max(0, Math.min(im.x, pw - Math.min(fw, pw)));
+      im.y = Math.max(0, Math.min(im.y, ph - Math.min(fh, ph)));
+      fig.style.left = im.x + 'px';
+      fig.style.top = im.y + 'px';
+    }
+    fig.addEventListener('pointerdown', function (e) {
+      if (!paper._csEditing) return;
+      if (e.target.closest('.cs-img-del')) return;
+      var isResize = !!e.target.closest('.cs-img-resize');
+      e.preventDefault();
+      e.stopPropagation();
+      var sx = e.clientX, sy = e.clientY;
+      var ox = im.x, oy = im.y, ow = im.w;
+      try { fig.setPointerCapture(e.pointerId); } catch (err) {}
+      fig.classList.add('is-active');
+      function move(ev) {
+        if (isResize) {
+          im.w = ow + (ev.clientX - sx);
+        } else {
+          im.x = ox + (ev.clientX - sx);
+          im.y = oy + (ev.clientY - sy);
+        }
+        apply();
+      }
+      function up(ev) {
+        fig.removeEventListener('pointermove', move);
+        fig.removeEventListener('pointerup', up);
+        fig.removeEventListener('pointercancel', up);
+        fig.classList.remove('is-active');
+        try { fig.releasePointerCapture(ev.pointerId); } catch (err) {}
+      }
+      fig.addEventListener('pointermove', move);
+      fig.addEventListener('pointerup', up);
+      fig.addEventListener('pointercancel', up);
+    });
+    var del = fig.querySelector('.cs-img-del');
+    if (del) del.addEventListener('click', function (e) {
+      e.stopPropagation();
+      paper._csImages = (paper._csImages || []).filter(function (x) { return x !== im; });
+      fig.remove();
+    });
+    apply();
+  }
+
+  // (Re)build the DOM for every stored image on its page. Safe to call after any
+  // re-pack: old elements are dropped with the old pages and recreated here.
+  function _attachPaperImages(paper) {
+    var imgs = paper && paper._csImages;
+    if (!imgs || !imgs.length) return;
+    var pages = paper.querySelectorAll('.cs-page');
+    if (!pages.length) return;
+    imgs.forEach(function (im) {
+      if (im.el && im.el.parentNode) im.el.parentNode.removeChild(im.el);
+      im.page = Math.min(im.page || 0, pages.length - 1);
+      var page = pages[im.page];
+      var fig = document.createElement('div');
+      fig.className = 'cs-img';
+      fig.setAttribute('contenteditable', 'false');
+      fig.style.left = im.x + 'px';
+      fig.style.top = im.y + 'px';
+      fig.style.width = im.w + 'px';
+      fig.innerHTML =
+        '<img src="' + im.src + '" alt="" draggable="false">' +
+        '<button type="button" class="cs-img-del" title="Remove image">×</button>' +
+        '<span class="cs-img-resize" title="Drag to resize"></span>';
+      page.appendChild(fig);
+      im.el = fig;
+      _wirePaperImage(paper, im, fig, page);
+    });
+  }
+
+  function _addPaperImage(ov, paper, file) {
+    if (!file || !/^image\//.test(file.type || '')) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var src = String(reader.result || '');
+      if (!src) return;
+      var probe = new Image();
+      probe.onload = function () {
+        var pages = paper.querySelectorAll('.cs-page');
+        if (!pages.length) {
+          if (window.showToast) window.showToast('Images unavailable', 'The paged view is required to place images.');
+          return;
+        }
+        paper._csImages = paper._csImages || [];
+        // Stagger drop position slightly so stacked inserts stay visible.
+        var n = paper._csImages.length;
+        paper._csImages.push({
+          src: src,
+          page: _visiblePageIndex(ov, paper),
+          x: 60 + (n % 5) * 24,
+          y: 60 + (n % 5) * 24,
+          w: Math.min(260, probe.naturalWidth || 260),
+        });
+        _attachPaperImages(paper);
+      };
+      probe.src = src;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function _openPaper(opts) {
     opts = opts || {};
     _closePaper();
+    // Images are a cheatsheet-only canvas feature; a summary opened in the same
+    // paper view still gets in-place text editing, but no image button.
+    var kind = opts.kind || 'cheatsheet';
     var ov = document.createElement('div');
     ov.className = 'cs-paper-overlay ss-print-root';
     ov.innerHTML =
@@ -964,11 +1143,20 @@
           '<select class="cs-paper-select" data-act="columns" title="Change columns"><option value="2">2 cols</option><option value="3">3 cols</option><option value="4">4 cols</option></select>' +
           '<select class="cs-paper-select" data-act="pad" title="Change page padding"><option value="6mm">Tight</option><option value="10mm">Normal</option><option value="16mm">Wide</option></select>' +
           '<select class="cs-paper-select" data-act="font" title="Change font size"><option value="0.72rem">Small</option><option value="0.78rem">Medium</option><option value="0.86rem">Large</option></select>' +
+          '<button type="button" class="cs-paper-btn" data-act="edit" title="Edit the text directly on the sheet">✎ Edit</button>' +
+          (kind === 'cheatsheet'
+            ? '<button type="button" class="cs-paper-btn" data-act="img" hidden title="Add a picture to the sheet">🖼 Image</button>' +
+              '<input type="file" accept="image/*" data-cs-img-input hidden>'
+            : '') +
           '<button type="button" class="cs-paper-btn" data-act="download">⤓ Download PDF</button>' +
           '<button type="button" class="cs-paper-btn cs-paper-close" data-act="close">Close</button>' +
         '</div>' +
       '</div>' +
       '<div class="cs-paper-scroll">' +
+        '<div class="cs-paper-veil" data-cs-veil>' +
+          '<div class="cs-paper-veil-spinner" aria-hidden="true"></div>' +
+          '<div>Preparing your sheet…</div>' +
+        '</div>' +
         '<article class="cs-paper">' +
           '<header class="cs-paper-head">' +
             '<h1>' + _esc(opts.course || 'Cheatsheet') + '</h1>' +
@@ -1013,12 +1201,47 @@
       _repaginate(paper);  // padding changed → inner height changed → re-pack
     });
     var body = ov.querySelector('.cs-paper-body');
-    if (body) _renderMarkdown(body, opts.markdown || '', true);
+    var veil = ov.querySelector('[data-cs-veil]');
+    // Open INSTANTLY: paint the overlay (with a loading veil) first, then run the
+    // heavy synchronous KaTeX + pagination work on a later frame. Rendering
+    // inline here blocked the click handler, so the whole page froze before the
+    // overlay ever appeared.
+    if (body) {
+      requestAnimationFrame(function () {
+        setTimeout(function () {
+          _renderMarkdown(body, opts.markdown || '', true, function () {
+            if (veil) { veil.remove(); veil = null; }
+          });
+        }, 30);
+      });
+    } else if (veil) {
+      veil.remove();
+      veil = null;
+    }
     ov.querySelector('[data-act="close"]').addEventListener('click', _closePaper);
+    var editBtn = ov.querySelector('[data-act="edit"]');
+    if (editBtn) editBtn.addEventListener('click', function () {
+      _setPaperEditing(ov, paper, !(paper && paper._csEditing));
+    });
+    var imgBtn = ov.querySelector('[data-act="img"]');
+    var imgInput = ov.querySelector('[data-cs-img-input]');
+    if (imgBtn && imgInput) {
+      imgBtn.addEventListener('click', function () { imgInput.click(); });
+      imgInput.addEventListener('change', function () {
+        var f = imgInput.files && imgInput.files[0];
+        if (f && paper) _addPaperImage(ov, paper, f);
+        imgInput.value = '';
+      });
+    }
     _wireDownload(
       ov.querySelector('[data-act="download"]'),
-      function () { return ov.querySelector('.cs-paper'); },
-      _safeName((opts.course || 'cheatsheet') + ' cheatsheet') + '.pdf'
+      function () {
+        var p = ov.querySelector('.cs-paper');
+        // Mid-edit download: re-measure the edited text so nothing overflows a page.
+        if (p && p._csEditing) _repaginate(p);
+        return p;
+      },
+      _safeName((opts.course || 'cheatsheet') + ' ' + kind) + '.pdf'
     );
     _paperEsc = function (e) { if (e.key === 'Escape') _closePaper(); };
     document.addEventListener('keydown', _paperEsc);
@@ -1055,6 +1278,60 @@
     });
   }
 
+  // ── Durable editing: edit the cheatsheet markdown and save it to the note ──
+  // The canvas edit mode is visual (layout/images for the PDF); this editor
+  // changes the stored content itself, so the edits persist and feed every
+  // later render (inline sheet, canvas, PDF).
+  function _wireInlineEdit(els, noteId) {
+    var sheet = els.result.querySelector('.cs-sheet');
+    var btn = sheet && sheet.querySelector('[data-cs-edit]');
+    var body = sheet && sheet.querySelector('.cs-sheet-body');
+    if (!btn || !body) return;
+    btn.addEventListener('click', function () {
+      if (sheet.querySelector('.cs-md-edit')) return;
+      var md = (els._paper && els._paper.markdown) || '';
+      var wrap = document.createElement('div');
+      wrap.className = 'cs-md-edit';
+      wrap.innerHTML =
+        '<textarea class="cs-md-ta" spellcheck="false" placeholder="Cheatsheet markdown…"></textarea>' +
+        '<div class="cs-md-actions">' +
+          '<button type="button" class="cs-btn cs-btn-primary cs-md-save">Save changes</button>' +
+          '<button type="button" class="cs-btn cs-md-cancel">Cancel</button>' +
+          '<span class="cs-md-status"></span>' +
+        '</div>';
+      wrap.querySelector('.cs-md-ta').value = md;
+      body.style.display = 'none';
+      body.parentNode.insertBefore(wrap, body);
+      btn.disabled = true;
+      var status = wrap.querySelector('.cs-md-status');
+      function closeEditor() {
+        wrap.remove();
+        body.style.display = '';
+        btn.disabled = false;
+      }
+      wrap.querySelector('.cs-md-cancel').addEventListener('click', closeEditor);
+      wrap.querySelector('.cs-md-save').addEventListener('click', function () {
+        var newMd = wrap.querySelector('.cs-md-ta').value;
+        status.textContent = 'Saving…';
+        _aiService()
+          .then(function (svc) {
+            // No note id (unsaved result) → keep the edit locally; it still
+            // drives the canvas + PDF for this session.
+            return noteId && typeof svc.updateNote === 'function'
+              ? svc.updateNote(noteId, { content_markdown: newMd })
+              : true;
+          })
+          .then(function (ok) {
+            if (noteId && !ok) { status.textContent = 'Save failed — please try again.'; return; }
+            if (els._paper) els._paper.markdown = newMd;
+            closeEditor();
+            _renderMarkdown(body, newMd);
+          })
+          .catch(function () { status.textContent = 'Save failed — please try again.'; });
+      });
+    });
+  }
+
   function _renderResult(els, res) {
     if (!res || res.error) {
       els.result.innerHTML =
@@ -1084,6 +1361,7 @@
           '<h3>' + _esc(res.title || 'Cheatsheet') + '</h3>' +
           (res.noteId ? '<span class="cs-saved">Saved to your notes</span>' : '') +
           '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button>' +
+          '<button type="button" class="cs-btn cs-sheet-edit" data-cs-edit>✎ Edit</button>' +
         '</div>' +
         '<div class="cs-sheet-body"></div>' +
         (res.citationWarning ? '<div class="cs-cite-warn">' + _esc(res.citationWarning) + '</div>' : '') +
@@ -1094,6 +1372,7 @@
     if (body) _renderMarkdown(body, res.text);
     var viewBtn = els.result.querySelector('[data-cs-view]');
     if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
+    _wireInlineEdit(els, res.noteId || null);
     _bindSourceClicks(els.result);
   }
 
@@ -1120,12 +1399,14 @@
       };
       els.result.innerHTML =
         '<div class="cs-sheet"><div class="cs-sheet-head"><h3>' + _esc(note.title || 'Cheatsheet') + '</h3>' +
-        '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button></div>' +
+        '<button type="button" class="cs-btn cs-view-print" data-cs-view>View / Print</button>' +
+        '<button type="button" class="cs-btn cs-sheet-edit" data-cs-edit>✎ Edit</button></div>' +
         '<div class="cs-sheet-body"></div></div>';
       var body = els.result.querySelector('.cs-sheet-body');
       if (body) _renderMarkdown(body, note.content_markdown || '');
       var viewBtn = els.result.querySelector('[data-cs-view]');
       if (viewBtn) viewBtn.addEventListener('click', function () { _openPaper(els._paper); });
+      _wireInlineEdit(els, note.id || id);
     }).catch(function () {
       els.result.innerHTML = '<div class="cs-msg cs-error">Could not load this cheatsheet.</div>';
     });

@@ -671,6 +671,21 @@ export async function getNoteById(
   return data.note || null;
 }
 
+/** Update a saved note's title/markdown (cheatsheet editor, etc.). */
+export async function updateNote(
+  id: string,
+  patch: { title?: string; content_markdown?: string }
+): Promise<boolean> {
+  const response = await fetch(_backendUrl() + '/api/notes?id=' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: _authJsonHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (response.status === 401) _throwSessionExpired();
+  if (response.ok) _courseNotesCache.clear();
+  return response.ok;
+}
+
 /** Delete a saved note by id. */
 export async function deleteNote(id: string): Promise<boolean> {
   const response = await fetch(_backendUrl() + '/api/notes?id=' + encodeURIComponent(id), {

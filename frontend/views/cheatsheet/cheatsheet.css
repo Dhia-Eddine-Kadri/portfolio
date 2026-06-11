@@ -164,6 +164,39 @@
   font-size: 0.82rem;
 }
 .cs-view-print:hover { background: rgba(255, 255, 255, 0.07); }
+/* "✎ Edit" sits next to View / Print and opens the markdown editor. */
+.cs-sheet-edit {
+  background: transparent;
+  border: 1px solid var(--border, #334155);
+  color: var(--text, #e2e8f0);
+  padding: 5px 12px;
+  font-size: 0.82rem;
+}
+.cs-sheet-edit:hover { background: rgba(255, 255, 255, 0.07); }
+.cs-sheet-edit:disabled { opacity: 0.45; cursor: default; }
+
+/* Inline markdown editor (durable edits saved back to the note) */
+.cs-md-edit { display: grid; gap: 10px; }
+.cs-md-ta {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--cs-line, #334155);
+  background: var(--cs-nested, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.cs-md-actions { display: flex; gap: 8px; align-items: center; }
+.cs-md-cancel {
+  background: transparent;
+  border: 1px solid var(--cs-line, #334155);
+  color: var(--text, #e2e8f0);
+}
+.cs-md-cancel:hover { background: rgba(255, 255, 255, 0.07); }
+.cs-md-status { font-size: 0.8rem; opacity: 0.8; }
 .cs-sheet-head { display: flex; align-items: center; gap: 10px; }
 
 .cs-progress-section,
@@ -232,8 +265,32 @@
   font-size: 0.8rem;
 }
 .cs-paper-btn:hover { background: #334155; }
+.cs-paper-btn.is-on { background: #6366f1; border-color: #6366f1; color: #fff; }
 .cs-paper-close { background: transparent; }
 .cs-paper-scroll { flex: 1 1 auto; overflow: auto; padding: 22px; }
+
+/* Instant-open loading veil: the overlay paints immediately; the heavy KaTeX +
+   pagination work runs on a later frame behind this. transform-based spin so the
+   compositor keeps it animating even while the main thread is busy. */
+.cs-paper-veil {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 55vh;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+.cs-paper-veil-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #818cf8;
+  animation: csSpin 0.8s linear infinite;
+}
+@keyframes csSpin { to { transform: rotate(360deg); } }
 
 .cs-paper {
   width: 297mm;
@@ -349,6 +406,55 @@
 .cs-paper.is-exporting .cs-block-tools { display: none !important; }
 .cs-paper.is-exporting .cs-block.cs-break-before { box-shadow: none; }
 @media print { .cs-block-tools { display: none !important; } }
+
+/* ── Canvas edit mode: in-place text + (cheatsheet) images ─────────────────── */
+.cs-page { position: relative; }
+.cs-paper.is-editing [contenteditable='true'] { border-radius: 3px; }
+.cs-paper.is-editing [contenteditable='true']:hover { outline: 1px dashed #c7d2fe; outline-offset: 2px; }
+.cs-paper.is-editing [contenteditable='true']:focus { outline: 1.5px solid #6366f1; outline-offset: 2px; }
+/* User-placed images: absolutely positioned on their page; interactive only in
+   edit mode. Handles are stripped from the exported PDF (onclone + is-exporting). */
+.cs-img { position: absolute; z-index: 5; line-height: 0; }
+.cs-img img { width: 100%; height: auto; display: block; }
+.cs-paper.is-editing .cs-img { cursor: move; outline: 1px dashed #94a3b8; touch-action: none; }
+.cs-paper.is-editing .cs-img:hover,
+.cs-paper.is-editing .cs-img.is-active { outline: 1.5px solid #6366f1; }
+.cs-img-del {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+}
+.cs-img-del:hover { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+.cs-img-resize {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid #6366f1;
+  background: #fff;
+  cursor: nwse-resize;
+  display: none;
+}
+.cs-paper.is-editing .cs-img-del,
+.cs-paper.is-editing .cs-img-resize { display: block; }
+.cs-paper.is-exporting .cs-img-del,
+.cs-paper.is-exporting .cs-img-resize { display: none !important; }
+.cs-paper.is-exporting .cs-img { outline: none !important; }
+.cs-paper.is-exporting [contenteditable='true'] { outline: none !important; }
+@media print { .cs-img-del, .cs-img-resize { display: none !important; } }
 /* A run of normal blocks → a multi-column band; the columns are exact equal
    widths (flex: 1 + min-width: 0) so nothing overflows the page. */
 .cs-cols { display: flex; align-items: flex-start; margin-bottom: 12px; }
@@ -848,6 +954,9 @@ body:not(.night) .cs-topic,
 body:not(.night) .cs-opt select,
 body:not(.night) .cs-preset,
 body:not(.night) .cs-view-print,
+body:not(.night) .cs-sheet-edit,
+body:not(.night) .cs-md-ta,
+body:not(.night) .cs-md-cancel,
 body:not(.night) .cs-saved-open,
 body:not(.night) .cs-section-tools button,
 body:not(.night) .cs-sp-folder,
@@ -862,6 +971,8 @@ body:not(.night) .cs-sp-folder-action {
 
 body:not(.night) .cs-preset:hover,
 body:not(.night) .cs-view-print:hover,
+body:not(.night) .cs-sheet-edit:hover,
+body:not(.night) .cs-md-cancel:hover,
 body:not(.night) .cs-saved-open:hover,
 body:not(.night) .cs-section-tools button:hover,
 body:not(.night) .cs-sp-item:hover,
