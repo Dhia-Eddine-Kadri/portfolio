@@ -535,6 +535,18 @@ interface MissionMarker {
   date: string; // YYYY-MM-DD local date at creation time
 }
 
+/** A cheatsheet/summary generated in this chat. The full markdown rides on the
+ *  assistant message so follow-up questions ("explain the cheatsheet you just
+ *  created") can hand the content back to the model — the visible reply only
+ *  says "Your cheatsheet is ready", which gives the AI nothing to explain. */
+interface GeneratedDoc {
+  kind: 'cheatsheet' | 'summary';
+  title: string;
+  markdown: string;
+  courseId: string;
+  noteId?: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
@@ -548,6 +560,8 @@ interface ChatMessage {
   /** Lightweight marker stored instead of the serialised mission HTML.
    *  On history replay the mission panel is re-fetched and re-rendered fresh. */
   missionMarker?: MissionMarker;
+  /** Set on the "Your cheatsheet/summary is ready" assistant reply. */
+  generatedDoc?: GeneratedDoc;
 }
 
 interface ConversationState {
@@ -782,6 +796,7 @@ async function streamAiReply(
     if (routed) {
       const msg: ChatMessage = { role: 'assistant', text: routed.text };
       if (routed.missionMarker) msg.missionMarker = routed.missionMarker;
+      if (routed.generatedDoc) msg.generatedDoc = routed.generatedDoc;
       state.messages.push(msg);
       setBubbleSubtitle(aiRow, 'course_files');
       touchActiveChat();
@@ -801,7 +816,11 @@ async function streamAiReply(
         .slice(0, -1)
         .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.text)
         .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.text }));
-      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames);
+      // A cheatsheet/summary generated earlier in this chat rides along as
+      // openFileContext — the backend truncates history turns to ~1.2k chars,
+      // so the doc would never survive inside previousTurns.
+      const followUpDoc = generatedDocForFollowUp(state.messages);
+      const streamed = await streamFromAskStream(rag.question, rag.courseId, bubble, controller, priorTurns, thinking, rag.documentIds, rag.documentNames, followUpDoc);
       raw = streamed.text;
       state.messages.push({
         role: 'assistant',
@@ -877,7 +896,7 @@ async function streamAiReply(
   }
 }
 
-type IntentRouteResult = { text: string; missionMarker?: MissionMarker };
+type IntentRouteResult = { text: string; missionMarker?: MissionMarker; generatedDoc?: GeneratedDoc };
 
 // ── PDF settings card (shared by cheatsheet + summary) ───────────────────────
 
@@ -1316,6 +1335,15 @@ async function handleIntentRoute(
       } catch { /* storage full — non-fatal */ }
     }
 
+    const sumGeneratedDoc: GeneratedDoc | undefined = sumResult && sumResult.text
+      ? {
+          kind: 'summary',
+          title: sumResult.title || 'Summary',
+          markdown: sumResult.text,
+          courseId: route.target.courseId,
+        }
+      : undefined;
+
     const sumText = sumPaperOpts
       ? 'Your summary is ready. Click **⤓ Open PDF viewer** below to view and download it.'
       : 'No summary could be generated from your course sources. Please try again.';
@@ -1343,7 +1371,7 @@ async function handleIntentRoute(
         return sumPaperOpts;
       });
     }
-    return { text: sumText };
+    return sumGeneratedDoc ? { text: sumText, generatedDoc: sumGeneratedDoc } : { text: sumText };
   }
 
   // ── cheatsheet ────────────────────────────────────────────────────────────
@@ -1458,6 +1486,18 @@ async function handleIntentRoute(
       });
     }
 
+    if (result && result.text) {
+      return {
+        text,
+        generatedDoc: {
+          kind: 'cheatsheet',
+          title: result.title || 'Cheatsheet',
+          markdown: result.text,
+          courseId: route.target.courseId,
+          noteId: result.noteId || undefined,
+        },
+      };
+    }
     return { text };
   }
 
@@ -1922,6 +1962,43 @@ function chatbotThinkingContext(state: ConversationState): ReturnType<typeof get
 // ── Phase 12 wiring helpers ─────────────────────────────────────────────────
 
 
+// Matches /ask-stream's openFileContext cap (_MAX_STREAM_OPEN_FILE_CTX_CHARS)
+// so a long cheatsheet never 400s the request.
+const NCB_GENERATED_DOC_CONTEXT_CHARS = 20000;
+
+// "explain the cheatsheet", "translate that summary", "what's in the pdf you
+// made" — EN + DE forms. Used only when the doc is NOT the reply the user is
+// directly responding to, so unrelated later questions don't drag a 20k-char
+// document into every prompt.
+const GENERATED_DOC_REF_RE =
+  /\b(cheat\s*-?\s*sheets?|spickzettel|formelsammlung|formula sheets?|summar(y|ies)|zusammenfassung(en)?|pdf|(that|the|this|das|die) (file|document|doc|sheet|datei|dokument)|(you|du) (just )?(made|created|generated|erstellt|generiert))\b/i;
+
+/** The generated doc the latest user message is asking about, if any.
+ *  Always returns the doc when the user is replying directly to the
+ *  "Your cheatsheet is ready" turn; otherwise only on an explicit mention. */
+function generatedDocForFollowUp(messages: ChatMessage[]): GeneratedDoc | null {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user' || !last.text) return null;
+  let doc: GeneratedDoc | null = null;
+  let docIdx = -1;
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role === 'assistant' && m.generatedDoc?.markdown) {
+      doc = m.generatedDoc;
+      docIdx = i;
+      break;
+    }
+  }
+  if (!doc) return null;
+  if (docIdx === messages.length - 2) return doc;
+  return GENERATED_DOC_REF_RE.test(last.text) ? doc : null;
+}
+
+function generatedDocLabel(doc: GeneratedDoc): string {
+  const kind = doc.kind === 'summary' ? 'Summary' : 'Cheatsheet';
+  return doc.title && doc.title !== kind ? kind + ' — ' + doc.title : kind;
+}
+
 /** Decide whether the latest user turn should go through RAG (`/ask-stream`)
  * or the generic chat endpoint. Returns the resolved RAG payload when
  * eligible, else null. */
@@ -1989,7 +2066,8 @@ async function streamFromAskStream(
   previousTurns: Array<{ role: 'user' | 'assistant'; text: string }> = [],
   thinking?: AIThinkingStatus | null,
   documentIds: string[] = [],
-  documentNames: string[] = []
+  documentNames: string[] = [],
+  generatedDoc: GeneratedDoc | null = null
 ): Promise<{ text: string; meta: Record<string, unknown> | null }> {
   const aiHost = ((window as unknown as { AI_SERVICE_URL?: string }).AI_SERVICE_URL || '').replace(/\/$/, '');
   if (!aiHost) {
@@ -2016,6 +2094,14 @@ async function streamFromAskStream(
       // Both omitted for "All files" (whole-course search).
       ...(documentIds.length ? { documentIds } : {}),
       ...(documentNames.length ? { documentNames } : {}),
+      // The cheatsheet/summary this chat generated, when the question is about
+      // it. openFileContext is the backend's "text the student is looking at"
+      // channel — retrieval can't surface a generated doc (it's a note, not an
+      // indexed course file), so it's handed over verbatim.
+      ...(generatedDoc ? {
+        activeFileName: generatedDocLabel(generatedDoc),
+        openFileContext: generatedDoc.markdown.slice(0, NCB_GENERATED_DOC_CONTEXT_CHARS),
+      } : {}),
     }),
   });
   if (!resp.ok || !resp.body || !resp.body.getReader) {
@@ -2569,9 +2655,22 @@ function buildApiMessages(
   for (let i = trimmed.length - 1; i >= 0; i--) {
     if (trimmed[i]!.role === 'user') { lastUserIdx = i; break; }
   }
+  // A cheatsheet/summary generated earlier in this chat that the latest user
+  // message refers to — injected like an attached document so the model can
+  // actually see what it "created" (the visible reply only says it's ready).
+  const followUpDoc = generatedDocForFollowUp(trimmed);
   return trimmed.map((m, idx) => {
     if (m.role === 'assistant') return { role: 'assistant', content: m.text };
     const blocks: Array<unknown> = [];
+    if (idx === lastUserIdx && followUpDoc) {
+      blocks.push({
+        type: 'text',
+        text:
+          '<document filename="' + generatedDocLabel(followUpDoc) + '" source="minallo-generated-' + followUpDoc.kind + '">\n' +
+          followUpDoc.markdown.slice(0, NCB_GENERATED_DOC_CONTEXT_CHARS) +
+          '\n</document>',
+      });
+    }
     // Prepend attached course-file docs into the most recent user message.
     if (idx === lastUserIdx && folderDocs.length) {
       folderDocs.forEach((d) => {
@@ -3890,6 +3989,18 @@ function compactMessageForStorage(m: ChatMessage): ChatMessage {
     // Preserve the mission marker verbatim — it's tiny and must survive
     // the storage round-trip so appendStoredMessage can re-fetch the cards.
     if (m.missionMarker) compact.missionMarker = m.missionMarker;
+    // Keep the generated cheatsheet/summary so "explain the cheatsheet you
+    // just created" still works after a page refresh. Capped at the same
+    // length the model would receive anyway.
+    if (m.generatedDoc?.markdown) {
+      compact.generatedDoc = {
+        kind: m.generatedDoc.kind,
+        title: m.generatedDoc.title,
+        markdown: m.generatedDoc.markdown.slice(0, NCB_GENERATED_DOC_CONTEXT_CHARS),
+        courseId: m.generatedDoc.courseId,
+        noteId: m.generatedDoc.noteId,
+      };
+    }
   }
   return compact;
 }
