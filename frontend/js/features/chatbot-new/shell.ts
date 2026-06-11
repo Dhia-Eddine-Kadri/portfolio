@@ -1103,6 +1103,47 @@ function resolveIntentCourse(messageText: string): {
   return { courseId: null, courseName: null, allNames };
 }
 
+/** Inline course chooser for study intents (cheatsheet/summary/notes/mission).
+ *  Rendered into the answer bubble as buttons; the awaiting intent flow
+ *  continues with the clicked course — same interaction model as
+ *  showPdfSettingsCard. Includes a Cancel action that resolves null. */
+function showCoursePickCard(
+  bubble: HTMLElement,
+  intent: string,
+  courses: Array<{ id: string; name: string }>
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const card = document.createElement('div');
+    card.className = 'ncb-cs-settings ncb-course-pick';
+    card.innerHTML =
+      '<div class="ncb-cs-settings-title">Which course should I use for your ' +
+        escapeHtml(intent.replace(/_/g, ' ')) + '?</div>' +
+      '<div class="ncb-course-pick-list">' +
+        courses.slice(0, 12).map((c) =>
+          '<button type="button" class="ncb-cs-opt ncb-course-pick-btn" data-course-id="' +
+          escapeAttr(c.id) + '">' + escapeHtml(c.name) + '</button>'
+        ).join('') +
+      '</div>' +
+      '<div class="ncb-cs-settings-footer">' +
+        '<button type="button" class="ncb-cs-opt ncb-course-pick-cancel">Cancel</button>' +
+      '</div>';
+    card.addEventListener('click', (e) => {
+      const cancel = (e.target as Element).closest('.ncb-course-pick-cancel');
+      if (cancel) {
+        card.remove();
+        resolve(null);
+        return;
+      }
+      const btn = (e.target as Element).closest<HTMLButtonElement>('.ncb-course-pick-btn');
+      if (!btn) return;
+      card.remove();
+      resolve(btn.dataset.courseId || null);
+    });
+    bubble.innerHTML = '';
+    bubble.appendChild(card);
+  });
+}
+
 async function handleIntentRoute(
   state: ConversationState,
   bubble: HTMLElement | null,
@@ -1120,15 +1161,21 @@ async function handleIntentRoute(
   if (route.needsClarification || !route.target.courseId) {
     if (thinking) await thinking.waitMinimum();
     thinking?.remove(true);
-    const names = resolvedCourse.allNames.slice(0, 10);
-    const exampleName = names[0] || 'Course name';
-    const text = names.length
-      ? 'Which course should I use? You have:\n\n' +
-        names.map((n) => '• ' + n).join('\n') +
-        '\n\nAsk again with the course name — e.g. "make a cheatsheet for ' + exampleName + '".'
-      : 'Which course should I create this for? Open a course first, then ask again.';
-    if (bubble) renderRichBubble(bubble, text);
-    return { text };
+    const courses = listAllCourses().filter((c) => c.name);
+    if (!bubble || !courses.length) {
+      const text = 'Which course should I create this for? Open a course first, then ask again.';
+      if (bubble) renderRichBubble(bubble, text);
+      return { text };
+    }
+    // Inline chooser: the intent flow awaits the click and continues in this
+    // same turn — no "type your question again" round-trip.
+    const pickedCourseId = await showCoursePickCard(bubble, route.intent, courses);
+    if (!pickedCourseId) {
+      const text = 'Cancelled.';
+      renderRichBubble(bubble, text);
+      return { text };
+    }
+    route.target.courseId = pickedCourseId;
   }
 
   if (route.intent === 'daily_mission') {
@@ -2429,16 +2476,18 @@ function typeIntoBubble(
 }
 
 function setSendBtnMode(btn: HTMLButtonElement, mode: 'send' | 'pause'): void {
-  // Keep the arrow-up glyph in both modes so the button always reads as
-  // "send". The mode flip only swaps the class (color + ring) and the
-  // aria-label / click handler — preserves stop-generation without
-  // making the button look broken mid-stream.
-  btn.innerHTML =
-    '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+  // While a response is generating/revealing the button is a REAL stop button
+  // (square glyph) — the earlier same-arrow-different-ring design read as the
+  // stop affordance "disappearing" mid-response. It flips back to the send
+  // arrow only when streamAiReply's finally runs, i.e. after the full reveal.
   if (mode === 'pause') {
+    btn.innerHTML =
+      '<svg class="ncb-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>';
     btn.classList.add('ncb-send-btn--pause');
     btn.setAttribute('aria-label', tStr('cb_stop_response_aria', 'Stop AI response'));
   } else {
+    btn.innerHTML =
+      '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
     btn.classList.remove('ncb-send-btn--pause');
     btn.setAttribute('aria-label', tStr('cb_send_btn', 'Send message'));
   }

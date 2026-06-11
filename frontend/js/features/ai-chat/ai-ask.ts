@@ -1340,18 +1340,32 @@ export function initAskAI(
         if (d._streamWrap) {
           const streamBubble = d._streamWrap.querySelector<HTMLElement>('.ai-bubble.bot');
           const rawFinal = d.content ? d.content.map((b) => b.text || '').join('') : '';
+          // The stop button must outlive the NETWORK stream and persist until
+          // the answer is visually complete. The final render defers behind
+          // the (CDN-loaded) KaTeX pass — hiding the button before that pass
+          // made it vanish while the response was still painting.
+          const _finishStreamControls = (): void => {
+            const _sb0 = document.getElementById('aiSend') as HTMLButtonElement | null;
+            if (_sb0) _sb0.disabled = false;
+            const _st0 = document.getElementById('stopBtn');
+            if (_st0) _st0.style.display = 'none';
+            if (window.spawnConfetti) window.spawnConfetti();
+            _autoScroll(aiMsgs);
+          };
+          let _controlsDeferred = false;
           if (streamBubble) {
             const _typingSpan = streamBubble.querySelector('.ss-stream-live, .ss-typing-span');
             if (_typingSpan) _typingSpan.remove();
             if (window._ssEnsureKatex) {
+              _controlsDeferred = true;
               window._ssEnsureKatex().then(() => {
                 if (window._renderMath && streamBubble) window._renderMath(streamBubble);
                 if (window._renderCode && streamBubble) window._renderCode(streamBubble);
                 streamBubble.querySelectorAll<HTMLElement>('.ss-rendered-block').forEach((sd) => {
                   sd.style.opacity = '1';
                 });
-                _autoScroll(aiMsgs);
-              }).catch(() => {});
+                _finishStreamControls();
+              }).catch(() => { _finishStreamControls(); });
             }
           }
           if (window._aiResponseActions && rawFinal && !d._streamWrap.querySelector('.ai-action-bar')) {
@@ -1361,12 +1375,7 @@ export function initAskAI(
               if (actions) mb.appendChild(actions);
             }
           }
-          const _sb0 = document.getElementById('aiSend') as HTMLButtonElement | null;
-          if (_sb0) _sb0.disabled = false;
-          const _st0 = document.getElementById('stopBtn');
-          if (_st0) _st0.style.display = 'none';
-          if (window.spawnConfetti) window.spawnConfetti();
-          _autoScroll(aiMsgs);
+          if (!_controlsDeferred) _finishStreamControls();
           return;
         }
 

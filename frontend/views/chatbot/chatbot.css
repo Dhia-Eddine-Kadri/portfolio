@@ -3566,6 +3566,22 @@ body:not(.night) .ncb-builder-spark { color: #1d4ed8; }
   padding-top: 4px;
 }
 
+/* Inline course chooser (study intents asked without a resolvable course). */
+.ncb-course-pick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+.ncb-course-pick-btn {
+  padding: 8px 14px;
+  font-size: 0.86rem;
+  border-radius: 8px;
+}
+.ncb-course-pick-cancel {
+  opacity: 0.75;
+}
+
 .ncb-cs-generate {
   padding: 8px 18px;
   border: none;
