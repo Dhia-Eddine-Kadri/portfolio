@@ -2089,9 +2089,31 @@ body:not(.night) .md-diagram-placeholder-sub {
 }
 body:not(.night) .md-diagram-svg {
   background:
-    linear-gradient(to right, rgba(37, 99, 235, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+    linear-gradient(to right, rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.06) 1px, transparent 1px),
     #ffffff !important;
+}
+body:not(.night) .md-diagram-stage {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(14, 165, 233, 0.08), transparent 30%),
+    radial-gradient(circle at 88% 80%, rgba(34, 197, 94, 0.06), transparent 34%) !important;
+}
+body:not(.night) .md-diagram-toolbar {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid rgba(37, 99, 235, 0.16) !important;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.12) !important;
+}
+body:not(.night) .md-diagram-toolbar button {
+  background: rgba(239, 246, 255, 0.9) !important;
+  border: 1px solid rgba(37, 99, 235, 0.16) !important;
+  color: #1e40af !important;
+}
+body:not(.night) .md-diagram-toolbar button:hover {
+  background: rgba(219, 234, 254, 0.95) !important;
+  border-color: rgba(14, 165, 233, 0.45) !important;
+}
+body:not(.night) .md-diagram-zoom-label {
+  color: var(--lm-muted) !important;
 }
 body:not(.night) .md-diagram-node {
   fill: rgba(37, 99, 235, 0.08) !important;
@@ -2100,9 +2122,16 @@ body:not(.night) .md-diagram-node {
 body:not(.night) .md-diagram-node-label {
   fill: var(--lm-text) !important;
 }
+body:not(.night) .md-diagram-node-sub {
+  fill: var(--lm-muted) !important;
+}
+body:not(.night) .md-diagram-edge {
+  stroke: rgba(37, 99, 235, 0.72) !important;
+}
 body:not(.night) .md-diagram-edge-label,
 body:not(.night) .md-diagram-free-label {
   fill: #1d4ed8 !important;
+  stroke: #ffffff !important;
 }
 
 /* AI-rendered 2D plots (minallo-plot fence). Dark defaults in styles.css

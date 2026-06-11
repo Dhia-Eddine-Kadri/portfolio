@@ -40,6 +40,7 @@ declare global {
     _ssCodeCopyBound?: boolean;
     _ssAiInputBound?: boolean;
     _ssAiInputModalBound?: boolean;
+    _ssDiagramViewerBound?: boolean;
   }
 }
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._ssCodeCopyBound) {
@@ -72,6 +73,157 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
       ta.remove();
     }
   });
+}
+
+const DIAGRAM_MIN_ZOOM = 0.35;
+const DIAGRAM_MAX_ZOOM = 2.8;
+
+function clampDiagramZoom(value: number): number {
+  return Math.max(DIAGRAM_MIN_ZOOM, Math.min(DIAGRAM_MAX_ZOOM, value));
+}
+
+function bindDiagramViewer(stage: HTMLElement): void {
+  if (stage.dataset.diagramViewerBound) return;
+  const svg = stage.querySelector<SVGSVGElement>('svg.md-diagram-svg');
+  const content = svg?.querySelector<SVGGElement>('.md-diagram-content');
+  if (!svg || !content) return;
+  stage.dataset.diagramViewerBound = '1';
+
+  const bounds = {
+    x: Number(content.dataset.boundsX || 0),
+    y: Number(content.dataset.boundsY || 0),
+    w: Math.max(1, Number(content.dataset.boundsW || 800)),
+    h: Math.max(1, Number(content.dataset.boundsH || 460)),
+  };
+  const viewBox = svg.viewBox.baseVal;
+  const state = { x: 0, y: 0, scale: 1 };
+  const pointers = new Map<number, { x: number; y: number }>();
+  let lastPan: { x: number; y: number } | null = null;
+  let pinchStart: { dist: number; scale: number; cx: number; cy: number } | null = null;
+
+  const setZoomLabel = (): void => {
+    const label = stage.querySelector<HTMLElement>('.md-diagram-zoom-label');
+    if (label) label.textContent = Math.round(state.scale * 100) + '%';
+  };
+  const apply = (): void => {
+    content.setAttribute('transform', 'translate(' + state.x.toFixed(2) + ' ' + state.y.toFixed(2) + ') scale(' + state.scale.toFixed(4) + ')');
+    setZoomLabel();
+  };
+  const svgPoint = (clientX: number, clientY: number): { x: number; y: number } => {
+    const rect = svg.getBoundingClientRect();
+    const sx = viewBox.width / Math.max(1, rect.width);
+    const sy = viewBox.height / Math.max(1, rect.height);
+    return {
+      x: viewBox.x + (clientX - rect.left) * sx,
+      y: viewBox.y + (clientY - rect.top) * sy,
+    };
+  };
+  const zoomAt = (nextScale: number, cx: number, cy: number): void => {
+    const scale = clampDiagramZoom(nextScale);
+    const beforeX = (cx - state.x) / state.scale;
+    const beforeY = (cy - state.y) / state.scale;
+    state.scale = scale;
+    state.x = cx - beforeX * state.scale;
+    state.y = cy - beforeY * state.scale;
+    apply();
+  };
+  const fit = (): void => {
+    const pad = 46;
+    const fitScale = clampDiagramZoom(Math.min(
+      (viewBox.width - pad) / bounds.w,
+      (viewBox.height - pad) / bounds.h
+    ));
+    state.scale = fitScale;
+    state.x = (viewBox.width - bounds.w * fitScale) / 2 - bounds.x * fitScale;
+    state.y = (viewBox.height - bounds.h * fitScale) / 2 - bounds.y * fitScale;
+    apply();
+  };
+
+  stage.querySelector<HTMLButtonElement>('[data-diagram-action="zoom-in"]')?.addEventListener('click', () => {
+    zoomAt(state.scale * 1.18, viewBox.width / 2, viewBox.height / 2);
+  });
+  stage.querySelector<HTMLButtonElement>('[data-diagram-action="zoom-out"]')?.addEventListener('click', () => {
+    zoomAt(state.scale / 1.18, viewBox.width / 2, viewBox.height / 2);
+  });
+  stage.querySelector<HTMLButtonElement>('[data-diagram-action="fit"]')?.addEventListener('click', fit);
+
+  stage.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    const p = svgPoint(ev.clientX, ev.clientY);
+    const factor = Math.exp(-ev.deltaY * 0.0018);
+    zoomAt(state.scale * factor, p.x, p.y);
+  }, { passive: false });
+
+  stage.addEventListener('pointerdown', (ev) => {
+    if ((ev.target as Element | null)?.closest('.md-diagram-toolbar')) return;
+    stage.setPointerCapture(ev.pointerId);
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    lastPan = { x: ev.clientX, y: ev.clientY };
+    stage.classList.add('is-panning');
+    if (pointers.size === 2) {
+      const pts = Array.from(pointers.values());
+      const dx = pts[1]!.x - pts[0]!.x;
+      const dy = pts[1]!.y - pts[0]!.y;
+      const mid = svgPoint((pts[0]!.x + pts[1]!.x) / 2, (pts[0]!.y + pts[1]!.y) / 2);
+      pinchStart = { dist: Math.max(1, Math.hypot(dx, dy)), scale: state.scale, cx: mid.x, cy: mid.y };
+    }
+  });
+  stage.addEventListener('pointermove', (ev) => {
+    if (!pointers.has(ev.pointerId)) return;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size >= 2 && pinchStart) {
+      const pts = Array.from(pointers.values());
+      const dx = pts[1]!.x - pts[0]!.x;
+      const dy = pts[1]!.y - pts[0]!.y;
+      const mid = svgPoint((pts[0]!.x + pts[1]!.x) / 2, (pts[0]!.y + pts[1]!.y) / 2);
+      zoomAt(pinchStart.scale * (Math.hypot(dx, dy) / pinchStart.dist), mid.x, mid.y);
+      return;
+    }
+    if (!lastPan) return;
+    const rect = svg.getBoundingClientRect();
+    const sx = viewBox.width / Math.max(1, rect.width);
+    const sy = viewBox.height / Math.max(1, rect.height);
+    state.x += (ev.clientX - lastPan.x) * sx;
+    state.y += (ev.clientY - lastPan.y) * sy;
+    lastPan = { x: ev.clientX, y: ev.clientY };
+    apply();
+  });
+  const stopPointer = (ev: PointerEvent): void => {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchStart = null;
+    if (!pointers.size) {
+      lastPan = null;
+      stage.classList.remove('is-panning');
+    }
+  };
+  stage.addEventListener('pointerup', stopPointer);
+  stage.addEventListener('pointercancel', stopPointer);
+  fit();
+  requestAnimationFrame(fit);
+}
+
+function initDiagramViewers(root: ParentNode = document): void {
+  root.querySelectorAll?.<HTMLElement>('.md-diagram-stage').forEach(bindDiagramViewer);
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._ssDiagramViewerBound) {
+  window._ssDiagramViewerBound = true;
+  const start = (): void => {
+    initDiagramViewers(document);
+    const obs = new MutationObserver((muts) => {
+      for (const mut of muts) {
+        mut.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return;
+          const el = node as Element;
+          if (el.matches?.('.md-diagram-stage')) bindDiagramViewer(el as HTMLElement);
+          else initDiagramViewers(el);
+        });
+      }
+    });
+    obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  };
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
 }
 
 // Normalise a German decimal comma to a dot, but only between digits, so
@@ -240,6 +392,295 @@ export function renderMarkdown(text: string): string {
   }
 
   function renderDiagram(raw: string): string {
+    type DiagramNode = {
+      id: string;
+      label: string;
+      description: string;
+      shape: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      titleLines: string[];
+      descLines: string[];
+      explicit: boolean;
+    };
+
+    try {
+      const spec = JSON.parse(raw) as {
+        title?: string;
+        caption?: string;
+        nodes?: Array<{ id?: string; label?: string; title?: string; description?: string; subtitle?: string; x?: number; y?: number; shape?: string }>;
+        edges?: Array<{ from?: string; to?: string; label?: string; type?: string }>;
+        labels?: Array<{ text?: string; x?: number; y?: number }>;
+      };
+      const rawNodes = Array.isArray(spec.nodes) ? spec.nodes.slice(0, 24) : [];
+      const edges = Array.isArray(spec.edges) ? spec.edges.slice(0, 36) : [];
+      const labels = Array.isArray(spec.labels) ? spec.labels.slice(0, 18) : [];
+      if (!rawNodes.length && !labels.length) throw new Error('empty diagram');
+
+      const wrapWords = (text: string, chars: number, maxLines: number): string[] => {
+        const words = text.trim().split(/\s+/).filter(Boolean);
+        const lines: string[] = [];
+        let current = '';
+        for (const word of words) {
+          const next = current ? current + ' ' + word : word;
+          if (next.length <= chars) {
+            current = next;
+            continue;
+          }
+          if (current) lines.push(current);
+          current = word;
+          if (lines.length >= maxLines - 1) break;
+        }
+        if (current && lines.length < maxLines) lines.push(current);
+        return lines.length ? lines : [''];
+      };
+
+      const measureNode = (node: { id?: string; label?: string; title?: string; description?: string; subtitle?: string; shape?: string; x?: number; y?: number }, idx: number): DiagramNode => {
+        const label = String(node.label || node.title || node.id || 'Concept ' + (idx + 1)).slice(0, 110);
+        const description = String(node.description || node.subtitle || '').slice(0, 110);
+        const shape = String(node.shape || 'rect').toLowerCase();
+        const titleLines = wrapWords(label, 22, 3);
+        const descLines = description ? wrapWords(description, 30, 2) : [];
+        const longest = [...titleLines, ...descLines].reduce((m, line) => Math.max(m, line.length), 0);
+        const baseW = Math.max(128, Math.min(280, Math.round(longest * 7.2 + 44)));
+        const baseH = Math.max(68, 32 + titleLines.length * 18 + descLines.length * 15);
+        const compact = shape === 'joint' || shape === 'arrow';
+        return {
+          id: String(node.id || 'n' + idx),
+          label,
+          description,
+          shape,
+          x: num(node.x, NaN),
+          y: num(node.y, NaN),
+          w: shape === 'circle' ? Math.max(92, Math.min(132, baseW)) : compact ? 54 : baseW,
+          h: shape === 'circle' ? Math.max(92, Math.min(132, baseH + 24)) : compact ? 54 : baseH,
+          titleLines,
+          descLines,
+          explicit: Number.isFinite(node.x) && Number.isFinite(node.y),
+        };
+      };
+
+      const nodes = rawNodes.map(measureNode);
+      const nodeById = new Map<string, DiagramNode>();
+      nodes.forEach((node) => nodeById.set(node.id, node));
+      const hasOverlap = (): boolean => {
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i]!;
+            const b = nodes[j]!;
+            if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 48 &&
+                Math.abs(a.y - b.y) < (a.h + b.h) / 2 + 56) return true;
+          }
+        }
+        return false;
+      };
+
+      const nodeGap = rawNodes.length > 6 ? 76 : 56;
+      const colGap = rawNodes.length > 6 ? 92 : 72;
+      const shouldAutoLayout = nodes.some((node) => !node.explicit) || rawNodes.length > 5 || hasOverlap();
+      if (shouldAutoLayout) {
+        const indegree = new Map<string, number>();
+        const outgoing = new Map<string, string[]>();
+        nodes.forEach((node) => { indegree.set(node.id, 0); outgoing.set(node.id, []); });
+        edges.forEach((edge) => {
+          const from = edge.from ? String(edge.from) : '';
+          const to = edge.to ? String(edge.to) : '';
+          if (!nodeById.has(from) || !nodeById.has(to) || from === to) return;
+          outgoing.get(from)?.push(to);
+          indegree.set(to, (indegree.get(to) || 0) + 1);
+        });
+        const layer = new Map<string, number>();
+        const queue = nodes.filter((node) => (indegree.get(node.id) || 0) === 0).map((node) => node.id);
+        if (!queue.length && nodes[0]) queue.push(nodes[0].id);
+        while (queue.length) {
+          const id = queue.shift()!;
+          const current = layer.get(id) || 0;
+          (outgoing.get(id) || []).forEach((next) => {
+            layer.set(next, Math.max(layer.get(next) || 0, current + 1));
+            indegree.set(next, (indegree.get(next) || 1) - 1);
+            if ((indegree.get(next) || 0) <= 0) queue.push(next);
+          });
+        }
+        nodes.forEach((node, idx) => { if (!layer.has(node.id)) layer.set(node.id, Math.floor(idx / 3)); });
+        const layers = new Map<number, DiagramNode[]>();
+        nodes.forEach((node) => {
+          const l = layer.get(node.id) || 0;
+          if (!layers.has(l)) layers.set(l, []);
+          layers.get(l)!.push(node);
+        });
+        let x = 110;
+        Array.from(layers.keys()).sort((a, b) => a - b).forEach((layerId) => {
+          const group = layers.get(layerId)!;
+          const maxW = Math.max(...group.map((node) => node.w));
+          const columnH = group.reduce((sum, node) => sum + node.h, 0) + Math.max(0, group.length - 1) * nodeGap;
+          let y = Math.max(92, 260 - columnH / 2);
+          group.forEach((node) => {
+            node.x = x + maxW / 2;
+            node.y = y + node.h / 2;
+            y += node.h + nodeGap;
+          });
+          x += maxW + colGap;
+        });
+      } else {
+        nodes.forEach((node, idx) => {
+          node.x = Math.max(80, num(node.x, 160 + (idx % 3) * 220));
+          node.y = Math.max(80, num(node.y, 120 + Math.floor(idx / 3) * 140));
+        });
+      }
+
+      for (let pass = 0; pass < 18; pass++) {
+        let moved = false;
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i]!;
+            const b = nodes[j]!;
+            const minX = (a.w + b.w) / 2 + 48;
+            const minY = (a.h + b.h) / 2 + 56;
+            const dx = b.x - a.x || 1;
+            const dy = b.y - a.y || 1;
+            if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
+              const pushX = (minX - Math.abs(dx)) / 2;
+              const pushY = (minY - Math.abs(dy)) / 2;
+              if (pushX < pushY) {
+                a.x -= Math.sign(dx) * pushX;
+                b.x += Math.sign(dx) * pushX;
+              } else {
+                a.y -= Math.sign(dy) * pushY;
+                b.y += Math.sign(dy) * pushY;
+              }
+              moved = true;
+            }
+          }
+        }
+        if (!moved) break;
+      }
+
+      const edgePoint = (from: DiagramNode, to: DiagramNode): { x: number; y: number } => {
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        if (from.shape === 'circle') {
+          const len = Math.max(1, Math.hypot(dx, dy));
+          return { x: from.x + (dx / len) * (from.w / 2), y: from.y + (dy / len) * (from.h / 2) };
+        }
+        const scale = Math.min((from.w / 2) / Math.max(1, Math.abs(dx)), (from.h / 2) / Math.max(1, Math.abs(dy)));
+        return { x: from.x + dx * scale, y: from.y + dy * scale };
+      };
+      const allXs = nodes.flatMap((node) => [node.x - node.w / 2, node.x + node.w / 2]);
+      const allYs = nodes.flatMap((node) => [node.y - node.h / 2, node.y + node.h / 2]);
+      labels.forEach((label) => {
+        allXs.push(num(label.x, 80));
+        allYs.push(num(label.y, 80));
+      });
+      const minX = Math.min(...allXs, 0) - 90;
+      const minY = Math.min(...allYs, 0) - 90;
+      const maxX = Math.max(...allXs, 760) + 90;
+      const maxY = Math.max(...allYs, 420) + 90;
+      const viewW = Math.max(860, Math.ceil(maxX - minX));
+      const viewH = Math.max(520, Math.ceil(maxY - minY));
+      const boundsX = Math.floor(minX);
+      const boundsY = Math.floor(minY);
+      const uid = Math.random().toString(36).slice(2, 9);
+      const arrowId = 'mdDiagramArrow-' + uid;
+      const hatchId = 'mdDiagramHatch-' + uid;
+      const svg: string[] = [
+        '<div class="md-diagram-toolbar" aria-label="Diagram controls">',
+          '<button type="button" data-diagram-action="zoom-in" aria-label="Zoom in">+</button>',
+          '<button type="button" data-diagram-action="zoom-out" aria-label="Zoom out">−</button>',
+          '<button type="button" data-diagram-action="fit" aria-label="Fit diagram to view">⤢</button>',
+          '<span class="md-diagram-zoom-label" aria-hidden="true">100%</span>',
+        '</div>',
+        '<svg class="md-diagram-svg" viewBox="0 0 ' + viewW + ' ' + viewH + '" role="img" aria-label="' + esc(spec.title || 'Rendered diagram') + '">',
+        '<defs>',
+          '<marker id="' + arrowId + '" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker>',
+          '<pattern id="' + hatchId + '" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="currentColor" stroke-width="1.2"/></pattern>',
+        '</defs>',
+        '<g class="md-diagram-content" data-bounds-x="' + boundsX + '" data-bounds-y="' + boundsY + '" data-bounds-w="' + Math.ceil(maxX - minX) + '" data-bounds-h="' + Math.ceil(maxY - minY) + '">',
+      ];
+
+      edges.forEach((edge, idx) => {
+        const a = edge.from ? nodeById.get(String(edge.from)) : null;
+        const b = edge.to ? nodeById.get(String(edge.to)) : null;
+        if (!a || !b) return;
+        let labelX = (a.x + b.x) / 2;
+        let labelY = (a.y + b.y) / 2 - 14;
+        if (a === b) {
+          const r = Math.max(a.w, a.h) / 2 + 28;
+          const p = 'M ' + (a.x - 18) + ' ' + (a.y - a.h / 2) + ' C ' + (a.x - r) + ' ' + (a.y - r) + ' ' + (a.x + r) + ' ' + (a.y - r) + ' ' + (a.x + 18) + ' ' + (a.y - a.h / 2);
+          svg.push('<path class="md-diagram-edge" d="' + p + '" marker-end="url(#' + arrowId + ')"/>');
+          labelX = a.x;
+          labelY = a.y - r - 12;
+        } else {
+          const start = edgePoint(a, b);
+          const end = edgePoint(b, a);
+          const dx = end.x - start.x;
+          const dy = end.y - start.y;
+          const len = Math.max(1, Math.hypot(dx, dy));
+          const curve = String(edge.type || '').toLowerCase() === 'arc' || Math.abs(dy) < 36 || idx % 2 === 1;
+          const off = curve ? Math.min(72, 28 + len * 0.08) * (idx % 2 ? 1 : -1) : 0;
+          const cx = (start.x + end.x) / 2 + (-dy / len) * off;
+          const cy = (start.y + end.y) / 2 + (dx / len) * off;
+          svg.push('<path class="md-diagram-edge" d="M ' + start.x.toFixed(1) + ' ' + start.y.toFixed(1) + ' Q ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ' ' + end.x.toFixed(1) + ' ' + end.y.toFixed(1) + '" marker-end="url(#' + arrowId + ')"/>');
+          labelX = cx + (-dy / len) * 14;
+          labelY = cy + (dx / len) * 14 - 8;
+        }
+        if (edge.label && String(edge.label).trim().length <= 42) {
+          svg.push('<text class="md-diagram-edge-label" x="' + labelX.toFixed(1) + '" y="' + labelY.toFixed(1) + '">' + esc(String(edge.label).slice(0, 42)) + '</text>');
+        }
+      });
+
+      nodes.forEach((node) => {
+        if (node.shape === 'circle') {
+          svg.push('<circle class="md-diagram-node" cx="' + node.x + '" cy="' + node.y + '" r="' + (Math.max(node.w, node.h) / 2) + '"/>');
+        } else if (node.shape === 'joint') {
+          svg.push('<circle class="md-diagram-node md-diagram-node--joint" cx="' + node.x + '" cy="' + node.y + '" r="7"/>');
+        } else if (node.shape === 'triangle') {
+          const s = Math.max(30, node.w / 3);
+          svg.push('<polygon class="md-diagram-node" points="' + node.x + ',' + (node.y - s) + ' ' + (node.x - s) + ',' + (node.y + s * 0.65) + ' ' + (node.x + s) + ',' + (node.y + s * 0.65) + '"/>');
+          svg.push('<line class="md-diagram-edge md-diagram-edge--support" x1="' + (node.x - s - 8) + '" y1="' + (node.y + s * 0.65 + 1) + '" x2="' + (node.x + s + 8) + '" y2="' + (node.y + s * 0.65 + 1) + '"/>');
+          svg.push('<rect x="' + (node.x - s - 8) + '" y="' + (node.y + s * 0.65 + 1) + '" width="' + ((s + 8) * 2) + '" height="8" fill="url(#' + hatchId + ')" opacity="0.55"/>');
+        } else if (node.shape === 'ground') {
+          const w = Math.max(76, node.w / 2);
+          svg.push('<line class="md-diagram-edge md-diagram-edge--support" x1="' + (node.x - w) + '" y1="' + node.y + '" x2="' + (node.x + w) + '" y2="' + node.y + '"/>');
+          svg.push('<rect x="' + (node.x - w) + '" y="' + node.y + '" width="' + (w * 2) + '" height="12" fill="url(#' + hatchId + ')" opacity="0.55"/>');
+        } else if (node.shape === 'arrow') {
+          const s = 12;
+          svg.push('<polygon class="md-diagram-node md-diagram-node--arrow" points="' + node.x + ',' + (node.y - s) + ' ' + (node.x + s) + ',' + node.y + ' ' + node.x + ',' + (node.y + s) + ' ' + (node.x - s) + ',' + node.y + '"/>');
+        } else {
+          svg.push('<rect class="md-diagram-node" x="' + (node.x - node.w / 2) + '" y="' + (node.y - node.h / 2) + '" width="' + node.w + '" height="' + node.h + '" rx="14"/>');
+        }
+        const outside = node.shape === 'triangle' || node.shape === 'ground' || node.shape === 'joint' || node.shape === 'arrow';
+        if (outside) {
+          svg.push('<text class="md-diagram-node-label" x="' + node.x + '" y="' + (node.y + node.h / 2 + 18) + '">' + esc(node.label.slice(0, 46)) + '</text>');
+          return;
+        }
+        const firstY = node.y - ((node.titleLines.length - 1) * 9) - (node.descLines.length ? 8 : 0);
+        node.titleLines.forEach((line, idx) => {
+          svg.push('<text class="md-diagram-node-label" x="' + node.x + '" y="' + (firstY + idx * 18) + '">' + esc(line) + '</text>');
+        });
+        node.descLines.forEach((line, idx) => {
+          svg.push('<text class="md-diagram-node-label md-diagram-node-sub" x="' + node.x + '" y="' + (firstY + node.titleLines.length * 18 + 4 + idx * 15) + '">' + esc(line) + '</text>');
+        });
+      });
+      labels.forEach((label) => {
+        svg.push('<text class="md-diagram-free-label" x="' + num(label.x, boundsX + 90) + '" y="' + num(label.y, boundsY + 90) + '">' + esc(String(label.text || '').slice(0, 90)) + '</text>');
+      });
+      svg.push('</g></svg>');
+
+      return (
+        '<figure class="md-diagram-card">' +
+          (spec.title ? '<figcaption class="md-diagram-title">' + esc(spec.title) + '</figcaption>' : '') +
+          '<div class="md-diagram-stage">' + svg.join('') + '</div>' +
+          (spec.caption ? '<figcaption class="md-diagram-caption">' + esc(spec.caption) + '</figcaption>' : '') +
+        '</figure>'
+      );
+    } catch {
+      return renderLegacyDiagram(raw);
+    }
+  }
+
+  function renderLegacyDiagram(raw: string): string {
     try {
       const spec = JSON.parse(raw) as {
         title?: string;
