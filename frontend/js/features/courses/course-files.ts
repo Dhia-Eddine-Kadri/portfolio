@@ -648,7 +648,6 @@ function openUploadModal(): UploadModalHandle {
       '</div>' +
       '<div class="co-upmodal-body">' +
         '<div class="co-upmodal-hero">' +
-          '<img class="co-upmodal-mascot" src="assets/cat-mascot.jpg" alt="">' +
           '<h2>Preparing Your Materials</h2>' +
           '<p>We’re analyzing your content and creating smart study materials.</p>' +
         '</div>' +
