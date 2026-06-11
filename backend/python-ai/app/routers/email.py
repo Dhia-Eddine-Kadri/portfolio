@@ -31,28 +31,52 @@ router = APIRouter(prefix="", tags=["email"])
 
 _APP_URL = "https://minallo.de"
 
+# Copy + feature cards mirror the "Confirm signup" template the user set up in
+# Supabase (dark navy card, cyan accent, ✦ wordmark) so both emails read as one
+# brand. No CTA button by design — the user is already signed in when this lands.
 _COPY = {
     "en": {
         "subject": "Welcome to Minallo 🎉",
         "title": "Welcome to Minallo!",
         "body": (
-            "Your account is ready. Upload your lecture PDFs and Minallo turns "
-            "them into summaries, cheatsheets, flashcards and quizzes — with an "
-            "AI tutor that answers from your own course material."
+            "Your account is ready. Upload your course materials and Minallo "
+            "turns them into everything you need to study smarter."
         ),
-        "cta": "Start studying",
+        "features_label": "What you can do on Minallo",
+        "features": [
+            ("✨", "AI Course Explainer",
+             "Ask questions and get answers based on your uploaded course materials."),
+            ("🧠", "Quizzes & Flashcards",
+             "Generate practice questions and memory cards from your documents."),
+            ("📄", "Cheatsheets & Summaries",
+             "Compress complex course topics into compact exam-ready study sheets."),
+            ("📝", "PDF Workspace & Notes",
+             "Read, annotate and turn lectures into clean AI notes."),
+            ("⏱️", "Focus Mode & German Practice",
+             "Pomodoro sessions, streaks, and vocabulary & grammar training."),
+        ],
         "footer": "You received this email because an account was created on minallo.de with this address.",
     },
     "de": {
         "subject": "Willkommen bei Minallo 🎉",
         "title": "Willkommen bei Minallo!",
         "body": (
-            "Dein Konto ist startklar. Lade deine Vorlesungs-PDFs hoch und "
-            "Minallo macht daraus Zusammenfassungen, Cheatsheets, Karteikarten "
-            "und Quizze — mit einem KI-Tutor, der aus deinen eigenen Unterlagen "
-            "antwortet."
+            "Dein Konto ist startklar. Lade deine Kursunterlagen hoch und "
+            "Minallo macht daraus alles, was du zum smarteren Lernen brauchst."
         ),
-        "cta": "Jetzt lernen",
+        "features_label": "Das kannst du auf Minallo machen",
+        "features": [
+            ("✨", "KI-Kurs-Erklärer",
+             "Stelle Fragen und erhalte Antworten auf Basis deiner hochgeladenen Kursunterlagen."),
+            ("🧠", "Quizze & Karteikarten",
+             "Erstelle Übungsfragen und Lernkarten aus deinen Dokumenten."),
+            ("📄", "Cheatsheets & Zusammenfassungen",
+             "Komprimiere komplexe Kursthemen in kompakte, klausurfertige Lernblätter."),
+            ("📝", "PDF-Arbeitsbereich & Notizen",
+             "Lies, markiere und verwandle Vorlesungen in saubere KI-Notizen."),
+            ("⏱️", "Fokus-Modus & Deutsch-Übungen",
+             "Pomodoro-Sessions, Streaks sowie Vokabel- und Grammatiktraining."),
+        ],
         "footer": "Du erhältst diese E-Mail, weil mit dieser Adresse ein Konto auf minallo.de erstellt wurde.",
     },
 }
@@ -62,6 +86,32 @@ class WelcomeRequest(BaseModel):
     language: str | None = None
 
 
+def _feature_card_html(icon: str, title: str, desc: str) -> str:
+    return f"""\
+        <tr>
+          <td style="padding:0 26px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#101f36;border:1px solid #274f7e;border-radius:18px;">
+              <tr>
+                <td width="64" align="center" valign="top" style="padding:20px 0 20px 18px;font-size:28px;line-height:32px;">
+                  {icon}
+                </td>
+                <td valign="top" style="padding:20px 20px 20px 8px;">
+                  <h3 style="margin:0;color:#ffffff;font-size:18px;line-height:24px;font-weight:800;">
+                    {title}
+                  </h3>
+                  <p style="margin:7px 0 0;color:#aab8cc;font-size:14px;line-height:22px;">
+                    {desc}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td height="12" style="font-size:12px;line-height:12px;">&nbsp;</td>
+        </tr>"""
+
+
 def _build_message(to_email: str, lang: str) -> EmailMessage:
     settings = get_settings()
     copy = _COPY.get(lang, _COPY["en"])
@@ -69,25 +119,102 @@ def _build_message(to_email: str, lang: str) -> EmailMessage:
     msg["Subject"] = copy["subject"]
     msg["From"] = formataddr((settings.smtp_from_name, settings.smtp_from_email))
     msg["To"] = to_email
-    msg.set_content(f"{copy['title']}\n\n{copy['body']}\n\n{copy['cta']}: {_APP_URL}\n\n{copy['footer']}\n")
+
+    plain_features = "\n".join(f"  • {t}: {d}" for _, t, d in copy["features"])
+    msg.set_content(
+        f"{copy['title']}\n\n{copy['body']}\n\n{copy['features_label']}:\n"
+        f"{plain_features}\n\n{_APP_URL}\n\n{copy['footer']}\n"
+    )
+
+    cards = "\n".join(_feature_card_html(i, t, d) for i, t, d in copy["features"])
     msg.add_alternative(
         f"""\
-<!DOCTYPE html>
-<html>
-  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
-    <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-      <div style="background:linear-gradient(135deg,#1d4ed8,#0ea5e9);border-radius:14px 14px 0 0;padding:28px 32px;">
-        <div style="color:#ffffff;font-size:22px;font-weight:700;">🦉 Minallo</div>
-      </div>
-      <div style="background:#ffffff;border-radius:0 0 14px 14px;padding:32px;color:#0f172a;">
-        <h1 style="margin:0 0 12px;font-size:20px;">{copy["title"]}</h1>
-        <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#334155;">{copy["body"]}</p>
-        <a href="{_APP_URL}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:10px;">{copy["cta"]} →</a>
-      </div>
-      <p style="margin:18px 8px 0;font-size:12px;color:#94a3b8;text-align:center;">{copy["footer"]}</p>
-    </div>
-  </body>
-</html>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#07111f;">
+  <tr>
+    <td align="center" style="padding:28px 12px;font-family:Arial,Helvetica,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;width:100%;background:#0e1a2d;border:1px solid #244166;border-radius:28px;overflow:hidden;">
+
+        <tr>
+          <td style="height:5px;background:#42d7e7;line-height:5px;font-size:5px;">&nbsp;</td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:38px 26px 10px;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" valign="middle" style="width:44px;height:44px;background:#132845;border:1px solid #315985;border-radius:14px;color:#42d7e7;font-size:25px;font-weight:700;line-height:44px;">
+                  ✦
+                </td>
+                <td width="12"></td>
+                <td valign="middle" style="font-size:28px;line-height:32px;font-weight:800;color:#f4f8ff;letter-spacing:-0.6px;">
+                  Minallo
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:28px 28px 0;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="width:70px;height:70px;background:#122743;border:1px solid #2a527e;border-radius:22px;color:#42d7e7;font-size:34px;line-height:70px;">
+                  🎉
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:24px 30px 0;">
+            <h1 style="margin:0;padding:0;color:#ffffff;font-size:42px;line-height:46px;font-weight:800;letter-spacing:-1.5px;">
+              {copy["title"]}
+            </h1>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:18px 34px 0;">
+            <p style="margin:0;color:#aab8cc;font-size:17px;line-height:28px;">
+              {copy["body"]}
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:34px 26px 18px;">
+            <p style="margin:0;color:#7fcef1;font-size:13px;line-height:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">
+              {copy["features_label"]}
+            </p>
+          </td>
+        </tr>
+
+{cards}
+
+        <tr>
+          <td style="padding:22px 26px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="height:1px;background:#244166;line-height:1px;font-size:1px;">&nbsp;</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:22px 28px 34px;">
+            <p style="margin:0;color:#7f8ca2;font-size:14px;line-height:22px;">
+              © 2026 Minallo · Built for students<br>
+              <a href="{_APP_URL}" style="color:#8fc7ff;text-decoration:none;">minallo.de</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
 """,
         subtype="html",
     )
