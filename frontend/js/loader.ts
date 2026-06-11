@@ -804,11 +804,15 @@ interface LandingTranslation {
   function loadFeatureSection(section: FeatureSection): Promise<void> {
     const cached = loadedFeatureSections[section.id];
     if (cached) return cached;
-    const promise = _fetchTimeout(section.file, 10000)
-      .then((r) => {
+    const fetchOnce = (): Promise<string> =>
+      _fetchTimeout(section.file, 10000).then((r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + section.file);
         return r.text();
-      })
+      });
+    const promise = fetchOnce()
+      // One immediate retry: a single DNS blip / slow first byte otherwise
+      // blanks the section (observed: settings.html AbortError on flaky DNS).
+      .catch(() => fetchOnce())
       .then((html) => {
         const target = document.getElementById(section.id);
         if (!target) {
@@ -820,6 +824,10 @@ interface LandingTranslation {
       })
       .catch((err: unknown) => {
         console.error('Error loading ' + section.file + ':', err);
+        // Do NOT cache the failure — with it cached, every later visit to the
+        // section returned this settled promise and the page stayed blank for
+        // the rest of the session. Evict so the next navigation refetches.
+        delete loadedFeatureSections[section.id];
       });
     loadedFeatureSections[section.id] = promise;
     return promise;
