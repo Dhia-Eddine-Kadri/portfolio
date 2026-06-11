@@ -129,19 +129,44 @@ var _paypalPlanId = '';
 var _ppConsentTs = '';
 var _billingConfigPromise = null;
 
+// subscription.js loads EARLY in the boot chain (before app-data.js/main.js),
+// while window._subService is only assigned at the end of main.js. On a hard
+// refresh landing directly on #portal=subscription, _initPayPalButton can
+// therefore run before the service exists — rejecting immediately here threw
+// "[paypal-init] failed: Subscription service not ready" plus a spurious
+// "Payment unavailable" toast on every such refresh. Wait for the service
+// instead; it arrives within a moment of main.js finishing.
+function _waitForSubService(timeoutMs) {
+  if (window._subService) return Promise.resolve(window._subService);
+  return new Promise(function (resolve, reject) {
+    var waited = 0;
+    var iv = setInterval(function () {
+      if (window._subService) {
+        clearInterval(iv);
+        resolve(window._subService);
+        return;
+      }
+      waited += 200;
+      if (waited >= (timeoutMs || 15000)) {
+        clearInterval(iv);
+        reject(new Error('Subscription service not ready'));
+      }
+    }, 200);
+  });
+}
+
 function _loadBillingConfig() {
   if (_billingConfigPromise) return _billingConfigPromise;
-  if (!window._subService) {
-    // Don't cache the failure — _subService becomes available shortly
-    // after main.js finishes loading. Caching a rejection would make
-    // every subsequent call (e.g. on hashchange) error forever.
-    return Promise.reject(new Error('Subscription service not ready'));
-  }
-  _billingConfigPromise = window._subService.loadBillingConfig().catch(function (err) {
-    // Same idea: clear the cache on failure so the next call retries.
-    _billingConfigPromise = null;
-    throw err;
-  });
+  _billingConfigPromise = _waitForSubService(15000)
+    .then(function (svc) {
+      return svc.loadBillingConfig();
+    })
+    .catch(function (err) {
+      // Don't cache the failure — clear it so the next call (e.g. on
+      // hashchange) retries instead of erroring forever.
+      _billingConfigPromise = null;
+      throw err;
+    });
   return _billingConfigPromise;
 }
 
@@ -1029,7 +1054,11 @@ document.addEventListener(
       clearInterval(verify);
       if (!_currentUser || !sessionId) return;
       try {
-        var data = await window._subService.verifyPayment(sessionId);
+        // _currentUser (supabase.js, early) can be ready long before
+        // window._subService (end of main.js) — wait for the service so a
+        // fast boot can't drop the post-checkout verification.
+        var svc = await _waitForSubService(15000);
+        var data = await svc.verifyPayment(sessionId);
         if (data.ok) {
           if (data.had_trial) _markDeviceTrialUsed();
           applySubscription({ plan: 'pro', status: 'active', expires_at: data.expires_at || null });
