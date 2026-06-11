@@ -2010,26 +2010,28 @@ body:not(.night) .ncb-skill-live-note {
 
 .ncb-builder-block-line.short { width: 70%; }
 
-/* Floating category chips around the sheet. */
+/* Category chips around the sheet — they surface one at a time, sit fully
+   readable on top of the sheet, then fade out before the next appears. */
 .ncb-builder-chip {
   position: absolute;
-  z-index: 1;
-  padding: 4px 10px;
+  z-index: 3;
+  padding: 5px 11px;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: #e0f2fe;
-  background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(125, 211, 252, 0.3);
-  box-shadow: 0 8px 20px rgba(8, 12, 28, 0.4);
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(125, 211, 252, 0.36);
+  box-shadow: 0 10px 24px rgba(8, 12, 28, 0.45);
   white-space: nowrap;
-  animation: ncb-builder-chipfloat 4.8s ease-in-out infinite;
+  opacity: 0;
+  animation: ncb-builder-chipcycle 5.2s ease-in-out infinite;
 }
 
-.ncb-builder-chip--1 { top: 8%; left: 2%; animation-delay: 0s; }
-.ncb-builder-chip--2 { top: 34%; right: -2%; animation-delay: 0.6s; }
-.ncb-builder-chip--3 { bottom: 26%; left: -2%; animation-delay: 1.2s; }
-.ncb-builder-chip--4 { bottom: 4%; right: 6%; animation-delay: 1.8s; }
+.ncb-builder-chip--1 { top: 4%;  left: 0;  animation-delay: 0s; }
+.ncb-builder-chip--2 { top: 32%; right: 0; animation-delay: 1.3s; }
+.ncb-builder-chip--3 { bottom: 28%; left: 0; animation-delay: 2.6s; }
+.ncb-builder-chip--4 { bottom: 2%; right: 4%; animation-delay: 3.9s; }
 
 .ncb-builder-progress {
   margin-top: 16px;
@@ -2082,9 +2084,14 @@ body:not(.night) .ncb-builder-spark { color: #1d4ed8; }
   50% { transform: translateY(-7px) rotate(0.4deg); }
 }
 
-@keyframes ncb-builder-chipfloat {
-  0%, 100% { transform: translateY(0); opacity: 0.92; }
-  50% { transform: translateY(-6px); opacity: 1; }
+/* One chip visible at a time: fade/scale in, hold, fade out. Four chips with
+   delays at 25% increments of the 5.2s cycle keep them appearing in sequence. */
+@keyframes ncb-builder-chipcycle {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.92); }
+  6%   { opacity: 1; transform: translateY(0) scale(1); }
+  19%  { opacity: 1; transform: translateY(0) scale(1); }
+  25%  { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.96); }
 }
 
 @keyframes ncb-builder-glow {
@@ -2109,6 +2116,8 @@ body:not(.night) .ncb-builder-spark { color: #1d4ed8; }
   .ncb-builder-step.is-active .ncb-builder-step-mark {
     animation: none;
   }
+  /* Without the cycle animation the chips would stay at opacity 0 — pin them on. */
+  .ncb-builder-chip { opacity: 1; }
 }
 
 .ncb-bubble-body code.ncb-code {
