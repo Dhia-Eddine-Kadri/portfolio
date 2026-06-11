@@ -404,12 +404,14 @@ export interface GenerateOpts {
 export async function generateStudyTool(
   courseId: string,
   tool: 'flashcards' | 'quiz' | 'summary',
-  opts?: GenerateOpts
+  opts?: GenerateOpts,
+  signal?: AbortSignal
 ): Promise<unknown> {
   const response = await fetch(_backendUrl() + '/api/ai/generate', {
     method: 'POST',
     headers: _authJsonHeaders(),
     body: JSON.stringify({ courseId, tool, ...(opts || {}) }),
+    signal,
   });
   return response.json();
 }
@@ -485,12 +487,14 @@ export interface CheatsheetResult {
 
 export async function generateCheatsheet(
   courseId: string,
-  opts?: { topic?: string; documentIds?: string[]; settings?: CheatsheetSettings }
+  opts?: { topic?: string; documentIds?: string[]; settings?: CheatsheetSettings },
+  signal?: AbortSignal
 ): Promise<CheatsheetResult> {
   const response = await fetch(_backendUrl() + '/api/ai/cheatsheet', {
     method: 'POST',
     headers: _authJsonHeaders(),
     body: JSON.stringify({ courseId, ...(opts || {}) }),
+    signal,
   });
   await _detectAiCapError(response);
   return response.json();
@@ -515,11 +519,13 @@ export interface NotesResult {
  *  never invents content beyond what the student's file contains. */
 export async function generateNotes(
   courseId: string,
-  opts: { fileName: string; pdfText: string; documentId?: string | null; language?: string }
+  opts: { fileName: string; pdfText: string; documentId?: string | null; language?: string },
+  signal?: AbortSignal
 ): Promise<NotesResult> {
   const response = await fetch(_backendUrl() + '/api/notes/generate', {
     method: 'POST',
     headers: _authJsonHeaders(),
+    signal,
     body: JSON.stringify({
       tool: 'notes',
       mode: 'generate',

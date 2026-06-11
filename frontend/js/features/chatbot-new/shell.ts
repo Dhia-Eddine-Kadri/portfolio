@@ -778,7 +778,7 @@ async function streamAiReply(
     // file uploads), route to the Python /ask-stream so plan-v2's RAG +
     // ranking + math template + verification all kick in. Otherwise fall
     // back to /api/ai for free-form chat + image/file handling.
-    const routed = await handleIntentRoute(state, bubble, thinking);
+    const routed = await handleIntentRoute(state, bubble, thinking, controller);
     if (routed) {
       const msg: ChatMessage = { role: 'assistant', text: routed.text };
       if (routed.missionMarker) msg.missionMarker = routed.missionMarker;
@@ -913,13 +913,21 @@ interface PdfSettingsCardConfig {
  */
 function showPdfSettingsCard(
   bubble: HTMLElement | null,
-  cfg: PdfSettingsCardConfig
+  cfg: PdfSettingsCardConfig,
+  signal?: AbortSignal
 ): Promise<PdfChatSettings | null> {
   return new Promise((resolve) => {
     if (!bubble) { resolve(null); return; }
 
     const card = document.createElement('div');
     card.className = 'ncb-cs-settings';
+
+    // Pause pressed while the card waits for a choice: resolve as cancelled
+    // instead of leaving the whole send flow awaiting a click forever.
+    if (signal) {
+      if (signal.aborted) { resolve(null); return; }
+      signal.addEventListener('abort', () => { card.remove(); resolve(null); }, { once: true });
+    }
 
     const renderGroup = (
       key: string, label: string,
@@ -1147,7 +1155,8 @@ function showCoursePickCard(
 async function handleIntentRoute(
   state: ConversationState,
   bubble: HTMLElement | null,
-  thinking: AIThinkingStatus | null
+  thinking: AIThinkingStatus | null,
+  controller: AbortController
 ): Promise<IntentRouteResult | null> {
   const last = state.messages[state.messages.length - 1];
   if (!last || last.role !== 'user' || !last.text) return null;
@@ -1255,7 +1264,7 @@ async function handleIntentRoute(
       showPages: true,
       showLanguage: false,
       generateLabel: 'Generate PDF',
-    });
+    }, controller.signal);
     if (!chatSettings) {
       const text = 'Summary cancelled.';
       if (bubble) renderRichBubble(bubble, text);
@@ -1265,14 +1274,22 @@ async function handleIntentRoute(
     // 2. Generate
     const builderSum = showStudyBuilderLoading(bubble, 'summary');
 
-    const [modSum] = await Promise.all([
-      import('../../services/ai-service.js'),
-      ensureCheatsheetScripts(),
-    ]);
+    let sumResult: { text?: string; title?: string };
+    try {
+      const [modSum] = await Promise.all([
+        import('../../services/ai-service.js'),
+        ensureCheatsheetScripts(),
+      ]);
+      throwIfAborted(controller.signal);
 
-    const sumResult = await modSum.generateStudyTool(
-      route.target.courseId, 'summary'
-    ) as { text?: string; title?: string };
+      sumResult = await modSum.generateStudyTool(
+        route.target.courseId, 'summary', undefined, controller.signal
+      ) as { text?: string; title?: string };
+      throwIfAborted(controller.signal);
+    } catch (err) {
+      cancelStudyBuilderLoading(builderSum);
+      throw err;
+    }
 
     await finishStudyBuilderLoading(builderSum);
 
@@ -1346,7 +1363,7 @@ async function handleIntentRoute(
       showLanguage: true,
       initialLang: langPref,
       generateLabel: 'Generate PDF',
-    });
+    }, controller.signal);
     if (!chatSettings) {
       const text = 'Cheatsheet cancelled.';
       if (bubble) renderRichBubble(bubble, text);
@@ -1360,19 +1377,27 @@ async function handleIntentRoute(
     // 3. Generate
     const builderCs = showStudyBuilderLoading(bubble, 'cheatsheet');
 
-    const [mod] = await Promise.all([
-      import('../../services/ai-service.js'),
-      ensureCheatsheetScripts(),
-    ]);
+    let result: Awaited<ReturnType<typeof import('../../services/ai-service.js')['generateCheatsheet']>>;
+    try {
+      const [mod] = await Promise.all([
+        import('../../services/ai-service.js'),
+        ensureCheatsheetScripts(),
+      ]);
+      throwIfAborted(controller.signal);
 
-    const result = await mod.generateCheatsheet(route.target.courseId, {
-      settings: {
-        columns: chatSettings.columns as 2 | 3 | 4,
-        fontSize: fontApiMap[chatSettings.fontSize],
-        output: 'web',
-        language: chatSettings.language as 'source' | 'en' | 'de' | 'de_terms_en_explanations',
-      }
-    });
+      result = await mod.generateCheatsheet(route.target.courseId, {
+        settings: {
+          columns: chatSettings.columns as 2 | 3 | 4,
+          fontSize: fontApiMap[chatSettings.fontSize],
+          output: 'web',
+          language: chatSettings.language as 'source' | 'en' | 'de' | 'de_terms_en_explanations',
+        }
+      }, controller.signal);
+      throwIfAborted(controller.signal);
+    } catch (err) {
+      cancelStudyBuilderLoading(builderCs);
+      throw err;
+    }
 
     await finishStudyBuilderLoading(builderCs);
 
@@ -1437,7 +1462,7 @@ async function handleIntentRoute(
   }
 
   if (route.intent === 'notes') {
-    const text = await handleNotesIntent(route.target.courseId, bubble);
+    const text = await handleNotesIntent(route.target.courseId, bubble, controller.signal);
     return { text };
   }
 
@@ -1709,6 +1734,19 @@ function showStudyBuilderLoading(
  * Holds a short minimum on-screen time so the animation never flashes, fills the
  * progress bar to 100% and ticks every step done before fading out.
  */
+/** Tear the Study Builder Canvas down immediately (pause pressed / request
+ *  failed). Without this the step-cycling interval keeps firing on a detached
+ *  element after the abort path overwrites the bubble. */
+function cancelStudyBuilderLoading(builder: HTMLElement | null): void {
+  if (!builder) return;
+  const el = builder as StudyBuilderElement;
+  if (el._skillLoadingTimer) {
+    window.clearInterval(el._skillLoadingTimer);
+    el._skillLoadingTimer = undefined;
+  }
+  el.remove();
+}
+
 async function finishStudyBuilderLoading(builder: HTMLElement | null): Promise<void> {
   if (!builder) return;
   const el = builder as StudyBuilderElement;
@@ -1737,7 +1775,11 @@ async function finishStudyBuilderLoading(builder: HTMLElement | null): Promise<v
  *  clarifying question when the choice is ambiguous, then grounds generation
  *  on that file's extracted text via the same single-shot `/api/notes/generate`
  *  call the Notes panel uses for short documents. */
-async function handleNotesIntent(courseId: string, bubble: HTMLElement | null): Promise<string> {
+async function handleNotesIntent(
+  courseId: string,
+  bubble: HTMLElement | null,
+  signal?: AbortSignal
+): Promise<string> {
   const w = window as unknown as {
     activeFileName?: string | null;
     activeCourseRef?: { id?: string; files?: Array<{ name?: string }> } | null;
@@ -1774,8 +1816,10 @@ async function handleNotesIntent(courseId: string, bubble: HTMLElement | null): 
       import('../../services/ai-service.js')
     ]);
     const [rawText] = await extraction.extractMultiplePdfs([fileName], 20);
+    if (signal) throwIfAborted(signal);
     const pdfText = (rawText || '').replace(/^=== .*? ===\n/, '');
-    const result = await ai.generateNotes(courseId, { fileName, pdfText });
+    const result = await ai.generateNotes(courseId, { fileName, pdfText }, signal);
+    if (signal) throwIfAborted(signal);
     if (result.error || !result.note?.content_markdown) {
       const text = 'I could not generate notes from ' + fileName + ' right now. Please try again from the Notes tab.';
       if (bubble) renderRichBubble(bubble, text);
@@ -1785,7 +1829,9 @@ async function handleNotesIntent(courseId: string, bubble: HTMLElement | null): 
       'Notes from ' + fileName + ' (saved to your Notes tab):\n\n' + result.note.content_markdown;
     if (bubble) renderRichBubble(bubble, text);
     return text;
-  } catch {
+  } catch (err) {
+    // Pause pressed: let the caller render the standard "Response stopped."
+    if ((err as Error)?.name === 'AbortError') throw err;
     const text = 'I could not generate notes from ' + fileName + ' right now. Please try again from the Notes tab.';
     if (bubble) renderRichBubble(bubble, text);
     return text;
@@ -2361,6 +2407,13 @@ async function callGenericAi(
 
 function abortSend(state: ConversationState): void {
   if (state.controller) state.controller.abort();
+}
+
+/** Mirror fetch's abort contract for non-fetch awaits: pressing pause must
+ *  stop an intent flow at the next checkpoint instead of letting the result
+ *  render after the user already gave up on it. */
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 }
 
 function appendUserBubble(
