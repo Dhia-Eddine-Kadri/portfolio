@@ -193,6 +193,38 @@ def enforce_interactive_cap(user_id: str, max_events: int) -> None:
     _enforce_bucket_cap(user_id, "interactive", _INTERACTIVE_EVENT_TYPES, max_events)
 
 
+def heavy_model_cap_reached(user_id: str, model: str, cap: int) -> bool:
+    """True when this month's strong-model allowance is used up.
+
+    Counts usage_events rows (the same metering the admin dashboard reads)
+    for ``model`` since the 1st. Unlike the bucket caps this never raises —
+    the caller downgrades to the standard model with a notice instead of
+    blocking the question, so the cap bounds COST without ever refusing a
+    paying user an answer. Fails open on lookup errors, like the other caps.
+    """
+    if not user_id or not model or cap <= 0:
+        return False
+    start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    try:
+        resp = (
+            get_supabase()
+            .table("usage_events")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("model", model)
+            .gte("created_at", start.isoformat())
+            .execute()
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("heavy-model cap lookup failed for %s", user_id)
+        return False
+    count = resp.count if resp.count is not None else len(resp.data or [])
+    if count >= cap:
+        _log_security_event(user_id, "ai_heavy_model_downgraded", {"count": count, "cap": cap, "model": model})
+        return True
+    return False
+
+
 def enforce_generation_cap(user_id: str, max_events: int) -> None:
     """Generation bucket cap (quiz / flashcards / notes summaries)."""
     _enforce_bucket_cap(user_id, "generation", _GENERATION_EVENT_TYPES, max_events)

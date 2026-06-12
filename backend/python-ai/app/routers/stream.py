@@ -821,6 +821,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             workspace_block=workspace_block or None,
             assistant_mode=assistant_mode,
             workspace_question=workspace_question,
+            user_id=user_id,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.
@@ -873,8 +874,11 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                     chunk_bytes = ("data: " + json.dumps(evt, ensure_ascii=False) + "\n\n").encode("utf-8")
             yield chunk_bytes
 
-        # After the generator finishes, persist to cache.
-        if version_hash and full_text_buf:
+        # After the generator finishes, persist to cache. Heavy-capped answers
+        # are not cached: they came from the downgraded model and carry the
+        # allowance notice in the token stream — replaying either next month
+        # (or to the same user mid-month) would be wrong.
+        if version_hash and full_text_buf and not captured_meta.get("heavyCapped"):
             try:
                 save_answer(
                     user_id=user_id, course_id=payload.courseId,

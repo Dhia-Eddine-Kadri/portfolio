@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # "low" is faster/cheaper; "medium" is the safe default that solves the
     # multi-phase kinematics correctly. Ignored for non-reasoning models.
     openai_reasoning_effort: str = Field("medium", alias="OPENAI_REASONING_EFFORT")
+    # Monthly per-user allowance of strong-model (o4-mini) answers. Beyond it,
+    # math/diagram questions silently fall back to the standard model with a
+    # notice. This bounds worst-case AI cost per subscriber: the strong model
+    # is ~13x the per-call cost of the mini model, so without this cap a user
+    # maxing the 2000-call interactive bucket on math could cost ~4x their
+    # subscription price in OpenAI spend alone.
+    heavy_monthly_cap: int = Field(400, alias="MINALLO_HEAVY_MONTHLY_CAP")
     openai_embedding_model: str = Field(
         "text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL"
     )

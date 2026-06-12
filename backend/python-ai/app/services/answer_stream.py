@@ -25,6 +25,7 @@ from .openai_client import get_openai_client
 
 from ..config import get_settings
 from ..supabase_client import get_supabase
+from .access_control import heavy_model_cap_reached
 from .answer_intent import classify_academic_intent
 from .answer import (
     DEFAULT_TUTOR_MODE,
@@ -822,6 +823,7 @@ def stream_answer(
     workspace_block: str | None = None,
     assistant_mode: str | None = None,
     workspace_question: bool = False,
+    user_id: str | None = None,
 ) -> Generator[bytes, None, None]:
     """Generator that yields SSE byte chunks. Pluggable into FastAPI's
     StreamingResponse with media_type='text/event-stream'.
@@ -989,6 +991,7 @@ def stream_answer(
     # The math gate is tight (strong retrieval + is_math_question +
     # exercise anchor + formula chunk presence ALL agree), so cost stays
     # predictable.
+    heavy_capped = False
     if model:
         target_model = model
     elif (
@@ -999,6 +1002,14 @@ def stream_answer(
         or will_attach_figure
     ):
         target_model = settings.openai_generate_model_strong
+        # Monthly strong-model allowance: bounds worst-case OpenAI cost per
+        # subscriber. Past the cap the question still gets answered — on the
+        # standard model, with a notice appended — instead of a 429.
+        if user_id and target_model != settings.openai_generate_model and heavy_model_cap_reached(
+            user_id, target_model, settings.heavy_monthly_cap
+        ):
+            target_model = settings.openai_generate_model
+            heavy_capped = True
     else:
         target_model = settings.openai_generate_model
 
@@ -1380,8 +1391,19 @@ def stream_answer(
     else:
         confidence_label = "low"
 
+    # Heavy-cap notice rides the token stream (so it lands in the visible
+    # answer and chat history) but NOT full_answer — verification and citation
+    # filtering ran on the real answer text above. stream.py skips the cache
+    # save when heavyCapped is set, so the note never replays from cache.
+    if heavy_capped:
+        yield _sse({"t": (
+            "\n\n⚠️ *This month's advanced-solver allowance is used up, so this answer "
+            "used the standard model. The allowance resets on the 1st.*"
+        )})
+
     yield _sse({
         "done": True,
+        "heavyCapped": heavy_capped,
         "retrievalMode": display_strength,
         "answerMode": answer_mode,
         "tutorMode": tutor_mode_norm,
