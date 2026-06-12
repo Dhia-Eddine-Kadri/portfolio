@@ -643,6 +643,36 @@ img, svg {
   margin-top: 2.25rem;
 }
 
+.nl-hero__trial {
+  margin: 0.95rem auto 0;
+  color: var(--nl-sky-100);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.nl-hero__trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  max-width: 56rem;
+  margin: 1.15rem auto 0;
+}
+
+.nl-hero__trust span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  border: 1px solid rgba(186, 230, 253, 0.17);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.34);
+  color: rgba(224, 242, 254, 0.82);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 .nl-hero__preview {
   margin-top: 4rem;
 }
@@ -2053,7 +2083,7 @@ img, svg {
     grid-template-columns: 1fr 1fr;
   }
   .nl-study-flow__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .nl-lifestyle__cards {
     grid-template-columns: repeat(3, 1fr);
@@ -2117,6 +2147,9 @@ img, svg {
   }
   .nl-features__grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .nl-study-flow__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .nl-paths__intro {
     grid-template-columns: 0.9fr 1.1fr;
