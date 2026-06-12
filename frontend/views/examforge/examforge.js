@@ -465,7 +465,7 @@
               st.marked = {};
             }
             renderAll();
-            _toast('Exam deleted', 'The exam was removed from the database.');
+            _toast('Exam deleted', 'The exam was removed.');
           }).catch(function (err) {
             btn.disabled = false;
             _toast('Delete failed', err && err.message ? err.message : 'Please try again.');
