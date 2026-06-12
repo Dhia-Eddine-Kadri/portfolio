@@ -688,10 +688,23 @@ if (aiPanel && aiMsgs) {
     messageSelector: '.ai-msg-wrap.user',
     isUser: () => true,
     snippetSource: (row) => row.querySelector<HTMLElement>('.ai-bubble') || row,
-    // The document-rail's fixed button rail (z-index 9500) overlaps the
-    // drawer's right edge in rail-hosted/maximized modes; measure the real
-    // overlap each layout pass so the track shifts left of the buttons
-    // instead of disappearing behind them.
+    // The document-rail's fixed button rail (z-index 9500) covers the
+    // drawer's right edge, so an edge overlay would hide behind it. When a
+    // vertical rail is on screen, mount the track INSIDE it (below the
+    // buttons) instead; it grows taller than the button stack and scrolls
+    // internally past the height cap. No rail → normal edge overlay.
+    inlineMount: () => {
+      const rail = document.querySelector<HTMLElement>('.dr-rail');
+      if (!rail) return null;
+      const r = rail.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return null;
+      // Mobile flips the rail horizontal at the bottom — no room for a
+      // vertical track there (the navigator is display:none <720px anyway).
+      if (r.width > r.height) return null;
+      return rail;
+    },
+    // Overlay-mode fallback: if the rail exists but inlineMount declined it,
+    // still keep the track clear of any horizontal overlap.
     rightInset: () => {
       const rail = document.querySelector<HTMLElement>('.dr-rail');
       if (!rail) return 0;

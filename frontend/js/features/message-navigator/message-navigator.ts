@@ -38,6 +38,13 @@ export interface MessageNavigatorOptions {
   /** Extra px to keep clear of the scroller's right edge, measured per layout
    *  pass — for fixed overlays that cover it (e.g. the document-rail buttons). */
   rightInset?: () => number;
+  /** When this returns an element, the navigator mounts INSIDE it as a normal
+   *  flex child (e.g. the document-rail button column) instead of overlaying
+   *  the scroller edge. Evaluated per layout pass, so the navigator hops
+   *  between inline and overlay placement as the surface changes. The track
+   *  keeps its natural marker pitch and scrolls (scrollbar hidden) when the
+   *  message count outgrows the height cap. */
+  inlineMount?: () => HTMLElement | null;
   /** Smaller track + preview panel for narrow surfaces. */
   compact?: boolean;
   /** Navigator stays hidden below this many messages. Default 4. */
@@ -75,6 +82,21 @@ const CSS = `
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: background 160ms ease, border-color 160ms ease;
+  /* Markers can outgrow the track (inline/rail mode): scroll them with the
+     scrollbar hidden so the pill stays visually clean. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.message-navigator-track::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.message-navigator-track-inner {
+  position: relative;
+  width: 100%;
 }
 .message-navigator:hover .message-navigator-track,
 .message-navigator[data-open] .message-navigator-track {
@@ -203,6 +225,33 @@ const CSS = `
   justify-self: end;
 }
 
+/* Inline variant: mounted as a flex child inside a button rail instead of
+   overlaying the chat edge. The rail centers it horizontally; height comes
+   from the track itself. */
+.message-navigator--inline {
+  position: relative;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  height: auto !important;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.message-navigator--inline .message-navigator-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+body:not(.night) .message-navigator--inline .message-navigator-track {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.20);
+}
+/* Inline nav is only as tall as its track, so "100%" would crush the preview
+   panel; pin a fixed cap instead. Double class beats the --compact rule that
+   appears later in this sheet. */
+.message-navigator.message-navigator--inline .message-navigator-panel {
+  max-height: 340px;
+}
+
 /* Compact variant (AI side panel) */
 .message-navigator--compact { width: 18px; }
 .message-navigator--compact .message-navigator-track { width: 14px; }
@@ -306,6 +355,11 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
   nav.dataset.hidden = '1';
   const track = document.createElement('div');
   track.className = 'message-navigator-track';
+  // Markers live on an inner div with an explicit height so the track can
+  // scroll them (hidden scrollbar) when inline-mounted and outgrown.
+  const trackInner = document.createElement('div');
+  trackInner.className = 'message-navigator-track-inner';
+  track.appendChild(trackInner);
   const panel = document.createElement('div');
   panel.className = 'message-navigator-panel';
   nav.appendChild(track);
@@ -318,6 +372,8 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
   let rafId = 0;
   let settleTimer = 0;
   let closeTimer = 0;
+  let inline = false;
+  let availH = 0;
 
   const isOpen = (): boolean => nav.dataset.open === '1';
 
@@ -332,20 +388,42 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
   }
 
   function updateGeometry(): void {
+    // Re-home the navigator first: inline inside the mount (rail) when one is
+    // available, otherwise as an overlay on the host.
+    const mount = opts.inlineMount ? opts.inlineMount() : null;
+    inline = !!mount;
+    if (mount && nav.parentElement !== mount) mount.appendChild(nav);
+    if (!mount && nav.parentElement !== opts.host) opts.host.appendChild(nav);
+    nav.classList.toggle('message-navigator--inline', inline);
+
     const sRect = opts.scroller.getBoundingClientRect();
     const guard = opts.bottomGuard ? opts.bottomGuard() : null;
     const guardH =
       guard && guard.offsetParent !== null ? guard.getBoundingClientRect().height : 0;
     const gap = 14;
-    const height = sRect.height - gap * 2 - guardH;
-    if (rows.length < minMessages || height < 110 || sRect.width < 300) {
+    const usable = sRect.height - gap * 2 - guardH;
+    if (rows.length < minMessages || usable < 110 || sRect.width < 300) {
       nav.dataset.hidden = '1';
       delete nav.dataset.open;
       return;
     }
     delete nav.dataset.hidden;
+
+    if (inline) {
+      // Flex child of the rail: no manual positioning. The track may grow
+      // taller than the rail's button stack but is capped so the rail never
+      // outgrows the viewport; beyond the cap it scrolls internally.
+      nav.style.left = '';
+      nav.style.top = '';
+      nav.style.width = '';
+      nav.style.height = '';
+      availH = Math.max(120, Math.min(Math.round(window.innerHeight * 0.38), usable));
+      return;
+    }
+
+    availH = usable;
     nav.style.width = navWidth + 'px';
-    nav.style.height = Math.round(height) + 'px';
+    nav.style.height = Math.round(usable) + 'px';
     // Delta-correct against the live rect instead of assuming which ancestor
     // is the containing block (it changes when #aiPanel is hosted in the
     // document-rail drawer with position:static forced inline).
@@ -358,13 +436,20 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
   }
 
   function rebuildMarkers(): void {
-    track.textContent = '';
+    trackInner.textContent = '';
     const n = rows.length;
     if (n === 0 || nav.dataset.hidden) return;
-    const navH = parseFloat(nav.style.height) || 0;
     const pad = 10;
-    const pitch = n > 1 ? Math.min(markerPitch, (navH - pad * 2 - 4) / (n - 1)) : 0;
-    track.style.height = Math.round(pad * 2 + 4 + pitch * (n - 1)) + 'px';
+    // Inline (rail) mode keeps the natural pitch and scrolls past the cap;
+    // overlay mode compresses the pitch to always fit the available height.
+    const pitch = inline
+      ? markerPitch
+      : n > 1
+        ? Math.min(markerPitch, (availH - pad * 2 - 4) / (n - 1))
+        : 0;
+    const contentH = pad * 2 + 4 + (n > 1 ? pitch * (n - 1) : 0);
+    trackInner.style.height = Math.round(contentH) + 'px';
+    track.style.height = Math.round(Math.min(contentH, availH)) + 'px';
     rows.forEach((row, i) => {
       const m = document.createElement('button');
       m.type = 'button';
@@ -378,7 +463,7 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
         'Jump to ' + (opts.isUser(row) ? 'your message ' : 'AI reply ') + (i + 1)
       );
       m.addEventListener('click', () => jumpTo(i));
-      track.appendChild(m);
+      trackInner.appendChild(m);
     });
   }
 
@@ -411,13 +496,29 @@ export function attachMessageNavigator(opts: MessageNavigatorOptions): MessageNa
   function setActive(idx: number): void {
     if (idx === activeIdx) return;
     activeIdx = idx;
-    const markers = track.children;
+    const markers = trackInner.children;
     for (let i = 0; i < markers.length; i++) {
       markers[i]?.classList.toggle('active', i === idx);
     }
     const items = panel.children;
     for (let i = 0; i < items.length; i++) {
       items[i]?.classList.toggle('active', i === idx);
+    }
+    ensureMarkerVisible(idx);
+  }
+
+  // Manual scroll correction (not scrollIntoView — that could also scroll
+  // the chat or page) so the active dash stays in view inside a track that
+  // scrolls with its scrollbar hidden.
+  function ensureMarkerVisible(idx: number): void {
+    if (track.scrollHeight <= track.clientHeight + 1) return;
+    const m = trackInner.children[idx] as HTMLElement | undefined;
+    if (!m) return;
+    const top = parseFloat(m.style.top) || 0;
+    if (top - 12 < track.scrollTop) {
+      track.scrollTop = Math.max(0, top - 12);
+    } else if (top + 12 > track.scrollTop + track.clientHeight) {
+      track.scrollTop = top + 12 - track.clientHeight;
     }
   }
 

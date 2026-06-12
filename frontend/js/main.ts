@@ -153,4 +153,4 @@ runIdle(() => {
 });
 
 // @ts-ignore — dynamic import with cache-busting query string
-import('./app.js?v=11');
+import('./app.js?v=12');
