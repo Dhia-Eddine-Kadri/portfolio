@@ -373,6 +373,10 @@ function _saveCourseHistory(courseId: string | null | undefined, pairs: HistoryP
   } catch { /* quota */ }
 }
 function _appendCourseHistory(courseId: string | null | undefined, question: string, answer: string): void {
+  // Never persist a fully blank turn — it restores as empty sender labels
+  // and, with a blank question, dedup collapses ALL such turns into one
+  // ghost entry that can shadow the real history.
+  if (!(question || '').trim() && !(answer || '').trim()) return;
   // A new turn means this course has live history again — lift any clear tombstone.
   _clearedCourses.delete(_historyKey(courseId));
   const pairs = _loadCourseHistory(courseId);
@@ -427,7 +431,11 @@ function _dedupPairs(pairs: HistoryPair[] | null): HistoryPair[] {
   const byQ = new Map<string, HistoryPair>();
   const order: string[] = [];
   for (const p of pairs) {
-    const key = (p.q || '').trim().toLowerCase();
+    // Question-less turns (problem-solver style) must not all collapse into
+    // one '' bucket — key them by their answer instead.
+    const key =
+      (p.q || '').trim().toLowerCase() ||
+      'a:' + (p.a || '').trim().slice(0, 80).toLowerCase();
     if (!byQ.has(key)) order.push(key);
     byQ.set(key, p);
   }
@@ -435,14 +443,25 @@ function _dedupPairs(pairs: HistoryPair[] | null): HistoryPair[] {
 }
 
 function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): void {
-  if (!pairs || !pairs.length) return;
+  // Blank turns (aborted/odd flows can save empty q+a) restore as a wall of
+  // empty sender labels that looks like a broken panel — drop them, and only
+  // wipe the greeting when something visible will replace it.
+  const visible = (pairs || []).filter(
+    (p) => (p.q || '').trim() || (p.a || '').trim()
+  );
+  if (!visible.length) return;
   // We only reach here when there's no in-progress user conversation (see the
   // guard in restoreCourseHistory). Clear any lone welcome greeting so the
   // restored history becomes the panel's content instead of sitting below it.
   aiMsgs.querySelectorAll('.ai-msg-wrap:not(.typing-wrap)').forEach((el) => el.remove());
-  pairs.forEach((pair) => {
-    const uWrap = window.addUserMsg ? (window.addUserMsg as (text: string, skipSave?: boolean) => HTMLElement | null)(pair.q, true) : null;
+  visible.forEach((pair) => {
+    const uWrap =
+      (pair.q || '').trim() && window.addUserMsg
+        ? (window.addUserMsg as (text: string, skipSave?: boolean) => HTMLElement | null)(pair.q, true)
+        : null;
     if (uWrap) uWrap.setAttribute('data-restored', 'true');
+    // Question-only turn: don't append an empty AI bubble for it.
+    if (!(pair.a || '').trim()) return;
     const wrap = document.createElement('div');
     wrap.className = 'ai-msg-wrap';
     wrap.setAttribute('data-restored', 'true');
@@ -461,13 +480,19 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
     const bubble = wrap.querySelector<HTMLElement>('.ai-bubble.bot');
     if (bubble) {
       bubble.setAttribute('data-raw', pair.a);
+      let renderFallback = 0;
       const _doRender = (): void => {
+        window.clearTimeout(renderFallback);
         bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : escapeHtml(pair.a);
         // Markdown is only half the job — LaTeX (\(…\), \frac, …) and code
         // blocks need their own passes, exactly like the live message path.
         if (window._renderMath) window._renderMath(bubble);
         if (window._renderCode) window._renderCode(bubble);
       };
+      // Watchdog: the bridge import / KaTeX CDN load below can stall without
+      // settling (AV interception, tracking prevention) — never leave the
+      // bubble blank; plain-markdown after 4s beats empty forever.
+      renderFallback = window.setTimeout(_doRender, 4000);
       const _renderState = window as unknown as {
         _ensureAiRenderBridge?: () => Promise<unknown>;
         _minalloRenderMarkdownReady?: boolean;
