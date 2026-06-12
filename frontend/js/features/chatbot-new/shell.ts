@@ -7,6 +7,7 @@
 // PR-06: real markdown (KaTeX), file upload (img/.txt/.pdf), real Regenerate.
 
 import { renderMarkdown } from '../ai-chat/ai-markdown.js';
+import { attachMessageNavigator } from '../message-navigator/message-navigator.js';
 import { handleSourceClick, firstPage } from '../pdf-viewer/source-link.js';
 import {
   createAIThinkingStatus,
@@ -51,6 +52,7 @@ export function initNewChatbotShell(): void {
 
   initSidebar(newRoot);
   initConversation(newRoot);
+  initMessageNavigator(newRoot);
   initImportModal(newRoot);
   initContextTabs(newRoot);
   initContextCollapse(newRoot);
@@ -651,6 +653,30 @@ function initConversation(root: HTMLElement): void {
     if (files.length === 0) return;
     ev.preventDefault();
     void absorbPastedImages(files, state, pasteRow);
+  });
+}
+
+// Vertical message minimap on the right edge of the chat column. Lets the
+// user jump between earlier turns in long tutoring conversations. The
+// component watches .ncb-msgs itself, so send/regenerate/chat-switch all
+// stay in sync without extra wiring here.
+function initMessageNavigator(root: HTMLElement): void {
+  const card = root.querySelector<HTMLElement>('.ncb-card');
+  const scroller = root.querySelector<HTMLElement>('.ncb-center');
+  const msgs = root.querySelector<HTMLElement>('.ncb-msgs');
+  if (!card || !scroller || !msgs) return;
+  if (card.dataset.msgnavBound === '1') return;
+  card.dataset.msgnavBound = '1';
+  attachMessageNavigator({
+    host: card,
+    scroller,
+    container: msgs,
+    messageSelector: '.ncb-msg-row',
+    isUser: (row) => row.classList.contains('ncb-msg-row--user'),
+    snippetSource: (row) =>
+      row.querySelector<HTMLElement>('.ncb-bubble-text, .ncb-bubble-body') || row,
+    bottomGuard: () => root.querySelector<HTMLElement>('.ncb-input'),
+    compact: false,
   });
 }
 

@@ -515,13 +515,17 @@
                     if (loaded)
                         return;
                     loaded = true;
-                    GAMES_SCRIPTS.reduce((p, src) => p.then(() => new Promise((res) => {
+                    // async=false scripts download in PARALLEL but execute in
+                    // insertion order, so games.js (the hub) still runs after every
+                    // sub-module — readiness drops from 13 sequential round trips
+                    // (the old promise chain) to roughly one.
+                    GAMES_SCRIPTS.forEach((src) => {
                         const s = document.createElement('script');
                         s.src = versioned(src);
-                        s.onload = () => res();
-                        s.onerror = () => { console.error('lazy-games failed:', src); res(); };
+                        s.async = false;
+                        s.onerror = () => { console.error('lazy-games failed:', src); };
                         document.body.appendChild(s);
-                    })), Promise.resolve());
+                    });
                 }
                 function bindTrigger() {
                     const btn = document.getElementById('psbGames');
@@ -540,6 +544,21 @@
                     });
                     obs.observe(document.body, { childList: true, subtree: true });
                 }
+                // The hub injects its markup into the empty #psec-games div only
+                // after every script has run, so a cold click stared at a blank
+                // page. Prewarm the bundle once the app is idle — by the time a
+                // user reaches for Games it's already executed and the page
+                // renders instantly.
+                function scheduleGamesIdlePrewarm() {
+                    const schedule = window.requestIdleCallback
+                        ? (cb) => window.requestIdleCallback(cb, { timeout: 9000 })
+                        : (cb) => window.setTimeout(cb, 3500);
+                    window.setTimeout(() => schedule(loadGames), 2600);
+                }
+                if (document.body.getAttribute('data-ss-ready') === '1')
+                    scheduleGamesIdlePrewarm();
+                else
+                    window.addEventListener('ss-ready', scheduleGamesIdlePrewarm, { once: true });
             })();
             (function setupPortalFeatureLazyLoad() {
                 const lazyMap = {
@@ -548,7 +567,7 @@
                     ],
                     dashboardCalendar: ['views/dashboard/dashboard-calendar.js'],
                     chat: ['views/chat/chat.js'],
-                    aipage: ['views/chatbot/chatbot.js?v=5'],
+                    aipage: ['views/chatbot/chatbot.js?v=6'],
                     german: ['views/practice/practice.js'],
                     notes: ['views/lecturenotes/lecturenotes.js'],
                     profile: ['views/profile/profile.js'],
@@ -667,7 +686,7 @@
                             return r.text();
                         });
                     }
-                    const shellSrc = 'js/features/chatbot-new/shell.js?v=6&av=' +
+                    const shellSrc = 'js/features/chatbot-new/shell.js?v=7&av=' +
                         encodeURIComponent(String(window.MinalloConfig?.assetVersion || SS?.version || '1'));
                     const exists = Array.from(document.querySelectorAll('link[rel="modulepreload"]')).some((link) => (link.getAttribute('href') || '') === shellSrc);
                     if (!exists) {
@@ -713,6 +732,13 @@
                         void Promise.all([loadFeature('aipage'), loadFeature('chat')]).catch((err) => {
                             console.warn('[loader] chat prewarm failed', err);
                         });
+                        // Settings is html + js + css fetched on demand, so a cold
+                        // click showed an empty section while the network round trips
+                        // ran. Prewarm the whole route (same path the nav hover uses)
+                        // so it renders instantly.
+                        const prewarmRoute = window._ssPrewarmPortalFeature;
+                        if (typeof prewarmRoute === 'function')
+                            void prewarmRoute('settings');
                     };
                     const schedule = window.requestIdleCallback
                         ? (cb) => window.requestIdleCallback(cb, { timeout: 4500 })

@@ -12,6 +12,7 @@ import { initAiChipsBridge } from './features/ai-chat/ai-chips-bridge.js';
 import { initAiConfettiBridge, spawnConfetti } from './features/ai-chat/ai-confetti-bridge.js';
 import { initAiPanelEffects } from './features/ai-chat/ai-panel-effects.js';
 import { initAiPanelBridge } from './features/ai-chat/ai-panel-bridge.js';
+import { attachMessageNavigator } from './features/message-navigator/message-navigator.js';
 import {
   copyBubble as _copyBubble,
   fallbackCopy as _fallbackCopy,
@@ -675,6 +676,20 @@ function _ensureAiExportBridge(): Promise<unknown> {
 }
 
 initAiPanelEffects({ aiMsgs, aiPanel });
+// Compact message minimap on the right edge of the side-panel chat. The
+// component is DOM-driven (MutationObserver on #aiMsgs), so it tracks both
+// the floating panel and its document-rail-hosted (.dr-host-ai) incarnation.
+if (aiPanel && aiMsgs) {
+  attachMessageNavigator({
+    host: aiPanel,
+    scroller: aiMsgs,
+    container: aiMsgs,
+    messageSelector: '.ai-msg-wrap:not(.typing-wrap)',
+    isUser: (row) => row.classList.contains('user'),
+    snippetSource: (row) => row.querySelector<HTMLElement>('.ai-bubble') || row,
+    compact: true,
+  });
+}
 const _aiPanelBridge = initAiPanelBridge({
   aiPanel, aiClose: document.getElementById('aiClose'), aiMsgs,
   t: _t, escapeHtml,

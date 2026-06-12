@@ -606,7 +606,7 @@ interface LandingTranslation {
             ],
             dashboardCalendar: ['views/dashboard/dashboard-calendar.js'],
             chat: ['views/chat/chat.js'],
-            aipage: ['views/chatbot/chatbot.js?v=5'],
+            aipage: ['views/chatbot/chatbot.js?v=6'],
             german: ['views/practice/practice.js'],
             notes: ['views/lecturenotes/lecturenotes.js'],
             profile: ['views/profile/profile.js'],
@@ -730,7 +730,7 @@ interface LandingTranslation {
               });
             }
             const shellSrc =
-              'js/features/chatbot-new/shell.js?v=6&av=' +
+              'js/features/chatbot-new/shell.js?v=7&av=' +
               encodeURIComponent(String(window.MinalloConfig?.assetVersion || SS?.version || '1'));
             const exists = Array.from(document.querySelectorAll('link[rel="modulepreload"]')).some(
               (link) => (link.getAttribute('href') || '') === shellSrc
