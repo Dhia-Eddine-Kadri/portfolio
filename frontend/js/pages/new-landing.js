@@ -41,143 +41,143 @@
         startFree: 'Start free trial'
       },
       hero: {
-        badge: 'AI study workspace for real course material',
-        title: 'Study from your own lectures, not generic answers.',
-        subtitle: 'Upload PDFs, lecture notes, exercises, and formula sheets. Minallo helps you understand the material, solve problems step by step, cite the source pages, and keep your study routine organized.',
+        badge: 'Course workspace, AI tutor, and exam prep in one app',
+        title: 'Study from the files your course actually uses.',
+        subtitle: 'Upload lecture PDFs, exercise sheets, solutions, notes, and formula collections. Minallo organizes them by course, opens them in a PDF workspace, answers with cited sources, and turns the same material into quizzes, flashcards, cheatsheets, Deep Learn lessons, and ExamForge mock exams.',
         buildCta: 'Start studying with Minallo',
         watchCta: 'Watch preview',
         stats: {
-          pdf: 'Upload, annotate, summarize, and organize course PDFs',
-          ai: 'AI answers grounded in your uploaded study material',
+          pdf: 'Course files, folders, document types, PDF tabs, notes, and summaries',
+          ai: 'AI, Problem, Notes, and Summary rails grounded in uploaded PDFs',
           focusLabel: 'Focus',
-          focus: 'Pomodoro, playlists, games, and streaks to keep momentum'
+          focus: 'Daily Mission, Pomodoro, Study Lounge, games, and progress tracking'
         }
       },
       tutorPreview: {
-        workspace: 'Workspace',
-        courseMaterials: 'Course materials',
+        workspace: 'Course workspace',
+        courseMaterials: 'Files in this course',
         synced: 'Synced',
-        tabs: { lecture: 'Lecture PDF', exercise: 'Exercise', formula: 'Formula sheet' },
-        smartRetrieval: 'Smart retrieval',
+        tabs: { lecture: 'Lecture', exercise: 'Exercise sheet', formula: 'Formula sheet' },
+        smartRetrieval: 'Document understanding',
         tutorName: 'Minallo AI Tutor',
-        mode: 'Course-grounded answer',
-        userMsg: 'Solve exercise 6 using my lecture method and cite the formula.',
-        aiMsg: 'The exercise uses the equilibrium method from your lecture. Start with the force balance, then substitute the values from the exercise sheet. The formula is confirmed in your formula sheet.',
-        cite1: 'Citation: Lecture 03 · page 12',
-        cite2: 'Citation: Formula sheet · page 2',
+        mode: 'Answering from course sources',
+        userMsg: 'Solve exercise 6 with my lecture method and show the source pages.',
+        aiMsg: 'I found the matching lecture method, the exercise values, and the formula sheet entry. Start with the equilibrium equations, substitute the given values, then verify the final reaction against the worked example style from your course.',
+        cite1: 'Source: Mechanics_lecture_03.pdf - page 12',
+        cite2: 'Source: Formula_collection.pdf - page 2',
         miniSources: 'Sources',
         miniVerified: 'Verified',
-        miniGuessing: 'Unsupported claims'
+        miniGuessing: 'Unsupported'
       },
       features: {
-        eyebrow: 'Features',
-        title: 'A cleaner way to study with your course files.',
-        lead: 'Minallo turns scattered PDFs, exercises, notes, and revision tools into one focused workspace for understanding, practice, and exam preparation.',
+        eyebrow: 'What is actually inside',
+        title: 'Built around the way the app works today.',
+        lead: 'Minallo is not just a chat box. It is a course dashboard, PDF workspace, AI tutor, practice generator, exam-prep area, editor, German practice space, and focus system tied together around your uploaded materials.',
         cards: [
-          { title: 'AI tutor for your course', text: 'Ask questions about uploaded lectures, exercises, and formula sheets and get answers shaped around the material your professor gave you.' },
-          { title: 'Sources you can verify', text: 'Important answers include document and page references, so you can check the original PDF instead of trusting a black-box explanation.' },
-          { title: 'Focus tools built in', text: 'Pomodoro sessions, study streaks, and progress signals help you keep working instead of only collecting files.' },
-          { title: 'Honest when context is missing', text: 'If the uploaded material is incomplete, Minallo explains what is missing and asks for the right file, page, or exercise number.' },
-          { title: 'Connect lectures, exercises, and formulas', text: 'Minallo can bring together the task, the professor’s method, and the formula sheet in one structured explanation.' },
-          { title: 'Faster repeated study help', text: 'When the same course question comes back, Minallo can reuse a verified answer instead of starting from zero.' },
-          { title: 'German learner mode', text: 'Practice vocabulary, grammar, examples, and revision games in a dedicated language-learning space.' },
-          { title: 'Playlists while studying', text: 'Keep your favorite playlists close so long study sessions feel more personal and easier to stay with.' },
-          { title: 'Study games for momentum', text: 'Use quick challenges and revision games for short breaks that still keep you connected to learning.' }
+          { title: 'Course workspaces', text: 'Create subjects by semester, upload PDFs into folders, track read and unread files, and open Quiz, Flashcards, ExamForge, Cheatsheet, and Deep Learn from the same course page.' },
+          { title: 'PDF workspace with AI rail', text: 'Open course PDFs with tabs and use the right rail for AI, Problem, Notes, and Summary without leaving the document you are reading.' },
+          { title: 'Source-aware answers', text: 'Ask about lectures, exercises, solutions, and formula sheets. Minallo searches the course, cites pages, and tells you when the uploaded material is not enough.' },
+          { title: 'ExamForge mock exams', text: 'Generate source-grounded practice exams, answer them in exam or practice mode, grade written answers, and delete old runs when you no longer need them.' },
+          { title: 'Cheatsheet and Deep Learn', text: 'Create dense exam-ready cheatsheets or longer guided lessons from selected course files, then save and reopen them later.' },
+          { title: 'Quizzes and flashcards', text: 'Generate scored quizzes and review cards from the same indexed PDFs instead of manually copying definitions, formulas, and concepts.' },
+          { title: 'Daily Mission and progress', text: 'Turn uploaded files into a daily study plan, review what is due, and see progress across reading, notes, practice, and AI activity.' },
+          { title: 'Editor tools', text: 'Use the Writer for rich-text documents, the PDF Editor for highlighting, signing, and text, and the PDF Merger to combine and reorder PDFs.' },
+          { title: 'German, games, and Study Lounge', text: 'Practice German vocabulary, grammar, sentences, and writing; take quick game breaks; and use Study Lounge music services while you work.' }
         ]
       },
       paths: {
-        eyebrow: 'Choose your space',
-        title: 'Start with the path that fits your goal.',
-        lead: 'Minallo adapts around the way you study: course work for lectures and exams, or a separate German-learning space for daily practice.',
+        eyebrow: 'Choose your workspace',
+        title: 'Start where the work actually happens.',
+        lead: 'Most students begin in Courses, then move into PDFs, AI help, exam practice, notes, and the daily plan. German practice, games, chat, and editor tools are separate when you need them.',
         studentCard: {
           eyebrow: 'Courses',
-          title: "I'm a student",
-          desc: 'For students who want one place for lecture files, exercises, PDF work, focus sessions, and course-aware AI support.',
+          title: "I'm studying a course",
+          desc: 'For lecture PDFs, exercise sheets, source-grounded answers, mock exams, cheatsheets, Deep Learn lessons, notes, summaries, and daily study plans.',
           items: [
-            'Organize every course, file, and study note',
-            'Get AI help with citations from your materials',
-            'Edit PDFs, take notes, and stay focused'
+            'Files, folders, document types, and PDF tabs',
+            'AI, Problem, Notes, and Summary inside the PDF workspace',
+            'Quiz, Flashcards, ExamForge, Cheatsheet, and Deep Learn'
           ]
         },
         germanCard: {
           eyebrow: 'Language',
           title: "I'm learning German",
-          desc: 'For learners who want vocabulary, grammar explanations, examples, and playful revision without mixing it into course work.',
+          desc: 'For vocabulary, grammar, sentence practice, daily word work, writing feedback, and playful revision outside your course folders.',
           items: [
-            'Vocabulary and grammar practice',
-            'Simple examples and sentence practice',
-            'Mini-games for revision and motivation'
+            'Vocabulary, grammar, and everyday sentences',
+            'Writing Coach feedback adapted to your level',
+            'Practice games and daily language routines'
           ]
         }
       },
       lifestyle: {
-        eyebrow: 'Study vibe',
-        title: 'A study space you actually want to return to.',
-        lead: 'Minallo combines serious study tools with small moments of motivation, so your workspace feels useful, personal, and sustainable.',
+        eyebrow: 'Momentum',
+        title: 'The app supports the routine around the studying too.',
+        lead: 'Minallo keeps the practical pieces close: dashboard widgets, Daily Mission tasks, Pomodoro focus, Study Lounge music, games, notifications, chat, and account-level progress.',
         cards: [
-          { title: 'Favorite playlists', text: 'Study, revise, or practice German with the music that helps you concentrate.' },
-          { title: 'Study games', text: 'Use quick games for vocabulary, revision breaks, and motivation between focused sessions.' },
-          { title: 'Streak rewards', text: 'Turn consistent work into visible progress, small wins, and a reason to keep going.' }
+          { title: 'Study Lounge music', text: 'Keep focus music and playlists nearby while you read, solve exercises, or review cards.' },
+          { title: 'Games for breaks', text: 'Open quick games from the sidebar when you need a reset without leaving the study app.' },
+          { title: 'Daily Mission', text: 'Use today\'s plan to decide what to read, review, practice, or generate next from your course files.' }
         ]
       },
       tutor: {
         eyebrow: 'AI Tutor',
-        title: 'An AI tutor that studies the same material you do.',
-        lead: 'Minallo starts with the PDF in front of you, searches the wider course when needed, and explains answers using your uploaded lectures, exercises, and formula sheets.',
+        title: 'Ask the AI from the exact place you are studying.',
+        lead: 'Use the side rail while a PDF is open, or the full Chatbot page for longer conversations. Both can use course context, source links, and document understanding from your uploaded files.',
         items: [
-          'Search across lectures, exercises, notes, and formula sheets',
-          'Show page-level citations for important answers',
-          'Use the open PDF first, then expand to the course',
-          'Flag missing context instead of guessing'
+          'Ask from the current PDF, a selected course, or the full chatbot',
+          'Open cited sources back to the right file and page',
+          'Use tutor modes for explanations, guided solving, notes, summaries, and study tasks',
+          'Generate Cheatsheet or Daily Mission actions from AI when the course context supports it'
         ]
       },
       pipeline: {
-        eyebrow: 'How it works',
-        title: 'From uploaded PDF to grounded answer',
+        eyebrow: 'How the course AI works',
+        title: 'From uploaded file to study action',
         steps: [
-          { title: 'Upload', text: 'Add lecture PDFs, exercise sheets, notes, and formula collections to your workspace.' },
-          { title: 'Understand', text: 'Minallo reads the files into searchable pages, formulas, exercises, and useful metadata.' },
-          { title: 'Retrieve', text: 'For each question, Minallo selects the most relevant course context instead of treating every file the same.' },
-          { title: 'Answer', text: 'You get a clear explanation with source pages and honest warnings when the material is incomplete.' }
+          { title: 'Upload and classify', text: 'Add lectures, exercises, solutions, notes, summaries, exams, or formula sheets. Minallo keeps the course file list organized and detects document types.' },
+          { title: 'Index the content', text: 'PDF text, pages, formulas, exercises, and topic signals become searchable for AI, quizzes, flashcards, cheatsheets, and Deep Learn.' },
+          { title: 'Retrieve the right context', text: 'For each question or generated tool, Minallo chooses relevant documents and pages instead of dumping the whole course into the answer.' },
+          { title: 'Create the study output', text: 'You get an answer, note, summary, quiz, flashcard deck, ExamForge run, Cheatsheet, Deep Learn lesson, or Daily Mission task tied back to your files.' }
         ]
       },
       workflow: {
         eyebrow: 'Workspace',
-        title: 'Everything important stays in one flow.',
-        lead: 'Move from course files to explanations, notes, focused work, German practice, and revision without jumping between disconnected tools.',
+        title: 'Everything important stays in one study flow.',
+        lead: 'Move between the surfaces students actually use inside Minallo: Courses, PDF rail tools, Chatbot, Editor, German practice, Games, Study Lounge, Dashboard, and Subscription.',
         cards: [
-          { title: 'Ask', text: 'Ask in natural language, even when you only know the page, topic, or exercise.' },
-          { title: 'Solve', text: 'Turn difficult exercises into structured steps you can follow and review.' },
-          { title: 'Learn', text: 'Practice German vocabulary, grammar, examples, and revision games in a separate space.' },
-          { title: 'Stay with it', text: 'Use focus sessions, playlists, games, and streaks to make studying easier to continue.' }
+          { title: 'Courses', text: 'Create a subject, upload files, organize folders, open PDFs, and launch Quiz, Flashcards, ExamForge, Cheatsheet, or Deep Learn from the course tabs.' },
+          { title: 'PDF rail', text: 'While reading a PDF, switch between AI, Problem, Notes, and Summary so the answer stays connected to the document.' },
+          { title: 'Chatbot and chat', text: 'Use the full chatbot for broader course conversations, and use Chat for rooms and messages outside the tutor.' },
+          { title: 'Editor and practice', text: 'Write documents, annotate PDFs, merge files, practice German, play games, and keep moving with Daily Mission and focus tools.' }
         ]
       },
       quote: {
-        title: '"The answer finally matches the way my course explains it."',
-        text: 'That is the point of Minallo: course-aware explanations, clear sources, and a workspace that helps students keep going.'
+        title: '"The answer points back to the exact file I was studying."',
+        text: 'That is the point of Minallo: course files first, source pages visible, and the next study action only one click away.'
       },
       pricing: {
         eyebrow: 'Pricing',
-        title: 'Try the full workspace before you commit.',
-        lead: 'Start with a 7-day free trial. Continue with one simple subscription for AI tutoring, document tools, German practice, focus features, playlists, and study games.',
+        title: 'Try the real workspace before you commit.',
+        lead: 'Start with a 7-day free trial. Continue with one subscription for course uploads, AI tutor, PDF workspace, Chatbot, quizzes, flashcards, ExamForge, Cheatsheet, Deep Learn, editor tools, German practice, games, and focus features.',
         pro: {
           popular: '7-day free trial',
           name: 'Student Pro',
-          sub: 'Everything you need for a focused study routine.',
+          sub: 'The full Minallo study app, not a limited demo.',
           per: '/month after trial',
           items: [
-            'Course-aware AI tutor with citations',
-            'Uploads, notes, summaries, quizzes, and flashcards',
-            'PDF editor and study workspace',
-            'German learner mode and revision games',
-            'Pomodoro, playlists, streaks, and focus dashboard'
+            'Courses, folders, uploads, PDF tabs, and source links',
+            'AI rail, Chatbot, notes, summaries, and problem solving',
+            'Quiz, Flashcards, ExamForge, Cheatsheet, and Deep Learn',
+            'Writer, PDF Editor, PDF Merger, and saved documents',
+            'German practice, Writing Coach, Games, Study Lounge, and Daily Mission'
           ],
           cta: 'Start 7-day free trial'
         }
       },
       ctaBanner: {
-        title: 'Build a study space that understands your material.',
-        text: 'Upload your course files, ask better questions, solve exercises with sources, and keep your routine moving with focus tools and revision features.',
+        title: 'Open a course, upload the files, and let the rest of the workspace connect.',
+        text: 'Read PDFs, ask with sources, generate practice, create cheatsheets and lessons, plan today\'s mission, edit documents, and keep your study routine in one place.',
         cta: 'Start studying now'
       },
       footer: {
@@ -481,36 +481,36 @@
     en: {
       student: {
         title: 'Course workspace',
-        subtitle: 'For university and school study',
-        description: 'A focused workspace for course files, lecture PDFs, exercises, AI explanations, PDF editing, notes, Pomodoro sessions, streaks, and study progress.',
+        subtitle: 'Files, PDF rail, AI, and exam prep',
+        description: 'Create a course, upload files into folders, open PDFs with AI, Problem, Notes, and Summary, and generate Quiz, Flashcards, ExamForge, Cheatsheet, Deep Learn, notes, summaries, and Daily Mission tasks from the same material.',
         icon: 'layout-dashboard',
         items: [
-          'Organized course pages for lectures, exercises, notes, and formula sheets',
-          'AI tutor answers grounded in uploaded course documents',
-          'PDF tools for highlighting, writing, signing, saving, and exporting',
-          'Pomodoro sessions, study streaks, dashboard stats, and progress tracking'
+          'Course tabs for Files, Quiz, Flashcards, ExamForge, Cheatsheet, and Deep Learn',
+          'PDF workspace with source-linked AI answers, problem solving, notes, and summaries',
+          'Daily Mission and progress across reading, notes, practice, and AI activity',
+          'Editor tools for writing documents, annotating PDFs, and merging PDFs'
         ],
         preview: [
-          ['file-text', 'Course library', 'Keep every subject, file, and note in one clean place.'],
-          ['brain-circuit', 'Course-aware AI', 'Ask questions and get answers with source pages.'],
-          ['timer', 'Focus mode', 'Study with Pomodoro sessions, progress, and visible streaks.']
+          ['file-text', 'Course files', 'Upload lectures, exercises, solutions, notes, exams, and formula sheets.'],
+          ['brain-circuit', 'Grounded AI', 'Ask from the PDF rail or full Chatbot and open cited pages.'],
+          ['trophy', 'Exam prep', 'Generate quizzes, flashcards, mock exams, cheatsheets, and lessons.']
         ]
       },
       german: {
         title: 'German practice space',
-        subtitle: 'For daily language progress',
-        description: 'A dedicated German-learning space for vocabulary, grammar help, simple explanations, everyday examples, and playful revision.',
+        subtitle: 'Vocabulary, writing, grammar, and games',
+        description: 'A dedicated German-learning area with vocabulary, grammar, sentence practice, daily word work, Writing Coach feedback, and small practice games away from your course folders.',
         icon: 'languages',
         items: [
-          'German vocabulary practice with simple examples and translations',
-          'Grammar explanations written for real understanding',
-          'Sentence examples for everyday German situations',
-          'Mini-games and revision challenges that make practice easier to repeat'
+          'Vocabulary, grammar, and everyday sentence practice',
+          'Writing Coach feedback adapted to your profile level',
+          'Daily word and language routines from the dashboard',
+          'Games and revision challenges for lighter practice sessions'
         ],
         preview: [
           ['languages', 'German coach', 'Build vocabulary, grammar, sentences, and everyday phrases.'],
-          ['book-open', 'Examples & phrases', 'Practice with simple examples and useful daily sentences.'],
-          ['gamepad-2', 'Language games', 'Review vocabulary through quick challenges.']
+          ['book-open', 'Writing feedback', 'Write a paragraph and get AI feedback for your level.'],
+          ['gamepad-2', 'Practice games', 'Review with quick challenges when you need a lighter session.']
         ]
       }
     },
