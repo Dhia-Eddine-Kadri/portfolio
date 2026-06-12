@@ -321,6 +321,13 @@
   background: rgba(15, 23, 42, .58);
 }
 
+.ef-session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .ef-doc {
   border-radius: 10px;
 }
@@ -353,9 +360,32 @@
   cursor: pointer;
 }
 
-.ef-session.active {
+.ef-session-row.active .ef-session {
   border-color: rgba(56, 189, 248, .58);
   background: rgba(30, 64, 117, .52);
+}
+
+.ef-session-delete {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  border: 1px solid rgba(248, 113, 113, .22);
+  border-radius: 12px;
+  color: #fca5a5;
+  background: rgba(127, 29, 29, .18);
+  cursor: pointer;
+}
+
+.ef-session-delete:hover {
+  border-color: rgba(248, 113, 113, .48);
+  background: rgba(127, 29, 29, .34);
+  color: #fecaca;
+}
+
+.ef-session-delete:disabled {
+  cursor: wait;
+  opacity: .58;
 }
 
 /* ── Course Topic Map ────────────────────────────────────────────────── */
@@ -803,6 +833,7 @@ body:not(.night) .ef-topic-search,
 body:not(.night) .ef-doc-group,
 body:not(.night) .ef-doc,
 body:not(.night) .ef-session,
+body:not(.night) .ef-session-delete,
 body:not(.night) .ef-question,
 body:not(.night) .ef-option,
 body:not(.night) .ef-feedback,
@@ -837,6 +868,7 @@ body:not(.night) .ef-doc-group-head {
 body:not(.night) .ef-doc-group-head:hover,
 body:not(.night) .ef-doc:hover,
 body:not(.night) .ef-session:hover,
+body:not(.night) .ef-session-delete:hover,
 body:not(.night) .ef-option:hover {
   background: rgba(239, 246, 255, 0.95) !important;
   border-color: var(--lm-card-border-strong) !important;
@@ -888,10 +920,21 @@ body:not(.night) .ef-topic-chip.is-active {
   border-color: rgba(37, 99, 235, 0.36) !important;
 }
 
-body:not(.night) .ef-session.active,
+body:not(.night) .ef-session-row.active .ef-session,
 body:not(.night) .ef-option.selected {
   background: rgba(37, 99, 235, 0.12) !important;
   border-color: rgba(37, 99, 235, 0.42) !important;
+}
+
+body:not(.night) .ef-session-delete {
+  color: #dc2626 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.22) !important;
+}
+
+body:not(.night) .ef-session-delete:hover {
+  background: rgba(239, 68, 68, 0.14) !important;
+  border-color: rgba(239, 68, 68, 0.38) !important;
 }
 
 body:not(.night) .ef-option.correct {

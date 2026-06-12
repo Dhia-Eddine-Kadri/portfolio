@@ -20,6 +20,25 @@
   function _supaHeaders() { return window._ssDb && window._ssDb.supaHeaders ? window._ssDb.supaHeaders() : {}; }
   function _supaUrl() { return window._ssDb && window._ssDb.supaUrl ? window._ssDb.supaUrl() : ''; }
 
+  function _deleteExamSession(sessionId, courseId) {
+    if (!sessionId || String(sessionId).indexOf('local-') === 0 || !_supaUrl()) {
+      return Promise.reject(new Error('This exam is not saved in the database.'));
+    }
+    var url = _supaUrl() + '/rest/v1/exam_sessions?id=eq.' + encodeURIComponent(sessionId) +
+      '&course_id=eq.' + encodeURIComponent(courseId) + '&select=id';
+    return fetch(url, {
+      method: 'DELETE',
+      headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=representation' })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('The exam could not be deleted.');
+      return r.json();
+    }).then(function (rows) {
+      if (!Array.isArray(rows) || !rows.length) {
+        throw new Error('No matching saved exam was deleted.');
+      }
+    });
+  }
+
   function _getState(courseId) {
     if (!_state[courseId]) {
       _state[courseId] = {
@@ -407,10 +426,15 @@
       els.sessions.innerHTML = st.sessions.map(function (s) {
         var active = s.id === st.activeId;
         return (
-          '<button class="ef-session ' + (active ? 'active' : '') + '" type="button" data-session="' + _esc(s.id) + '">' +
+          '<div class="ef-session-row' + (active ? ' active' : '') + '" data-session-row="' + _esc(s.id) + '">' +
+          '<button class="ef-session" type="button" data-session="' + _esc(s.id) + '">' +
             '<span class="ef-session-title">' + _esc(s.title || 'ExamForge') + '</span>' +
             '<span class="ef-session-meta">' + s.questions.length + ' questions · ' + _esc(s.difficulty || 'medium') + '</span>' +
-          '</button>'
+          '</button>' +
+          '<button class="ef-session-delete" type="button" data-delete-session="' + _esc(s.id) + '" title="Delete exam" aria-label="Delete exam">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>' +
+          '</button>' +
+          '</div>'
         );
       }).join('');
       els.sessions.querySelectorAll('[data-session]').forEach(function (btn) {
@@ -421,6 +445,31 @@
           st.grades = {};
           st.marked = {};
           renderAll();
+        });
+      });
+      els.sessions.querySelectorAll('[data-delete-session]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var sessionId = btn.getAttribute('data-delete-session');
+          var session = st.sessions.find(function (s) { return s.id === sessionId; });
+          if (!sessionId || !session) return;
+          if (!window.confirm('Delete this ExamForge run?\n\nThis removes the exam, its questions, and saved answers from the database.')) return;
+          btn.disabled = true;
+          _deleteExamSession(sessionId, courseId).then(function () {
+            st.sessions = st.sessions.filter(function (s) { return s.id !== sessionId; });
+            if (st.activeId === sessionId) {
+              st.activeId = st.sessions[0] ? st.sessions[0].id : null;
+              st.answers = {};
+              st.grades = {};
+              st.submitted = false;
+              st.marked = {};
+            }
+            renderAll();
+            _toast('Exam deleted', 'The exam was removed from the database.');
+          }).catch(function (err) {
+            btn.disabled = false;
+            _toast('Delete failed', err && err.message ? err.message : 'Please try again.');
+          });
         });
       });
     }
