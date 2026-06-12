@@ -34,7 +34,9 @@ function _subscriptionMsg(): string {
 function isInternalTechnicalQuestion(text: string): boolean {
   const q = (text || '').toLowerCase();
   if (!q.trim()) return false;
-  const internalTerms = /\b(api|backend|database|db|schema|sql|supabase|stripe|paypal|cloudflare|server|endpoint|token|jwt|secret|key|rag|embedding|vector|prompt|system prompt|architecture|implementation|source code|codebase|repository|migration|rls|security rules|auth flow|webhook|deno|netlify|worker|function)\b/i;
+  const modelProbe = /\b(what|which|whose|who|tell|show|reveal|name|using|powered)\b[\s\S]{0,80}\b(model|llm|ai model|gpt|openai|claude|gemini|mistral|llama)\b|\b(model|llm|ai model|gpt|openai|claude|gemini|mistral|llama)\b[\s\S]{0,80}\b(what|which|whose|who|tell|show|reveal|name|using|powered)\b/i;
+  if (modelProbe.test(q)) return true;
+  const internalTerms = /\b(api|backend|database|db|schema|sql|supabase|stripe|paypal|cloudflare|server|endpoint|token|jwt|secret|key|rag|embedding|vector|prompt|system prompt|architecture|implementation|source code|codebase|repository|migration|rls|security rules|auth flow|webhook|deno|netlify|worker|function|model|llm|gpt|openai|claude|gemini|mistral|llama)\b/i;
   const probing = /\b(how|what|where|why|show|tell|explain|describe|list|give|share|reveal|access|debug|bypass|inspect|build|implemented|stored|connected|works?|configured)\b/i;
   return internalTerms.test(q) && probing.test(q);
 }
