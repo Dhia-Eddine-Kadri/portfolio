@@ -410,6 +410,10 @@ interface HistoryPair {
   q: string;
   a: string;
   ts?: number;
+  // Cited sources of the answer, so the "Sources (N)" dropdown survives the
+  // panel being closed/reopened. Local-only: the chat_history table has no
+  // sources column, so cross-device restores fall back to no dropdown.
+  sources?: SourceItem[];
 }
 
 function _historyKey(courseId?: string | null): string {
@@ -432,7 +436,12 @@ function _saveCourseHistory(courseId: string | null | undefined, pairs: HistoryP
     localStorage.setItem(_historyKey(courseId), JSON.stringify(trimmed));
   } catch { /* quota */ }
 }
-function _appendCourseHistory(courseId: string | null | undefined, question: string, answer: string): void {
+function _appendCourseHistory(
+  courseId: string | null | undefined,
+  question: string,
+  answer: string,
+  sources?: SourceItem[]
+): void {
   // Never persist a fully blank turn — it restores as empty sender labels
   // and, with a blank question, dedup collapses ALL such turns into one
   // ghost entry that can shadow the real history.
@@ -440,6 +449,8 @@ function _appendCourseHistory(courseId: string | null | undefined, question: str
   // A new turn means this course has live history again — lift any clear tombstone.
   _clearedCourses.delete(_historyKey(courseId));
   const pairs = _loadCourseHistory(courseId);
+  // Cap per-pair sources so a long course history can't crowd localStorage.
+  const src = sources && sources.length ? sources.slice(0, 8) : undefined;
   // If the most recent pair has the same question, this is a regenerate —
   // replace its answer instead of appending a duplicate pair. Without this,
   // restoring history after a regenerate renders both the old and the new
@@ -448,8 +459,9 @@ function _appendCourseHistory(courseId: string | null | undefined, question: str
   if (last && (last.q || '').trim() === (question || '').trim()) {
     last.a = answer;
     last.ts = Date.now();
+    last.sources = src;
   } else {
-    pairs.push({ q: question, a: answer, ts: Date.now() });
+    pairs.push({ q: question, a: answer, ts: Date.now(), ...(src ? { sources: src } : {}) });
   }
   _saveCourseHistory(courseId, pairs);
   const _ps = (window as unknown as { _progressSync?: { syncCourseAiSessions?: (id: string, n: number) => void } })._progressSync;
@@ -497,7 +509,12 @@ function _dedupPairs(pairs: HistoryPair[] | null): HistoryPair[] {
       (p.q || '').trim().toLowerCase() ||
       'a:' + (p.a || '').trim().slice(0, 80).toLowerCase();
     if (!byQ.has(key)) order.push(key);
-    byQ.set(key, p);
+    // The DB copy of a turn has no sources column — when it collides with the
+    // local copy of the same question, keep the local pair's sources so the
+    // restored answer doesn't lose its dropdown.
+    const prev = byQ.get(key);
+    const merged = prev?.sources?.length && !p.sources?.length ? { ...p, sources: prev.sources } : p;
+    byQ.set(key, merged);
   }
   return order.map((k) => byQ.get(k)!);
 }
@@ -551,6 +568,9 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
         // blocks need their own passes, exactly like the live message path.
         if (window._renderMath) window._renderMath(bubble);
         if (window._renderCode) window._renderCode(bubble);
+        // After the innerHTML write, like the live path — appending earlier
+        // would be wiped by this render (or by the 4s watchdog re-render).
+        appendSourcesDropdown(bubble, pair.sources);
       };
       // Watchdog: the bridge import / KaTeX CDN load below can stall without
       // settling (AV interception, tracking prevention) — never leave the
@@ -1443,7 +1463,7 @@ export function initAskAI(
                 answerCacheId: _cacheId,
               };
 
-              _appendCourseHistory(_courseId, question, fullAnswer);
+              _appendCourseHistory(_courseId, question, fullAnswer, sources);
 
               if (bubble) {
                 bubble.setAttribute('data-raw', fullAnswer);
@@ -1555,7 +1575,12 @@ export function initAskAI(
         // finalize(); without this the non-RAG branch silently dropped chat
         // history on reload for users with no indexed course docs.
         if (!d.error && displayTextLocal && displayTextLocal !== 'No response') {
-          _appendCourseHistory(window.activeCourseId || window.currentCourseId || '', question, displayTextLocal);
+          _appendCourseHistory(
+            window.activeCourseId || window.currentCourseId || '',
+            question,
+            displayTextLocal,
+            (d._ragData as RagAskResponse | undefined)?.sources
+          );
         }
 
         const ansWrap = document.createElement('div');
