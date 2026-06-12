@@ -44,6 +44,7 @@ from .answer import (
 from .document_context import understanding_block_for_ids
 from .retrieval import RetrievedChunk
 from .storage import download_document_bytes
+from .workspace_context import ACTIONS_CONTRACT, EXAM_COACH_OVERLAY, TUTOR_STRUCTURE_OVERLAY
 
 log = logging.getLogger(__name__)
 
@@ -813,6 +814,9 @@ def stream_answer(
     weak_topics: list[str] | None = None,
     previous_turns: list[dict[str, str]] | None = None,
     problem_solver: dict[str, str] | None = None,
+    workspace_block: str | None = None,
+    assistant_mode: str | None = None,
+    workspace_question: bool = False,
 ) -> Generator[bytes, None, None]:
     """Generator that yields SSE byte chunks. Pluggable into FastAPI's
     StreamingResponse with media_type='text/event-stream'.
@@ -838,6 +842,11 @@ def stream_answer(
     # have", "is there a game room" away from the RAG pipeline so the model
     # can't pattern-match course chunks into a generic-study-app reply.
     app_question = is_app_question(question)
+    # Workspace questions ("where are my flashcards", "what can I do in this
+    # course") are answered from the LIVE WORKSPACE block, not lecture chunks —
+    # same fast path as app questions.
+    if workspace_question:
+        app_question = True
 
     strength = _context_strength(chunks)
     # Review fix #3 — partial retrieval mode. Mirrors answer.py's logic:
@@ -1059,6 +1068,21 @@ def stream_answer(
             has_history=bool(previous_turns),
             active_file_name=("Problem Solver input" if has_problem_source else active_file_name),
         )
+
+    # ── Workspace awareness (layer 2 of the three knowledge layers) ──────────
+    # The live workspace block carries the student's real course data (file/
+    # quiz/deck/exam counts, weak topics, current tab). It rides EVERY course
+    # request: app questions answer with real numbers, content questions can
+    # point at the right tab, and the actions contract lets the model offer
+    # clickable next steps.
+    if workspace_block:
+        system_prompt += "\n" + workspace_block
+        if not problem_solver:
+            system_prompt += ACTIONS_CONTRACT
+    if assistant_mode == "exam_coach":
+        system_prompt += EXAM_COACH_OVERLAY
+    elif assistant_mode == "tutor" and not app_question:
+        system_prompt += TUTOR_STRUCTURE_OVERLAY
 
     user_message = "QUESTION:\n" + question.strip()
     if problem_mode and problem_solver:

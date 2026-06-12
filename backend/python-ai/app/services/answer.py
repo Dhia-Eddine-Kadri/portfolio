@@ -399,8 +399,20 @@ SIDEBAR (left rail, top → bottom)
    "Word of the day", quick links to recent courses, calendar of
    upcoming events.
 2. Courses — the core workspace. List of semesters; each semester holds
-   courses. Inside a course: Files tab, Notes tab, Summaries tab, Quiz
-   tab, Flashcards tab, Forum tab, Calendar tab.
+   courses. Inside a course there are EXACTLY six tabs (use these exact
+   names): Files, Quiz, Flashcards, ExamForge, Cheatsheet, Deep Learn.
+   • Files — course folders, uploaded PDFs, lecture notes, exercises and
+     all study material. Upload, open, organise into folders.
+   • Quiz — AI-generated quizzes from the course material: take quizzes,
+     review answers, see scores and weak topics.
+   • Flashcards — AI-generated flashcard decks for active recall:
+     study decks, review difficult cards, track progress.
+   • ExamForge — exam-style practice generated from the course material:
+     practice exams with difficulty levels, solutions, performance.
+   • Cheatsheet — compact exam-focused summaries: key formulas,
+     definitions, short revision notes generated from the files.
+   • Deep Learn — guided tutor mode that teaches course topics step by
+     step from the uploaded material, with understanding checks.
 3. Lecture Notes — separate hub that lists every auto-generated note /
    summary across all courses.
 4. Editor — three sub-tools: Writer (rich-text editor with AI assist),
@@ -485,15 +497,23 @@ the second one in split view). Features:
 ──────────────────────────────────────────────────────────────────────
 GENERATING STUDY MATERIAL FROM A COURSE
 ──────────────────────────────────────────────────────────────────────
-Inside a course:
-- Notes tab → "Generate notes" → choose source files → AI writes
-  structured lecture notes.
-- Summaries tab → "Generate summary" → choose TL;DR or Detailed.
+Inside a course (tab names are exact):
 - Quiz tab → "Generate quiz" → pick file(s), number of questions,
   difficulty. Take the quiz inline; selected answers turn blue,
-  correct = green, incorrect = red.
+  correct = green, incorrect = red. Scores feed the weak-topic tracker.
 - Flashcards tab → "Generate flashcards" → review with spaced
   repetition; each card has front/back + difficulty rating.
+- ExamForge tab → "Generate exam" → exam-style practice built from the
+  course files (difficulty levels, solutions, score tracking).
+- Cheatsheet tab → "Generate cheatsheet" → one dense, exam-ready page of
+  the key formulas and definitions from the course files.
+- Deep Learn tab → "Start Deep Learn" → a guided step-by-step tutoring
+  session on a course topic, with follow-up questions and understanding
+  checks.
+- AI notes and summaries for a single file are generated from the PDF
+  viewer (Notes / Summary buttons on the right rail).
+The recommended exam-prep order is: Files → Cheatsheet → Deep Learn →
+Flashcards → Quiz → ExamForge.
 
 ──────────────────────────────────────────────────────────────────────
 EDITOR HUB (sidebar "Editor")

@@ -44,6 +44,14 @@ from ..services.source_router import (
     effective_document_ids,
 )
 from ..services.web_answer import generate_web_answer
+from ..services.workspace_context import (
+    detect_assistant_mode,
+    fetch_workspace_snapshot,
+    format_workspace_block,
+    is_workspace_question,
+    sanitize_page_context,
+    workspace_fingerprint,
+)
 from ..supabase_client import get_supabase
 
 # Same hourly cap as the Netlify /api/ai/ask path so the two surfaces share
@@ -134,6 +142,16 @@ class OpenFileImagePayload(BaseModel):
     page: int | None = None
 
 
+class PageContextPayload(BaseModel):
+    """Where the student currently is in the Minallo UI. Only facts the server
+    can't know; sanitised + clamped in workspace_context.sanitize_page_context.
+    Workspace DATA (counts, names) is never accepted from the client."""
+    page: str | None = None          # e.g. "course" | "pdf-viewer" | "chatbot"
+    courseName: str | None = None
+    activeTab: str | None = None     # files|quiz|flashcards|examforge|cheatsheet|deeplearn
+    documentTitle: str | None = None
+
+
 class AskStreamRequest(BaseModel):
     courseId: str
     documentIds: list[str] | None = None
@@ -159,6 +177,10 @@ class AskStreamRequest(BaseModel):
     # sends a long history.
     previousTurns: list[PreviousTurn] | None = None
     problemSolver: ProblemSolverPayload | None = None
+    # Current UI location (page / course tab / open document title). Optional;
+    # sanitised server-side. Lets the assistant answer "where am I, what can I
+    # do here" and point at the right course tab.
+    pageContext: PageContextPayload | None = None
     # bypassCache is intentionally NOT exposed on the public API. The cache
     # is keyed by document_version_hash so it invalidates automatically when
     # documents change; letting the client opt out defeats the single biggest
@@ -379,7 +401,13 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     )
 
     app_question = is_app_question(question)
-    if app_question:
+    # Workspace questions ("where are my flashcards", "which quizzes did I
+    # complete", "what can I do in this course") are answered from the live
+    # workspace snapshot, not lecture chunks — same routing as app questions.
+    workspace_question = (
+        not app_question and bool(payload.courseId) and is_workspace_question(question)
+    )
+    if app_question or workspace_question:
         source_decision = replace(
             source_decision,
             source_scope=SourceScope.GENERAL_KNOWLEDGE,
@@ -388,8 +416,9 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             relevance_score=None,
             web_search_used=False,
         )
+    app_or_workspace = app_question or workspace_question
 
-    if source_decision.source_scope == SourceScope.NEEDS_CLARIFICATION and not app_question:
+    if source_decision.source_scope == SourceScope.NEEDS_CLARIFICATION and not app_or_workspace:
         return _stream_static_answer(
             text=source_decision.needs_clarification_message
             or "Which file should I use? Please select a PDF or switch to All course files.",
@@ -397,7 +426,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             answer_mode="clarification",
         )
 
-    if source_decision.source_scope == SourceScope.INTERNET and not app_question:
+    if source_decision.source_scope == SourceScope.INTERNET and not app_or_workspace:
         web_answer = await run_in_threadpool(
             lambda: generate_web_answer(question, query=source_decision.sanitized_web_query or question)
         )
@@ -412,7 +441,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             completion_tokens=web_answer.get("completionTokens"),
         )
 
-    if source_decision.source_scope == SourceScope.GENERAL_KNOWLEDGE and not app_question:
+    if source_decision.source_scope == SourceScope.GENERAL_KNOWLEDGE and not app_or_workspace:
         prefix = auto_general_prefix() if source_decision.selected_source_mode.value == "auto" else ""
         general = await run_in_threadpool(lambda: generate_general_answer(question, prefix=prefix))
         return _stream_static_answer(
@@ -423,6 +452,30 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             prompt_tokens=general.get("promptTokens"),
             completion_tokens=general.get("completionTokens"),
         )
+
+    # ── Live workspace context (layer 2: the student's real Minallo data) ────
+    # Server-fetched, user-scoped; the client only contributes the sanitised UI
+    # location. The block rides the system prompt for every course request, and
+    # its fingerprint joins the cache key so "you have 3 quizzes" answers die
+    # the moment a 4th appears. All best-effort — never blocks answering.
+    page_context = sanitize_page_context(
+        payload.pageContext.model_dump() if payload.pageContext else None
+    )
+    workspace_snapshot = None
+    weak_topics: list[str] = []
+    if payload.courseId:
+        from ..services.mastery import fetch_weak_topics  # noqa: WPS433
+        workspace_snapshot = await run_in_threadpool(
+            lambda: fetch_workspace_snapshot(user_id, payload.courseId)
+        )
+        weak_topics = await run_in_threadpool(lambda: fetch_weak_topics(user_id, payload.courseId))
+    workspace_block = format_workspace_block(
+        workspace_snapshot, page_context=page_context, weak_topics=weak_topics
+    )
+    ws_fingerprint = workspace_fingerprint(
+        {"s": workspace_snapshot, "w": weak_topics, "p": page_context}
+    ) if workspace_block else ""
+    assistant_mode = detect_assistant_mode(question)
 
     # ── Cache check (same logic as /ask) ─────────────────────────────────────
     # When the request carries openFileContext (the user is reading a PDF
@@ -470,6 +523,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         "source_scope": source_decision.source_scope.value,
         "course_file_scope": source_decision.course_file_scope.value,
         "selected_document_ids": retrieval_document_ids,
+        "workspace_fingerprint": ws_fingerprint or None,
     }
     if cacheable:
         version_hash = await run_in_threadpool(lambda: fetch_course_version_hash(user_id, payload.courseId))
@@ -609,7 +663,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # MINALLO_APP_CONTEXT only — sending it empty chunks here saves the
     # retrieval cost AND prevents an accidental [Source N] leakage if the
     # model ever ignored its prompt override.
-    if app_question:
+    if app_or_workspace:
         chunks = []
         exercise_hit = None
         formula_hits = []
@@ -671,6 +725,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         used_document_ids=list(dict.fromkeys(c.document_id for c in chunks if c.document_id)),
     )
     has_strong_course_anchor = bool(payload.openFileContext or exercise_hit or formula_hits or relevance_score >= 0.18)
+    # App/workspace questions need no course anchor — they're answered from the
+    # product map + live workspace block, not from retrieved chunks. (Without
+    # this exemption, "where is settings" with no open PDF used to fall through
+    # to a generic general-knowledge answer that never saw the app map.)
+    if app_or_workspace:
+        has_strong_course_anchor = True
     if not has_strong_course_anchor:
         if source_decision.selected_source_mode.value == "course_files":
             return _stream_static_answer(
@@ -697,10 +757,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     full_text_buf: list[str] = []
     captured_meta: dict[str, Any] = {}
 
-    # Phase 3: per-student weak-topic coaching note. Best-effort; failure
-    # here must never block answering.
-    from ..services.mastery import fetch_weak_topics  # noqa: WPS433
-    weak_topics = await run_in_threadpool(lambda: fetch_weak_topics(user_id, payload.courseId))
+    # weak_topics was fetched above (it feeds the workspace block + cache
+    # fingerprint as well as the per-student coaching note in the prompt).
 
     def gen():
         import json
@@ -713,6 +771,9 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             weak_topics=weak_topics,
             previous_turns=previous_turns_payload,
             problem_solver=payload.problemSolver.model_dump() if payload.problemSolver else None,
+            workspace_block=workspace_block or None,
+            assistant_mode=assistant_mode,
+            workspace_question=workspace_question,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.

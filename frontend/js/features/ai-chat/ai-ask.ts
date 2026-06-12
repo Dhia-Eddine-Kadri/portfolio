@@ -11,6 +11,7 @@ import { getPane } from '../pdf-viewer/pdf-panes.js';
 import { handleSourceClick, firstPage } from '../pdf-viewer/source-link.js';
 import { getCompareFileName } from '../pdf-viewer/pdf-compare.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
+import { buildPageContext } from './ai-page-context.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 import {
   createAIThinkingStatus,
@@ -1161,6 +1162,9 @@ export function initAskAI(
                 tutorMode: 'explain',
                 problemSolver: opts?.problemSolver || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
+                // Where the student is in the UI right now (page, course tab,
+                // open document) — feeds the backend's live-workspace block.
+                pageContext: buildPageContext() || undefined,
               }),
             })
               .then(async (res) => {

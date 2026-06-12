@@ -179,6 +179,17 @@ body:not(.night) .co-files-loading {
   margin: 12px 0; padding: 10px 12px; border-radius: 12px;
   border: 1px dashed rgba(148, 163, 184, 0.4); color: rgba(203, 213, 225, 0.8); font-size: 0.84rem;
 }
+/* Clickable next-step buttons offered by the AI (minallo-actions block). */
+.md-ai-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.md-ai-action {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(37, 99, 235, 0.55);
+  background: rgba(37, 99, 235, 0.14); color: #93c5fd;
+  font-weight: 700; font-size: 0.8rem; line-height: 1.2;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.md-ai-action:hover { background: rgba(37, 99, 235, 0.3); transform: translateY(-1px); }
+.md-ai-action:disabled { cursor: default; opacity: 0.6; transform: none; }
 /* The input form is lifted into this centered modal (popup) by ai-markdown.ts. */
 .md-ai-input-modal-backdrop {
   position: fixed; inset: 0; z-index: 10050;

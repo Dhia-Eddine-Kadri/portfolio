@@ -14,6 +14,7 @@ import {
   type AIThinkingStatus
 } from '../ai-chat/ai-thinking-status.js';
 import { routeStudyIntent } from '../ai-chat/intent-router.js';
+import { buildPageContext } from '../ai-chat/ai-page-context.js';
 import type { DailyMissionPanelHandlers } from '../daily-mission/daily-mission-ui.js';
 import {
   generateDailyMission,
@@ -2185,6 +2186,10 @@ async function streamFromAskStream(
       sourceMode: sourceModeForActiveChat(),
       courseFileScope: courseFileScopeForActiveChat(),
       previousTurns,
+      // UI location (page / course tab / open document) for the backend's
+      // live-workspace block. In the standalone Chatbot this mostly carries
+      // page='chatbot' unless a course/PDF is open behind it.
+      pageContext: buildPageContext() || undefined,
       // Only sent for "Selected file(s)" scope — narrows retrieval to these
       // documents. The client knows file names, not document ids, so names are
       // the working path (backend resolves them); ids are sent when known.

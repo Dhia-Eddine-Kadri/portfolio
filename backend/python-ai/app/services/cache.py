@@ -44,6 +44,7 @@ def question_hash(
     selected_document_ids: list[str] | None = None,
     retrieved_chunk_ids: list[str] | None = None,
     web_query: str | None = None,
+    workspace_fingerprint: str | None = None,
 ) -> str:
     """Composite cache key for an answer.
 
@@ -99,6 +100,10 @@ def question_hash(
         parts.append("chunks=" + hashlib.sha256(serial_chunks.encode("utf-8")).hexdigest()[:16])
     if web_query:
         parts.append("web=" + hashlib.sha256(web_query.encode("utf-8")).hexdigest()[:16])
+    if workspace_fingerprint:
+        # Live workspace counts feed the prompt ("you have 3 quizzes") — a
+        # cached answer must die when the workspace changes.
+        parts.append(f"wf={workspace_fingerprint}")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -119,7 +124,9 @@ def question_hash(
 # v9 re-enables source-routed caching on a whole-course version hash with
 # symmetric lookup/save keys; older rows used the never-matching selected-doc
 # key and must not be reachable.
-_CACHE_SCHEMA_VERSION = "v10-2026-06-07-source-index"
+# v11 invalidates pre-workspace-context answers: prompts now carry the live
+# workspace block, mode overlays and the minallo-actions contract.
+_CACHE_SCHEMA_VERSION = "v11-2026-06-12-workspace-context"
 
 
 def document_version_hash(document_hashes: list[str | None]) -> str:
@@ -194,6 +201,7 @@ def lookup_answer(
     selected_document_ids: list[str] | None = None,
     retrieved_chunk_ids: list[str] | None = None,
     web_query: str | None = None,
+    workspace_fingerprint: str | None = None,
 ) -> dict[str, Any] | None:
     """Return the cached answer JSON, or None on miss. Bumps usage stats on hit.
 
@@ -218,6 +226,7 @@ def lookup_answer(
         selected_document_ids=selected_document_ids,
         retrieved_chunk_ids=retrieved_chunk_ids,
         web_query=web_query,
+        workspace_fingerprint=workspace_fingerprint,
     )
     sb = get_supabase()
     try:
@@ -265,6 +274,7 @@ def save_answer(
     selected_document_ids: list[str] | None = None,
     retrieved_chunk_ids: list[str] | None = None,
     web_query: str | None = None,
+    workspace_fingerprint: str | None = None,
 ) -> None:
     """Upsert the answer for next time. Safe to no-op on errors.
 
@@ -289,6 +299,7 @@ def save_answer(
             selected_document_ids=selected_document_ids,
             retrieved_chunk_ids=retrieved_chunk_ids,
             web_query=web_query,
+            workspace_fingerprint=workspace_fingerprint,
         ),
         "normalized_question":   _normalize_question(question),
         "document_version_hash": version_hash,

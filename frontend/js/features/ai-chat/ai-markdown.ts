@@ -298,6 +298,91 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
   });
 }
 
+// ── minallo-actions: clickable next-step buttons offered by the AI ──────────
+//
+// The backend's ACTIONS_CONTRACT (workspace_context.py) lets the model end an
+// answer with a ```minallo-actions``` JSON block. renderActionButtons() (inside
+// the markdown renderer) turns it into buttons; this delegated click handler
+// executes them. Two kinds:
+//   * tab actions   — open/generate inside a course tab. Navigates via the
+//     globals the PDF back-button already uses (showPortalSection +
+//     showCourseSection), so it works from the course rail, the PDF viewer
+//     AND the standalone Chatbot.
+//   * ask actions   — compose a follow-up question and dispatch the existing
+//     `minallo-ai-input-submit` event; the per-surface listeners route it
+//     through their own send path exactly like minallo-input forms.
+// Action ids must stay in sync with ALLOWED_AI_ACTIONS on the backend.
+export const AI_ACTION_TABS: Record<string, string> = {
+  open_files: 'files',
+  open_quiz: 'quiz',
+  open_flashcards: 'flashcards',
+  open_examforge: 'examforge',
+  open_cheatsheet: 'cheatsheet',
+  open_deep_learn: 'deeplearn',
+  generate_quiz: 'quiz',
+  generate_flashcards: 'flashcards',
+  generate_cheatsheet: 'cheatsheet',
+  generate_examforge_exam: 'examforge',
+  start_deeplearn: 'deeplearn',
+};
+export const AI_ASK_ACTIONS: Record<string, string> = {
+  create_study_plan: 'Create a study plan for this course based on my files, progress and weak topics.',
+  review_weak_topics: 'Which topics am I weak in, and how should I review them?',
+};
+
+function _runCourseTabAction(tab: string): boolean {
+  const w = window as unknown as {
+    activeCourseRef?: unknown;
+    showCourseSection?: (course: unknown, section: string) => void;
+    showPortalSection?: (section: string) => void;
+  };
+  if (!w.activeCourseRef || typeof w.showCourseSection !== 'function') return false;
+  // Make sure the Courses section is on screen first (the click may come from
+  // the standalone Chatbot), then switch to the requested course tab.
+  if (typeof w.showPortalSection === 'function') w.showPortalSection('courses');
+  w.showCourseSection(w.activeCourseRef, tab);
+  return true;
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const _w = window as unknown as { _ssAiActionBound?: boolean };
+  if (!_w._ssAiActionBound) {
+    _w._ssAiActionBound = true;
+    document.addEventListener('click', (ev) => {
+      const btn = (ev.target as Element | null)?.closest?.(
+        '.md-ai-action'
+      ) as HTMLButtonElement | null;
+      if (!btn || btn.disabled) return;
+      const action = btn.dataset.aiAction || '';
+
+      const askText = AI_ASK_ACTIONS[action];
+      if (askText) {
+        const surface = btn.closest('.ncb-root') ? 'chatbot' : 'pdf-panel';
+        document.dispatchEvent(
+          new CustomEvent('minallo-ai-input-submit', {
+            bubbles: true,
+            detail: { text: askText, surface },
+          })
+        );
+        btn.disabled = true;
+        return;
+      }
+
+      const tab = AI_ACTION_TABS[action];
+      if (!tab) return;
+      if (_runCourseTabAction(tab)) {
+        if (action.startsWith('generate_') || action === 'start_deeplearn') {
+          if (typeof window.showToast === 'function') {
+            window.showToast(btn.textContent || 'Opening…', 'Use the Generate button in this tab.');
+          }
+        }
+      } else if (typeof window.showToast === 'function') {
+        window.showToast('Open a course first', 'Go to Courses and open the course, then try again.');
+      }
+    });
+  }
+}
+
 // Lift a `minallo-input` form out of the message bubble into a small centered
 // modal (a popup), leaving a placeholder note in the bubble. This both reads
 // as a dialog the student must answer and escapes the bubble's inline CSS that
@@ -1169,6 +1254,38 @@ export function renderMarkdown(text: string): string {
     }
   }
 
+  // Render a `minallo-actions` block — the AI offering clickable next steps
+  // ("Generate flashcards", "Open Quiz"). Validation is strict: only
+  // allowlisted action ids render, labels are length-capped and escaped, and
+  // malformed JSON renders nothing (the prose above it still stands alone).
+  function renderActionButtons(raw: string): string {
+    const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
+    try {
+      const spec = JSON.parse(raw) as { actions?: Array<{ action?: string; label?: string }> };
+      const buttons = (Array.isArray(spec.actions) ? spec.actions : [])
+        .filter(
+          (a) =>
+            a && typeof a.action === 'string' &&
+            (AI_ACTION_TABS[a.action] || AI_ASK_ACTIONS[a.action]) &&
+            typeof a.label === 'string' && a.label.trim()
+        )
+        .slice(0, 3);
+      if (!buttons.length) return '';
+      const html = buttons
+        .map((a) => {
+          const label = String(a.label).trim().slice(0, 48);
+          return (
+            '<button type="button" class="md-ai-action" data-ai-action="' +
+            escAttr(String(a.action)) + '">' + esc(label) + '</button>'
+          );
+        })
+        .join('');
+      return '<div class="md-ai-actions" role="group" aria-label="Suggested actions">' + html + '</div>';
+    } catch {
+      return '';
+    }
+  }
+
   function inline(s: string): string {
     // Stash already-rendered math (and code spans) under sentinel placeholders
     // BEFORE escaping, so their trusted HTML survives the esc() pass that
@@ -1267,6 +1384,11 @@ export function renderMarkdown(text: string): string {
       }
       if (/^(minallo-input|input-json)$/i.test(lang)) {
         out.push(renderInputForm(code.join('\n')));
+        i++;
+        continue;
+      }
+      if (/^(minallo-actions|actions-json)$/i.test(lang)) {
+        out.push(renderActionButtons(code.join('\n')));
         i++;
         continue;
       }

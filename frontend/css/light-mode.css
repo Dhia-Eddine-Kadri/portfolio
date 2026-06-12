@@ -2079,6 +2079,12 @@ body:not(.night) .md-ai-input-modal {
 }
 body:not(.night) .md-ai-input-modal-backdrop { background: rgba(15, 23, 42, 0.45) !important; }
 body:not(.night) .md-ai-input-placeholder { color: var(--lm-muted) !important; }
+body:not(.night) .md-ai-action {
+  background: rgba(37, 99, 235, 0.08) !important;
+  border-color: rgba(37, 99, 235, 0.35) !important;
+  color: #1d4ed8 !important;
+}
+body:not(.night) .md-ai-action:hover { background: rgba(37, 99, 235, 0.16) !important; }
 body:not(.night) .md-diagram-title,
 body:not(.night) .md-diagram-placeholder-title {
   color: var(--lm-text) !important;
