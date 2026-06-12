@@ -79,6 +79,15 @@ def test_account_block_lists_real_courses_only():
     assert format_account_block({"courses": []}) == ""
 
 
+def test_account_block_course_chat_variant_drops_generic_chat_caveat():
+    snap = {"courses": [{"id": "tm2", "name": "TM2", "files": 12}]}
+    course_chat = format_account_block(snap, in_course_chat=True)
+    generic = format_account_block(snap)
+    assert "this generic chat cannot read" in generic
+    assert "this generic chat cannot read" not in course_chat
+    assert "never invent" in course_chat
+
+
 def test_block_empty_when_nothing_known():
     assert format_workspace_block(None) == ""
     assert format_workspace_block(None, page_context={}, weak_topics=[]) == ""
@@ -145,6 +154,23 @@ def test_workspace_question_detection():
     assert is_workspace_question("which topics am I weak in?")
     assert not is_workspace_question("What is the moment of inertia of a beam?")
     assert not is_workspace_question("")
+
+
+def test_course_list_questions_are_workspace_questions():
+    # The exact phrasings from the 2026-06-12 bug report: these used to fall
+    # into the auto-mode default (course-files RAG) and the model invented
+    # a course list from retrieved lecture chunks.
+    assert is_workspace_question("what courses do I have inside the website?")
+    assert is_workspace_question("I meant inside the tab courses, what courses do I have listed there?")
+    assert is_workspace_question("Which courses do I have?")
+    assert is_workspace_question("how many courses do I have?")
+    assert is_workspace_question("list my courses")
+    assert is_workspace_question("what are my courses?")
+    assert is_workspace_question("welche Kurse habe ich?")
+    assert is_workspace_question("zeig mir meine Kurse")
+    # Academic questions that merely mention a course must stay on RAG.
+    assert not is_workspace_question("Which course topics are covered in chapter 3?")
+    assert not is_workspace_question("summarize the course introduction lecture")
 
 
 def test_actions_contract_only_names_allowed_actions():

@@ -46,7 +46,9 @@ from ..services.source_router import (
 from ..services.web_answer import generate_web_answer
 from ..services.workspace_context import (
     detect_assistant_mode,
+    fetch_account_snapshot,
     fetch_workspace_snapshot,
+    format_account_block,
     format_workspace_block,
     is_workspace_question,
     sanitize_page_context,
@@ -472,8 +474,15 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     workspace_block = format_workspace_block(
         workspace_snapshot, page_context=page_context, weak_topics=weak_topics
     )
+    # App/workspace questions ("what courses do I have?") need the account-wide
+    # course list: the per-course snapshot above cannot name the student's other
+    # courses, which is exactly what the model used to invent.
+    account_snapshot = None
+    if app_or_workspace:
+        account_snapshot = await run_in_threadpool(lambda: fetch_account_snapshot(user_id))
+        workspace_block += format_account_block(account_snapshot, in_course_chat=True)
     ws_fingerprint = workspace_fingerprint(
-        {"s": workspace_snapshot, "w": weak_topics, "p": page_context}
+        {"s": workspace_snapshot, "w": weak_topics, "p": page_context, "a": account_snapshot}
     ) if workspace_block else ""
     assistant_mode = detect_assistant_mode(question)
 

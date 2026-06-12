@@ -431,7 +431,14 @@ _WORKSPACE_QUESTION_RE = re.compile(
     r"what\s+can\s+i\s+do\s+(in|with)\s+(this|the|my)\s+course|"
     r"was\s+kann\s+ich\s+(in|mit)\s+(diesem|dem)\s+kurs|"
     r"what('?s| is)\s+(inside|in)\s+(this|the|my)\s+(course|folder)|"
-    r"which\s+topics?\s+am\s+i\s+weak|what\s+are\s+my\s+weak"
+    r"which\s+topics?\s+am\s+i\s+weak|what\s+are\s+my\s+weak|"
+    # Account-level course-list questions ("what courses do I have", "how many
+    # courses are in my account"). Answered from the account snapshot — RAG
+    # retrieval would only pull lecture chunks and invent a course list.
+    r"(what|which|how\s+many)\s+courses?\s+(do|did|does|have|am|are)\s+i|"
+    r"my\s+courses|list\s+(all\s+(of\s+)?)?my\s+courses?|"
+    r"courses?\s+(in|inside|on)\s+(my|the|this)\s+(account|website|app|site|platform|sidebar)|"
+    r"welche\s+kurse\s+hab(e)?\s+ich|meine\s+kurse|wie\s+viele\s+kurse"
     r")\b",
     re.IGNORECASE,
 )
@@ -550,24 +557,40 @@ def fetch_account_snapshot(user_id: str) -> dict[str, Any] | None:
     return snapshot
 
 
-def format_account_block(snapshot: dict[str, Any] | None) -> str:
-    """Compact course-list block for the generic chatbot. "" when unknown."""
+def format_account_block(snapshot: dict[str, Any] | None, *, in_course_chat: bool = False) -> str:
+    """Compact course-list block. "" when unknown.
+
+    ``in_course_chat`` switches the trailing guidance: the generic chatbot
+    cannot read course files unless attached, while the course-scoped
+    ``/ask-stream`` surface can — telling the model otherwise there would
+    make it refuse questions it can actually answer.
+    """
     if not snapshot or not snapshot.get("courses"):
         return ""
     course_lines = [
         f'- "{c["name"]}"' + (f" ({c['files']} file(s) uploaded)" if c.get("files") else " (no files yet)")
         for c in snapshot["courses"]
     ]
+    if in_course_chat:
+        guidance = (
+            "For another course's content, suggest opening that course "
+            "(sidebar → Courses) and asking the AI there."
+        )
+    else:
+        guidance = (
+            "For questions about a specific course's content, suggest "
+            "opening that course (sidebar → Courses) and asking the AI there, or "
+            "importing its files into this chat — this generic chat cannot read "
+            "course files unless they are attached."
+        )
     return (
         "\n\n"
         "MINALLO ACCOUNT WORKSPACE — this student's real courses (server-fetched):\n"
         + "\n".join(course_lines) + "\n"
         "Rules: these are the ONLY courses that exist — never invent others. "
+        "When the student asks what courses they have, list these names exactly. "
         "Each course has six tabs: Files, Quiz, Flashcards, ExamForge, Cheatsheet, "
-        "Deep Learn. For questions about a specific course's content, suggest "
-        "opening that course (sidebar → Courses) and asking the AI there, or "
-        "importing its files into this chat — this generic chat cannot read "
-        "course files unless they are attached."
+        "Deep Learn. " + guidance
     )
 
 
