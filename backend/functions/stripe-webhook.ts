@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 import { requireEnv } from '../lib/env';
 import { supaRequest } from '../lib/supabase-admin';
-import { stripeGet } from '../lib/stripe';
+import { stripeGet, stripeDelete } from '../lib/stripe';
 import { recordDeviceTrial } from '../lib/trial-device';
 import { recordSubEvent, lookupByStripeCustomer } from '../lib/subscription-events';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
@@ -38,7 +38,14 @@ interface InvoiceObject {
   subscription?: string;
   amount_paid?: number;
   currency?: string;
+  attempt_count?: number;
 }
+
+// Hard cap on charge attempts for one invoice. Stripe's own dunning (Smart
+// Retries) is dashboard-configured and could keep retrying for weeks; after
+// the third failed attempt we cancel the subscription at Stripe ourselves so
+// a user with no funds is never charged a fourth time.
+const MAX_PAYMENT_ATTEMPTS = 3;
 
 const SIGNATURE_TOLERANCE_SECONDS = 300; // matches stripe-node default
 
@@ -323,7 +330,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     }
 
     if (evt.type === 'invoice.payment_failed') {
-      const cusId = (evt.data.object as InvoiceObject).customer;
+      const inv = evt.data.object as InvoiceObject;
+      const cusId = inv.customer;
       if (cusId) {
         // Past_due users should lose access immediately. The grace period (if
         // any) is configured in Stripe — we mirror their decision by stamping
@@ -337,6 +345,21 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
             updated_at: new Date().toISOString()
           },
           serviceKey, prefer);
+
+        // Third failed charge → stop dunning for good by cancelling the
+        // subscription at Stripe. The resulting customer.subscription.deleted
+        // event flips the row to cancelled. 404 = already gone (a webhook
+        // retry after partial success) and counts as done; other failures
+        // throw so Stripe redelivers this event and we try the cancel again.
+        const attempts = typeof inv.attempt_count === 'number' ? inv.attempt_count : 0;
+        if (attempts >= MAX_PAYMENT_ATTEMPTS && inv.subscription) {
+          const delRes = await stripeDelete(
+            '/v1/subscriptions/' + encodeURIComponent(String(inv.subscription))
+          );
+          if ((delRes.status < 200 || delRes.status >= 300) && delRes.status !== 404) {
+            throw new Error('cancel after ' + attempts + ' failed attempts -> ' + delRes.status);
+          }
+        }
       }
     }
 

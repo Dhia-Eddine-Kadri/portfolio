@@ -18,6 +18,9 @@
 //   - BILLING.SUBSCRIPTION.EXPIRED    → status=cancelled, expires_at=now()
 //   - BILLING.SUBSCRIPTION.ACTIVATED  → status=active,    extend expires_at
 //   - PAYMENT.SALE.COMPLETED          → status=active,    extend expires_at
+//   - BILLING.SUBSCRIPTION.PAYMENT.FAILED → status=past_due, expires_at=now();
+//     after the 3rd consecutive failure the subscription is cancelled at
+//     PayPal so the user is never charged again.
 // Any other event type is acknowledged but not acted on.
 
 import { requireEnv, optionalEnv } from '../lib/env';
@@ -35,8 +38,16 @@ interface PaypalEvent {
     billing_agreement_id?: string;  // subscription id for PAYMENT.SALE.* events
     custom_id?: string;         // user id (we set this at subscription create time)
     status?: string;
+    billing_info?: {
+      failed_payments_count?: number;
+    };
   };
 }
+
+// Hard cap on consecutive failed charges. PayPal keeps retrying per the plan's
+// payment_failure_threshold; after the third failure we cancel the
+// subscription ourselves so a user with no funds is never charged again.
+const MAX_PAYMENT_FAILURES = 3;
 
 interface VerifyResponse {
   verification_status?: string;
@@ -240,6 +251,46 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
         event_type: parsed.event_type === 'BILLING.SUBSCRIPTION.EXPIRED' ? 'expired' : 'cancelled',
         subscription_id: subId
       });
+    } else if (parsed.event_type === 'BILLING.SUBSCRIPTION.PAYMENT.FAILED') {
+      // A charge attempt bounced (no funds, expired card, …). Revoke access
+      // now; a later successful payment re-extends via PAYMENT.SALE.COMPLETED.
+      await supaWriteOrThrow('PATCH',
+        'subscriptions?paypal_subscription_id=eq.' + encodeURIComponent(subId),
+        {
+          status: 'past_due',
+          expires_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        serviceKey, prefer);
+
+      // Third consecutive failure → cancel at PayPal so it never charges this
+      // account again. 422 = not in a cancellable state (already cancelled or
+      // suspended), which is the outcome we want anyway. Other failures throw
+      // so PayPal redelivers the event and the cancel is retried.
+      const failures = Number(parsed.resource?.billing_info?.failed_payments_count) || 0;
+      if (failures >= MAX_PAYMENT_FAILURES) {
+        const cancelRes = await paypalRequest(
+          'POST',
+          PAYPAL_API_BASE + '/v1/billing/subscriptions/' + encodeURIComponent(subId) + '/cancel',
+          { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          { reason: 'Payment failed ' + failures + ' times' }
+        );
+        if ((cancelRes.status < 200 || cancelRes.status >= 300) && cancelRes.status !== 422) {
+          throw new Error('cancel after ' + failures + ' failed payments -> ' + cancelRes.status);
+        }
+        await supaWriteOrThrow('PATCH',
+          'subscriptions?paypal_subscription_id=eq.' + encodeURIComponent(subId),
+          {
+            status: 'cancelled',
+            expires_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          serviceKey, prefer);
+        await recordSubEvent(serviceKey, {
+          user_id: analyticsUid, provider: 'paypal', event_type: 'cancelled',
+          subscription_id: subId
+        });
+      }
     } else if (parsed.event_type === 'BILLING.SUBSCRIPTION.SUSPENDED') {
       await supaWriteOrThrow('PATCH',
         'subscriptions?paypal_subscription_id=eq.' + encodeURIComponent(subId),

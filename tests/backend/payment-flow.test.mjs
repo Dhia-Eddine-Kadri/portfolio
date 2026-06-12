@@ -175,6 +175,127 @@ test('paypal-webhook: ledger 500 returns 5xx (not 200 duplicate)', async () => {
 });
 
 // -----------------------------------------------------------------------------
+// (2b) Failed-payment cap: after the 3rd failed charge the subscription is
+//      cancelled at the provider so the user is never charged again.
+// -----------------------------------------------------------------------------
+function stripeFailedInvoiceEvent(attemptCount) {
+  return JSON.stringify({
+    id: 'evt_pay_failed_' + attemptCount,
+    type: 'invoice.payment_failed',
+    data: {
+      object: {
+        customer: 'cus_dunning',
+        subscription: 'sub_dunning',
+        attempt_count: attemptCount
+      }
+    }
+  });
+}
+
+async function runStripeFailedInvoice(attemptCount) {
+  let cancelCalled = false;
+  const restore = withFetch([
+    {
+      match: u => u.includes('/stripe_webhook_events'),
+      respond: () => jsonResponse(201, {})
+    },
+    {
+      match: u => u.includes('/rest/v1/subscriptions'),
+      respond: () => new Response(null, { status: 204 })
+    },
+    {
+      match: (u, init) => u.includes('/v1/subscriptions/sub_dunning') && init && init.method === 'DELETE',
+      respond: () => { cancelCalled = true; return jsonResponse(200, { id: 'sub_dunning', status: 'canceled' }); }
+    }
+  ]);
+  try {
+    delete require.cache[require.resolve('../../backend/functions/stripe-webhook.ts')];
+    const { handler } = require('../../backend/functions/stripe-webhook.ts');
+    const payload = stripeFailedInvoiceEvent(attemptCount);
+    const res = await handler({
+      httpMethod: 'POST',
+      headers: { 'stripe-signature': signStripe(payload, process.env.STRIPE_WEBHOOK_SECRET) },
+      body: payload
+    });
+    return { res, cancelCalled };
+  } finally { restore(); }
+}
+
+test('stripe-webhook: 3rd failed charge cancels the subscription (no more attempts)', async () => {
+  const { res, cancelCalled } = await runStripeFailedInvoice(3);
+  assert.equal(res.statusCode, 200);
+  assert.equal(cancelCalled, true, 'must DELETE the subscription after the 3rd failure');
+});
+
+test('stripe-webhook: 2nd failed charge does NOT cancel yet', async () => {
+  const { res, cancelCalled } = await runStripeFailedInvoice(2);
+  assert.equal(res.statusCode, 200);
+  assert.equal(cancelCalled, false, 'attempts 1-2 only mark past_due');
+});
+
+async function runPaypalFailedPayment(failedCount) {
+  let cancelCalled = false;
+  const restore = withFetch([
+    {
+      match: u => u.includes('/v1/oauth2/token'),
+      respond: () => jsonResponse(200, { access_token: 'pp_token' })
+    },
+    {
+      match: u => u.includes('/verify-webhook-signature'),
+      respond: () => jsonResponse(200, { verification_status: 'SUCCESS' })
+    },
+    {
+      match: u => u.includes('/paypal_webhook_events'),
+      respond: () => jsonResponse(201, {})
+    },
+    {
+      match: u => u.includes('/v1/billing/subscriptions/I-DUNNING/cancel'),
+      respond: () => { cancelCalled = true; return new Response(null, { status: 204 }); }
+    },
+    {
+      match: u => u.includes('/rest/v1/'),
+      respond: () => new Response(null, { status: 204 })
+    }
+  ]);
+  try {
+    delete require.cache[require.resolve('../../backend/functions/paypal-webhook.ts')];
+    const { handler } = require('../../backend/functions/paypal-webhook.ts');
+    const res = await handler({
+      httpMethod: 'POST',
+      headers: {
+        'paypal-transmission-id': 't',
+        'paypal-transmission-time': '2026-06-12T00:00:00Z',
+        'paypal-transmission-sig': 'sig',
+        'paypal-cert-url': 'https://api.sandbox.paypal.com/cert',
+        'paypal-auth-algo': 'SHA256withRSA'
+      },
+      body: JSON.stringify({
+        id: 'WH-PAY-FAILED-' + failedCount,
+        event_type: 'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
+        resource: {
+          id: 'I-DUNNING',
+          custom_id: 'user-1',
+          billing_info: { failed_payments_count: failedCount }
+        }
+      })
+    });
+    return { res, cancelCalled };
+  } finally { restore(); }
+}
+
+test('paypal-webhook: 3rd failed payment cancels the subscription', async () => {
+  const { res, cancelCalled } = await runPaypalFailedPayment(3);
+  assert.equal(res.statusCode, 200);
+  assert.equal(cancelCalled, true, 'must cancel at PayPal after the 3rd failure');
+});
+
+test('paypal-webhook: 1st failed payment only marks past_due', async () => {
+  const { res, cancelCalled } = await runPaypalFailedPayment(1);
+  assert.equal(res.statusCode, 200);
+  assert.equal(cancelCalled, false);
+});
+
+// -----------------------------------------------------------------------------
 // (3) PayPal activation gates — consent + ownership + status
 // -----------------------------------------------------------------------------
 function makeAuthHeaders() {

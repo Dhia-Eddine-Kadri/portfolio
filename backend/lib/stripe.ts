@@ -42,3 +42,14 @@ export async function stripeGet<T = unknown>(path: string): Promise<SupaResult<T
   });
   return { status: res.status, body: await _parseJsonOrText<T>(res) };
 }
+
+export async function stripeDelete<T = unknown>(path: string): Promise<SupaResult<T>> {
+  const secretKey = requireEnv('STRIPE_SECRET_KEY');
+  const res = await fetch('https://api.stripe.com' + path, {
+    method: 'DELETE',
+    headers: {
+      Authorization: 'Basic ' + btoa(secretKey + ':')
+    }
+  });
+  return { status: res.status, body: await _parseJsonOrText<T>(res) };
+}
