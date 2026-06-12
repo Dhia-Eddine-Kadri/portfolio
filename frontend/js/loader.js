@@ -239,10 +239,10 @@
                 link.href = href;
                 document.head.appendChild(link);
             }
-            ensureStylesheet('css/new-landing.css?v=19');
+            ensureStylesheet('css/new-landing.css?v=20');
             ensureStylesheet('css/auth.css?v=5');
         })();
-        _fetchTimeout('pages/new_landing.html?v=20', 10000)
+        _fetchTimeout('pages/new_landing.html?v=21', 10000)
             .then((r) => {
             if (!r.ok)
                 throw new Error('HTTP ' + r.status + ' loading new_landing.html');
@@ -255,7 +255,7 @@
             // can find its #/data-* hooks on first query.
             (function () {
                 const script = document.createElement('script');
-                script.src = 'js/pages/new-landing.js?v=17';
+                script.src = 'js/pages/new-landing.js?v=18';
                 script.defer = true;
                 document.body.appendChild(script);
             })();

@@ -1055,7 +1055,23 @@
             "
           >
             <div style="font-size: 2.8rem; margin-bottom: 10px">&#x1F393;</div>
+            <p
+              data-paywall-context
+              style="
+                display: inline-flex;
+                margin: 0 0 10px;
+                padding: 5px 10px;
+                border-radius: 999px;
+                background: rgba(59, 130, 246, 0.14);
+                color: #93c5fd;
+                font-size: 0.74rem;
+                font-weight: 800;
+              "
+            >
+              You're trying to use Pro
+            </p>
             <h2
+              data-paywall-title
               data-i18n="pw_welcome"
               style="
                 font-family: var(--font-main);
@@ -1064,14 +1080,14 @@
                 margin: 0 0 8px;
               "
             >
-              Welcome to Minallo
+              Start Pro and unlock Minallo
             </h2>
             <p
               data-paywall-desc
               data-i18n="pw_desc"
               style="font-size: 0.85rem; color: var(--on-glass-muted); margin: 0 0 20px"
             >
-              To access all features, start your free 7-day trial. No charge until the trial ends.
+              Try Pro free for 7 days and unlock Minallo's full exam-prep workflow: AI Tutor, Cheatsheet, Flashcards, Quiz, ExamForge, and Deep Learn.
             </p>
             <div class="sub-trial-badge" data-i18n="pw_trial_badge" style="margin-bottom: 14px; display: inline-block">
               &#x2728; 7-day free trial
@@ -1084,7 +1100,7 @@
                 margin-bottom: 16px;
               "
             >
-              &#x20AC;11.99
+              <span data-paywall-price-today>&#x20AC;0 today</span>
               <span
                 data-after-trial
                 data-i18n="pw_after_trial"
@@ -1094,7 +1110,7 @@
                   font-weight: 700;
                   color: var(--on-glass-muted);
                 "
-                >/ month after trial</span
+                >Then &#x20AC;11.99/month after the trial</span
               >
             </div>
             <div
@@ -1106,25 +1122,44 @@
                 gap: 7px;
               "
             >
-              <div class="sub-feat" data-i18n="pw_feat_ai">Generous AI usage (fair-use: 2000 chat &middot; 200 generations / month)</div>
-              <div class="sub-feat" data-i18n="pw_feat_pdf">PDF reader &amp; lecture notes</div>
-              <div class="sub-feat" data-i18n="pw_feat_multi">Multi-PDF summaries</div>
-              <div class="sub-feat" data-i18n="pw_feat_chat">Chat rooms</div>
-              <div class="sub-feat" data-i18n="pw_feat_support">Priority support</div>
+              <div class="sub-feat" data-i18n="pw_feat_ai">AI Tutor</div>
+              <div class="sub-feat" data-i18n="pw_feat_pdf">Course Workspace and Files</div>
+              <div class="sub-feat" data-i18n="pw_feat_multi">Cheatsheet, Flashcards, Quiz, and ExamForge</div>
+              <div class="sub-feat" data-i18n="pw_feat_chat">Deep Learn step-by-step explanations</div>
+              <div class="sub-feat" data-i18n="pw_feat_support">Course-based study help</div>
             </div>
             <button
               id="paywallUpgradeBtn"
               class="sub-btn sub-btn-upgrade"
               style="font-size: 0.92rem; padding: 14px"
             >
-              &#x1F389; Start free 7-day trial
+              Start 7-day free trial
+            </button>
+            <button
+              id="paywallNotNowBtn"
+              type="button"
+              data-i18n="pw_not_now"
+              style="
+                width: 100%;
+                margin-top: 8px;
+                padding: 12px;
+                border-radius: 14px;
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                background: rgba(148, 163, 184, 0.08);
+                color: var(--on-glass);
+                font-family: var(--font-main);
+                font-weight: 800;
+                cursor: pointer;
+              "
+            >
+              Not now
             </button>
             <p
               data-cancel-note
               data-i18n="pw_cancel_note"
               style="font-size: 0.72rem; color: var(--on-glass-muted); margin-top: 10px"
             >
-              Cancel anytime. No charge during trial.
+              Cancel anytime before the trial ends.
             </p>
             <div style="margin-top: 12px">
               <div id="paywallPaypal"></div>

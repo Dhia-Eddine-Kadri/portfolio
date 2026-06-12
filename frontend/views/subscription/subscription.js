@@ -128,6 +128,7 @@ var _paywallPaypalRenderPending = false;
 var _paypalPlanId = '';
 var _ppConsentTs = '';
 var _billingConfigPromise = null;
+var _lastPaywallFeatureMsg = '';
 
 // subscription.js loads EARLY in the boot chain (before app-data.js/main.js),
 // while window._subService is only assigned at the end of main.js. On a hard
@@ -492,13 +493,97 @@ function _initPayPalButton(attempt) {
     });
 }
 
-function _showPaywall() {
+function _paywallFeatureCopy(featureMsg) {
+  var raw = String(featureMsg || '').toLowerCase();
+  var lang = window._lang === 'de' ? 'de' : 'en';
+  var fallback = lang === 'de'
+    ? {
+        name: 'Minallo Pro',
+        context: 'Du moechtest Pro nutzen',
+        title: 'Starte Pro und schalte Minallo frei',
+        desc: 'Teste Pro 7 Tage kostenlos und schalte Minallos kompletten Pruefungsworkflow frei: AI Tutor, Cheatsheet, Flashcards, Quiz, ExamForge und Deep Learn.'
+      }
+    : {
+        name: 'Minallo Pro',
+        context: 'You’re trying to use Pro',
+        title: 'Start Pro and unlock Minallo',
+        desc: 'Try Pro free for 7 days and unlock Minallo’s full exam-prep workflow: AI Tutor, Cheatsheet, Flashcards, Quiz, ExamForge, and Deep Learn.'
+      };
+  var map = [
+    ['cheatsheet', 'Cheatsheet',
+      'Start Pro and turn this file into a compact revision Cheatsheet.',
+      'Starte Pro und verwandle diese Datei in ein kompaktes Wiederholungs-Cheatsheet.'],
+    ['examforge', 'ExamForge',
+      'Start Pro and create exam-style practice from this course.',
+      'Starte Pro und erstelle pruefungsnahe Uebungen aus diesem Kurs.'],
+    ['deep learn', 'Deep Learn',
+      'Start Pro and learn this topic step by step with your AI tutor.',
+      'Starte Pro und lerne dieses Thema Schritt fuer Schritt mit deinem KI-Tutor.'],
+    ['quiz', 'Quiz',
+      'Start Pro and create practice questions from your course material.',
+      'Starte Pro und erstelle Uebungsfragen aus deinem Kursmaterial.'],
+    ['flashcard', 'Flashcards',
+      'Start Pro and revise your course material with active recall.',
+      'Starte Pro und wiederhole dein Kursmaterial mit Active Recall.'],
+    ['multi-pdf', 'Summaries',
+      'Start Pro and summarize multiple course files in one study flow.',
+      'Starte Pro und fasse mehrere Kursdateien in einem Lernfluss zusammen.'],
+    ['summary', 'Summaries',
+      'Start Pro and summarize your course material for faster revision.',
+      'Starte Pro und fasse dein Kursmaterial fuer schnellere Wiederholung zusammen.'],
+    ['ai tutor', 'AI Tutor',
+      'Start Pro and get course-based help from your AI tutor.',
+      'Starte Pro und bekomme kursbasierte Hilfe von deinem KI-Tutor.']
+  ];
+  for (var i = 0; i < map.length; i++) {
+    if (raw.indexOf(map[i][0]) !== -1) {
+      var name = map[i][1];
+      return {
+        name: name,
+        context: lang === 'de' ? 'Du moechtest ' + name + ' nutzen' : 'You’re trying to use ' + name,
+        title: lang === 'de' ? 'Starte Pro und schalte ' + name + ' frei' : 'Start Pro and unlock ' + name,
+        desc: lang === 'de' ? map[i][3] : map[i][2]
+      };
+    }
+  }
+  return fallback;
+}
+
+function _showPaywall(featureMsg) {
+  if (featureMsg) _lastPaywallFeatureMsg = String(featureMsg);
+  var copy = _paywallFeatureCopy(featureMsg || _lastPaywallFeatureMsg);
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
     btn.textContent = (_hadTrial || _deviceHadTrial)
       ? _subT('sub_subscribe', 'Subscribe — €11.99/month')
-      : _subT('sub_start_trial', 'Start free 7-day trial');
+      : _subT('pw_start_trial_cta', 'Start 7-day free trial');
   var modal = document.getElementById('paywallModal');
+  if (modal) {
+    var ctx = modal.querySelector('[data-paywall-context]');
+    if (ctx) ctx.textContent = copy.context;
+    var title = modal.querySelector('[data-paywall-title]');
+    if (title) {
+      title.textContent = copy.title;
+      title.removeAttribute('data-i18n');
+    }
+    var descDefault = modal.querySelector('[data-paywall-desc]');
+    if (descDefault) {
+      descDefault.textContent = copy.desc;
+      descDefault.removeAttribute('data-i18n');
+    }
+    var priceToday = modal.querySelector('[data-paywall-price-today]');
+    if (priceToday) priceToday.textContent = window._lang === 'de' ? '0 € heute' : '€0 today';
+    var afterDefault = modal.querySelector('[data-after-trial]');
+    if (afterDefault) {
+      afterDefault.textContent = window._lang === 'de' ? 'Danach 11,99 €/Monat nach der Testphase' : 'Then €11.99/month after the trial';
+      afterDefault.removeAttribute('data-i18n');
+    }
+    var cancelDefault = modal.querySelector('[data-cancel-note]');
+    if (cancelDefault) {
+      cancelDefault.textContent = window._lang === 'de' ? 'Jederzeit vor Ende der Testphase kuendbar.' : 'Cancel anytime before the trial ends.';
+      cancelDefault.removeAttribute('data-i18n');
+    }
+  }
   if ((_hadTrial || _deviceHadTrial) && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
@@ -509,7 +594,7 @@ function _showPaywall() {
     }
     var afterTrial = modal.querySelector('[data-after-trial]');
     if (afterTrial) {
-      afterTrial.textContent = window._lang === 'de' ? '/ Monat' : '/ month';
+      afterTrial.textContent = window._lang === 'de' ? '11,99 €/Monat' : '€11.99/month';
       afterTrial.removeAttribute('data-i18n');
     }
     var cancelNote = modal.querySelector('[data-cancel-note]');
@@ -522,7 +607,7 @@ function _showPaywall() {
   if (!_paywallPaypalRendered && typeof paypal === 'undefined') {
     _ssEnsurePayPalSdk()
       .then(function () {
-        _showPaywall();
+        _showPaywall(_lastPaywallFeatureMsg);
       })
       .catch(function (err) {
         console.warn('PayPal SDK failed to load:', err);
@@ -593,7 +678,7 @@ function _showPaywall() {
 
 function _requirePro(featureMsg) {
   if (_userIsPro) return true;
-  _showPaywall();
+  _showPaywall(featureMsg);
   return false;
 }
 
@@ -927,6 +1012,15 @@ function _bindSubscriptionControls() {
       if (typeof window.showPortalSection === 'function') {
         window.showPortalSection('subscription');
       }
+    });
+  }
+
+  var paywallNotNowBtn = document.getElementById('paywallNotNowBtn');
+  if (paywallNotNowBtn && !paywallNotNowBtn.dataset.bound) {
+    paywallNotNowBtn.dataset.bound = '1';
+    paywallNotNowBtn.addEventListener('click', function () {
+      var modal = document.getElementById('paywallModal');
+      if (modal) modal.style.display = 'none';
     });
   }
 

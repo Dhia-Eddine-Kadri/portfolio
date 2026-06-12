@@ -581,6 +581,7 @@ export function openCourse(course: LegacyCourse): void {
   // the data is usually already resolved by the time the tab mounts.
   void import('../../services/ai-service.js')
     .then((svc) => {
+      void svc.prefetchCourseDocuments?.(course.id).catch(() => undefined);
       void svc.getCourseTopicMap?.(course.id).catch(() => undefined);
       void svc.listCourseNotes?.(course.id).catch(() => undefined);
     })

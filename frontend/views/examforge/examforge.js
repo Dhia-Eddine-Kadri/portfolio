@@ -779,7 +779,10 @@
     function loadInitial() {
       loadTopicMap();
       _service().then(function (svc) {
-        return svc.listCourseDocuments(courseId).then(function (docs) {
+        var list = typeof svc.prefetchCourseDocuments === 'function'
+          ? svc.prefetchCourseDocuments(courseId)
+          : svc.listCourseDocuments(courseId);
+        return list.then(function (docs) {
           return typeof svc.filterDocsByCourseFiles === 'function'
             ? svc.filterDocsByCourseFiles(docs, courseId) : docs;
         });

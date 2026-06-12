@@ -41,6 +41,21 @@ function tStr(key: string, fallback: string): string {
   return fallback;
 }
 
+function isInternalTechnicalQuestion(text: string): boolean {
+  const q = (text || '').toLowerCase();
+  if (!q.trim()) return false;
+  const internalTerms = /\b(api|backend|database|db|schema|sql|supabase|stripe|paypal|cloudflare|server|endpoint|token|jwt|secret|key|rag|embedding|vector|prompt|system prompt|architecture|implementation|source code|codebase|repository|migration|rls|security rules|auth flow|webhook|deno|netlify|worker|function)\b/i;
+  const probing = /\b(how|what|where|why|show|tell|explain|describe|list|give|share|reveal|access|debug|bypass|inspect|build|implemented|stored|connected|works?|configured)\b/i;
+  return internalTerms.test(q) && probing.test(q);
+}
+
+function technicalRefusal(): string {
+  return tStr(
+    'ai_refuse_technical',
+    "I can't help with technical or internal implementation details about Minallo. I can still help you study from your course material, create revision notes, quiz you, or explain a topic step by step."
+  );
+}
+
 export function initNewChatbotShell(): void {
   const newRoot = document.getElementById('ncbRoot') as HTMLElement | null;
   if (!newRoot) return;
@@ -796,6 +811,19 @@ async function doSend(
   state.files = [];
   renderPasteRow(state, pasteRow);
   renderFilesRow(stage.closest<HTMLElement>('.ncb-root')!, state);
+
+  if (isInternalTechnicalQuestion(text)) {
+    const aiRow = appendAiBubble(msgs);
+    const bubble = aiRow.querySelector<HTMLElement>('.ncb-bubble-body');
+    const raw = technicalRefusal();
+    if (bubble) renderRichBubble(bubble, raw, false);
+    state.messages.push({ role: 'assistant', text: raw, allowDiagrams: false });
+    setBubbleSubtitle(aiRow, 'study_only');
+    touchActiveChat();
+    saveChatStore();
+    appendBubbleActions(aiRow, raw);
+    return;
+  }
 
   await streamAiReply(state, sendBtn, msgs);
 }
@@ -2514,6 +2542,7 @@ function createSoftStreamReveal(
   let visibleTail = '';    // stripped tail text currently shown in `live`
   let buffer = '';
   let raf: number | null = null;
+  let timer: number | null = null;
   let finishResolve: (() => void) | null = null;
 
   const scroll = (): void => {
@@ -2552,12 +2581,30 @@ function createSoftStreamReveal(
     }
   };
 
+  const clearScheduled = (): void => {
+    if (raf != null) {
+      window.cancelAnimationFrame(raf);
+      raf = null;
+    }
+    if (timer != null) {
+      window.clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const cleanup = (): void => {
+    clearScheduled();
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
+
   const drain = (): void => {
     raf = null;
+    timer = null;
     if (!buffer) {
       if (finishResolve) {
         const resolve = finishResolve;
         finishResolve = null;
+        cleanup();
         resolve();
       }
       return;
@@ -2567,12 +2614,23 @@ function createSoftStreamReveal(
     rawText += added;
     promoteStable();
     renderTail();
-    raf = window.requestAnimationFrame(drain);
+    schedule();
   };
 
   const schedule = (): void => {
-    if (raf == null) raf = window.requestAnimationFrame(drain);
+    if (raf != null || timer != null) return;
+    if (document.hidden) timer = window.setTimeout(drain, 0);
+    else raf = window.requestAnimationFrame(drain);
   };
+
+  function onVisibilityChange(): void {
+    if (!document.hidden || raf == null) return;
+    window.cancelAnimationFrame(raf);
+    raf = null;
+    schedule();
+  };
+
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   return {
     push(text: string): void {
@@ -2580,7 +2638,10 @@ function createSoftStreamReveal(
       schedule();
     },
     finish(): Promise<void> {
-      if (!buffer && raf == null) return Promise.resolve();
+      if (!buffer && raf == null && timer == null) {
+        cleanup();
+        return Promise.resolve();
+      }
       return new Promise((resolve) => {
         finishResolve = resolve;
         schedule();

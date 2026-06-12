@@ -1620,6 +1620,26 @@
     if (!els.gen) return;
 
     var state = { preset: 'balanced' };
+    var docsPromise = null;
+    function loadCourseDocs() {
+      if (!docsPromise) {
+        docsPromise = _aiService()
+          .then(function (svc) {
+            var list = typeof svc.prefetchCourseDocuments === 'function'
+              ? svc.prefetchCourseDocuments(courseId)
+              : svc.listCourseDocuments(courseId);
+            return list.then(function (docs) {
+              return typeof svc.filterDocsByCourseFiles === 'function'
+                ? svc.filterDocsByCourseFiles(docs, courseId) : docs;
+            });
+          })
+          .catch(function (err) {
+            docsPromise = null;
+            throw err;
+          });
+      }
+      return docsPromise;
+    }
 
     // Recommended layout per mode — applied to the controls when a preset is
     // picked so each mode also *looks* distinct (the user can still override).
@@ -1693,6 +1713,7 @@
     if (els.topic) els.topic.addEventListener('input', _checkConflicts);
 
     _aiService().then(function (svc) { _loadSaved(svc, els, courseId); });
+    if (courseId) loadCourseDocs().catch(function () { /* retry on click */ });
 
     function doGenerate(documentIds) {
       var topic = ((els.topic && els.topic.value) || '').trim();
@@ -1733,13 +1754,7 @@
     els.gen.addEventListener('click', function () {
       if (!courseId) return;
       els.gen.disabled = true;
-      _aiService()
-        .then(function (svc) {
-          return svc.listCourseDocuments(courseId).then(function (docs) {
-            return typeof svc.filterDocsByCourseFiles === 'function'
-              ? svc.filterDocsByCourseFiles(docs, courseId) : docs;
-          });
-        })
+      loadCourseDocs()
         .then(function (docs) {
           els.gen.disabled = false;
           var ready = (docs || []).filter(function (d) { return d.processing_status === 'ready'; });

@@ -31,6 +31,21 @@ function _subscriptionMsg(): string {
     : 'You need an active subscription to use the AI tutor. Open **Subscription** in the menu to unlock it.';
 }
 
+function isInternalTechnicalQuestion(text: string): boolean {
+  const q = (text || '').toLowerCase();
+  if (!q.trim()) return false;
+  const internalTerms = /\b(api|backend|database|db|schema|sql|supabase|stripe|paypal|cloudflare|server|endpoint|token|jwt|secret|key|rag|embedding|vector|prompt|system prompt|architecture|implementation|source code|codebase|repository|migration|rls|security rules|auth flow|webhook|deno|netlify|worker|function)\b/i;
+  const probing = /\b(how|what|where|why|show|tell|explain|describe|list|give|share|reveal|access|debug|bypass|inspect|build|implemented|stored|connected|works?|configured)\b/i;
+  return internalTerms.test(q) && probing.test(q);
+}
+
+function _technicalRefusalMsg(): string {
+  const v = typeof window._t === 'function' ? window._t('ai_refuse_technical') : '';
+  return v && v !== 'ai_refuse_technical'
+    ? v
+    : "I can't help with technical or internal implementation details about Minallo. I can still help you study from your course material, create revision notes, quiz you, or explain a topic step by step.";
+}
+
 interface AskAiState {
   generationStopped: boolean;
   currentGenId: number;
@@ -637,6 +652,14 @@ export function initAskAI(
     const _chatHistory = window.serializeChatDOM ? window.serializeChatDOM() : [];
     if (!skipUserBubble && window.addUserMsg) window.addUserMsg(question);
 
+    if (isInternalTechnicalQuestion(question)) {
+      const refusal = _technicalRefusalMsg();
+      if (window.addBotMsg) window.addBotMsg(refusal);
+      const courseId = window.activeCourseId || window.currentCourseId || '';
+      if (courseId) _appendCourseHistory(courseId, question, refusal);
+      return { content: [{ text: refusal }] };
+    }
+
     const _aiSendBtn = document.getElementById('aiSend') as HTMLButtonElement | null;
     const _stopBtn = document.getElementById('stopBtn') as StopButton | null;
     if (_aiSendBtn) _aiSendBtn.disabled = true;
@@ -1082,6 +1105,11 @@ export function initAskAI(
 
             function queueToken(tok: string): void {
               rawText += tok;
+              if (document.hidden) {
+                if (!ansWrap) ensureBubble();
+                if (bubble) bubble.setAttribute('data-raw', rawText);
+                return;
+              }
               if (ansWrap) schedulePaint();
               else beginStreamingWhenReady();
             }

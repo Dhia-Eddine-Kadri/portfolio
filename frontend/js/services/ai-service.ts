@@ -114,6 +114,7 @@ export function uploadCourseDocument(
   courseId: string,
   sourceType?: string
 ): Promise<UploadResponse> {
+  clearCourseDocumentCache(courseId);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -148,6 +149,7 @@ export function uploadCourseDocument(
             new Error((data.error && data.error.message) || 'Upload failed (' + response.status + ')')
           );
         } else {
+          clearCourseDocumentCache(courseId);
           resolve(data);
         }
       } catch (err: unknown) {
@@ -190,20 +192,71 @@ export interface CourseDocument {
   updated_at?: string;
 }
 
-export async function listCourseDocuments(courseId: string): Promise<CourseDocument[]> {
+interface CourseDocumentCacheEntry {
+  docs?: CourseDocument[];
+  promise?: Promise<CourseDocument[]>;
+  expiresAt: number;
+}
+
+const _courseDocumentCache = new Map<string, CourseDocumentCacheEntry>();
+const COURSE_DOCUMENT_CACHE_MS = 30000;
+
+function _cloneCourseDocuments(docs: CourseDocument[]): CourseDocument[] {
+  return docs.map((doc) => ({ ...doc }));
+}
+
+export function clearCourseDocumentCache(courseId?: string): void {
+  if (courseId) _courseDocumentCache.delete(courseId);
+  else _courseDocumentCache.clear();
+}
+
+export function prefetchCourseDocuments(courseId: string): Promise<CourseDocument[]> {
+  return listCourseDocuments(courseId).catch(() => []);
+}
+
+export async function listCourseDocuments(
+  courseId: string,
+  opts?: { force?: boolean }
+): Promise<CourseDocument[]> {
+  const key = String(courseId || '').trim();
+  if (!key) return [];
+
+  const now = Date.now();
+  const cached = _courseDocumentCache.get(key);
+  if (!opts?.force && cached) {
+    if (cached.docs && cached.expiresAt > now) return _cloneCourseDocuments(cached.docs);
+    if (cached.promise) return cached.promise.then(_cloneCourseDocuments);
+  }
+
   // Wait for session restore so the Authorization header isn't empty during
   // dashboard prewarm. Otherwise the proxy returns 401 and cards show no files
   // until the user manually reopens the course.
-  if (window._sbSessionReady) await window._sbSessionReady;
+  const promise = (async () => {
+    if (window._sbSessionReady) await window._sbSessionReady;
 
-  const response = await fetch(
-    _backendUrl() + '/api/documents/list?courseId=' + encodeURIComponent(courseId),
-    { headers: { Authorization: 'Bearer ' + _token() } }
-  );
-  if (response.status === 401) _throwSessionExpired();
-  if (!response.ok) return [];
-  const data = (await response.json()) as { documents?: CourseDocument[] };
-  return data.documents || [];
+    const response = await fetch(
+      _backendUrl() + '/api/documents/list?courseId=' + encodeURIComponent(key),
+      { headers: { Authorization: 'Bearer ' + _token() } }
+    );
+    if (response.status === 401) _throwSessionExpired();
+    if (!response.ok) return [];
+    const data = (await response.json()) as { documents?: CourseDocument[] };
+    return data.documents || [];
+  })();
+
+  _courseDocumentCache.set(key, { promise, expiresAt: now + COURSE_DOCUMENT_CACHE_MS });
+
+  try {
+    const docs = await promise;
+    _courseDocumentCache.set(key, {
+      docs: _cloneCourseDocuments(docs),
+      expiresAt: Date.now() + COURSE_DOCUMENT_CACHE_MS,
+    });
+    return _cloneCourseDocuments(docs);
+  } catch (err) {
+    _courseDocumentCache.delete(key);
+    throw err;
+  }
 }
 
 export function filterDocsByCourseFiles(
@@ -247,6 +300,7 @@ export async function indexExistingDocument(
   folder?: string | null,
   meta?: DocumentMeta
 ): Promise<unknown> {
+  clearCourseDocumentCache(courseId);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
   const payload: Record<string, unknown> = {
@@ -276,7 +330,9 @@ export async function indexExistingDocument(
     if (response.status === 401) _throwSessionExpired();
     const text = await response.text();
     try {
-      return JSON.parse(text);
+      const data = JSON.parse(text);
+      clearCourseDocumentCache(courseId);
+      return data;
     } catch {
       throw new Error('Index failed (' + response.status + ')');
     }
@@ -287,12 +343,15 @@ export async function indexExistingDocument(
 }
 
 export async function deleteRagDocument(documentId: string): Promise<unknown> {
+  clearCourseDocumentCache();
   const response = await fetch(_backendUrl() + '/api/documents/delete', {
     method: 'POST',
     headers: _authJsonHeaders(),
     body: JSON.stringify({ documentId }),
   });
-  return response.json();
+  const data = await response.json();
+  clearCourseDocumentCache();
+  return data;
 }
 
 export interface OcrReviewPage {

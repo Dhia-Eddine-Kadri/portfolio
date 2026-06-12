@@ -1165,10 +1165,32 @@
     };
     if (els.select) els.select._courseId = courseId;
 
+    var docsPromise = null;
+    function loadCourseDocs() {
+      if (!docsPromise) {
+        docsPromise = _aiService()
+          .then(function (svc) {
+            var list = typeof svc.prefetchCourseDocuments === 'function'
+              ? svc.prefetchCourseDocuments(courseId)
+              : svc.listCourseDocuments(courseId);
+            return list.then(function (docs) {
+              return typeof svc.filterDocsByCourseFiles === 'function'
+                ? svc.filterDocsByCourseFiles(docs, courseId) : docs;
+            });
+          })
+          .catch(function (err) {
+            docsPromise = null;
+            throw err;
+          });
+      }
+      return docsPromise;
+    }
+
     _aiService().then(function (svc) {
       _populateTopics(svc, els.select);
       _loadSaved(svc, els, courseId);
     });
+    if (courseId) loadCourseDocs().catch(function () { /* retry on click */ });
 
     // Selecting a topic from the map clears the free-text box and vice-versa.
     if (els.select) els.select.addEventListener('change', function () {
@@ -1220,13 +1242,7 @@
         return;
       }
       els.gen.disabled = true;
-      _aiService()
-        .then(function (svc) {
-          return svc.listCourseDocuments(courseId).then(function (docs) {
-            return typeof svc.filterDocsByCourseFiles === 'function'
-              ? svc.filterDocsByCourseFiles(docs, courseId) : docs;
-          });
-        })
+      loadCourseDocs()
         .then(function (docs) {
           els.gen.disabled = false;
           var ready = (docs || []).filter(function (d) { return d.processing_status === 'ready'; });

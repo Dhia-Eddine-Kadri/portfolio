@@ -514,6 +514,22 @@ img, svg {
   color: #fff;
 }
 
+.nl-card__kicker {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: rgba(14, 165, 233, 0.10);
+  padding: 0.28rem 0.65rem;
+  color: var(--nl-sky-200);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
 .nl-card__title a {
   color: inherit;
   text-decoration: none;
@@ -933,6 +949,130 @@ img, svg {
 }
 
 /* Features */
+.nl-study-flow {
+  padding-top: 5.5rem;
+}
+
+.nl-study-flow__head {
+  max-width: 54rem;
+  margin: 0 auto 2.25rem;
+  text-align: center;
+}
+
+.nl-study-flow__title {
+  font-size: clamp(2.15rem, 4vw, 3.65rem);
+  line-height: 1.05;
+  color: #fff;
+}
+
+.nl-study-flow__lead {
+  max-width: 48rem;
+  margin: 1.1rem auto 0;
+  color: var(--nl-slate-300);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.nl-study-flow__rail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin: 0 auto 2rem;
+  max-width: 66rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  border-radius: 1.25rem;
+  background: rgba(2, 6, 23, 0.38);
+}
+
+.nl-study-flow__rail span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.11);
+  color: var(--nl-sky-100);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.nl-study-flow__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+.nl-study-step {
+  position: relative;
+  min-height: 11.5rem;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.86), rgba(8, 47, 73, 0.35)),
+    rgba(255, 255, 255, 0.045);
+  padding: 1.15rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.nl-study-step::after {
+  content: "";
+  position: absolute;
+  right: -2.2rem;
+  top: -2.2rem;
+  width: 6.25rem;
+  height: 6.25rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.10);
+  pointer-events: none;
+}
+
+.nl-study-step b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 1rem;
+  border-radius: 0.8rem;
+  background: var(--nl-sky-300);
+  color: var(--nl-slate-950);
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.nl-study-step h3 {
+  margin: 0;
+  color: #fff;
+  font-family: var(--nl-font-display);
+  font-size: 1.08rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.nl-study-step p {
+  margin-top: 0.65rem;
+  color: var(--nl-slate-300);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.nl-study-flow__explain {
+  max-width: 58rem;
+  margin: 1.6rem auto 0;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 1.25rem;
+  background: rgba(125, 211, 252, 0.08);
+  padding: 1.2rem 1.35rem;
+  color: var(--nl-slate-200);
+  line-height: 1.75;
+  text-align: center;
+}
+
 .nl-features__head {
   max-width: 48rem;
   margin-bottom: 3rem;
@@ -1462,6 +1602,27 @@ img, svg {
   color: var(--nl-slate-300);
 }
 
+.nl-pricing__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.35rem;
+}
+
+.nl-pricing__trust span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.20);
+  background: rgba(125, 211, 252, 0.08);
+  color: var(--nl-sky-100);
+  padding: 0.42rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .nl-pricing__cards {
   display: grid;
   grid-template-columns: 1fr;
@@ -1507,17 +1668,20 @@ img, svg {
   font-size: 2.5rem;
   color: #fff;
   line-height: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
+  display: block;
+}
+
+.nl-price-card__today {
+  display: block;
 }
 
 .nl-price-card__per {
+  display: block;
+  margin-top: 0.35rem;
   font-family: var(--nl-font-body);
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--nl-slate-400);
-  padding-bottom: 0.25rem;
 }
 
 .nl-price-card__items {
@@ -1536,6 +1700,30 @@ img, svg {
 
 .nl-price-card__cta {
   margin-top: 1.75rem;
+}
+
+.nl-price-legal {
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.30);
+  padding: 0.95rem 1rem;
+  color: var(--nl-slate-300);
+}
+
+.nl-price-legal summary {
+  cursor: pointer;
+  color: var(--nl-sky-100);
+  font-weight: 900;
+}
+
+.nl-price-legal summary::marker {
+  color: var(--nl-sky-300);
+}
+
+.nl-price-legal p {
+  margin-top: 0.75rem;
+  line-height: 1.65;
+  font-size: 0.9rem;
 }
 
 /* FAQ */
@@ -1759,6 +1947,30 @@ img, svg {
   color: #1e293b;
 }
 
+.nl-cta__line {
+  margin-top: 1rem;
+  color: #082f49;
+  font-weight: 950;
+}
+
+.nl-cta__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.nl-cta__secondary {
+  background: rgba(2, 6, 23, 0.10);
+  border-color: rgba(2, 6, 23, 0.16);
+  color: #082f49;
+}
+
+.nl-cta__secondary:hover {
+  background: rgba(2, 6, 23, 0.16);
+  color: #020617;
+}
+
 /* Footer */
 .nl-footer {
   border-top: 1px solid var(--nl-white-10);
@@ -1807,8 +2019,14 @@ img, svg {
   .nl-cta__grid {
     grid-template-columns: 1fr auto;
   }
+  .nl-cta__actions {
+    align-items: flex-end;
+  }
   .nl-tp-citations {
     grid-template-columns: 1fr 1fr;
+  }
+  .nl-study-flow__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1834,6 +2052,9 @@ img, svg {
   .nl-features__grid {
     grid-template-columns: 1fr 1fr;
   }
+  .nl-study-flow__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
   .nl-lifestyle__cards {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -1847,7 +2068,7 @@ img, svg {
     grid-template-columns: 1fr 1fr;
   }
   .nl-pricing__cards {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
   .nl-paths__preview {
     grid-template-columns: repeat(3, 1fr);
