@@ -9,6 +9,7 @@ from app.services.workspace_context import (
     format_account_block,
     format_workspace_block,
     is_workspace_question,
+    match_course_in_text,
     sanitize_page_context,
     workspace_fingerprint,
 )
@@ -171,6 +172,48 @@ def test_course_list_questions_are_workspace_questions():
     # Academic questions that merely mention a course must stay on RAG.
     assert not is_workspace_question("Which course topics are covered in chapter 3?")
     assert not is_workspace_question("summarize the course introduction lecture")
+
+
+def test_tool_inventory_questions_are_workspace_questions():
+    # The 2026-06-12 follow-up bug: "what cheatsheets do I have in Technische
+    # Mechanik 2" fell through to RAG, found no anchor, and got a generic
+    # navigation answer instead of the real cheatsheet list.
+    assert is_workspace_question("what cheatsheets do I have in Technische Mechanik 2")
+    assert is_workspace_question("what cheat sheets do I have?")
+    assert is_workspace_question("which flashcard decks do I have?")
+    assert is_workspace_question("how many quizzes do I have in this course?")
+    assert is_workspace_question("what files do I have in TM2?")
+    assert is_workspace_question("welche Spickzettel habe ich?")
+    assert is_workspace_question("wie viele Karteikarten habe ich?")
+    # Content questions about those topics must stay on RAG.
+    assert not is_workspace_question("what does the cheatsheet say about torsion?")
+    assert not is_workspace_question("explain exercise 3 from the quiz")
+
+
+def test_match_course_in_text():
+    snap = {"courses": [
+        {"id": "tm", "name": "Technische Mechanik", "short": "TM1", "files": 3},
+        {"id": "tm2", "name": "Technische Mechanik 2", "short": "TM2", "files": 12},
+        {"id": "im", "name": "Ingenieurmathematik", "short": "", "files": 5},
+    ]}
+    # Longest match wins: "Technische Mechanik 2" beats "Technische Mechanik".
+    assert match_course_in_text(snap, "what cheatsheets do I have in Technische Mechanik 2?")["id"] == "tm2"
+    assert match_course_in_text(snap, "show my files in technische mechanik")["id"] == "tm"
+    # Short codes match on word boundaries only.
+    assert match_course_in_text(snap, "how many quizzes in TM2?")["id"] == "tm2"
+    assert match_course_in_text(snap, "the atm2x sensor datasheet") is None
+    assert match_course_in_text(snap, "what courses do I have?") is None
+    assert match_course_in_text(None, "TM2") is None
+    assert match_course_in_text(snap, "") is None
+
+
+def test_workspace_block_course_name_label():
+    labelled = format_workspace_block(_snapshot(), course_name="Technische Mechanik 2")
+    assert 'for the course "Technische Mechanik 2"' in labelled
+    plain = format_workspace_block(_snapshot())
+    assert "the course the student asked about" not in plain
+    # No snapshot → no label either (never attribute absent data to a course).
+    assert format_workspace_block(None, course_name="TM2") == ""
 
 
 def test_actions_contract_only_names_allowed_actions():

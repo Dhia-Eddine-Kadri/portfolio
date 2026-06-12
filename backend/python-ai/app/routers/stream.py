@@ -51,6 +51,7 @@ from ..services.workspace_context import (
     format_account_block,
     format_workspace_block,
     is_workspace_question,
+    match_course_in_text,
     sanitize_page_context,
     workspace_fingerprint,
 )
@@ -471,18 +472,39 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             lambda: fetch_workspace_snapshot(user_id, payload.courseId)
         )
         weak_topics = await run_in_threadpool(lambda: fetch_weak_topics(user_id, payload.courseId))
-    workspace_block = format_workspace_block(
-        workspace_snapshot, page_context=page_context, weak_topics=weak_topics
-    )
     # App/workspace questions ("what courses do I have?") need the account-wide
     # course list: the per-course snapshot above cannot name the student's other
     # courses, which is exactly what the model used to invent.
     account_snapshot = None
+    named_course_name: str | None = None
     if app_or_workspace:
         account_snapshot = await run_in_threadpool(lambda: fetch_account_snapshot(user_id))
+        # "what cheatsheets do I have in Technische Mechanik 2" — the question
+        # names a course. Swap the workspace snapshot to THAT course; the
+        # active-course snapshot would silently describe the wrong one.
+        named_course = match_course_in_text(account_snapshot, question)
+        if named_course and named_course.get("id"):
+            if named_course["id"] == payload.courseId:
+                named_course_name = named_course["name"]
+            else:
+                named_snapshot = await run_in_threadpool(
+                    lambda: fetch_workspace_snapshot(user_id, named_course["id"])
+                )
+                if named_snapshot:
+                    workspace_snapshot = named_snapshot
+                    # Weak topics were fetched for the active course — they
+                    # must not be attributed to the named one.
+                    weak_topics = []
+                    named_course_name = named_course["name"]
+    workspace_block = format_workspace_block(
+        workspace_snapshot, page_context=page_context, weak_topics=weak_topics,
+        course_name=named_course_name,
+    )
+    if account_snapshot:
         workspace_block += format_account_block(account_snapshot, in_course_chat=True)
     ws_fingerprint = workspace_fingerprint(
-        {"s": workspace_snapshot, "w": weak_topics, "p": page_context, "a": account_snapshot}
+        {"s": workspace_snapshot, "w": weak_topics, "p": page_context,
+         "a": account_snapshot, "n": named_course_name}
     ) if workspace_block else ""
     assistant_mode = detect_assistant_mode(question)
 

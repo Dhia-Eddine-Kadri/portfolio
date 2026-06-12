@@ -253,9 +253,14 @@ def format_workspace_block(
     *,
     page_context: dict[str, str] | None = None,
     weak_topics: list[str] | None = None,
+    course_name: str | None = None,
 ) -> str:
     """The LIVE WORKSPACE prompt section. Returns "" when there is nothing
-    real to say (no snapshot, no location, no weak topics)."""
+    real to say (no snapshot, no location, no weak topics).
+
+    ``course_name`` labels whose data the counts are — set when the student
+    asked about a specific course by name, so the model attributes the
+    numbers to that course rather than the one currently on screen."""
     if not snapshot and not page_context and not weak_topics:
         return ""
 
@@ -268,6 +273,11 @@ def format_workspace_block(
         "(always use these exact tab names)",
         "",
     ]
+    if course_name and snapshot:
+        lines.append(
+            f'- All counts below are for the course "{course_name}" — '
+            "the course the student asked about."
+        )
 
     if snapshot:
         files = snapshot.get("files")
@@ -427,18 +437,23 @@ _WORKSPACE_QUESTION_RE = re.compile(
     r"meine?n?\s+(dateien|dokumente|karteikarten|quizz?e|prüfungen|pruefungen|"
     r"spickzettel|fortschritt|schwächen|schwaechen)|"
     r"which\s+(quiz(zes)?|exams?|topics?|flashcards?)\s+(did|have)\s+i|"
-    r"welche\s+(quizz?e|themen|prüfungen|pruefungen)\s+habe\s+ich|"
+    r"welche\s+(quizz?e|themen|prüfungen|pruefungen|dateien|dokumente|"
+    r"karteikarten|spickzettel|cheat\s*-?\s*sheets?|kurse)\s+hab(e)?\s+ich|"
     r"what\s+can\s+i\s+do\s+(in|with)\s+(this|the|my)\s+course|"
     r"was\s+kann\s+ich\s+(in|mit)\s+(diesem|dem)\s+kurs|"
     r"what('?s| is)\s+(inside|in)\s+(this|the|my)\s+(course|folder)|"
     r"which\s+topics?\s+am\s+i\s+weak|what\s+are\s+my\s+weak|"
-    # Account-level course-list questions ("what courses do I have", "how many
-    # courses are in my account"). Answered from the account snapshot — RAG
-    # retrieval would only pull lecture chunks and invent a course list.
-    r"(what|which|how\s+many)\s+courses?\s+(do|did|does|have|am|are)\s+i|"
+    # "what/which/how many <tool items or courses> do I have …" — inventory
+    # questions about the student's own material. Answered from the workspace
+    # and account snapshots — RAG retrieval would only pull lecture chunks and
+    # invent an inventory.
+    r"(what|which|how\s+many)\s+(files?|documents?|pdfs?|quiz(zes)?|"
+    r"flashcards?|(flashcard\s+)?decks?|exams?|cheat\s*-?\s*sheets?|"
+    r"summaries|notes?|deep\s*-?\s*learn\s+sessions?|courses?)\s+"
+    r"(do|did|does|have|has|am|are|can)\s+i|"
     r"my\s+courses|list\s+(all\s+(of\s+)?)?my\s+courses?|"
     r"courses?\s+(in|inside|on)\s+(my|the|this)\s+(account|website|app|site|platform|sidebar)|"
-    r"welche\s+kurse\s+hab(e)?\s+ich|meine\s+kurse|wie\s+viele\s+kurse"
+    r"meine\s+kurse|wie\s+viele\s+(kurse|dateien|karteikarten|quizz?e|spickzettel)"
     r")\b",
     re.IGNORECASE,
 )
@@ -540,6 +555,9 @@ def fetch_account_snapshot(user_id: str) -> dict[str, Any] | None:
                     courses.append({
                         "id": cid,
                         "name": name[:80],
+                        # The abbreviation students actually type ("TM2") —
+                        # kept for match_course_in_text, not shown in prompts.
+                        "short": str(c.get("short") or "").strip()[:20],
                         "files": doc_counts.get(cid, 0),
                     })
                     if len(courses) >= 20:
@@ -555,6 +573,28 @@ def fetch_account_snapshot(user_id: str) -> dict[str, Any] | None:
     if len(_account_cache) > 2000:
         _account_cache.clear()
     return snapshot
+
+
+def match_course_in_text(snapshot: dict[str, Any] | None, text: str) -> dict[str, Any] | None:
+    """Best-effort: the account-snapshot course whose name (or short code)
+    appears in ``text``. Longest match wins, so "Technische Mechanik 2" beats
+    a sibling "Technische Mechanik". ``None`` when nothing matches — the
+    caller then stays on the active course."""
+    if not snapshot or not snapshot.get("courses") or not text:
+        return None
+    t = " ".join(text.lower().split())
+    best: dict[str, Any] | None = None
+    best_len = 0
+    for c in snapshot["courses"]:
+        for key in ("name", "short"):
+            v = " ".join(str(c.get(key) or "").lower().split())
+            # ≥3 chars and not embedded in a longer word ("TM2" must not
+            # match inside "atm2x"); names are short so re.escape is cheap.
+            if len(v) >= 3 and len(v) > best_len and re.search(
+                rf"(?<![a-z0-9]){re.escape(v)}(?![a-z0-9])", t
+            ):
+                best, best_len = c, len(v)
+    return best
 
 
 def format_account_block(snapshot: dict[str, Any] | None, *, in_course_chat: bool = False) -> str:
