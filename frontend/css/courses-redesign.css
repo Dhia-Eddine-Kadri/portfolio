@@ -2238,6 +2238,22 @@ body.minallo-in-course .welcome-state {
   border-color: color-mix(in srgb, var(--co-folder-accent) 28%, rgba(255, 255, 255, 0.1));
   background: rgba(255, 255, 255, 0.04);
 }
+/* Drag-and-drop upload: while a file drag is over the panel, show a dashed
+   outline (drop = course root); the folder card under the cursor lights up
+   instead (drop = that folder). */
+#coFilesPanel.co-drop-active {
+  outline: 2px dashed rgba(96, 165, 250, 0.5);
+  outline-offset: -4px;
+  border-radius: 16px;
+}
+#coFilesPanel.co-drop-active:has(.co-folder-section.co-drop-target) {
+  outline-color: rgba(96, 165, 250, 0.15);
+}
+.co-inner-v2 .co-folder-section.co-folder-v2.co-drop-target {
+  border-color: color-mix(in srgb, var(--co-folder-accent) 75%, rgba(255, 255, 255, 0.15));
+  background: color-mix(in srgb, var(--co-folder-accent) 14%, rgba(255, 255, 255, 0.03));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--co-folder-accent) 40%, transparent);
+}
 .co-inner-v2 .co-folder-section.co-folder-v2:not(.collapsed) {
   border-color: color-mix(in srgb, var(--co-folder-accent) 24%, rgba(255, 255, 255, 0.1));
   background: rgba(255, 255, 255, 0.04);

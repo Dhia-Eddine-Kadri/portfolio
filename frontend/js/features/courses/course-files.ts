@@ -61,6 +61,10 @@ interface CourseFileLite {
 // Key: courseId + ':' + fname.toLowerCase() → 'ready' | 'triggered'
 const _ragConfirmed: Record<string, 'ready' | 'triggered'> = {};
 
+// Mirrors the `accept` attribute on #coUploadInput (course-view.ts). Drag&drop
+// bypasses `accept`, so dropped files are screened against this instead.
+const DND_ALLOWED_EXT_RE = /\.(pdf|txt|docx|png|jpe?g)$/i;
+
 export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
   let selectMode = false;
   // Shared selection store — keep one array reference so folder "select all"
@@ -487,9 +491,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
     });
   }
 
-  if (uploadInput) {
-    uploadInput.addEventListener('change', function (this: FolderUploadInput) {
-      const picked = Array.from(this.files || []);
+  function startUpload(picked: File[], targetFolder: string | null): void {
       if (!picked.length) return;
       const uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
       if (!uid) {
@@ -501,9 +503,6 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
 
       const { valid: files, rejected } = filterOversizedFiles(picked);
       warnRejected(rejected, files.length === 0);
-      // Reset the input so picking the same oversized file again still fires
-      // `change`. Otherwise the user is stuck after one rejection.
-      try { this.value = ''; } catch { /* ignore */ }
       if (!files.length) return;
 
       const modal = openUploadModal();
@@ -517,7 +516,6 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
         const avg = Math.round(totalPct.reduce((a, b) => a + b, 0) / files.length);
         modal.setUploadPct(avg);
       }
-      const targetFolder = this._targetFolder || null;
       Promise.all(
         files.map((file, idx) =>
           window
@@ -597,7 +595,76 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
           const msg = e instanceof Error ? e.message : 'Please try again.';
           if (typeof window.showToast === 'function') window.showToast('Upload failed', msg);
         });
-      this.value = '';
+  }
+
+  if (uploadInput) {
+    uploadInput.addEventListener('change', function (this: FolderUploadInput) {
+      const picked = Array.from(this.files || []);
+      // Reset the input so picking the same (oversized) file again still fires
+      // `change`. Otherwise the user is stuck after one rejection.
+      try { this.value = ''; } catch { /* ignore */ }
+      startUpload(picked, this._targetFolder || null);
+    });
+  }
+
+  // ── Drag & drop upload ───────────────────────────────────────────────────
+  // Dropping anywhere on the Files panel uploads to the course root; while
+  // the drag hovers a folder card the card lights up and the drop goes into
+  // that folder instead. The file input's `accept` filter doesn't apply to
+  // drops, so unsupported extensions are screened here.
+  const filesPanel = co.querySelector<HTMLElement>('#coFilesPanel');
+  if (filesPanel && !filesPanel.dataset.dndBound) {
+    filesPanel.dataset.dndBound = '1';
+    // dragenter/dragleave fire for every child crossed; track depth so the
+    // highlight only clears when the drag truly leaves the panel.
+    let dragDepth = 0;
+    const clearDropUi = (): void => {
+      dragDepth = 0;
+      filesPanel.classList.remove('co-drop-active');
+      filesPanel.querySelectorAll('.co-folder-section.co-drop-target')
+        .forEach((el) => el.classList.remove('co-drop-target'));
+    };
+    const folderUnder = (e: DragEvent): HTMLElement | null =>
+      e.target instanceof Element ? e.target.closest<HTMLElement>('.co-folder-section') : null;
+    const hasFiles = (e: DragEvent): boolean =>
+      !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+
+    filesPanel.addEventListener('dragenter', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth++;
+      filesPanel.classList.add('co-drop-active');
+    });
+    filesPanel.addEventListener('dragover', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      const target = folderUnder(e);
+      filesPanel.querySelectorAll('.co-folder-section.co-drop-target').forEach((el) => {
+        if (el !== target) el.classList.remove('co-drop-target');
+      });
+      target?.classList.add('co-drop-target');
+    });
+    filesPanel.addEventListener('dragleave', (e) => {
+      if (!hasFiles(e)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) clearDropUi();
+    });
+    filesPanel.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      const folderName = folderUnder(e)?.getAttribute('data-folder') || null;
+      clearDropUi();
+      const dropped = Array.from(e.dataTransfer?.files || []);
+      const allowed = dropped.filter((f) => DND_ALLOWED_EXT_RE.test(f.name));
+      const blocked = dropped.filter((f) => !DND_ALLOWED_EXT_RE.test(f.name));
+      if (blocked.length && typeof window.showToast === 'function') {
+        window.showToast(
+          'Unsupported file type',
+          blocked.map((f) => f.name).join(', ') + ' — allowed: PDF, TXT, DOCX, PNG, JPG'
+        );
+      }
+      startUpload(allowed, folderName);
     });
   }
 }
