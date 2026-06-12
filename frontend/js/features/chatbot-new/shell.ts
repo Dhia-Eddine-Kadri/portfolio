@@ -671,12 +671,14 @@ function initMessageNavigator(root: HTMLElement): void {
     host: card,
     scroller,
     container: msgs,
-    messageSelector: '.ncb-msg-row',
-    isUser: (row) => row.classList.contains('ncb-msg-row--user'),
-    snippetSource: (row) =>
-      row.querySelector<HTMLElement>('.ncb-bubble-text, .ncb-bubble-body') || row,
+    // User turns only (ChatGPT-style): prompts are the landmarks people
+    // navigate by; listing AI replies too doubles the list with noise.
+    messageSelector: '.ncb-msg-row--user',
+    isUser: () => true,
+    snippetSource: (row) => row.querySelector<HTMLElement>('.ncb-bubble-text') || row,
     bottomGuard: () => root.querySelector<HTMLElement>('.ncb-input'),
     compact: false,
+    minMessages: 3,
   });
 }
 
@@ -2788,12 +2790,32 @@ function scrollMsgsToBottom(msgs: HTMLElement): void {
   if (scroller) scroller.scrollTop = scroller.scrollHeight;
 }
 
+// Cost guards for the generic /chat route (no server-side history trim there,
+// unlike /ask-stream which hard-caps history at ~2k chars). The newest
+// messages keep full fidelity — the active exchange is what follow-ups
+// reference — while older turns are capped so a long chat plateaus instead of
+// riding ~20 full-length messages (and full 60k-char attachments) per request.
+const NCB_HISTORY_FULL_MESSAGES = 6;
+const NCB_HISTORY_TURN_CHAR_CAP = 1500;
+const NCB_HISTORY_DOC_CHAR_CAP = 8000;
+// Imported course sources are re-injected into the LATEST user message on
+// every request (that is their contract — the AI must keep seeing them), so
+// they are the most expensive bytes in the chat. Cap per document and total.
+const NCB_IMPORT_DOC_CHAR_CAP = 20000;
+const NCB_IMPORT_TOTAL_CHAR_BUDGET = 60000;
+
+function capChars(text: string, max: number, note: string): string {
+  return text.length <= max ? text : text.slice(0, max) + '\n' + note;
+}
+
 function buildApiMessages(
   messages: ChatMessage[],
   resolvedFollowUpDoc: GeneratedDoc | null = null
 ): Array<{ role: 'user' | 'assistant'; content: unknown }> {
   // Mirror chatbot.js: keep last ~20 messages, and inline images as Claude-shaped image blocks.
   const trimmed = messages.slice(-20);
+  // Messages older than the newest NCB_HISTORY_FULL_MESSAGES get capped.
+  const fullFidelityFrom = Math.max(0, trimmed.length - NCB_HISTORY_FULL_MESSAGES);
   // Selected sources (from the global library) are injected into the
   // LATEST user message only — so the AI sees them every reply without
   // ballooning every historical turn with copies.
@@ -2812,8 +2834,13 @@ function buildApiMessages(
   // restore for old chats); the in-chat scan is the synchronous fallback.
   const followUpDoc = resolvedFollowUpDoc ?? generatedDocForFollowUp(trimmed);
   const result: Array<{ role: 'user' | 'assistant'; content: unknown }> = trimmed.map((m, idx) => {
+    const isOldTurn = idx < fullFidelityFrom;
     if (m.role === 'assistant') {
-      return { role: 'assistant' as const, content: sanitizeChatbotDiagrams(m.text, !!m.allowDiagrams) };
+      const text = sanitizeChatbotDiagrams(m.text, !!m.allowDiagrams);
+      return {
+        role: 'assistant' as const,
+        content: isOldTurn ? capChars(text, NCB_HISTORY_TURN_CHAR_CAP, '[…]') : text,
+      };
     }
     const blocks: Array<unknown> = [];
     if (idx === lastUserIdx && followUpDoc) {
@@ -2825,14 +2852,32 @@ function buildApiMessages(
           '\n</document>',
       });
     }
-    // Prepend attached course-file docs into the most recent user message.
+    // Prepend attached course-file docs into the most recent user message,
+    // under a total budget so five imported lecture PDFs don't put ~100k+
+    // chars on EVERY turn of the chat.
     if (idx === lastUserIdx && folderDocs.length) {
+      let importBudget = NCB_IMPORT_TOTAL_CHAR_BUDGET;
       folderDocs.forEach((d) => {
+        if (importBudget <= 0) {
+          blocks.push({
+            type: 'text',
+            text:
+              '(The imported file "' + d.name + '" was omitted — too much imported material ' +
+              'for one request. Deselect some sources to include it.)',
+          });
+          return;
+        }
+        const slice = capChars(
+          d.text,
+          Math.min(NCB_IMPORT_DOC_CHAR_CAP, importBudget),
+          '[Truncated — ask about a specific section for more detail.]'
+        );
+        importBudget -= slice.length;
         blocks.push({
           type: 'text',
           text:
             '<document filename="' + d.name + '" source="course-import">\n' +
-            d.text +
+            slice +
             '\n</document>',
         });
       });
@@ -2869,9 +2914,17 @@ function buildApiMessages(
           });
         });
       } else if (f.kind === 'text' && f.textContent) {
+        // Full text only while the file's message is recent; once the
+        // conversation moves on, a head slice + the discussion already in
+        // history carry follow-ups, instead of resending up to 60k chars
+        // on every request until the message leaves the 20-message window.
+        const docText = isOldTurn
+          ? capChars(f.textContent, NCB_HISTORY_DOC_CHAR_CAP,
+              '[Truncated — earlier turns discussed this file; re-attach it for full detail.]')
+          : f.textContent;
         blocks.push({
           type: 'text',
-          text: '<document filename="' + f.name + '">\n' + f.textContent + '\n</document>',
+          text: '<document filename="' + f.name + '">\n' + docText + '\n</document>',
         });
       } else {
         blocks.push({
@@ -2880,7 +2933,12 @@ function buildApiMessages(
         });
       }
     });
-    if (m.text) blocks.push({ type: 'text', text: m.text });
+    if (m.text) {
+      blocks.push({
+        type: 'text',
+        text: isOldTurn ? capChars(m.text, NCB_HISTORY_TURN_CHAR_CAP, '[…]') : m.text,
+      });
+    }
     return {
       role: 'user' as const,
       content: blocks.length === 1 && (blocks[0] as { type?: string }).type === 'text'

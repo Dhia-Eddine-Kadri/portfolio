@@ -684,10 +684,12 @@ if (aiPanel && aiMsgs) {
     host: aiPanel,
     scroller: aiMsgs,
     container: aiMsgs,
-    messageSelector: '.ai-msg-wrap:not(.typing-wrap)',
-    isUser: (row) => row.classList.contains('user'),
+    // User turns only (ChatGPT-style) — AI replies would double the list.
+    messageSelector: '.ai-msg-wrap.user',
+    isUser: () => true,
     snippetSource: (row) => row.querySelector<HTMLElement>('.ai-bubble') || row,
     compact: true,
+    minMessages: 3,
   });
 }
 const _aiPanelBridge = initAiPanelBridge({
