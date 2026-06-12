@@ -175,6 +175,37 @@
           cta: 'Start your 1-week free trial'
         }
       },
+      faq: {
+        eyebrow: 'Frequently Asked Questions',
+        title: 'Questions students ask before trying Minallo.',
+        lead: 'Quick answers about course files, exam prep tools, pricing, privacy, and how Minallo helps you study.',
+        questions: [
+          'Does Minallo only answer from my uploaded course files?',
+          'Does Minallo show sources when it uses external information?',
+          'Is Minallo just another AI chatbot?',
+          'Does Minallo teach proactively or do I need to ask everything myself?',
+          'Can Minallo help me know what to study next?',
+          'Can Minallo identify my weak topics?',
+          'Can Minallo prepare me for an exam?',
+          'Can Minallo handle scanned slides, handwritten notes, or diagrams?',
+          'What should I upload to Minallo?',
+          'Can I upload multiple files for one course?',
+          'Can Minallo explain difficult topics step by step?',
+          'Can Minallo create quizzes from my course material?',
+          'Can Minallo create flashcards?',
+          'What is Cheatsheet?',
+          'What is ExamForge?',
+          'What is Deep Learn?',
+          'Can Minallo replace studying?',
+          'Are AI answers always correct?',
+          'Can Minallo help if I only have a few days before the exam?',
+          'Does the €11.99/month Pro plan include everything?',
+          'Can I cancel anytime?',
+          'Is there a free trial?',
+          'Is my course material private?',
+          'Who is Minallo for?'
+        ]
+      },
       ctaBanner: {
         title: 'Upload your course and start studying smarter today.',
         text: 'Turn lecture notes, PDFs, and exercises into quizzes, flashcards, cheatsheets, exam-style practice, and step-by-step explanations.',
@@ -396,6 +427,37 @@
           ],
           cta: '1 Woche kostenlos starten'
         }
+      },
+      faq: {
+        eyebrow: 'Häufige Fragen',
+        title: 'Fragen, die Studierende vor Minallo stellen.',
+        lead: 'Kurze Antworten zu Kursdateien, Prüfungstools, Preisen, Datenschutz und wie Minallo beim Lernen hilft.',
+        questions: [
+          'Antwortet Minallo nur aus meinen hochgeladenen Kursdateien?',
+          'Zeigt Minallo Quellen, wenn externe Informationen genutzt werden?',
+          'Ist Minallo nur ein weiterer KI-Chatbot?',
+          'Unterrichtet Minallo proaktiv oder muss ich alles selbst fragen?',
+          'Kann Minallo mir helfen zu wissen, was ich als Nächstes lernen soll?',
+          'Kann Minallo meine schwachen Themen erkennen?',
+          'Kann Minallo mich auf eine Prüfung vorbereiten?',
+          'Kann Minallo gescannte Folien, handschriftliche Notizen oder Diagramme verarbeiten?',
+          'Was sollte ich in Minallo hochladen?',
+          'Kann ich mehrere Dateien für einen Kurs hochladen?',
+          'Kann Minallo schwierige Themen Schritt für Schritt erklären?',
+          'Kann Minallo Quizze aus meinem Kursmaterial erstellen?',
+          'Kann Minallo Karteikarten erstellen?',
+          'Was ist Cheatsheet?',
+          'Was ist ExamForge?',
+          'Was ist Deep Learn?',
+          'Kann Minallo das Lernen ersetzen?',
+          'Sind KI-Antworten immer richtig?',
+          'Kann Minallo helfen, wenn ich nur noch wenige Tage bis zur Prüfung habe?',
+          'Ist im Pro-Abo für 11,99 €/Monat alles enthalten?',
+          'Kann ich jederzeit kündigen?',
+          'Gibt es eine kostenlose Testphase?',
+          'Ist mein Kursmaterial privat?',
+          'Für wen ist Minallo gedacht?'
+        ]
       },
       ctaBanner: {
         title: 'Lade deinen Kurs hoch und lerne ab heute smarter.',
