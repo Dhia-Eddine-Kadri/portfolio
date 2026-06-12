@@ -533,9 +533,11 @@ export function restoreCourseHistory(courseId: string | null | undefined): void 
   const supaUrl = window._SUPA || '';
   const tok = window._sbToken || '';
   if (supaUrl && tok) {
+    // Latest 40 turns (desc + reverse). The old asc+limit query returned the
+    // 40 OLDEST rows, so long courses could never restore recent chats.
     fetch(
       supaUrl + '/rest/v1/chat_history?course_id=eq.' + encodeURIComponent(courseId) +
-        '&order=created_at.asc&limit=40',
+        '&order=created_at.desc&limit=40',
       {
         headers: {
           apikey: window._SAKEY || '',
@@ -544,13 +546,20 @@ export function restoreCourseHistory(courseId: string | null | undefined): void 
       }
     )
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((rows: Array<{ question: string; answer: string }> | null) => {
-        if (rows && rows.length) {
-          const pairs = rows.map((r) => ({ q: r.question, a: r.answer }));
-          _renderHistoryPairs(_dedupPairs(pairs), aiMsgs);
-        } else {
-          _renderHistoryPairs(_dedupPairs(_loadCourseHistory(courseId)), aiMsgs);
-        }
+      .then((rows: Array<{ question: string; answer: string; created_at?: string }> | null) => {
+        // MERGE the DB copy with the local copy instead of either/or. The DB
+        // write in _appendCourseHistory is best-effort and skips many turns,
+        // so most history lives only in localStorage — rendering "DB if any
+        // rows" made one synced turn hide an entire local conversation.
+        const dbPairs: HistoryPair[] = (rows || []).map((r) => ({
+          q: r.question,
+          a: r.answer,
+          ts: r.created_at ? Date.parse(r.created_at) || 0 : 0,
+        }));
+        const merged = dbPairs
+          .concat(_loadCourseHistory(courseId))
+          .sort((x, y) => (x.ts || 0) - (y.ts || 0));
+        _renderHistoryPairs(_dedupPairs(merged), aiMsgs);
       })
       .catch(() => {
         _renderHistoryPairs(_dedupPairs(_loadCourseHistory(courseId)), aiMsgs);
