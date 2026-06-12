@@ -1,7 +1,7 @@
 interface AdminFetchBody {
   action:
     | 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself'
-    | 'signups' | 'subscriptions' | 'retention'
+    | 'signups' | 'newusers' | 'subscriptions' | 'retention'
     | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage';
   [k: string]: unknown;
 }
@@ -46,6 +46,25 @@ export async function getSignupStats(range: string, bucket?: string): Promise<Si
   const body: AdminFetchBody = { action: 'signups', range };
   if (bucket) body.bucket = bucket;
   const res = await _adminFetch(body);
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export interface NewUser {
+  id: string;
+  email?: string;
+  created_at?: string;
+  plan: string;
+  status: string;
+}
+
+export interface NewUsersResult {
+  users: NewUser[];
+  hours: number;
+}
+
+export async function getNewUsers(): Promise<NewUsersResult | null> {
+  const res = await _adminFetch({ action: 'newusers' });
   if (!res.ok) return null;
   return res.json().catch(() => null);
 }

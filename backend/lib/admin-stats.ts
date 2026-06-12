@@ -129,6 +129,25 @@ export function bucketSignups(
   return { total, range, bucket, series, summary };
 }
 
+// ── New users (signed up within the last N hours) ────────────────────────────
+// Pure filter + sort so the cutoff logic is unit-testable; the handler feeds in
+// the auth-users page scan. Newest first. Timestamps slightly in the future
+// (clock skew between Auth and this function) still count as "new".
+export function selectNewUsers<T extends { created_at?: string }>(
+  users: T[],
+  hours: number,
+  now: Date = new Date()
+): T[] {
+  const cutoffMs = now.getTime() - hours * 60 * 60 * 1000;
+  return users
+    .filter((u) => {
+      if (!u.created_at) return false;
+      const t = new Date(u.created_at).getTime();
+      return Number.isFinite(t) && t >= cutoffMs;
+    })
+    .sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+}
+
 // ── Subscription snapshot (from current `subscriptions` rows) ────────────────
 export interface SubRow {
   plan?: string | null;

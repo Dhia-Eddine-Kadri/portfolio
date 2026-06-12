@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   bucketSignups,
+  selectNewUsers,
   summarizeSubscriptions,
   computeRetention,
   buildMonthList,
@@ -52,6 +53,24 @@ test('bucketSignups summary buckets <7d vs >7d correctly', () => {
   assert.equal(r.summary.month, 4);         // + 10 days
   assert.equal(r.summary.year, 5);          // + 40 days
   assert.equal(r.summary.currentUsers, 3);  // 10, 40, 400 days ago
+});
+
+test('selectNewUsers keeps only the last 24h, newest first', () => {
+  const hoursAgo = (n) => new Date(NOW.getTime() - n * 60 * 60 * 1000).toISOString();
+  const users = [
+    { id: 'a', created_at: hoursAgo(30) },  // too old
+    { id: 'b', created_at: hoursAgo(2) },
+    { id: 'c', created_at: hoursAgo(23) },
+    { id: 'd', created_at: hoursAgo(-0.1) }, // slight clock skew → still new
+    { id: 'e' },                             // no timestamp → dropped
+    { id: 'f', created_at: 'not-a-date' },   // invalid → dropped
+  ];
+  const fresh = selectNewUsers(users, 24, NOW);
+  assert.deepEqual(fresh.map((u) => u.id), ['d', 'b', 'c']);
+});
+
+test('selectNewUsers returns empty for empty input', () => {
+  assert.deepEqual(selectNewUsers([], 24, NOW), []);
 });
 
 test('bucketSignups daily series sums to range total and is sorted', () => {

@@ -5,7 +5,7 @@ import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { logSecurityEvent } from '../lib/logger';
 import { isUuid } from '../lib/validation';
 import {
-  bucketSignups, summarizeSubscriptions, computeRetention, computeFinancials, computeUsage,
+  bucketSignups, selectNewUsers, summarizeSubscriptions, computeRetention, computeFinancials, computeUsage,
   buildMonthList, bucketAiByMonth, computeFinanceSeries,
   isBucket, isRange, RANGE_DAYS, type Bucket, type Range, type SubRow, type SubEvent,
   type CostConfig, type UserUsage, type UsageEvent
@@ -91,7 +91,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -230,6 +230,49 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       range: r, bucket: b, total_users: result.summary.total, auth_method: adminCheck.method
     });
     return jsonResponse(200, { ...result, metadata: { generatedAt: new Date().toISOString(), windowDays: RANGE_DAYS[r] } });
+  }
+
+  // ── Analytics: users who signed up in the last 24 hours ───────────────────
+  if (action === 'newusers') {
+    const HOURS = 24;
+    // Same paged auth-users scan as the signups action — needs no migration
+    // and is fine at launch scale.
+    const all: Array<{ id: string; email?: string; created_at?: string }> = [];
+    const PER_PAGE = 1000;
+    for (let page = 1; page <= 100; page++) {
+      const res = await supaAuthAdminRequest<UsersListResponse>(
+        'GET', 'users?per_page=' + PER_PAGE + '&page=' + page, serviceKey
+      );
+      if (res.status < 200 || res.status >= 300) break;
+      const pageUsers = (res.body && res.body.users) || [];
+      for (const u of pageUsers) {
+        all.push({ id: u.id, email: u.email, created_at: u['created_at'] as string | undefined });
+      }
+      if (pageUsers.length < PER_PAGE) break;
+    }
+    const fresh = selectNewUsers(all, HOURS).slice(0, 50);
+
+    // Plan/status for the fresh accounts in a single query.
+    const planByUser = new Map<string, { plan: string; status: string }>();
+    if (fresh.length) {
+      const ids = fresh.map((u) => encodeURIComponent(u.id)).join(',');
+      const subRes = await supaRequest<Array<{ user_id?: string; plan?: string; status?: string }>>(
+        'GET', 'subscriptions?user_id=in.(' + ids + ')&select=user_id,plan,status', null, serviceKey
+      );
+      for (const r of (Array.isArray(subRes.body) ? subRes.body : [])) {
+        if (r.user_id) planByUser.set(String(r.user_id), { plan: r.plan || 'free', status: r.status || 'none' });
+      }
+    }
+    const users = fresh.map((u) => ({
+      ...u,
+      plan: planByUser.get(u.id)?.plan || 'free',
+      status: planByUser.get(u.id)?.status || 'none'
+    }));
+
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_new_users', {
+      hours: HOURS, count: users.length, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, { users, hours: HOURS, metadata: { generatedAt: new Date().toISOString() } });
   }
 
   // ── Analytics: subscription snapshot ──────────────────────────────────────

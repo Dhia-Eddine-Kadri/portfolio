@@ -23,7 +23,7 @@ import {
 // namespace import a missing export is just `undefined`, so the dashboard
 // degrades to absent while the rest of the admin page still works.
 import * as adminSvc from '../../services/admin-service.js';
-import type { FinanceSeries } from '../../services/admin-service.js';
+import type { FinanceSeries, NewUser } from '../../services/admin-service.js';
 import { renderBarChart, renderLineChart, type LinePoint } from './admin-charts.js';
 import { escapeHtml } from '../../utils/escape-html.js';
 
@@ -154,10 +154,12 @@ async function loadAdminStats(): Promise<void> {
   if (loading) loading.style.display = 'none';
   if (body) body.style.display = '';
   ['adminFinanceCards', 'adminFinanceChart', 'adminGrowthCards', 'adminDangerUsers',
-   'adminActivityCards', 'adminSubCards', 'adminFunnel', 'adminRetention'].forEach(_sectionLoading);
+   'adminActivityCards', 'adminSubCards', 'adminFunnel', 'adminRetention',
+   'adminNewUsers'].forEach(_sectionLoading);
 
   // Fire independently; a slow/failed section never blocks the others.
   const guard = (p: Promise<void>): Promise<void> => p.catch(() => { /* section shows its own empty state */ });
+  void guard(loadNewUsers());
   void guard(loadFinancials());
   void guard(loadUsage());
   void guard(loadFinanceSeries());
@@ -178,6 +180,7 @@ async function reloadSignupChart(): Promise<void> {
     // for the funnel so we don't trigger a second full auth-users scan.
     _lastSignupTotal = data.summary.total;
     _renderGrowthCards(data);
+    _renderNewUserStats(data);
     _renderSignupChart(data);
   }
 }
@@ -205,6 +208,89 @@ function _renderGrowthCards(data: SignupStats): void {
   host.appendChild(_miniCard('This year', s.year));
   host.appendChild(_miniCard('Total users', s.total, '#6ee7b7'));
   host.appendChild(_miniCard('Current (>7d)', s.currentUsers));
+}
+
+// ── New users (last 24h) ─────────────────────────────────────────────────────
+
+// Daily / weekly / monthly signup counts inside the New-users card, fed from
+// the signup scan that the growth chart already runs (no extra request).
+function _renderNewUserStats(data: SignupStats): void {
+  const host = document.getElementById('adminNewUserStats');
+  if (!host) return;
+  host.innerHTML = '';
+  const s = data.summary;
+  host.appendChild(_miniCard('Today', s.today, '#34d399'));
+  host.appendChild(_miniCard('Last 7 days', s.week, '#7dd3fc'));
+  host.appendChild(_miniCard('Last 30 days', s.month));
+}
+
+const NEW_USER_MS = 24 * 60 * 60 * 1000;
+
+function _isNewUser(createdAt?: string): boolean {
+  if (!createdAt) return false;
+  const t = new Date(createdAt).getTime();
+  return Number.isFinite(t) && Date.now() - t < NEW_USER_MS;
+}
+
+function _newChip(): HTMLElement {
+  const chip = document.createElement('span');
+  chip.className = 'adm-new-chip';
+  chip.textContent = 'NEW';
+  return chip;
+}
+
+function _timeAgo(iso?: string): string {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.round(mins / 60);
+  return hrs + ' h ago';
+}
+
+async function loadNewUsers(): Promise<void> {
+  const host = document.getElementById('adminNewUsers');
+  if (!host) return;
+  const data = typeof adminSvc.getNewUsers === 'function' ? await adminSvc.getNewUsers() : null;
+  const badge = document.getElementById('adminNewUsersBadge');
+  if (!data) {
+    host.innerHTML = '<div class="adm-empty">New-user list unavailable.</div>';
+    return;
+  }
+  const users = data.users || [];
+  if (badge) {
+    badge.style.display = users.length ? '' : 'none';
+    badge.textContent = '+' + users.length;
+  }
+  if (!users.length) {
+    host.innerHTML = '<div class="adm-empty">No new users in the last 24 hours.</div>';
+    return;
+  }
+  host.innerHTML = '';
+  users.forEach((u) => host.appendChild(_renderNewUserRow(u)));
+}
+
+function _renderNewUserRow(u: NewUser): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'adm-new-user';
+  row.appendChild(_newChip());
+
+  const info = document.createElement('div');
+  info.className = 'adm-new-user-info';
+  const email = document.createElement('b');
+  email.textContent = u.email || u.id.slice(0, 8) + '…';
+  const meta = document.createElement('span');
+  const joined = u.created_at ? new Date(u.created_at).toLocaleString() : '';
+  meta.textContent = joined + (u.created_at ? ' · ' + _timeAgo(u.created_at) : '');
+  info.append(email, meta);
+  row.appendChild(info);
+
+  const isPro = u.plan === 'pro' && u.status === 'active';
+  const plan = document.createElement('span');
+  plan.className = 'adm-tag' + (isPro ? ' green' : '');
+  plan.textContent = isPro ? 'Pro' : 'Free';
+  row.appendChild(plan);
+  return row;
 }
 
 function _renderSignupChart(data: SignupStats): void {
@@ -762,18 +848,24 @@ async function adminSearch(): Promise<void> {
     results.innerHTML = '';
     (users as AdminUser[]).forEach((u) => {
       const isPro = u.plan === 'pro' && u.status === 'active';
+      const isNew = _isNewUser(u.created_at);
       const joined = u.created_at ? new Date(u.created_at).toLocaleDateString() : '';
 
       const card = document.createElement('div');
       card.style.cssText =
         'background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:12px';
+      if (isNew) {
+        card.style.borderColor = 'rgba(16,185,129,.45)';
+        card.style.background = 'rgba(16,185,129,.07)';
+      }
 
       const info = document.createElement('div');
       info.style.cssText = 'flex:1;min-width:0';
 
       const emailEl = document.createElement('div');
-      emailEl.style.cssText = 'font-weight:800;color:var(--on-glass);font-size:.88rem';
+      emailEl.style.cssText = 'font-weight:800;color:var(--on-glass);font-size:.88rem;display:flex;align-items:center;gap:8px';
       emailEl.textContent = u.email || '';
+      if (isNew) emailEl.appendChild(_newChip());
 
       const joinedEl = document.createElement('div');
       joinedEl.style.cssText = 'font-size:.72rem;color:var(--on-glass-muted)';
