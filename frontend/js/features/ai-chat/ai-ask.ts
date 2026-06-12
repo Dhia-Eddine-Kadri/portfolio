@@ -1134,6 +1134,11 @@ export function initAskAI(
                 if (!bubble) return;
                 bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : escapeHtml(display);
                 if (opts?.keepMarkers) linkifySourceCitations(bubble, opts.sources);
+                // Must happen AFTER the innerHTML write above: this render is
+                // deferred behind the KaTeX promise, so a dropdown appended by
+                // the caller beforehand would be wiped by it (the bug that made
+                // the Sources block vanish from finished answers).
+                appendSourcesDropdown(bubble, opts?.sources);
                 _autoScroll(aiMsgs);
               };
               if (window._ssEnsureKatex) {
@@ -1446,8 +1451,10 @@ export function initAskAI(
                 bubble.classList.remove('ai-bubble-streaming');
               }
 
+              // The dropdown is appended inside fullRender's deferred pass —
+              // appending it here, before that pass replaces the bubble's
+              // innerHTML, would lose it.
               fullRender(displayText, { keepMarkers: true, sources });
-              appendSourcesDropdown(bubble, sources);
 
               if (ansWrap && !ansWrap.querySelector('.rag-feedback-bar')) {
                 const _mb = ansWrap.querySelector<HTMLElement>('.msg-body');

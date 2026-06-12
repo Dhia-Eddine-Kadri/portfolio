@@ -38,7 +38,7 @@ from app.services.answer import (  # noqa: E402
     _SYSTEM_PROMPT_PARTIAL,
     _SYSTEM_PROMPT_STRONG,
     _SYSTEM_PROMPT_WEAK,
-    _course_material_found_note,
+    strip_answer_intro,
     USER_INTENT_OVERLAY,
     is_app_question,
     _sources_for_answer,
@@ -404,24 +404,34 @@ def test_problem_solver_input_is_primary_source() -> None:
     assert "method-only placeholders" in body
 
 
-def test_course_material_found_note_names_retrieved_sources() -> None:
-    from types import SimpleNamespace
-
-    chunk = SimpleNamespace(
-        document_id="doc1",
-        page_start=4,
-        page_end=4,
-        chunk_type="lecture",
-        section_title="Kinematics",
+def test_strip_answer_intro_removes_banned_openings() -> None:
+    """Answers must open with the substance — the deterministic backstop for
+    the ANSWER OPENING prompt rule. Sources ride the metadata; the UI renders
+    them once, below the answer."""
+    text = (
+        "### Course material found\n"
+        "- [Source 1] EngMec2 Lecture.pdf, p.4\n\n"
+        "I will use these uploaded course sources for the notation, method, and explanation below.\n"
+        "I'm powered by Minallo AI — the built-in tutor model of this platform.\n\n"
+        "To solve this exercise, apply the coordinate transformation."
     )
+    assert strip_answer_intro(text) == "To solve this exercise, apply the coordinate transformation."
 
-    note = _course_material_found_note([chunk], {"doc1": "EngMec2 Lecture.pdf"})
+    # Same-line intro: only the announcement sentence goes, the content stays.
+    assert strip_answer_intro(
+        "I'm powered by Minallo AI. The bending moment follows from equilibrium."
+    ) == "The bending moment follows from equilibrium."
 
-    assert note.startswith("### Course material found")
-    assert "[Source 1]" in note
-    assert "EngMec2 Lecture.pdf, p.4" in note
-    assert "Kinematics" in note
-    assert "notation, method, and explanation" in note
+
+def test_strip_answer_intro_keeps_legitimate_openings() -> None:
+    for text in (
+        "To solve this exercise, we first use the given coordinate transformation.",
+        "Based on the provided sources, the modulus is E = 210 GPa.",
+        "I will use the chain rule here.",
+        # Fluid-dynamics "Quellen" is course content, not a source announcement.
+        "Ich verwende die Quellenstärke q aus der Vorlesung.",
+    ):
+        assert strip_answer_intro(text) == text
 
 
 def test_open_context_only_promotes_when_request_targets_visible_page() -> None:

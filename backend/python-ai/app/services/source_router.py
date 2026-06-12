@@ -74,8 +74,24 @@ _INTERNET_SIGNAL_RE = re.compile(
     r"\b("
     r"latest|current|today|now|recent|newest|news|price|pricing|cost of|"
     r"competitors?|market|statistics?|law updates?|rule changes?|release date|"
-    r"official website|online sources?|find sources online|202[5-9]"
+    r"official website|online sources?|find sources online|202[5-9]|"
+    r"youtube|website|webseite|wikipedia|google"
     r")\b",
+    re.IGNORECASE,
+)
+# A pasted link is the strongest possible internet signal: the answer cannot
+# come from course files or model knowledge, only from fetching the page. In
+# AUTO mode it outranks every course signal — "can you watch THIS video"
+# contains the course-signal word "this", which used to route URL questions
+# into course retrieval and end in a "I can't access external content" shrug.
+# Bare domains are limited to a few well-known content sites: generic TLD
+# matching collides with study subjects that are literally named after
+# domains (ASP.NET, socket.io) and German abbreviations ("z.B."). Pasted
+# links carry https:// or www. anyway.
+_URL_RE = re.compile(
+    r"(?:https?://|www\.)\S+"
+    r"|\byoutu\.be/\S+"
+    r"|\b(?:youtube|wikipedia|github|stackoverflow)\.(?:com|org)\b",
     re.IGNORECASE,
 )
 # Auto-routing relevance gate: with no explicit file/context/keyword signal,
@@ -184,6 +200,18 @@ def classify_source_scope(
     q = question or ""
     has_context = bool((selected_text or "").strip() or (open_file_context or "").strip())
     has_specific_file = bool(document_ids or active_document_id)
+    # A URL in the question wins over EVERYTHING in auto mode — including an
+    # active/selected file and the side rail. The user pasted a link; no course
+    # chunk or open PDF can answer what's behind it.
+    if _URL_RE.search(q):
+        return SourceDecision(
+            mode,
+            SourceScope.INTERNET,
+            file_scope,
+            source_label(SourceScope.INTERNET),
+            used_ids or [],
+            sanitized_web_query=sanitize_web_query(q),
+        )
     # An explicitly selected/active file is a deliberate "use this" signal, so
     # it outranks internet keywords that may just be part of a question *about*
     # that file (e.g. "explain the current method in this PDF" — "current"

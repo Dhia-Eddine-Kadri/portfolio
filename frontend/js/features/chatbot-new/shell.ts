@@ -2209,9 +2209,14 @@ function ragEligibility(
     // No course context. Internet mode still works — a web search needs no
     // course — so route it through /ask-stream with an empty courseId (the
     // backend's INTERNET branch returns before any course/retrieval logic).
-    // Auto and Course Files stay on the generic chat path when there's no
-    // course to ground against.
-    if (normaliseSourceMode(active.sourceMode) === 'internet') {
+    // Auto mode joins it when the question contains a URL: the generic chat
+    // path cannot fetch pages and used to answer "I can't access external
+    // content" — the backend's auto router resolves a URL question to its
+    // INTERNET branch (mirrors _URL_RE in source_router.py). Course Files
+    // stays on the generic path when there's no course to ground against.
+    const mode = normaliseSourceMode(active.sourceMode);
+    const hasUrl = /(?:https?:\/\/|www\.)\S+|\byoutu\.be\/\S+|\b(?:youtube|wikipedia|github|stackoverflow)\.(?:com|org)\b/i.test(last.text);
+    if (mode === 'internet' || (mode === 'auto' && hasUrl)) {
       return { question: last.text.trim(), courseId: '', documentIds: [], documentNames: [] };
     }
     return null;
