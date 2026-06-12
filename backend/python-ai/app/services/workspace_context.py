@@ -167,6 +167,44 @@ def fetch_workspace_snapshot(user_id: str, course_id: str) -> dict[str, Any] | N
     except Exception:
         log.exception("workspace snapshot: notes query failed")
 
+    # Recent activity in this course + account-level study stats (Study Lounge).
+    try:
+        prog = (
+            sb.table("course_progress")
+            .select("opened_files, ai_sessions, last_opened_at")
+            .eq("user_id", user_id).eq("course_id", course_id)
+            .limit(1)
+            .execute()
+        )
+        row = (prog.data or [None])[0]
+        if row:
+            opened = row.get("opened_files")
+            opened_list = opened if isinstance(opened, list) else []
+            snapshot["activity"] = {
+                "openedFiles": [str(f)[:80] for f in opened_list[-5:]],
+                "aiSessions": int(row.get("ai_sessions") or 0),
+                "lastOpenedAt": (str(row.get("last_opened_at") or "")[:10] or None),
+            }
+    except Exception:
+        log.exception("workspace snapshot: course_progress query failed")
+
+    try:
+        lounge = (
+            sb.table("study_lounge_stats")
+            .select("study_minutes, streak")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        row = (lounge.data or [None])[0]
+        if row:
+            snapshot["study"] = {
+                "minutes": int(row.get("study_minutes") or 0),
+                "streak": int(row.get("streak") or 0),
+            }
+    except Exception:
+        log.exception("workspace snapshot: study_lounge_stats query failed")
+
     result = snapshot or None
     _snapshot_cache[cache_key] = (now, result)
     # Keep the in-process cache bounded.
@@ -273,6 +311,27 @@ def format_workspace_block(
             lines.append(_section_line(
                 "Deep Learn",
                 f"{dl.get('count', 0)} session(s)" + (f" — {names}" if names else ""),
+            ))
+
+    if snapshot:
+        act = snapshot.get("activity")
+        if act:
+            bits: list[str] = []
+            if act.get("lastOpenedAt"):
+                bits.append(f"course last opened {act['lastOpenedAt']}")
+            if act.get("aiSessions"):
+                bits.append(f"{act['aiSessions']} AI session(s)")
+            opened = act.get("openedFiles") or []
+            if opened:
+                bits.append("recently opened: " + ", ".join(f'"{n}"' for n in opened[-3:]))
+            if bits:
+                lines.append(_section_line("Recent activity", "; ".join(bits)))
+        study = snapshot.get("study")
+        if study and (study.get("minutes") or study.get("streak")):
+            lines.append(_section_line(
+                "Study stats (whole account)",
+                f"{study.get('minutes', 0)} min total study time, "
+                f"{study.get('streak', 0)}-day streak",
             ))
 
     if weak_topics:
@@ -416,6 +475,101 @@ Structure the answer as a plan grounded in the LIVE WORKSPACE data:
    Skip steps whose material doesn't exist yet — suggest generating it instead.
 4. Keep it actionable: each step says what to do in which tab, in one line.
 """
+
+# ── Account-level workspace (for the generic /chat path, no course scope) ───
+#
+# The standalone Chatbot often runs with no course selected. This block gives
+# it the student's real course list (from profiles.courses) with per-course
+# document counts, so "which courses do I have" / "where should I ask about X"
+# get grounded answers instead of guesses.
+
+_account_cache: dict[str, tuple[float, dict[str, Any] | None]] = {}
+
+
+def fetch_account_snapshot(user_id: str) -> dict[str, Any] | None:
+    if not user_id:
+        return None
+    hit = _account_cache.get(user_id)
+    now = time.time()
+    if hit and now - hit[0] < _SNAPSHOT_TTL_SECONDS:
+        return hit[1]
+
+    sb = get_supabase()
+    snapshot: dict[str, Any] | None = None
+    try:
+        prof = (
+            sb.table("profiles").select("courses").eq("id", user_id).limit(1).execute()
+        )
+        courses_json = (prof.data or [{}])[0].get("courses") if prof.data else None
+
+        doc_counts: dict[str, int] = {}
+        try:
+            docs = (
+                sb.table("documents")
+                .select("course_id")
+                .eq("user_id", user_id)
+                .limit(2000)
+                .execute()
+            )
+            for r in docs.data or []:
+                cid = str(r.get("course_id") or "")
+                if cid:
+                    doc_counts[cid] = doc_counts.get(cid, 0) + 1
+        except Exception:
+            log.exception("account snapshot: documents query failed")
+
+        courses: list[dict[str, Any]] = []
+        if isinstance(courses_json, dict):
+            for sem_courses in courses_json.values():
+                if not isinstance(sem_courses, list):
+                    continue
+                for c in sem_courses:
+                    if not isinstance(c, dict):
+                        continue
+                    cid = str(c.get("id") or "").strip()
+                    name = str(c.get("name") or c.get("short") or "").strip()
+                    if not name:
+                        continue
+                    courses.append({
+                        "id": cid,
+                        "name": name[:80],
+                        "files": doc_counts.get(cid, 0),
+                    })
+                    if len(courses) >= 20:
+                        break
+                if len(courses) >= 20:
+                    break
+        if courses:
+            snapshot = {"courses": courses}
+    except Exception:
+        log.exception("account snapshot failed")
+
+    _account_cache[user_id] = (now, snapshot)
+    if len(_account_cache) > 2000:
+        _account_cache.clear()
+    return snapshot
+
+
+def format_account_block(snapshot: dict[str, Any] | None) -> str:
+    """Compact course-list block for the generic chatbot. "" when unknown."""
+    if not snapshot or not snapshot.get("courses"):
+        return ""
+    course_lines = [
+        f'- "{c["name"]}"' + (f" ({c['files']} file(s) uploaded)" if c.get("files") else " (no files yet)")
+        for c in snapshot["courses"]
+    ]
+    return (
+        "\n\n"
+        "MINALLO ACCOUNT WORKSPACE — this student's real courses (server-fetched):\n"
+        + "\n".join(course_lines) + "\n"
+        "Rules: these are the ONLY courses that exist — never invent others. "
+        "Each course has six tabs: Files, Quiz, Flashcards, ExamForge, Cheatsheet, "
+        "Deep Learn. For questions about a specific course's content, suggest "
+        "opening that course (sidebar → Courses) and asking the AI there, or "
+        "importing its files into this chat — this generic chat cannot read "
+        "course files unless they are attached."
+    )
+
 
 # Contract for clickable action buttons. Mirrored by the frontend renderer
 # (ai-markdown.ts `minallo-actions` block) — keep the JSON shape and the

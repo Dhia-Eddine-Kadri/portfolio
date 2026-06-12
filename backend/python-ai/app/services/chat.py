@@ -155,6 +155,27 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
     max_tokens = _normalise_max_tokens(payload.get("max_tokens"))
     client = get_openai_client()
 
+    # Account workspace awareness: the generic chatbot knows the student's
+    # real course list (names + file counts, server-fetched and cached) so
+    # "which courses do I have" / "where do I ask about X" answer from real
+    # data. Best-effort — a failed lookup never blocks the chat.
+    user_id = str(payload.get("userId") or "")
+    if user_id:
+        try:
+            from .workspace_context import fetch_account_snapshot, format_account_block  # noqa: WPS433
+            account_block = format_account_block(fetch_account_snapshot(user_id))
+        except Exception:
+            log.exception("account workspace block failed (non-fatal)")
+            account_block = ""
+        if account_block:
+            if messages and messages[0].get("role") == "system":
+                messages[0] = {
+                    "role": "system",
+                    "content": (messages[0].get("content") or "") + account_block,
+                }
+            else:
+                messages = [{"role": "system", "content": account_block.strip()}] + messages
+
     # Diagram-intent detection on the last user turn. When the student
     # asks for a diagram on the generic /chat path (no course selected),
     # append the rendering overlay to the system message so the first

@@ -6,6 +6,7 @@ from app.services.workspace_context import (
     ALLOWED_AI_ACTIONS,
     ACTIONS_CONTRACT,
     detect_assistant_mode,
+    format_account_block,
     format_workspace_block,
     is_workspace_question,
     sanitize_page_context,
@@ -47,6 +48,35 @@ def test_block_includes_location_and_weak_topics():
     assert 'in the course "EngMech 2"' in block
     assert "on the Quiz tab" in block
     assert "Torsion" in block and "Knickung" in block
+
+
+def test_block_includes_activity_and_study_stats():
+    snap = _snapshot()
+    snap["activity"] = {
+        "openedFiles": ["Mechanik2.pdf"],
+        "aiSessions": 4,
+        "lastOpenedAt": "2026-06-11",
+    }
+    snap["study"] = {"minutes": 412, "streak": 5}
+    block = format_workspace_block(snap)
+    assert "course last opened 2026-06-11" in block
+    assert "4 AI session(s)" in block
+    assert '"Mechanik2.pdf"' in block
+    assert "412 min total study time, 5-day streak" in block
+
+
+def test_account_block_lists_real_courses_only():
+    block = format_account_block({
+        "courses": [
+            {"id": "tm2", "name": "TM2", "files": 12},
+            {"id": "ft", "name": "Fertigungstechnik", "files": 0},
+        ]
+    })
+    assert '"TM2" (12 file(s) uploaded)' in block
+    assert '"Fertigungstechnik" (no files yet)' in block
+    assert "never invent" in block
+    assert format_account_block(None) == ""
+    assert format_account_block({"courses": []}) == ""
 
 
 def test_block_empty_when_nothing_known():
