@@ -126,7 +126,11 @@ def question_hash(
 # key and must not be reachable.
 # v11 invalidates pre-workspace-context answers: prompts now carry the live
 # workspace block, mode overlays and the minallo-actions contract.
-_CACHE_SCHEMA_VERSION = "v11-2026-06-12-workspace-context"
+# v12 invalidates answers stored with the deterministic source preface
+# ("### Course material found" + "I will use these uploaded course sources…")
+# baked into the body; answers now open with the substance and sources ride
+# the metadata only.
+_CACHE_SCHEMA_VERSION = "v12-2026-06-12-clean-answer-opening"
 
 
 def document_version_hash(document_hashes: list[str | None]) -> str:

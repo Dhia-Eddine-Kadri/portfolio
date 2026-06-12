@@ -138,8 +138,38 @@ function _getTime(): string {
   );
 }
 
+// Mirrors strip_answer_intro in answer.py: drops banned opening announcements
+// (the old "### Course material found" preface, "I will use these uploaded
+// course sources…", "I'm powered by Minallo AI…") so answers saved BEFORE the
+// backend scrub, or streamed from a not-yet-redeployed backend, still render
+// starting with the substance. Sources render once, in the dropdown below.
+const ANSWER_INTRO_RX = new RegExp(
+  '^\\s*(?:' +
+    '#{1,6}\\s*course material found[^\\n]*' +
+    '|-\\s*\\[source\\s+\\d+\\][^\\n]*' +
+    "|i(?:'|’)?m\\s+(?:minallo\\b|powered\\s+by\\b)[^.!\\n]*[.!]?" +
+    '|i\\s+am\\s+(?:minallo\\b|powered\\s+by\\b)[^.!\\n]*[.!]?' +
+    "|i(?:\\s+will|(?:'|’)ll)\\s+use\\s+(?:th(?:e|ese|is)|your)\\s+(?:uploaded\\s+)?(?:course\\s+)?(?:sources?|materials?|files?|documents?)[^.!\\n]*[.!]?" +
+    "|based\\s+on\\s+(?:the\\s+|your\\s+|these\\s+)?(?:provided\\s+|uploaded\\s+|retrieved\\s+)?(?:course\\s+)?(?:sources?|materials?|documents?)\\s*,?\\s*(?:here(?:'|’)?s\\b|here\\s+is\\b|below\\s+is\\b|i(?:\\s+will|(?:'|’)ll)\\b)[^.!:\\n]*[.!:]?" +
+    '|ich\\s+bin\\s+minallo\\b[^.!\\n]*[.!]?' +
+    '|ich\\s+werde\\s+von\\s+minallo\\b[^.!\\n]*[.!]?' +
+    '|ich\\s+(?:werde|nutze|verwende)\\s+(?:diese|die|deine|ihre)\\s+(?:hochgeladenen?\\s+\\w*|kurs\\w*)[^.!\\n]*[.!]?' +
+    ')[ \\t]*',
+  'i'
+);
+
+function stripAnswerIntro(text: string): string {
+  let out = text || '';
+  for (;;) {
+    const m = out.match(ANSWER_INTRO_RX);
+    if (!m || !m[0].trim()) break;
+    out = out.slice(m[0].length);
+  }
+  return out === text ? text : out.replace(/^\n+/, '');
+}
+
 function stripSourceMarkers(text: string): string {
-  return (text || '')
+  return stripAnswerIntro(text || '')
     .replace(/\s*\[Source\s+\d+\]/gi, '')
     .replace(/\s+\./g, '.')
     .replace(/\s+,/g, ',')
@@ -147,7 +177,9 @@ function stripSourceMarkers(text: string): string {
 }
 
 function stripSourceMarkersLive(text: string): string {
-  return (text || '')
+  // Live re-renders always pass the FULL buffer from position 0, so the
+  // start-anchored intro strip is safe here too.
+  return stripAnswerIntro(text || '')
     .replace(/\s*\[Source\s+\d+\]/gi, '')
     .replace(/\s+\./g, '.')
     .replace(/\s+,/g, ',');
@@ -179,7 +211,7 @@ function appendSourcesDropdown(bubble: HTMLElement | null, sources?: SourceItem[
   const details = document.createElement('details');
   details.className = 'ai-rag-sources';
   const summary = document.createElement('summary');
-  summary.textContent = 'Sources';
+  summary.textContent = 'Sources (' + sources.length + ')';
   const list = document.createElement('ul');
   sources.forEach((s) => {
     const item = document.createElement('li');
@@ -507,11 +539,14 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
       '</div>';
     const bubble = wrap.querySelector<HTMLElement>('.ai-bubble.bot');
     if (bubble) {
-      bubble.setAttribute('data-raw', pair.a);
+      // Answers saved before the clean-opening fix may still start with the
+      // old source preface / self-intro — scrub at render time.
+      const restoredAnswer = stripAnswerIntro(pair.a);
+      bubble.setAttribute('data-raw', restoredAnswer);
       let renderFallback = 0;
       const _doRender = (): void => {
         window.clearTimeout(renderFallback);
-        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : escapeHtml(pair.a);
+        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(restoredAnswer) : escapeHtml(restoredAnswer);
         // Markdown is only half the job — LaTeX (\(…\), \frac, …) and code
         // blocks need their own passes, exactly like the live message path.
         if (window._renderMath) window._renderMath(bubble);
@@ -1090,7 +1125,7 @@ export function initAskAI(
 
             function fullRender(text: string, opts?: { keepMarkers?: boolean; sources?: SourceItem[] }): void {
               if (!bubble) return;
-              const cleaned = text.replace(metaPattern, '').trim();
+              const cleaned = stripAnswerIntro(text.replace(metaPattern, '').trim());
               // For the final render we KEEP [Source N] so they can be linkified
               // into clickable chips; mid-stream renders still strip them.
               const display = opts?.keepMarkers ? cleaned : stripSourceMarkers(cleaned);

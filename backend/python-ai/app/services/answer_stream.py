@@ -35,8 +35,8 @@ from .answer import (
     MINALLO_APP_CONTEXT,
     _APP_ONLY_SYSTEM_PROMPT,
     _build_context_block,
-    _course_material_found_note,
     _cited_indices,
+    strip_answer_intro,
     _context_strength,
     chat_completion_params,
     is_app_question,
@@ -1187,10 +1187,19 @@ def stream_answer(
         "unsupported": display_strength != "strong",
     })
 
-    if used_chunks and not app_question:
-        source_note = _course_material_found_note(used_chunks, doc_names)
-        answer_buf.append(source_note)
-        yield _sse({"t": source_note})
+    # No streamed source preface on purpose: sources ride the done-event
+    # metadata and the UI renders them once, BELOW the answer. The stream must
+    # open with the actual explanation — the intro hold below enforces that
+    # deterministically (the ANSWER OPENING prompt rule alone is not enough).
+    #
+    # While intro_hold is True the first tokens are buffered instead of
+    # emitted, so a banned opening ("I'm powered by Minallo AI…", "I will use
+    # these uploaded course sources…") can be scrubbed before the client sees
+    # anything. Released as soon as a substantive first line is complete, or
+    # at 250 chars — longer than any announcement sentence — so the perceived
+    # streaming delay stays well under a second.
+    intro_hold = True
+    intro_buf = ""
 
     # Weave in recent Q&A turns so the model can resolve follow-up
     # references ("the formula above", "explain that"). Server-side cap:
@@ -1234,12 +1243,31 @@ def stream_answer(
             delta = choices[0].delta
             token = getattr(delta, "content", None) if delta else None
             if token:
+                if intro_hold:
+                    intro_buf += token
+                    cleaned = strip_answer_intro(intro_buf).lstrip("\n")
+                    first_line = cleaned.split("\n", 1)[0].strip() if "\n" in cleaned else ""
+                    if first_line or len(intro_buf) >= 250:
+                        intro_hold = False
+                        if cleaned:
+                            answer_buf.append(cleaned)
+                            yield _sse({"t": cleaned})
+                        intro_buf = ""
+                    continue
                 answer_buf.append(token)
                 yield _sse({"t": token})
     except Exception as e:  # noqa: BLE001
         log.exception("stream_answer failed")
         yield _sse({"error": f"{type(e).__name__}: {e}"})
         return
+
+    # Short answer that never tripped the release condition (no newline and
+    # under the hold cap) — scrub and flush it now.
+    if intro_hold and intro_buf:
+        cleaned = strip_answer_intro(intro_buf).lstrip("\n")
+        if cleaned:
+            answer_buf.append(cleaned)
+            yield _sse({"t": cleaned})
 
     full_answer = "".join(answer_buf)
 

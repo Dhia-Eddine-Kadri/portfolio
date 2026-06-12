@@ -2407,7 +2407,7 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
         return line;
       })
       .join('');
-    sourceHtml = '<details class="ncb-ask-sources"><summary>' + escapeHtml(tStr('cb_sources_summary', 'Sources')) + '</summary><ul>' + items + '</ul></details>';
+    sourceHtml = '<details class="ncb-ask-sources"><summary>' + escapeHtml(tStr('cb_sources_summary', 'Sources')) + ' (' + sources.length + ')</summary><ul>' + items + '</ul></details>';
   }
   footerHtml += sourceHtml;
   if (footerHtml) {
@@ -2447,8 +2447,38 @@ interface SrcItem {
   snippet?: string | null;
 }
 
+// Mirrors strip_answer_intro in answer.py: drops banned opening announcements
+// (the old "### Course material found" preface, "I will use these uploaded
+// course sources…", "I'm powered by Minallo AI…") so answers saved BEFORE the
+// backend scrub still render starting with the substance. Sources render
+// once, in the dropdown below the answer.
+const ANSWER_INTRO_RX = new RegExp(
+  '^\\s*(?:' +
+    '#{1,6}\\s*course material found[^\\n]*' +
+    '|-\\s*\\[source\\s+\\d+\\][^\\n]*' +
+    "|i(?:'|’)?m\\s+(?:minallo\\b|powered\\s+by\\b)[^.!\\n]*[.!]?" +
+    '|i\\s+am\\s+(?:minallo\\b|powered\\s+by\\b)[^.!\\n]*[.!]?' +
+    "|i(?:\\s+will|(?:'|’)ll)\\s+use\\s+(?:th(?:e|ese|is)|your)\\s+(?:uploaded\\s+)?(?:course\\s+)?(?:sources?|materials?|files?|documents?)[^.!\\n]*[.!]?" +
+    "|based\\s+on\\s+(?:the\\s+|your\\s+|these\\s+)?(?:provided\\s+|uploaded\\s+|retrieved\\s+)?(?:course\\s+)?(?:sources?|materials?|documents?)\\s*,?\\s*(?:here(?:'|’)?s\\b|here\\s+is\\b|below\\s+is\\b|i(?:\\s+will|(?:'|’)ll)\\b)[^.!:\\n]*[.!:]?" +
+    '|ich\\s+bin\\s+minallo\\b[^.!\\n]*[.!]?' +
+    '|ich\\s+werde\\s+von\\s+minallo\\b[^.!\\n]*[.!]?' +
+    '|ich\\s+(?:werde|nutze|verwende)\\s+(?:diese|die|deine|ihre)\\s+(?:hochgeladenen?\\s+\\w*|kurs\\w*)[^.!\\n]*[.!]?' +
+    ')[ \\t]*',
+  'i'
+);
+
+function stripAnswerIntro(text: string): string {
+  let out = text || '';
+  for (;;) {
+    const m = out.match(ANSWER_INTRO_RX);
+    if (!m || !m[0].trim()) break;
+    out = out.slice(m[0].length);
+  }
+  return out === text ? text : out.replace(/^\n+/, '');
+}
+
 function stripSourceMarkers(text: string): string {
-  return (text || "")
+  return stripAnswerIntro(text || "")
     .replace(/\s*\[Source\s+\d+\]/gi, "")
     .replace(/\s+\./g, ".")
     .replace(/\s+,/g, ",")
@@ -2456,6 +2486,9 @@ function stripSourceMarkers(text: string): string {
 }
 
 function stripSourceMarkersLive(text: string): string {
+  // NOTE: no intro strip here — live rendering also passes TAIL slices of
+  // the buffer through this, and the start-anchored intro patterns must only
+  // ever run against text that begins at position 0.
   return (text || "")
     .replace(/\s*\[Source\s+\d+\]/gi, "")
     .replace(/\s+\./g, ".")
@@ -4801,7 +4834,9 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
     return;
   }
 
-  if (bubble) renderRichBubble(bubble, m.text, !!m.allowDiagrams);
+  // Answers saved before the clean-opening fix may still start with the old
+  // source preface / self-intro — scrub at render time.
+  if (bubble) renderRichBubble(bubble, stripAnswerIntro(m.text), !!m.allowDiagrams);
   if (bubble && (m.sourceLabel || m.sources?.length)) {
     appendAskStreamMeta(bubble, {
       sourceLabel: m.sourceLabel,
