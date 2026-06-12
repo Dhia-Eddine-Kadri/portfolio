@@ -216,6 +216,64 @@ def test_workspace_block_course_name_label():
     assert format_workspace_block(None, course_name="TM2") == ""
 
 
+class _FakeQuery:
+    def __init__(self, table: str, rows: list, calls: dict):
+        self._table, self._rows, self._calls = table, rows, calls
+
+    def select(self, cols, **_kw):
+        self._calls.setdefault(self._table, {})["select"] = cols
+        return self
+
+    def eq(self, *_a):
+        return self
+
+    def in_(self, col, vals):
+        self._calls.setdefault(self._table, {})["in"] = (col, list(vals))
+        return self
+
+    def order(self, *_a, **_kw):
+        return self
+
+    def limit(self, _n):
+        return self
+
+    def execute(self):
+        result = type("R", (), {})()
+        result.data = self._rows
+        result.count = len(self._rows)
+        return result
+
+
+class _FakeSupabase:
+    def __init__(self, rows_by_table: dict, calls: dict):
+        self._rows, self._calls = rows_by_table, calls
+
+    def table(self, name: str):
+        return _FakeQuery(name, self._rows.get(name, []), self._calls)
+
+
+def test_snapshot_notes_query_uses_type_column(monkeypatch):
+    # Regression: the notes column is `type` (012_notes.sql), not `note_type`.
+    # The wrong name made the query raise on every request, so the cheatsheet/
+    # Deep Learn sections silently vanished from all snapshots and the model
+    # invented cheatsheet inventories.
+    import app.services.workspace_context as wc
+    calls: dict = {}
+    fake = _FakeSupabase({
+        "notes": [
+            {"title": "Course Cheatsheet", "type": "cheatsheet"},
+            {"title": "Lesson 1", "type": "deep_learn"},
+        ],
+    }, calls)
+    monkeypatch.setattr(wc, "get_supabase", lambda: fake)
+    snap = wc.fetch_workspace_snapshot("user-type-col-test", "course-type-col-test")
+    assert snap is not None
+    assert snap["cheatsheet"] == {"count": 1, "recent": ["Course Cheatsheet"]}
+    assert snap["deeplearn"] == {"count": 1, "recent": ["Lesson 1"]}
+    assert "note_type" not in (calls["notes"].get("select") or "")
+    assert calls["notes"]["in"][0] == "type"
+
+
 def test_actions_contract_only_names_allowed_actions():
     # Every action id mentioned in the contract text must be allowlisted —
     # the frontend renderer drops anything else silently.

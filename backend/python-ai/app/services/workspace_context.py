@@ -154,14 +154,14 @@ def fetch_workspace_snapshot(user_id: str, course_id: str) -> dict[str, Any] | N
     try:
         notes = (
             sb.table("notes")
-            .select("title, note_type")
+            .select("title, type")
             .eq("user_id", user_id).eq("course_id", course_id)
-            .in_("note_type", ["cheatsheet", "deep_learn"])
+            .in_("type", ["cheatsheet", "deep_learn"])
             .order("created_at", desc=True).limit(50)
             .execute()
         )
-        sheets = [r for r in (notes.data or []) if r.get("note_type") == "cheatsheet"]
-        sessions = [r for r in (notes.data or []) if r.get("note_type") == "deep_learn"]
+        sheets = [r for r in (notes.data or []) if r.get("type") == "cheatsheet"]
+        sessions = [r for r in (notes.data or []) if r.get("type") == "deep_learn"]
         snapshot["cheatsheet"] = {"count": len(sheets), "recent": _names(sheets, "title", 3)}
         snapshot["deeplearn"] = {"count": len(sessions), "recent": _names(sessions, "title", 3)}
     except Exception:
