@@ -543,6 +543,27 @@ document.getElementById('pdfFit')?.addEventListener('click', () => {
   renderPages();
   setTimeout(() => _pdfScrollToPage(pg), 120);
 });
+
+// Ctrl/Cmd + mouse wheel zoom, like a browser or native PDF reader. Unlike the
+// toolbar buttons (which re-render the canvases from scratch and momentarily
+// blank the page), this scales the already-rendered pages live via a CSS `zoom`
+// multiplier — the document never reloads or flashes, it just grows/shrinks
+// smoothly. pdfScale stays the single source of truth; the multiplier is just
+// pdfScale relative to the scale we last rendered at, and renderPages resets it.
+document.getElementById('pdfBody')?.addEventListener(
+  'wheel',
+  (e: WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    pdfScale = Math.min(4, Math.max(0.25, Math.round(pdfScale * factor * 100) / 100));
+    const body = document.getElementById('pdfBody');
+    const rendered = (window as unknown as { _pdfRenderedScale?: number })._pdfRenderedScale || 0.9;
+    if (body) body.style.setProperty('--pdf-wheel-zoom', String(pdfScale / rendered));
+    updateZoomPct();
+  },
+  { passive: false }
+);
 // Fullscreen reading mode. We request native fullscreen on <html> (so the
 // browser tabs + address bar disappear), and apply layout classes so that
 // INSIDE the fullscreen the sidebar + header are covered while the document

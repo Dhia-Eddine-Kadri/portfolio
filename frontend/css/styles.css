@@ -3197,6 +3197,10 @@ body.pdf-maximized .annotate-popover {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   border-radius: 2px;
   margin: 0 auto;
+  /* Live Ctrl+wheel zoom (set on #pdfBody by pdf-controls). `zoom` reflows the
+     page in normal flow — so pages keep stacking and the scroll height grows
+     correctly — without re-rendering the canvas, so the file never reloads. */
+  zoom: var(--pdf-wheel-zoom, 1);
 }
 .pdf-page-wrap canvas {
   display: block;

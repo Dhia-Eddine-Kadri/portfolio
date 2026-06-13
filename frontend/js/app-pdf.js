@@ -93,6 +93,12 @@ function renderPages() {
   if (!pdfDoc) return;
   var body = document.getElementById('pdfBody');
   body.innerHTML = '';
+  // These canvases are now crisp at the current pdfScale, so the live Ctrl+wheel
+  // CSS-zoom multiplier (pdfScale ÷ last-rendered scale) collapses back to 1.
+  // Record the scale we rendered at and drop the multiplier so it doesn't
+  // compound on top of the fresh render.
+  window._pdfRenderedScale = pdfScale;
+  body.style.removeProperty('--pdf-wheel-zoom');
   // Stop any previous virtualization observer.
   if (window._pdfPageObserver && typeof window._pdfPageObserver.disconnect === 'function') {
     window._pdfPageObserver.disconnect();
