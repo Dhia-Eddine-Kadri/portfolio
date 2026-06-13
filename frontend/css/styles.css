@@ -2168,6 +2168,19 @@ body.pdf-maximized #pdfMaximize {
   font-weight: 800;
   line-height: 1;
 }
+#portal .sidebar .sb-item .sb-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  margin-left: 0;
+  pointer-events: none;
+}
+#portal .sidebar.expanded .sb-item .sb-badge {
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+}
 .pdf-toolbar {
   display: flex;
   align-items: center;

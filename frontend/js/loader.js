@@ -363,7 +363,7 @@
         [
             'css/base.css?v=6',
             'css/theme.css?v=6',
-            'css/styles.css?v=41',
+            'css/styles.css?v=42',
             'css/courses-redesign.css?v=40',
             'views/daily-mission/daily-mission.css?v=11',
             'css/app-design-system.css?v=6',
@@ -589,7 +589,7 @@
                 const lazyCssMap = {
                     dashboard: ['views/dashboard/dashboard.css?v=5'],
                     chat: ['views/chat/chat.css'],
-                    aipage: ['views/chatbot/chatbot.css?v=8'],
+                    aipage: ['views/chatbot/chatbot.css?v=9'],
                     german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
                     notes: ['views/lecturenotes/lecturenotes.css'],
                     profile: ['views/profile/profile.css'],
