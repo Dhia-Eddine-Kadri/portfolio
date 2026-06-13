@@ -14,6 +14,23 @@
   background: transparent;
 }
 
+/* File / PDF view owns its internal scroll: the PDF canvas and the docked AI
+   panel each scroll independently inside #app. In portal (dashboard) mode the
+   shell intentionally grows past the viewport so the page scrolls as one for
+   the continuous background, but in file mode that same growth removes the
+   height cap #app → .ai-msgs / PDF scroller depend on, so the whole page
+   scrolls as a single block and the two panes move together. Pin the shell to
+   the viewport here so the inner scrollers reclaim their own overflow. */
+#portal[data-active-view="file"] {
+  overflow: hidden;
+}
+#portal[data-active-view="file"] .shell {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── Sidebar (premium dark glass, click-to-expand, floating panel) ── */
 #portal .sidebar {
   position: sticky;
