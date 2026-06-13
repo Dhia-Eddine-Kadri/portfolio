@@ -5192,10 +5192,12 @@ function initContextCollapse(root: HTMLElement): void {
   // forever after via NCB_CTX_KEY.
   let open = true;
   try {
+    const isCompact = !!(window.matchMedia && window.matchMedia('(max-width: 1024px)').matches);
     const raw = localStorage.getItem(NCB_CTX_KEY);
-    if (raw === '0') open = false;
+    if (!isCompact) open = true;
+    else if (raw === '0') open = false;
     else if (raw === '1') open = true;
-    else if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+    else {
       open = false;
     }
   } catch {

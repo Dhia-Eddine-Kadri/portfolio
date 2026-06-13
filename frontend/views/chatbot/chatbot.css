@@ -93,21 +93,24 @@ body.ncb-fullbleed .ncb-main {
 /* Header */
 
 .ncb-header {
-  display: none;
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 70;
+  display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  padding: 0 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  flex-shrink: 0;
+  justify-content: flex-end;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
 }
 
 .ncb-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: none;
 }
 
 .ncb-header-icon-tile {
@@ -145,6 +148,7 @@ body.ncb-fullbleed .ncb-main {
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .ncb-pill {

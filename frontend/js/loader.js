@@ -589,7 +589,7 @@
                 const lazyCssMap = {
                     dashboard: ['views/dashboard/dashboard.css?v=5'],
                     chat: ['views/chat/chat.css'],
-                    aipage: ['views/chatbot/chatbot.css?v=9'],
+                    aipage: ['views/chatbot/chatbot.css?v=10'],
                     german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
                     notes: ['views/lecturenotes/lecturenotes.css'],
                     profile: ['views/profile/profile.css'],
@@ -686,7 +686,7 @@
                             return r.text();
                         });
                     }
-                    const shellSrc = 'js/features/chatbot-new/shell.js?v=8&av=' +
+                    const shellSrc = 'js/features/chatbot-new/shell.js?v=9&av=' +
                         encodeURIComponent(String(window.MinalloConfig?.assetVersion || SS?.version || '1'));
                     const exists = Array.from(document.querySelectorAll('link[rel="modulepreload"]')).some((link) => (link.getAttribute('href') || '') === shellSrc);
                     if (!exists) {
