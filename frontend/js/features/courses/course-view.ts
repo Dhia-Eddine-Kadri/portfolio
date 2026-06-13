@@ -397,6 +397,10 @@ export function openCourse(course: LegacyCourse): void {
   if (!course.files) course.files = [];
   window.activeCourseId = course.id;
   window.activeFileName = null;
+  // No file open in this course yet — the AI side panel must start empty,
+  // not carry over the previously open file's chat.
+  (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId = null;
+  if (typeof window.resetAiPanelChat === 'function') window.resetAiPanelChat();
 
   // Top-level switch first — clears portal-section orphans and studip view.
   // The course overview lives inside #app (the file-view container), so we want
@@ -746,6 +750,8 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
 
   window.activeFileName = null;
   window.activeStorageName = null;
+  (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId = null;
+  if (typeof window.resetAiPanelChat === 'function') window.resetAiPanelChat();
 
   if (window._notesPanel && typeof window._notesPanel.close === 'function') {
     window._notesPanel.close();

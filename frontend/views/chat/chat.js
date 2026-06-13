@@ -310,7 +310,10 @@
       // answers from Supabase on the next refresh, so "Clear chat" looked
       // like it did nothing.
       if (typeof window.clearCourseHistory === 'function') {
-        window.clearCourseHistory(window.activeCourseId || window.currentCourseId || '');
+        window.clearCourseHistory(
+          window.activeCourseId || window.currentCourseId || '',
+          window.activeRagDocumentId || null
+        );
       }
       if (typeof window.addBotMsg === 'function') {
         window.addBotMsg(window._t ? window._t('ai_chat_cleared_msg') : 'Chat cleared');

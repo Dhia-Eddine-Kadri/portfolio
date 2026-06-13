@@ -191,8 +191,10 @@ declare global {
     addTyping?: () => unknown;
     _pdfToImages?: (maxPages?: number) => Promise<string[]>;
     stopGeneration?: () => void;
-    restoreCourseHistory?: (courseId?: string | null) => void;
-    clearCourseHistory?: (courseId: string) => void;
+    restoreCourseHistory?: (courseId?: string | null, fileId?: string | null) => void;
+    clearCourseHistory?: (courseId: string, fileId?: string | null) => void;
+    resetAiPanelChat?: () => void;
+    activeRagDocumentId?: string | null;
     _abortCurrentStream?: () => void;
     _activeStreamRender?: (() => void) | null;
     _attachedImages?: unknown[];

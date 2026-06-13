@@ -4,6 +4,7 @@ import {
   pdfToImages,
   restoreCourseHistory,
   clearCourseHistory,
+  resetAiPanelChat,
 } from './ai-ask.js';
 import { detectIntent, type IntentResult } from './intent-router.js';
 
@@ -211,6 +212,7 @@ export function initAiAskBridge(state: AskAiState): {
 
   window.restoreCourseHistory = restoreCourseHistory;
   window.clearCourseHistory = clearCourseHistory;
+  window.resetAiPanelChat = resetAiPanelChat;
 
   // minallo-input forms (the AI asking for a missing value) dispatch
   // 'minallo-ai-input-submit' on submit. On the PDF AI panel we resolve it

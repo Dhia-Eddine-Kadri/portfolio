@@ -409,6 +409,8 @@ function closeTab(key: string): void {
     window.activeStorageName = null;
     window.pdfDoc = null;
     window.pdfFullText = '';
+    (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId = null;
+    if (typeof window.resetAiPanelChat === 'function') window.resetAiPanelChat();
     if (typeof window._setAiChipsVisible === 'function') window._setAiChipsVisible(false);
     if (closingCourse && typeof window.showCourseSection === 'function') {
       window.showCourseSection(closingCourse, 'files');

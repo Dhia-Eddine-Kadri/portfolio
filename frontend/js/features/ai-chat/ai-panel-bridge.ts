@@ -63,8 +63,11 @@ export function initAiPanelBridge(options?: AiPanelBridgeOptions): {
       aiPanel.classList.add('visible');
     }
     const cid = window.activeCourseId || window.currentCourseId || '';
-    if (cid && typeof window.restoreCourseHistory === 'function') {
-      window.restoreCourseHistory(cid);
+    const fid = window.activeRagDocumentId || null;
+    if (typeof window.restoreCourseHistory === 'function') {
+      // Always call this, even with no file open — it clears the panel to
+      // empty rather than leaving a previous file's messages on screen.
+      window.restoreCourseHistory(cid, fid);
     }
     if (aiMsgs) {
       requestAnimationFrame(() => { aiMsgs.scrollTop = aiMsgs.scrollHeight; });

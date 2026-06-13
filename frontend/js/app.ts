@@ -793,19 +793,24 @@ window.askAI = askAI;
 window.stopGeneration = (): void => {
   void _ensureAiAskBridge().then((bridge) => bridge.stopGeneration());
 };
-window.restoreCourseHistory = (courseId?: string | null): void => {
+window.restoreCourseHistory = (courseId?: string | null, fileId?: string | null): void => {
   // Ensure the render + export bridges too (not just ask) — otherwise restored
   // history renders with renderMarkdown/_renderMath/_aiResponseActions missing,
   // so answers come back as raw markdown/LaTeX with no export buttons.
   void Promise.all([_ensureAiRenderBridge(), _ensureAiExportBridge()])
     .then(() => _ensureAiAskBridge())
     .then(() => {
-      if (typeof window.restoreCourseHistory === 'function') window.restoreCourseHistory(courseId);
+      if (typeof window.restoreCourseHistory === 'function') window.restoreCourseHistory(courseId, fileId);
     });
 };
-window.clearCourseHistory = (courseId: string): void => {
+window.clearCourseHistory = (courseId: string, fileId?: string | null): void => {
   void _ensureAiAskBridge().then(() => {
-    if (typeof window.clearCourseHistory === 'function') window.clearCourseHistory(courseId);
+    if (typeof window.clearCourseHistory === 'function') window.clearCourseHistory(courseId, fileId);
+  });
+};
+window.resetAiPanelChat = (): void => {
+  void _ensureAiAskBridge().then(() => {
+    if (typeof window.resetAiPanelChat === 'function') window.resetAiPanelChat();
   });
 };
 
