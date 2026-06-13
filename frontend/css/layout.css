@@ -16,10 +16,13 @@
 
 /* ── Sidebar (premium dark glass, click-to-expand, floating panel) ── */
 #portal .sidebar {
-  position: relative;
+  position: sticky;
+  top: 14px;
   transform: none;
   flex-shrink: 0;
   width: var(--sb-collapsed);
+  height: calc(100dvh - 28px);
+  max-height: calc(100dvh - 28px);
   margin: 14px 0 14px 14px;
   padding: 14px 10px;
   display: flex;
