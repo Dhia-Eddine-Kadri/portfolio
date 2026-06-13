@@ -1,10 +1,24 @@
 (function () {
   var container = document.getElementById('psec-editor');
   if (!container) return;
-  fetch('views/editor/editor.html')
-    .then(function (r) {
+  // Retry the markup fetch a couple of times: this dispatcher only runs once
+  // (the loader won't re-inject the script on re-navigation), so a single
+  // transient network failure here would leave the page blank until a full
+  // reload. Retrying self-heals the common flaky-connection case.
+  function _ssFetchText(url, tries) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
-    })
+    }).catch(function (err) {
+      if (tries > 0) {
+        return new Promise(function (res) { setTimeout(res, 400); }).then(function () {
+          return _ssFetchText(url, tries - 1);
+        });
+      }
+      throw err;
+    });
+  }
+  _ssFetchText('views/editor/editor.html', 2)
     .then(function (html) {
       var tmp = document.createElement('div');
       tmp.innerHTML = html;
@@ -24,6 +38,9 @@
       }
       window.dispatchEvent(new Event('ss-editor-ready'));
       _init();
+    })
+    .catch(function (err) {
+      console.error('editor.html load failed:', err);
     });
   function _init() {
     // ── EDITOR HUB ───────────────────────────────────────────────────────────────
