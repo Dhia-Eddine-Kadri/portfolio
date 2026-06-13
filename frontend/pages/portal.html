@@ -1375,26 +1375,84 @@
 
         <!-- NOTIFICATIONS -->
         <div id="psec-notifications" class="portal-section" style="display: none">
-          <div class="notif-wrap">
-            <div class="notif-header">
-              <div class="notif-header-left">
-                <div class="notif-title-icon">&#x1F514;</div>
-                <div>
-                  <div class="notif-title" data-i18n="nav_notifications">Notifications</div>
-                  <div class="notif-subtitle" id="notifCount" data-i18n="notif_all_caught">All caught up</div>
+          <div class="notif-page">
+            <div class="notif-page-header">
+              <div class="notif-page-heading">
+                <div class="notif-page-label" data-i18n="notif_page_label">Minallo Inbox</div>
+                <h1 class="notif-page-title" data-i18n="nav_notifications">Notifications</h1>
+              </div>
+              <div class="notif-search-wrap">
+                <span class="notif-search-icon" aria-hidden="true">&#x1F50D;</span>
+                <input
+                  type="search"
+                  id="notifSearch"
+                  class="notif-search-input"
+                  data-i18n-placeholder="notif_search_placeholder"
+                  placeholder="Search notifications..."
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+
+            <div class="notif-page-content">
+              <!-- LEFT: notifications inbox -->
+              <div class="notif-wrap">
+                <div class="notif-header">
+                  <div class="notif-header-left">
+                    <div class="notif-title" data-i18n="notif_inbox_title">Notifications</div>
+                    <span class="notif-count-badge" id="notifCount">0</span>
+                  </div>
+                  <button class="notif-mark-all" id="notifMarkAll" data-i18n="notif_mark_all">Mark all read</button>
+                </div>
+                <div class="notif-tabs">
+                  <button class="notif-tab active" data-tab="all" data-i18n="notif_tab_all">All</button>
+                  <button class="notif-tab" data-tab="unread" data-i18n="notif_tab_unread">Unread</button>
+                  <button class="notif-tab" data-tab="projects" data-i18n="notif_tab_projects">Projects</button>
+                  <button class="notif-tab" data-tab="files" data-i18n="notif_tab_files">Files</button>
+                </div>
+                <div class="notif-list" id="notifList">
+                  <div class="notif-empty">
+                    <div class="notif-empty-icon">&#x1F514;</div>
+                    <div class="notif-empty-title" data-i18n="notif_empty_title">You're all caught up!</div>
+                    <div class="notif-empty-sub" data-i18n="notif_empty_sub">New notifications will appear here</div>
+                  </div>
                 </div>
               </div>
-              <button class="notif-mark-all" id="notifMarkAll" data-i18n="notif_mark_all">Mark all read</button>
-            </div>
-            <div class="notif-tabs">
-              <button class="notif-tab active" data-tab="all" data-i18n="notif_tab_all">All</button>
-              <button class="notif-tab" data-tab="unread" data-i18n="notif_tab_unread">Unread</button>
-            </div>
-            <div class="notif-list" id="notifList">
-              <div class="notif-empty">
-                <div class="notif-empty-icon">&#x1F514;</div>
-                <div class="notif-empty-title" data-i18n="notif_empty_title">You're all caught up!</div>
-                <div class="notif-empty-sub" data-i18n="notif_empty_sub">New notifications will appear here</div>
+
+              <!-- RIGHT: pinned courses + selected notification -->
+              <div class="notif-side">
+                <div class="notif-pinned">
+                  <div class="notif-pinned-header">
+                    <div>
+                      <div class="notif-pinned-title" data-i18n="notif_pinned_title">Pinned courses</div>
+                      <div class="notif-pinned-sub" data-i18n="notif_pinned_sub">Quick access to the courses that matter most.</div>
+                    </div>
+                    <button class="notif-edit-pins" id="notifEditPins" data-i18n="notif_edit_pins">Edit pins</button>
+                  </div>
+                  <div class="notif-pin-editor" id="notifPinEditor" hidden></div>
+                  <div class="notif-pinned-grid" id="notifPinnedGrid">
+                    <div class="notif-pinned-empty" id="notifPinnedEmpty" data-i18n="notif_pinned_empty">
+                      No pinned courses yet. Click "Edit pins" to add one.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="notif-selected">
+                  <div class="notif-selected-header">
+                    <div class="notif-selected-title" data-i18n="notif_selected_title">Selected notification</div>
+                    <span class="notif-live-badge" data-i18n="notif_live">Live</span>
+                  </div>
+                  <div class="notif-selected-body">
+                    <div class="notif-selected-tile">
+                      <div class="notif-selected-label" data-i18n="notif_current_action">Current action</div>
+                      <div class="notif-selected-value" id="notifSelectedAction" data-i18n="notif_none_selected">No notification selected</div>
+                    </div>
+                    <div class="notif-selected-tile">
+                      <div class="notif-selected-label" data-i18n="notif_connected_area">Connected area</div>
+                      <div class="notif-selected-value" id="notifSelectedArea" data-i18n="notif_select_item">Select an item from the inbox</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

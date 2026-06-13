@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 from ..auth import require_internal_token
 from ..config import get_settings
+from ..services.access_control import HEAVY_CAP_NOTICE
 from ..services.openai_client import get_openai_client
 from ..supabase_client import get_supabase
 
@@ -856,13 +857,27 @@ def _group_pages(
     return out, effective
 
 
-def _call_openai(system_prompt: str, user_message: str, max_tokens: int = 4000) -> str:
+def _call_openai(
+    system_prompt: str, user_message: str, max_tokens: int = 4000, user_id: str | None = None,
+) -> tuple[str, bool]:
+    """Returns (markdown, heavy_capped). Full notes/summary generation runs on
+    the strong model and is bounded by the same monthly heavy-model allowance
+    as math answers — past the cap, generation continues on the standard
+    model with a notice instead of an error."""
     settings = get_settings()
     client = get_openai_client()
     from ..services.llm_json import _token_limit_param
-    token_param = _token_limit_param(settings.openai_generate_model_strong, max_tokens)
+    from ..services.access_control import heavy_model_cap_reached
+
+    target_model = settings.openai_generate_model_strong
+    heavy_capped = False
+    if user_id and heavy_model_cap_reached(user_id, target_model, settings.heavy_monthly_cap):
+        target_model = settings.openai_generate_model
+        heavy_capped = True
+
+    token_param = _token_limit_param(target_model, max_tokens)
     resp = client.chat.completions.create(
-        model=settings.openai_generate_model_strong,
+        model=target_model,
         **token_param,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -872,11 +887,11 @@ def _call_openai(system_prompt: str, user_message: str, max_tokens: int = 4000) 
     from ..services.usage_meter import record_usage, usage_from_response  # noqa: WPS433
     record_usage(
         feature="notes_full",
-        model=settings.openai_generate_model_strong,
+        model=target_model,
         **usage_from_response(resp),
     )
     text = (resp.choices[0].message.content if resp.choices and resp.choices[0].message else "") or ""
-    return text.strip()
+    return text.strip(), heavy_capped
 
 
 def _batch_texts(parts: list[str], max_chars: int) -> list[str]:
@@ -903,14 +918,16 @@ def _merge_with_staging(
     max_chars: int,
     max_tokens: int,
     depth: int = 0,
-) -> str:
+    user_id: str | None = None,
+) -> tuple[str, bool]:
     batches = _batch_texts(parts, max_chars)
     if len(batches) <= 1 or depth >= 3:
-        return _call_openai(system_prompt, instruction + "\n\n".join(batches), max_tokens=max_tokens)
+        return _call_openai(system_prompt, instruction + "\n\n".join(batches), max_tokens=max_tokens, user_id=user_id)
 
     intermediate_parts: list[str] = []
+    heavy_capped = False
     for i, batch in enumerate(batches):
-        intermediate = _call_openai(
+        intermediate, capped = _call_openai(
             system_prompt,
             (
                 "Intermediate merge pass. Preserve all unique exam-relevant content and page references "
@@ -919,10 +936,13 @@ def _merge_with_staging(
                 + batch
             ),
             max_tokens=max_tokens,
+            user_id=user_id,
         )
+        heavy_capped = heavy_capped or capped
         intermediate_parts.append(f"=== INTERMEDIATE MERGE {i + 1} ===\n\n{intermediate}")
 
-    return _merge_with_staging(system_prompt, instruction, intermediate_parts, max_chars, max_tokens, depth + 1)
+    merged, capped = _merge_with_staging(system_prompt, instruction, intermediate_parts, max_chars, max_tokens, depth + 1, user_id=user_id)
+    return merged, heavy_capped or capped
 
 
 _TITLE_RE = re.compile(r"^#\s+(.+)", re.MULTILINE)
@@ -1056,15 +1076,16 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             system_prompt = _merge_prompt(payload.language, payload.tool, payload.detailLevel)
             max_chars = _EXAM_MERGE_CONTEXT_CHARS if is_exam_summary else _MAX_CONTEXT_CHARS
             if len(combined) > max_chars:
-                merged = _merge_with_staging(
+                merged, heavy_capped = _merge_with_staging(
                     system_prompt,
                     instruction,
                     combined_parts,
                     max_chars,
                     merge_tokens,
+                    user_id=payload.userId,
                 )
             else:
-                merged = _call_openai(system_prompt, instruction + combined, max_tokens=merge_tokens)
+                merged, heavy_capped = _call_openai(system_prompt, instruction + combined, max_tokens=merge_tokens, user_id=payload.userId)
         except Exception as e:  # noqa: BLE001
             log.exception("merge LLM failed")
             return {"error": f"Merge failed: {e}"}
@@ -1080,7 +1101,8 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
             payload.userId, payload.courseId, payload.documentId, title, payload.tool,
             merged, merge_sources, filter_start, filter_end,
         )
-        return {"note": {"id": note_id, "title": title, "type": payload.tool, "content_markdown": merged, "sources": merge_sources}}
+        content = merged + HEAVY_CAP_NOTICE if heavy_capped else merged
+        return {"note": {"id": note_id, "title": title, "type": payload.tool, "content_markdown": content, "sources": merge_sources}, "heavyCapped": heavy_capped}
 
     # ── SECTION ─────────────────────────────────────────────────────────────
     if payload.mode == "section":
@@ -1106,11 +1128,12 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
         sys_p = _section_prompt(payload.language, sec_start, sec_end, payload.tool, payload.detailLevel)
         sec_tokens = 4000 if _normalize_detail(payload.detailLevel) == "exam" else 2500
         try:
-            md = _call_openai(sys_p, f"PDF-INHALT (Seiten {sec_start}–{sec_end}):\n\n{context}\n\n{instr}", max_tokens=sec_tokens)
+            md, heavy_capped = _call_openai(sys_p, f"PDF-INHALT (Seiten {sec_start}–{sec_end}):\n\n{context}\n\n{instr}", max_tokens=sec_tokens, user_id=payload.userId)
         except Exception as e:  # noqa: BLE001
             log.exception("section LLM failed")
             return {"error": f"Section generation failed: {e}"}
-        return {"markdown": md, "pageStart": sec_start, "pageEnd": sec_end}
+        content = md + HEAVY_CAP_NOTICE if heavy_capped else md
+        return {"markdown": content, "pageStart": sec_start, "pageEnd": sec_end, "heavyCapped": heavy_capped}
 
     # ── GENERATE (default) ──────────────────────────────────────────────────
     filter_start: int | None = None
@@ -1183,7 +1206,7 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
 
     gen_tokens = 8000 if (payload.tool == "summary" and _normalize_detail(payload.detailLevel) == "exam") else 6000
     try:
-        markdown = _call_openai(system_prompt, user_message, max_tokens=gen_tokens)
+        markdown, heavy_capped = _call_openai(system_prompt, user_message, max_tokens=gen_tokens, user_id=payload.userId)
     except Exception as e:  # noqa: BLE001
         log.exception("notes LLM failed")
         return {"error": f"KI-Generierung fehlgeschlagen: {e}"}
@@ -1200,4 +1223,5 @@ def notes_generate(payload: NotesGenerateRequest) -> dict[str, Any]:
         payload.userId, payload.courseId, payload.documentId, title, payload.tool,
         markdown, sources, filter_start, filter_end,
     )
-    return {"note": {"id": note_id, "title": title, "type": payload.tool, "content_markdown": markdown, "sources": sources}}
+    content = markdown + HEAVY_CAP_NOTICE if heavy_capped else markdown
+    return {"note": {"id": note_id, "title": title, "type": payload.tool, "content_markdown": content, "sources": sources}, "heavyCapped": heavy_capped}

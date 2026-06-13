@@ -1085,18 +1085,24 @@ def pick_system_prompt(
     if weak_topics and tutor_mode != "quiz" and label != "weak":
         from .mastery import coaching_overlay  # noqa: WPS433
         coach = coaching_overlay(weak_topics)
+    # Prompt-cache ordering: fully static blocks first (base template, tutor
+    # overlay, app context map, user-intent + dignity rules, confidentiality
+    # rule), then semi-stable per-user content (coaching), then the volatile
+    # per-question intent routing LAST. OpenAI's prefix cache only credits a
+    # byte-identical PREFIX, so anything that varies per question must sit
+    # after everything that doesn't — callers append further volatile blocks
+    # (workspace snapshot, active-file sentence, history, user message) after
+    # this returned prompt.
     prompt = base
     if overlay:
         prompt += overlay
+    prompt += MINALLO_APP_CONTEXT
+    prompt += USER_INTENT_OVERLAY
+    prompt += DIGNITY_OVERLAY
+    prompt += INTERNAL_CONFIDENTIALITY_RULE
     if coach:
         prompt += coach
     prompt += intent_style_instruction(academic_intent)
-    prompt += MINALLO_APP_CONTEXT
-    prompt += USER_INTENT_OVERLAY
-    # Student-Dignity rules apply to every reply, every tutor mode, every
-    # retrieval strength. Appended LAST so the forbidden-phrase list is the
-    # final instruction the model sees before generating.
-    prompt += DIGNITY_OVERLAY
     return prompt, label
 
 
@@ -1293,9 +1299,6 @@ def generate_answer(
     # Worked math/exercise solutions in KaTeX overrun the small default budget
     # and truncate mid-calculation; give the math path room to finish.
     effective_max_tokens = max(max_tokens, 4500) if (answer_mode == "math" or wants_diagram) else max_tokens
-
-    if INTERNAL_CONFIDENTIALITY_RULE not in system_prompt:
-        system_prompt += INTERNAL_CONFIDENTIALITY_RULE
 
     client = get_openai_client()
     completion = client.chat.completions.create(

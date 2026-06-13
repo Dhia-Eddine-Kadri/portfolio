@@ -554,94 +554,133 @@ body.night #psec-subscription .sub-btn-current {
 
 /* ── NOTIFICATIONS (#psec-notifications) ────────────────────────────────── */
 
-body.night #psec-notifications .notif-wrap {
-  max-width: 720px;
-  margin: 0 auto;
+body.night #psec-notifications .notif-page-label {
+  color: rgba(124, 92, 255, 0.75) !important;
 }
-body.night #psec-notifications .notif-header {
+body.night #psec-notifications .notif-page-title {
+  color: #fff !important;
+}
+body.night #psec-notifications .notif-search-input {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+}
+body.night #psec-notifications .notif-search-input::placeholder {
+  color: rgba(226, 232, 240, 0.45) !important;
+}
+body.night #psec-notifications .notif-search-input:focus {
+  border-color: rgba(124, 92, 255, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18) !important;
+}
+
+body.night #psec-notifications .notif-wrap,
+body.night #psec-notifications .notif-pinned,
+body.night #psec-notifications .notif-selected {
   border-radius: 24px !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   background: rgba(255, 255, 255, 0.06) !important;
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
-  padding: 22px 24px !important;
-  margin-bottom: 16px;
 }
-body.night #psec-notifications .notif-title {
+body.night #psec-notifications .notif-title,
+body.night #psec-notifications .notif-pinned-title,
+body.night #psec-notifications .notif-selected-title {
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 1.2rem !important;
   font-weight: 700 !important;
   color: #fff !important;
   letter-spacing: -0.01em;
 }
-body.night #psec-notifications .notif-subtitle {
-  font-size: 0.85rem;
-  color: rgba(226, 232, 240, 0.6) !important;
+body.night #psec-notifications .notif-count-badge {
+  background: rgba(124, 92, 255, 0.22) !important;
+  color: #c4b5fd !important;
 }
-body.night #psec-notifications .notif-title-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: rgba(96, 165, 250, 0.14);
-  border: 1px solid rgba(96, 165, 250, 0.28);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-body.night #psec-notifications .notif-mark-all {
+body.night #psec-notifications .notif-mark-all,
+body.night #psec-notifications .notif-edit-pins {
   border-radius: 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   background: rgba(255, 255, 255, 0.07) !important;
   color: rgba(226, 232, 240, 0.95) !important;
   font-weight: 600 !important;
 }
+body.night #psec-notifications .notif-mark-all:hover,
+body.night #psec-notifications .notif-edit-pins:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
 body.night #psec-notifications .notif-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 body.night #psec-notifications .notif-tab {
-  padding: 9px 16px !important;
-  border-radius: 10px !important;
   background: transparent !important;
   color: rgba(226, 232, 240, 0.65) !important;
   font-weight: 600 !important;
   border: none !important;
-  cursor: pointer;
 }
 body.night #psec-notifications .notif-tab.active {
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.35), rgba(99, 102, 241, 0.28)) !important;
   color: #fff !important;
 }
-body.night #psec-notifications .notif-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-body.night #psec-notifications .notif-list > * {
-  border-radius: 16px !important;
+body.night .notif-item,
+body.night #psec-notifications .notif-empty,
+body.night .notif-pinned-empty,
+body.night .notif-pin-card,
+body.night .notif-selected-tile,
+body.night .notif-pin-stat,
+body.night .notif-pin-editor {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   background: rgba(255, 255, 255, 0.04) !important;
-  padding: 14px 18px !important;
+}
+body.night .notif-item:hover {
+  background: rgba(124, 92, 255, 0.12) !important;
+  border-color: rgba(124, 92, 255, 0.32) !important;
+}
+body.night .notif-item.unread {
+  background: rgba(124, 92, 255, 0.14) !important;
+  border-color: rgba(124, 92, 255, 0.32) !important;
+}
+body.night .notif-item.unread::after {
+  background: #a78bfa !important;
+  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25) !important;
+}
+body.night .notif-item.selected {
+  border-color: #06d6a0 !important;
+  box-shadow: 0 0 0 1px #06d6a0 inset !important;
+}
+body.night .notif-item-title,
+body.night .notif-pin-card-name,
+body.night .notif-pin-stat-value,
+body.night .notif-pin-info-value,
+body.night .notif-selected-value,
+body.night #psec-notifications .notif-empty-title {
+  color: #fff !important;
+}
+body.night .notif-item-text,
+body.night .notif-pin-card-meta,
+body.night .notif-pin-info,
+body.night .notif-pinned-sub,
+body.night #psec-notifications .notif-empty-sub,
+body.night .notif-pinned-empty {
+  color: rgba(226, 232, 240, 0.6) !important;
+}
+body.night .notif-item-time,
+body.night .notif-pin-stat-label,
+body.night .notif-selected-label {
+  color: rgba(226, 232, 240, 0.45) !important;
 }
 body.night #psec-notifications .notif-empty {
-  border-radius: 24px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 56px 24px;
-  text-align: center;
-  color: rgba(226, 232, 240, 0.6);
+  border-style: dashed !important;
 }
-body.night #psec-notifications .notif-empty-title {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 6px;
+body.night .notif-pin-open {
+  color: #a78bfa !important;
+}
+body.night .notif-pin-open:hover {
+  color: #c4b5fd !important;
+}
+body.night .notif-live-badge {
+  background: rgba(6, 214, 160, 0.16) !important;
+  border-color: rgba(6, 214, 160, 0.4) !important;
+  color: #34f5c5 !important;
 }
 
 /* ── EDITOR (#psec-editor) ──────────────────────────────────────────────── */

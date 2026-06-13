@@ -193,6 +193,12 @@ def enforce_interactive_cap(user_id: str, max_events: int) -> None:
     _enforce_bucket_cap(user_id, "interactive", _INTERACTIVE_EVENT_TYPES, max_events)
 
 
+HEAVY_CAP_NOTICE = (
+    "\n\n⚠️ *This month's advanced-solver allowance is used up, so this was "
+    "generated with the standard model. The allowance resets on the 1st.*"
+)
+
+
 def heavy_model_cap_reached(user_id: str, model: str, cap: int) -> bool:
     """True when this month's strong-model allowance is used up.
 
