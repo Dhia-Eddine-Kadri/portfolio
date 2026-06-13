@@ -18,6 +18,7 @@ import {
   getThinkingContext,
   type AIThinkingStatus
 } from './ai-thinking-status.js';
+import { getAiChatKey } from './chat-key.js';
 
 /** The subscription gate (HTTP 402 / "subscription required") should read as a
  * calm upgrade prompt, not a raw server error. */
@@ -339,7 +340,8 @@ const MINALLO_APP_CONTEXT =
 
   'PROBLEM SOLVER MODES (AI panel "Problem" button): Hint (nudge), Setup (Given/Required/Formula), Check (verify student work), Solve (full solution), Practice (similar problem).\n\n' +
 
-  'GENERATING STUDY MATERIAL: inside a course, the Notes / Summaries / Quiz / Flashcards tabs each have a "Generate" button — pick source file(s) and options.\n\n' +
+  'GENERATING STUDY MATERIAL: inside a course, the Notes / Summaries / Quiz / Flashcards tabs each have a "Generate" button — pick source file(s) and options. ' +
+  'SHORTCUT: while inside a course, simply typing "cheatsheet", "summary", or "notes" (or e.g. "make a summary") in this chat auto-generates it right away — no need to navigate to the tab.\n\n' +
 
   'STYLE: Numbered steps. Name the exact UI element. Suggest the next action. ' +
   'Never claim you don\'t know which website you\'re in — you ARE Minallo AI on Minallo. ' +
@@ -416,28 +418,50 @@ interface HistoryPair {
   sources?: SourceItem[];
 }
 
-function _historyKey(courseId?: string | null): string {
-  return _HISTORY_PREFIX + (courseId || 'default');
+// A chatKey is `course:<courseId>:file:<fileId>:sidepanel` (see chat-key.ts).
+// Pairs with no fileId (no file open) are never persisted — see callers below,
+// which all bail out early when getAiChatKey() returns null.
+function _historyKey(chatKey: string): string {
+  return _HISTORY_PREFIX + chatKey;
 }
-// Courses cleared this session. The clear button deletes the chat_history rows
-// asynchronously (fire-and-forget fetch), but the AI panel re-opens ~100ms
-// later and restoreCourseHistory() would read the not-yet-deleted rows and
-// repopulate — so "Clear chat" looked like it did nothing. This tombstone
-// suppresses the restore for a cleared course until a new question is asked
-// (which removes the tombstone via _appendCourseHistory).
-const _clearedCourses = new Set<string>();
-function _loadCourseHistory(courseId?: string | null): HistoryPair[] {
-  try { return JSON.parse(localStorage.getItem(_historyKey(courseId)) || '[]'); } catch { return []; }
+// Chat keys (course+file pairs) cleared this session. The clear button deletes
+// the chat_history rows asynchronously (fire-and-forget fetch), but the AI
+// panel re-opens ~100ms later and restoreCourseHistory() would read the
+// not-yet-deleted rows and repopulate — so "Clear chat" looked like it did
+// nothing. This tombstone suppresses the restore for a cleared chat until a
+// new question is asked (which removes the tombstone via _appendCourseHistory).
+const _clearedChats = new Set<string>();
+
+// Race guard: every restore call is tagged with the chatKey it was requested
+// for. If the user switches files before the fetch/localStorage read resolves,
+// `_currentChatKey` will have moved on by the time it completes, and the stale
+// result is dropped instead of rendering into the wrong file's panel.
+let _currentChatKey: string | null = null;
+
+/** Clears the visible message list and marks the panel as belonging to no
+ * chat. Called whenever the active course/file changes, BEFORE the new
+ * chat's history (if any) is loaded — so a file switch never shows a flash
+ * of the previous file's messages. */
+export function resetAiPanelChat(): void {
+  _currentChatKey = null;
+  const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
+  if (!aiMsgs) return;
+  aiMsgs.querySelectorAll('.ai-msg-wrap, .ai-sel-banner').forEach((el) => el.remove());
 }
-function _saveCourseHistory(courseId: string | null | undefined, pairs: HistoryPair[]): void {
+
+function _loadCourseHistory(chatKey: string): HistoryPair[] {
+  try { return JSON.parse(localStorage.getItem(_historyKey(chatKey)) || '[]'); } catch { return []; }
+}
+function _saveCourseHistory(chatKey: string, pairs: HistoryPair[]): void {
   try {
     let trimmed = pairs;
     if (trimmed.length > _HISTORY_MAX) trimmed = trimmed.slice(trimmed.length - _HISTORY_MAX);
-    localStorage.setItem(_historyKey(courseId), JSON.stringify(trimmed));
+    localStorage.setItem(_historyKey(chatKey), JSON.stringify(trimmed));
   } catch { /* quota */ }
 }
 function _appendCourseHistory(
   courseId: string | null | undefined,
+  fileId: string | null | undefined,
   question: string,
   answer: string,
   sources?: SourceItem[]
@@ -446,10 +470,15 @@ function _appendCourseHistory(
   // and, with a blank question, dedup collapses ALL such turns into one
   // ghost entry that can shadow the real history.
   if (!(question || '').trim() && !(answer || '').trim()) return;
-  // A new turn means this course has live history again — lift any clear tombstone.
-  _clearedCourses.delete(_historyKey(courseId));
-  const pairs = _loadCourseHistory(courseId);
-  // Cap per-pair sources so a long course history can't crowd localStorage.
+  // No file open: this is a temporary no-file chat. Never save it under any
+  // file's history (and there's nothing to fall back to — don't reuse the
+  // last file's key).
+  const chatKey = getAiChatKey(courseId, fileId);
+  if (!chatKey) return;
+  // A new turn means this chat has live history again — lift any clear tombstone.
+  _clearedChats.delete(chatKey);
+  const pairs = _loadCourseHistory(chatKey);
+  // Cap per-pair sources so a long history can't crowd localStorage.
   const src = sources && sources.length ? sources.slice(0, 8) : undefined;
   // If the most recent pair has the same question, this is a regenerate —
   // replace its answer instead of appending a duplicate pair. Without this,
@@ -463,15 +492,17 @@ function _appendCourseHistory(
   } else {
     pairs.push({ q: question, a: answer, ts: Date.now(), ...(src ? { sources: src } : {}) });
   }
-  _saveCourseHistory(courseId, pairs);
+  _saveCourseHistory(chatKey, pairs);
   const _ps = (window as unknown as { _progressSync?: { syncCourseAiSessions?: (id: string, n: number) => void } })._progressSync;
   if (courseId) _ps?.syncCourseAiSessions?.(courseId, pairs.length);
 
   // Also persist to the chat_history table (RLS-scoped to the user) so history
-  // survives a refresh and syncs across devices. restoreCourseHistory() reads
-  // this table first, then falls back to the localStorage copy above. This
-  // write was missing on the python-ai /ask-stream path, so the rail used to
-  // only save locally. Best-effort — never block or throw on failure.
+  // survives a refresh and syncs across devices. This write was missing on the
+  // python-ai /ask-stream path, so the rail used to only save locally.
+  // Best-effort — never block or throw on failure. The per-file restore below
+  // reads localStorage only (the table has no document_id column to scope by
+  // file), so this is a cross-device backup, not the source of truth for
+  // per-file isolation.
   try {
     const supaUrl = window._SUPA || '';
     const tok = window._sbToken || '';
@@ -601,65 +632,67 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
   aiMsgs.scrollTop = aiMsgs.scrollHeight;
 }
 
-export function restoreCourseHistory(courseId: string | null | undefined): void {
-  if (!courseId) return;
-  // Just-cleared course: don't repopulate from the DB rows that are still being
-  // deleted. Stays suppressed until the student asks something new.
-  if (_clearedCourses.has(_historyKey(courseId))) return;
+/**
+ * Loads and renders the side panel's chat history for the given course+file
+ * pair. courseId/fileId must both be set — when no file is open (fileId is
+ * null/undefined/not loaded yet), this clears the panel to empty and does NOT
+ * fall back to any previously loaded file's history.
+ */
+export function restoreCourseHistory(
+  courseId: string | null | undefined,
+  fileId?: string | null
+): void {
+  const chatKey = getAiChatKey(courseId, fileId);
   const aiMsgs = document.getElementById('aiMsgs') || document.querySelector<HTMLElement>('.ai-msgs');
   if (!aiMsgs) return;
+
+  if (!chatKey) {
+    // No file selected — start empty, never reuse a previous file's chat.
+    resetAiPanelChat();
+    return;
+  }
+
+  // Reset before loading so a file switch never flashes the previous file's
+  // messages while the new chat's history is fetched.
+  if (_currentChatKey !== chatKey) resetAiPanelChat();
+  _currentChatKey = chatKey;
+
+  // Just-cleared chat: don't repopulate from local data left over from before
+  // the clear. Stays suppressed until the student asks something new.
+  if (_clearedChats.has(chatKey)) return;
+
   // Only skip restore if a real conversation is already present (a user
-  // message). A lone bot greeting must NOT block restore — otherwise the
-  // boot-time welcome message permanently hides saved history.
+  // message) FOR THIS CHAT KEY. A lone bot greeting must NOT block restore —
+  // otherwise the boot-time welcome message permanently hides saved history.
   if (aiMsgs.querySelector('.ai-msg-wrap.user')) return;
 
-  const supaUrl = window._SUPA || '';
-  const tok = window._sbToken || '';
-  if (supaUrl && tok) {
-    // Latest 40 turns (desc + reverse). The old asc+limit query returned the
-    // 40 OLDEST rows, so long courses could never restore recent chats.
-    fetch(
-      supaUrl + '/rest/v1/chat_history?course_id=eq.' + encodeURIComponent(courseId) +
-        '&order=created_at.desc&limit=40',
-      {
-        headers: {
-          apikey: window._SAKEY || '',
-          Authorization: 'Bearer ' + tok,
-        },
-      }
-    )
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((rows: Array<{ question: string; answer: string; created_at?: string }> | null) => {
-        // MERGE the DB copy with the local copy instead of either/or. The DB
-        // write in _appendCourseHistory is best-effort and skips many turns,
-        // so most history lives only in localStorage — rendering "DB if any
-        // rows" made one synced turn hide an entire local conversation.
-        const dbPairs: HistoryPair[] = (rows || []).map((r) => ({
-          q: r.question,
-          a: r.answer,
-          ts: r.created_at ? Date.parse(r.created_at) || 0 : 0,
-        }));
-        const merged = dbPairs
-          .concat(_loadCourseHistory(courseId))
-          .sort((x, y) => (x.ts || 0) - (y.ts || 0));
-        _renderHistoryPairs(_dedupPairs(merged), aiMsgs);
-      })
-      .catch(() => {
-        _renderHistoryPairs(_dedupPairs(_loadCourseHistory(courseId)), aiMsgs);
-      });
-  } else {
-    _renderHistoryPairs(_dedupPairs(_loadCourseHistory(courseId)), aiMsgs);
-  }
+  // Per-file isolation: restore from localStorage only. The chat_history
+  // table has no document_id column, so a course-wide DB merge here would
+  // leak every file's messages into each other's panel — see
+  // _appendCourseHistory's comment on why the table is write-only for now.
+  const myChatKey = chatKey;
+  const pairs = _loadCourseHistory(chatKey);
+  // Defer one tick so a same-tick file switch (which bumps _currentChatKey)
+  // can cancel this render before it touches the DOM.
+  Promise.resolve().then(() => {
+    if (_currentChatKey !== myChatKey) return;
+    _renderHistoryPairs(_dedupPairs(pairs), aiMsgs);
+  });
 }
 
-export function clearCourseHistory(courseId: string): void {
-  // Tombstone so the panel's re-open (openAI → restoreCourseHistory) doesn't
-  // race the async DB delete below and bring the chat back.
-  _clearedCourses.add(_historyKey(courseId));
-  try { localStorage.removeItem(_historyKey(courseId)); } catch { /* ignore */ }
-  // Also delete the rows synced to chat_history — otherwise restoreCourseHistory
-  // reads them back from Supabase on the next refresh and the "cleared" chat
-  // reappears. RLS scopes the delete to this user's rows for this course.
+/** Clears the side panel's chat for the given course+file pair, both locally
+ * and (best-effort) the synced chat_history rows for that course. */
+export function clearCourseHistory(courseId: string, fileId?: string | null): void {
+  const chatKey = getAiChatKey(courseId, fileId);
+  if (chatKey) {
+    // Tombstone so the panel's re-open (openAI → restoreCourseHistory) doesn't
+    // bring the cleared chat back from localStorage.
+    _clearedChats.add(chatKey);
+    try { localStorage.removeItem(_historyKey(chatKey)); } catch { /* ignore */ }
+  }
+  // Also delete the rows synced to chat_history for this course. RLS scopes
+  // the delete to this user's rows for this course — the table isn't
+  // per-file, so this clears the cross-device backup for the whole course.
   try {
     const supaUrl = window._SUPA || '';
     const tok = window._sbToken || '';
@@ -724,7 +757,8 @@ export function initAskAI(
       const refusal = _technicalRefusalMsg();
       if (window.addBotMsg) window.addBotMsg(refusal);
       const courseId = window.activeCourseId || window.currentCourseId || '';
-      if (courseId) _appendCourseHistory(courseId, question, refusal);
+      const fileId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
+      if (courseId) _appendCourseHistory(courseId, fileId, question, refusal);
       return { content: [{ text: refusal }] };
     }
 
@@ -1463,7 +1497,7 @@ export function initAskAI(
                 answerCacheId: _cacheId,
               };
 
-              _appendCourseHistory(_courseId, question, fullAnswer, sources);
+              _appendCourseHistory(_courseId, _activeDocId, question, fullAnswer, sources);
 
               if (bubble) {
                 bubble.setAttribute('data-raw', fullAnswer);
@@ -1577,6 +1611,7 @@ export function initAskAI(
         if (!d.error && displayTextLocal && displayTextLocal !== 'No response') {
           _appendCourseHistory(
             window.activeCourseId || window.currentCourseId || '',
+            (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null,
             question,
             displayTextLocal,
             (d._ragData as RagAskResponse | undefined)?.sources
