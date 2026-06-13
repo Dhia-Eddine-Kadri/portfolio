@@ -957,6 +957,47 @@
     el.textContent = String(new Date().getFullYear());
   }
 
+  // ---- F2. Back-to-top button ------------------------------------------
+
+  function initBackToTop() {
+    var main = document.querySelector('.nl-main') || document.body;
+    if (!main || document.getElementById('nlToTop')) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'nlToTop';
+    btn.className = 'nl-to-top';
+    btn.setAttribute('aria-label', 'Back to top');
+    btn.innerHTML =
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
+    main.appendChild(btn);
+
+    btn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    });
+
+    // Show once the user has scrolled a screenful or so past the hero.
+    var SHOW_AT = 600;
+    var ticking = false;
+    var sync = function () {
+      ticking = false;
+      var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+      btn.classList.toggle('is-visible', y > SHOW_AT);
+    };
+    window.addEventListener(
+      'scroll',
+      function () {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(sync);
+      },
+      { passive: true }
+    );
+    sync();
+  }
+
   // ---- G. CTA buttons ---------------------------------------------------
 
   function initCtaButtons() {
@@ -2329,6 +2370,7 @@
     try { initRevealOnScroll(); } catch (e) { /* noop */ }
     try { initHeroParallax(); } catch (e) { /* noop */ }
     try { initFooterYear(); } catch (e) { /* noop */ }
+    try { initBackToTop(); } catch (e) { /* noop */ }
   }
 
   if (document.readyState === 'loading') {

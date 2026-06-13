@@ -5447,3 +5447,59 @@ body.nl-body .nl-pv__stage {
 body.nl-body .nl-pv__dot.is-active.is-playing .nl-pv__dot-pip::after {
   animation: none;
 }
+
+/* ===================== Back-to-top button =====================
+   Injected by new-landing.js. Fixed to the bottom-right; fades in once
+   the user has scrolled past the hero. Sits above page content but below
+   the preview modal (z-index 2000). */
+body.nl-body .nl-to-top {
+  position: fixed;
+  right: clamp(16px, 4vw, 36px);
+  bottom: clamp(16px, 4vw, 32px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-white-15);
+  background: linear-gradient(135deg, var(--nl-sky-500), var(--nl-sky-600));
+  color: #ffffff;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.5);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px) scale(0.9);
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s linear 0.22s,
+    background 0.18s ease;
+}
+body.nl-body .nl-to-top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition: opacity 0.22s ease, transform 0.22s ease, background 0.18s ease;
+}
+body.nl-body .nl-to-top:hover {
+  background: linear-gradient(135deg, var(--nl-sky-400), var(--nl-sky-500));
+  transform: translateY(-2px) scale(1.04);
+}
+body.nl-body .nl-to-top:active {
+  transform: translateY(0) scale(0.96);
+}
+body.nl-body .nl-to-top:focus-visible {
+  outline: 2px solid var(--nl-sky-200);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.nl-body .nl-to-top {
+    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
+    transform: none;
+  }
+  body.nl-body .nl-to-top.is-visible {
+    transform: none;
+  }
+  body.nl-body .nl-to-top:hover {
+    transform: none;
+  }
+}
