@@ -178,6 +178,21 @@
     font-weight: 700;
     outline: none;
   }
+  #psec-admin .adm-date-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--adm-muted, #aab8cc);
+    text-transform: uppercase;
+  }
+  #psec-admin .adm-date-field input[type='date'] {
+    color-scheme: dark;
+    text-transform: none;
+    letter-spacing: normal;
+  }
 
   /* Mini stat grid (growth / activity / subscriptions) */
   #psec-admin .adm-mini-grid {
@@ -905,10 +920,13 @@
                     <div class="adm-card-head">
                       <div>
                         <h2 class="adm-card-title" data-i18n="admin_export_title">Export report</h2>
-                        <p class="adm-card-desc" data-i18n="admin_export_desc">Download an Excel sheet of cost, revenue, profit and AI usage per user for the selected period.</p>
+                        <p class="adm-card-desc" data-i18n="admin_export_desc">Download an Excel sheet of cost, revenue, profit and AI usage per user. Pick an exact date range, or use a quick preset.</p>
                       </div>
                       <div class="adm-card-controls">
-                        <select id="adminExportPeriod" class="adm-select">
+                        <label class="adm-date-field">From<input type="date" id="adminExportFrom" class="adm-select" /></label>
+                        <label class="adm-date-field">To<input type="date" id="adminExportTo" class="adm-select" /></label>
+                        <select id="adminExportPeriod" class="adm-select" title="Quick preset (ignored when a date range is set)">
+                          <option value="">Custom range</option>
                           <option value="7">Last 7 days</option>
                           <option value="30" selected>Last 30 days</option>
                           <option value="90">Last 90 days</option>

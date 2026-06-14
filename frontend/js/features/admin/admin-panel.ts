@@ -118,18 +118,36 @@ function _buildUsageCsv(data: UsageExport): string {
 
 async function downloadUsageReport(btn: HTMLButtonElement): Promise<void> {
   const sel = document.getElementById('adminExportPeriod') as HTMLSelectElement | null;
+  const fromEl = document.getElementById('adminExportFrom') as HTMLInputElement | null;
+  const toEl = document.getElementById('adminExportTo') as HTMLInputElement | null;
   const status = document.getElementById('adminExportStatus');
-  const days = parseInt(sel?.value || '30', 10) || 30;
   if (typeof adminSvc.getUsageExport !== 'function') {
     if (status) status.innerHTML = '<div class="adm-empty">Export unavailable — reload the page to pick up the latest admin code.</div>';
     return;
   }
+
+  // Explicit date range wins; otherwise fall back to the quick preset.
+  const from = fromEl?.value || '';
+  const to = toEl?.value || '';
+  const useRange = !!(from && to);
+  if (useRange && from > to) {
+    if (status) status.innerHTML = '<div class="adm-empty">“From” date must be on or before “To” date.</div>';
+    return;
+  }
+  if (!useRange && (from || to)) {
+    if (status) status.innerHTML = '<div class="adm-empty">Set both a “From” and a “To” date for a custom range, or clear both to use a preset.</div>';
+    return;
+  }
+  const days = parseInt(sel?.value || '30', 10) || 30;
+  const params = useRange ? { from, to } : { days };
+  const fileTag = useRange ? from + '_to_' + to : 'last-' + days + 'd';
+
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = 'Building…';
   if (status) status.innerHTML = '<div class="adm-empty">Generating report…</div>';
   try {
-    const data = await adminSvc.getUsageExport(days);
+    const data = await adminSvc.getUsageExport(params);
     if (!data) throw new Error('Request failed');
     if (!data.available) {
       if (status) status.innerHTML = '<div class="adm-empty">No meter data. Apply the <code>20260612_000001_usage_events</code> migration first.</div>';
@@ -141,12 +159,12 @@ async function downloadUsageReport(btn: HTMLButtonElement): Promise<void> {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'minallo-report-last-' + days + 'd-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.download = 'minallo-report-' + fileTag + '.csv';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     if (status) {
       status.innerHTML = '<div class="adm-empty">Downloaded ' + data.rows.length +
-        ' user row(s) for the last ' + days + ' days.</div>';
+        ' user row(s) for ' + escapeHtml(data.period || fileTag) + '.</div>';
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

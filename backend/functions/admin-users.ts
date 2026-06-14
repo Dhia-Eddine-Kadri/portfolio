@@ -79,7 +79,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
   let action: unknown, query = '', userId: unknown, plan: unknown,
       reportId: unknown, status: unknown, resolutionNote = '',
-      range: unknown, bucket: unknown, months: unknown, config: unknown, days: unknown;
+      range: unknown, bucket: unknown, months: unknown, config: unknown, days: unknown,
+      from: unknown, to: unknown;
   try {
     const b = JSON.parse(event.body || '{}') as Record<string, unknown>;
     if (!b || typeof b !== 'object' || Array.isArray(b)) return fail(400, 'Invalid body');
@@ -95,6 +96,8 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     months = b.months;
     config = b.config;
     days = b.days;
+    from = b.from;
+    to = b.to;
   } catch { return fail(400, 'Invalid body'); }
 
   const callerToken = extractBearerToken(event.headers);
@@ -576,16 +579,38 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
   // ── Financial: per-user cost/revenue/profit export (downloadable report) ──
   if (action === 'usageexport') {
-    let d = typeof days === 'number' ? Math.floor(days) : parseInt(String(days || ''), 10);
-    if (!Number.isFinite(d) || d < 1) d = 30;
-    if (d > 365) d = 365;
-    const sinceDate = new Date(Date.now() - d * 24 * 60 * 60 * 1000);
-    const since = sinceDate.toISOString();
+    // Two modes: an explicit YYYY-MM-DD from/to range (inclusive), or a rolling
+    // "last N days" preset. The range, when both dates are valid, wins.
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    const fromStr = typeof from === 'string' ? from.trim() : '';
+    const toStr = typeof to === 'string' ? to.trim() : '';
+    let since: string;
+    let until: string | null = null;
+    let period: string;
+    let d = 0;
+    if (fromStr && toStr) {
+      if (!dateRe.test(fromStr) || !dateRe.test(toStr)) return fail(400, 'Dates must be YYYY-MM-DD');
+      const start = new Date(fromStr + 'T00:00:00.000Z');
+      const end = new Date(toStr + 'T23:59:59.999Z');
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return fail(400, 'Invalid date');
+      if (start.getTime() > end.getTime()) return fail(400, '"from" must be on or before "to"');
+      since = start.toISOString();
+      until = end.toISOString();
+      period = fromStr + ' to ' + toStr;
+      d = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    } else {
+      d = typeof days === 'number' ? Math.floor(days) : parseInt(String(days || ''), 10);
+      if (!Number.isFinite(d) || d < 1) d = 30;
+      if (d > 365) d = 365;
+      since = new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+      period = 'last ' + d + ' days';
+    }
+    const untilFilter = until ? '&created_at=lte.' + encodeURIComponent(until) : '';
     const [cfg, meterRes, subRes, emailMap] = await Promise.all([
       loadCostConfig(serviceKey),
       supaRequest<UsageEventRow[]>(
         'GET',
-        'usage_events?created_at=gte.' + encodeURIComponent(since) +
+        'usage_events?created_at=gte.' + encodeURIComponent(since) + untilFilter +
           '&select=user_id,feature,model,prompt_tokens,completion_tokens,cached_tokens&limit=500000',
         null, serviceKey
       ),
@@ -597,7 +622,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     // Table missing (migration not applied) → tell the UI instead of 500ing.
     if (!Array.isArray(meterRes.body)) {
       return jsonResponse(200, {
-        available: false, days: d, rows: [],
+        available: false, days: d, since, until, period, rows: [],
         metadata: { generatedAt: new Date().toISOString() }
       });
     }
@@ -613,12 +638,14 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       email: emailMap.get(row.userId) || row.email
     }));
     await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_usage_export', {
-      days: d, rows: rows.length, auth_method: adminCheck.method
+      days: d, period, rows: rows.length, auth_method: adminCheck.method
     });
     return jsonResponse(200, {
       available: true,
       days: d,
       since,
+      until,
+      period,
       generatedAt: new Date().toISOString(),
       rows,
       metadata: { generatedAt: new Date().toISOString() }

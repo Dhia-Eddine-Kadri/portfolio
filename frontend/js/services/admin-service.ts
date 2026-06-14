@@ -262,12 +262,25 @@ export interface UsageExport {
   available: boolean;       // false until the usage_events migration is applied
   days: number;
   since: string;
+  until: string | null;     // set when an explicit from/to range was used
+  period: string;           // human-readable label of the window
   generatedAt: string;
   rows: UsageExportRow[];
 }
 
-export async function getUsageExport(days = 30): Promise<UsageExport | null> {
-  const res = await _adminFetch({ action: 'usageexport', days });
+// Pass either a preset { days } window OR an explicit { from, to } range
+// (YYYY-MM-DD, inclusive). When from+to are both set they take precedence.
+export async function getUsageExport(
+  params: { days?: number; from?: string; to?: string } = {},
+): Promise<UsageExport | null> {
+  const body: AdminFetchBody = { action: 'usageexport' };
+  if (params.from && params.to) {
+    body.from = params.from;
+    body.to = params.to;
+  } else {
+    body.days = params.days ?? 30;
+  }
+  const res = await _adminFetch(body);
   if (!res.ok) return null;
   return res.json().catch(() => null);
 }
