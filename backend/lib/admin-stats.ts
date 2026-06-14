@@ -346,6 +346,97 @@ export function computeAiUsage(rows: UsageEventRow[], cfg: CostConfig): AiUsageS
   };
 }
 
+// ── Per-user usage/cost/profit export (downloadable report) ──────────────────
+// One row per user combining metered AI usage (usage_events) with their paying
+// status, so the admin can download a full cost/revenue/profit report for a
+// period. The row set is the UNION of users with metered usage and current
+// paying users (so paid users with no AI calls still contribute revenue), plus
+// a synthetic "service" row carrying unattributed cost (indexing/embeddings).
+export interface UsageExportRow {
+  userId: string;
+  email?: string;
+  paid: boolean;
+  requests: number;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  aiCostCents: number;
+  revenueCents: number;
+  feeCents: number;
+  profitCents: number;
+}
+
+const SERVICE_USER_ID = '(service: indexing/embeddings)';
+
+export function computeUsageExport(
+  rows: UsageEventRow[],
+  paidSet: Set<string>,
+  cfg: CostConfig
+): UsageExportRow[] {
+  interface Agg {
+    requests: number; prompt: number; cached: number; completion: number; cost: number;
+  }
+  const byUser = new Map<string, Agg>();
+  let svc: Agg | null = null;
+  for (const r of rows) {
+    const cost = usageEventCostCents(r, cfg);
+    const uid = r.user_id ? String(r.user_id) : '';
+    const target = uid
+      ? (byUser.get(uid) || (() => { const a = { requests: 0, prompt: 0, cached: 0, completion: 0, cost: 0 }; byUser.set(uid, a); return a; })())
+      : (svc || (svc = { requests: 0, prompt: 0, cached: 0, completion: 0, cost: 0 }));
+    target.requests += 1;
+    target.prompt += Number(r.prompt_tokens) || 0;
+    target.cached += Number(r.cached_tokens) || 0;
+    target.completion += Number(r.completion_tokens) || 0;
+    target.cost += cost;
+  }
+
+  // Make sure every paying user appears even with zero metered usage.
+  for (const uid of paidSet) {
+    if (!byUser.has(uid)) byUser.set(uid, { requests: 0, prompt: 0, cached: 0, completion: 0, cost: 0 });
+  }
+
+  const price = cfg.monthlyPriceCents;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const out: UsageExportRow[] = [];
+  for (const [uid, a] of byUser) {
+    const paid = paidSet.has(uid);
+    const revenueCents = paid ? price : 0;
+    const feeCents = paid ? (price * cfg.paymentFeePct) / 100 + cfg.paymentFeeFixedCents : 0;
+    const profitCents = revenueCents - a.cost - feeCents;
+    out.push({
+      userId: uid,
+      paid,
+      requests: a.requests,
+      promptTokens: a.prompt,
+      cachedTokens: a.cached,
+      completionTokens: a.completion,
+      aiCostCents: round2(a.cost),
+      revenueCents: round2(revenueCents),
+      feeCents: round2(feeCents),
+      profitCents: round2(profitCents)
+    });
+  }
+  // Worst profit first so over-costly users surface at the top of the sheet.
+  out.sort((x, y) => x.profitCents - y.profitCents);
+
+  if (svc) {
+    out.push({
+      userId: SERVICE_USER_ID,
+      paid: false,
+      requests: svc.requests,
+      promptTokens: svc.prompt,
+      cachedTokens: svc.cached,
+      completionTokens: svc.completion,
+      aiCostCents: round2(svc.cost),
+      revenueCents: 0,
+      feeCents: 0,
+      profitCents: round2(-svc.cost)
+    });
+  }
+  return out;
+}
+
 // Compute the measured token cost (in cents) from raw token counts + config.
 export function tokenCostCents(
   promptTokens: number,

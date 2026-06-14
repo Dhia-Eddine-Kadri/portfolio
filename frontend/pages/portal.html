@@ -904,6 +904,26 @@
                   <section class="adm-card">
                     <div class="adm-card-head">
                       <div>
+                        <h2 class="adm-card-title" data-i18n="admin_export_title">Export report</h2>
+                        <p class="adm-card-desc" data-i18n="admin_export_desc">Download an Excel sheet of cost, revenue, profit and AI usage per user for the selected period.</p>
+                      </div>
+                      <div class="adm-card-controls">
+                        <select id="adminExportPeriod" class="adm-select">
+                          <option value="7">Last 7 days</option>
+                          <option value="30" selected>Last 30 days</option>
+                          <option value="90">Last 90 days</option>
+                          <option value="180">Last 180 days</option>
+                          <option value="365">Last 365 days</option>
+                        </select>
+                        <button id="adminExportBtn" class="sub-btn" style="width:auto;padding:8px 18px;font-size:.78rem">Download Excel</button>
+                      </div>
+                    </div>
+                    <div class="adm-card-body" id="adminExportStatus"></div>
+                  </section>
+
+                  <section class="adm-card">
+                    <div class="adm-card-head">
+                      <div>
                         <h2 class="adm-card-title" data-i18n="admin_retention_title">Monthly retention</h2>
                         <p class="adm-card-desc" data-i18n="admin_retention_desc">Active paid, new, renewed and cancelled per month.</p>
                       </div>

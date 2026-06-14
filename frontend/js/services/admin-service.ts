@@ -2,7 +2,7 @@ interface AdminFetchBody {
   action:
     | 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself'
     | 'signups' | 'newusers' | 'subscriptions' | 'retention'
-    | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage' | 'aiusage';
+    | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage' | 'aiusage' | 'usageexport';
   [k: string]: unknown;
 }
 
@@ -238,6 +238,36 @@ export interface AiUsageStats {
 
 export async function getAiUsage(days = 30): Promise<AiUsageStats | null> {
   const res = await _adminFetch({ action: 'aiusage', days });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+// ── Per-user cost/revenue/profit export (downloadable report) ────────────────
+
+export interface UsageExportRow {
+  userId: string;
+  email?: string;
+  paid: boolean;
+  requests: number;
+  promptTokens: number;
+  cachedTokens: number;
+  completionTokens: number;
+  aiCostCents: number;
+  revenueCents: number;
+  feeCents: number;
+  profitCents: number;
+}
+
+export interface UsageExport {
+  available: boolean;       // false until the usage_events migration is applied
+  days: number;
+  since: string;
+  generatedAt: string;
+  rows: UsageExportRow[];
+}
+
+export async function getUsageExport(days = 30): Promise<UsageExport | null> {
+  const res = await _adminFetch({ action: 'usageexport', days });
   if (!res.ok) return null;
   return res.json().catch(() => null);
 }

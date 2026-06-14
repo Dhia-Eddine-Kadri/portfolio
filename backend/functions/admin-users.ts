@@ -6,7 +6,7 @@ import { logSecurityEvent } from '../lib/logger';
 import { isUuid } from '../lib/validation';
 import {
   bucketSignups, selectNewUsers, summarizeSubscriptions, computeRetention, computeFinancials, computeUsage,
-  buildMonthList, bucketAiByMonth, computeFinanceSeries, computeAiUsage,
+  buildMonthList, bucketAiByMonth, computeFinanceSeries, computeAiUsage, computeUsageExport,
   isBucket, isRange, RANGE_DAYS, type Bucket, type Range, type SubRow, type SubEvent,
   type CostConfig, type UserUsage, type UsageEvent, type UsageEventRow
 } from '../lib/admin-stats';
@@ -37,6 +37,23 @@ async function collectSignupTimestamps(serviceKey: string): Promise<string[]> {
     if (users.length < PER_PAGE) break;
   }
   return out;
+}
+
+// Build a userId → email map by paging the Auth Admin API. Needs no migration
+// and is fine at launch scale (same scan the signups/newusers actions use).
+async function collectUserEmails(serviceKey: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const PER_PAGE = 1000;
+  for (let page = 1; page <= 100; page++) {
+    const res = await supaAuthAdminRequest<{ users?: Array<{ id?: string; email?: string }> }>(
+      'GET', 'users?per_page=' + PER_PAGE + '&page=' + page, serviceKey
+    );
+    if (res.status < 200 || res.status >= 300) break;
+    const users = (res.body && res.body.users) || [];
+    for (const u of users) if (u.id && u.email) map.set(u.id, u.email);
+    if (users.length < PER_PAGE) break;
+  }
+  return map;
 }
 
 interface AdminRow { user_id: string }
@@ -92,7 +109,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage', 'usageexport'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -553,6 +570,57 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       totalRequests: usage.totalRequests,
       unattributedCostCents: usage.unattributedCostCents,
       topUsers,
+      metadata: { generatedAt: new Date().toISOString() }
+    });
+  }
+
+  // ── Financial: per-user cost/revenue/profit export (downloadable report) ──
+  if (action === 'usageexport') {
+    let d = typeof days === 'number' ? Math.floor(days) : parseInt(String(days || ''), 10);
+    if (!Number.isFinite(d) || d < 1) d = 30;
+    if (d > 365) d = 365;
+    const sinceDate = new Date(Date.now() - d * 24 * 60 * 60 * 1000);
+    const since = sinceDate.toISOString();
+    const [cfg, meterRes, subRes, emailMap] = await Promise.all([
+      loadCostConfig(serviceKey),
+      supaRequest<UsageEventRow[]>(
+        'GET',
+        'usage_events?created_at=gte.' + encodeURIComponent(since) +
+          '&select=user_id,feature,model,prompt_tokens,completion_tokens,cached_tokens&limit=500000',
+        null, serviceKey
+      ),
+      supaRequest<Array<{ user_id?: string; plan?: string; status?: string }>>(
+        'GET', 'subscriptions?select=user_id,plan,status', null, serviceKey
+      ),
+      collectUserEmails(serviceKey)
+    ]);
+    // Table missing (migration not applied) → tell the UI instead of 500ing.
+    if (!Array.isArray(meterRes.body)) {
+      return jsonResponse(200, {
+        available: false, days: d, rows: [],
+        metadata: { generatedAt: new Date().toISOString() }
+      });
+    }
+    const subRows = Array.isArray(subRes.body) ? subRes.body : [];
+    const paidSet = new Set<string>();
+    for (const r of subRows) {
+      if (r.user_id && String(r.plan).toLowerCase() === 'pro' && String(r.status).toLowerCase() === 'active') {
+        paidSet.add(String(r.user_id));
+      }
+    }
+    const rows = computeUsageExport(meterRes.body, paidSet, cfg).map((row) => ({
+      ...row,
+      email: emailMap.get(row.userId) || row.email
+    }));
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_stats_usage_export', {
+      days: d, rows: rows.length, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, {
+      available: true,
+      days: d,
+      since,
+      generatedAt: new Date().toISOString(),
+      rows,
       metadata: { generatedAt: new Date().toISOString() }
     });
   }

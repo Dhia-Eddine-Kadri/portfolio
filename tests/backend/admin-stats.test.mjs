@@ -245,6 +245,45 @@ test('computeAiUsage aggregates per feature x model with cached pricing', async 
   assert.equal(out.perUserCostCents.get('u1'), 28.5);
 });
 
+test('computeUsageExport: per-user cost/revenue/profit + service row', async () => {
+  const { computeUsageExport } = await import('../../backend/lib/admin-stats.ts');
+  const rows = [
+    // Paid user u1: 1M uncached input + 0.1M output on mini = 21 cents
+    { user_id: 'u1', feature: 'ask_stream', model: 'gpt-4o-mini-2024-07-18',
+      prompt_tokens: 1_000_000, completion_tokens: 100_000, cached_tokens: 0 },
+    // Free user u2: 1M input on mini = 15 cents
+    { user_id: 'u2', feature: 'ask_stream', model: 'gpt-4o-mini-2024-07-18',
+      prompt_tokens: 1_000_000, completion_tokens: 0, cached_tokens: 0 },
+    // Unattributed embeddings: 1M x 2 cents -> service row
+    { user_id: null, feature: 'embeddings', model: 'text-embedding-3-small',
+      prompt_tokens: 1_000_000, completion_tokens: 0, cached_tokens: 0 },
+  ];
+  // u1 is paying; u3 is paying with zero metered usage (must still appear).
+  const out = computeUsageExport(rows, new Set(['u1', 'u3']), CFG);
+
+  const u1 = out.find((r) => r.userId === 'u1');
+  assert.equal(u1.paid, true);
+  assert.equal(u1.aiCostCents, 21);
+  assert.equal(u1.revenueCents, 1199);
+  assert.equal(u1.profitCents, 1178); // 1199 - 21 (fees are 0 in CFG)
+
+  const u2 = out.find((r) => r.userId === 'u2');
+  assert.equal(u2.paid, false);
+  assert.equal(u2.revenueCents, 0);
+  assert.equal(u2.profitCents, -15);
+
+  const u3 = out.find((r) => r.userId === 'u3');
+  assert.ok(u3, 'paying user with no usage still appears');
+  assert.equal(u3.requests, 0);
+  assert.equal(u3.revenueCents, 1199);
+
+  const svc = out.find((r) => r.userId.startsWith('(service'));
+  assert.equal(svc.aiCostCents, 2);
+  assert.equal(svc.profitCents, -2);
+  // Service row is always last.
+  assert.equal(out[out.length - 1].userId, svc.userId);
+});
+
 test('computeFinancials: meteredCostCents overrides both estimates', () => {
   const users = [
     { userId: 'a', interactive: 100, generation: 10, paid: true, meteredCostCents: 42 },

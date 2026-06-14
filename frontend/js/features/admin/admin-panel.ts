@@ -15,6 +15,7 @@ import {
   type DangerUser,
   type CostConfig,
   type UsageStats,
+  type UsageExport,
 } from '../../services/admin-service.js';
 // Analytics functions are reached via a namespace import on purpose: this
 // module is lazy-imported when the admin page opens, and a stale browser-cached
@@ -63,6 +64,97 @@ export function initAdminPanel(): void {
   }
   initRetrievalInspector();
   initAdminStats();
+  initUsageExport();
+}
+
+// ── Per-user cost/revenue/profit export (downloadable Excel/CSV report) ───────
+
+function initUsageExport(): void {
+  const btn = document.getElementById('adminExportBtn') as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.addEventListener('click', () => { void downloadUsageReport(btn); });
+}
+
+// Quote a CSV cell, escaping embedded quotes and forcing text/number handling.
+function _csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function _eurNum(cents: number, dp = 2): string {
+  return (cents / 100).toFixed(dp);
+}
+
+function _buildUsageCsv(data: UsageExport): string {
+  const header = [
+    'Email', 'User ID', 'Plan', 'Requests',
+    'Input tokens', 'Cached tokens', 'Output tokens',
+    'AI cost (€)', 'Revenue (€)', 'Payment fees (€)', 'Profit (€)',
+  ];
+  const lines: string[] = [header.map(_csvCell).join(',')];
+  const totals = { requests: 0, prompt: 0, cached: 0, completion: 0, ai: 0, rev: 0, fee: 0, profit: 0 };
+  for (const r of data.rows) {
+    totals.requests += r.requests;
+    totals.prompt += r.promptTokens;
+    totals.cached += r.cachedTokens;
+    totals.completion += r.completionTokens;
+    totals.ai += r.aiCostCents;
+    totals.rev += r.revenueCents;
+    totals.fee += r.feeCents;
+    totals.profit += r.profitCents;
+    lines.push([
+      r.email || '', r.userId, r.paid ? 'Pro' : 'Free', r.requests,
+      r.promptTokens, r.cachedTokens, r.completionTokens,
+      _eurNum(r.aiCostCents, 4), _eurNum(r.revenueCents), _eurNum(r.feeCents), _eurNum(r.profitCents),
+    ].map(_csvCell).join(','));
+  }
+  lines.push([
+    'TOTAL', '', '', totals.requests,
+    totals.prompt, totals.cached, totals.completion,
+    _eurNum(totals.ai, 4), _eurNum(totals.rev), _eurNum(totals.fee), _eurNum(totals.profit),
+  ].map(_csvCell).join(','));
+  return lines.join('\r\n');
+}
+
+async function downloadUsageReport(btn: HTMLButtonElement): Promise<void> {
+  const sel = document.getElementById('adminExportPeriod') as HTMLSelectElement | null;
+  const status = document.getElementById('adminExportStatus');
+  const days = parseInt(sel?.value || '30', 10) || 30;
+  if (typeof adminSvc.getUsageExport !== 'function') {
+    if (status) status.innerHTML = '<div class="adm-empty">Export unavailable — reload the page to pick up the latest admin code.</div>';
+    return;
+  }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Building…';
+  if (status) status.innerHTML = '<div class="adm-empty">Generating report…</div>';
+  try {
+    const data = await adminSvc.getUsageExport(days);
+    if (!data) throw new Error('Request failed');
+    if (!data.available) {
+      if (status) status.innerHTML = '<div class="adm-empty">No meter data. Apply the <code>20260612_000001_usage_events</code> migration first.</div>';
+      return;
+    }
+    const csv = _buildUsageCsv(data);
+    // UTF-8 BOM so Excel opens accented emails / the € sign correctly.
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'minallo-report-last-' + days + 'd-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    if (status) {
+      status.innerHTML = '<div class="adm-empty">Downloaded ' + data.rows.length +
+        ' user row(s) for the last ' + days + ' days.</div>';
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (status) status.innerHTML = '<div class="adm-empty">Export failed: ' + escapeHtml(msg) + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
 }
 
 // ── Analytics dashboard ─────────────────────────────────────────────────────
