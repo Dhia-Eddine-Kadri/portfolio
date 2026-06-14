@@ -327,9 +327,20 @@
     if (!list) return;
     if (empty) empty.style.display = 'none';
     if (wrap)  wrap.style.display = 'none';
+    list.style.display = 'flex';
 
-    if (!_savedNotes.length) {
-      list.style.display = 'flex';
+    // Show only the notes for the file currently open, so each file's saved
+    // notes stay separate instead of every file's notes piling up together.
+    // Fall back to showing all when the document id hasn't resolved yet (older
+    // notes can also lack a document_id), so nothing silently disappears.
+    var scoped = _savedNotes;
+    if (_ctx.documentId) {
+      scoped = _savedNotes.filter(function (n) {
+        return !n.document_id || n.document_id === _ctx.documentId;
+      });
+    }
+
+    if (!scoped.length) {
       list.innerHTML = '<div class="np-empty" style="height:100%">' +
         '<div class="np-empty-icon">&#x1F4DA;</div>' +
         '<div class="np-empty-title">No saved notes</div>' +
@@ -338,22 +349,33 @@
       return;
     }
 
-    list.style.display = 'flex';
-    list.innerHTML = _savedNotes.map(function (n, idx) {
+    function _itemHtml(n) {
       var date = n.created_at ? new Date(n.created_at).toLocaleDateString() : '';
       var pages = (n.source_page_start != null)
         ? 'S. ' + n.source_page_start + (n.source_page_end && n.source_page_end !== n.source_page_start ? '–' + n.source_page_end : '')
         : 'Whole PDF';
-      return '<div class="np-saved-item" data-idx="' + idx + '">' +
+      return '<div class="np-saved-item" data-id="' + _esc(n.id) + '">' +
         '<div class="np-saved-item-title">' + _esc(n.title || 'Untitled') + '</div>' +
         '<div class="np-saved-item-meta">' +
-          '<span class="np-saved-badge np-saved-badge-' + (n.type || 'notes') + '">' + (n.type === 'summary' ? 'Summary' : 'Notes') + '</span>' +
           '<span class="np-saved-pages">' + pages + '</span>' +
           '<span class="np-saved-date">' + date + '</span>' +
         '</div>' +
-        '<button class="np-saved-delete" data-id="' + n.id + '" title="Delete">&#x1F5D1;</button>' +
+        '<button class="np-saved-delete" data-id="' + _esc(n.id) + '" title="Delete">&#x1F5D1;</button>' +
       '</div>';
-    }).join('');
+    }
+
+    // Keep Notes and Summaries in their own labeled groups — never interleaved.
+    function _group(label, arr) {
+      if (!arr.length) return '';
+      return '<div class="np-saved-group">' +
+        '<div class="np-saved-group-title">' + label + ' <span class="np-saved-group-count">' + arr.length + '</span></div>' +
+        arr.map(_itemHtml).join('') +
+      '</div>';
+    }
+
+    var notesItems   = scoped.filter(function (n) { return n.type !== 'summary'; });
+    var summaryItems = scoped.filter(function (n) { return n.type === 'summary'; });
+    list.innerHTML = _group('Notes', notesItems) + _group('Summaries', summaryItems);
   }
 
   function _setStatus(msg, cls) {
@@ -409,8 +431,18 @@
         return n.type === 'notes' || n.type === 'summary';
       });
     } catch (e) { console.warn('[notes-panel] load error:', e); }
-    _currentNote = _notesByType[_activeTab] || null;
-    if (_panelOpen) _renderCurrentTab();
+    if (_panelOpen) {
+      // When the Saved tab is open, re-render the saved LIST. Calling
+      // _renderCurrentTab() here (the old behavior) blanked the list and showed
+      // the empty "No notes yet" editor, so freshly generated notes looked like
+      // they never appeared.
+      if (_activeTab === 'saved') {
+        _renderSavedList();
+      } else {
+        _currentNote = _notesByType[_activeTab] || null;
+        _renderCurrentTab();
+      }
+    }
   }
 
   async function _loadNoteContent(note) {
@@ -645,8 +677,14 @@
         data.note.content_markdown = _stripMarker(data.note.content_markdown);
         _notesByType[_activeTab] = data.note;
         _currentNote = data.note;
+        // Drop any stale optimistic/previous copy of this note, then add the
+        // fresh one with its document_id + content so it shows under the right
+        // file group in Saved and opens instantly without a refetch.
+        _savedNotes = _savedNotes.filter(function (n) { return n.id !== data.note.id; });
         _savedNotes.unshift({
           id: data.note.id, title: data.note.title, type: data.note.type,
+          document_id: data.note.document_id || _ctx.documentId || null,
+          content_markdown: data.note.content_markdown || '',
           source_page_start: data.note.source_page_start, source_page_end: data.note.source_page_end,
           created_at: new Date().toISOString()
         });
@@ -849,10 +887,13 @@
         return;
       }
       if (item) {
-        var idx = parseInt(item.getAttribute('data-idx'), 10);
-        var note = _savedNotes[idx];
+        // Look up by id (not list position): the saved list is grouped and the
+        // array order can change, so an index-based lookup would open the wrong
+        // note — or none at all.
+        var clickedId = item.getAttribute('data-id');
+        var note = _savedNotes.find(function (n) { return String(n.id) === String(clickedId); });
         if (!note) return;
-        // Switch to appropriate tab and load note content
+        // Switch to the matching editor tab and open the note immediately.
         var tab = (note.type === 'summary') ? 'summary' : 'notes';
         _notesByType[tab] = Object.assign({}, note, { content_markdown: note.content_markdown || '' });
         _currentNote = _notesByType[tab];
@@ -862,6 +903,8 @@
         });
         var actionBar = $id('npActionBar');
         if (actionBar) actionBar.style.display = '';
+        var detailRow = $id('npDetailRow');
+        if (detailRow) detailRow.style.display = (tab === 'summary') ? '' : 'none';
         var savedList = $id('npSavedList');
         if (savedList) savedList.style.display = 'none';
         if (!_currentNote.content_markdown) {

@@ -438,6 +438,34 @@
   scrollbar-color: rgba(37,99,235,0.3) transparent;
 }
 
+.np-saved-group { display: flex; flex-direction: column; }
+.np-saved-group + .np-saved-group { margin-top: 6px; }
+
+.np-saved-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  position: sticky;
+  top: 0;
+  background: #12112a;
+  z-index: 1;
+}
+
+.np-saved-group-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.5);
+}
+
 .np-saved-item {
   display: flex;
   align-items: center;
