@@ -306,7 +306,10 @@ async function loadTodaysTasks(force = false): Promise<void> {
           const isDup = mergedMatches.some(
             (x) => x.exerciseFileId === m.exerciseFileId && x.possibleLectureFileId === m.possibleLectureFileId
           );
-          if (!isDup) mergedMatches.push(m);
+          // Pin the owning plan onto the match itself. The confirm/dismiss
+          // endpoint needs a planId; resolving it later by courseId can miss,
+          // which left the Confirm button bound to a no-op.
+          if (!isDup) mergedMatches.push({ ...m, planId: m.planId || resp.planId || '' });
         });
       }
     });
@@ -702,6 +705,11 @@ async function _openTaskSource(task: DailyMissionTask & { _courseId?: string }):
 // back to the AI chat when there's no resolvable file.
 async function _startTask(task: DailyMissionTask & { _courseId?: string }): Promise<void> {
   if (task.status === 'todo') void updateTaskStatus(task.id, 'in_progress');
+  // Exam/quiz tasks should land on the generator that produces the questions
+  // (ExamForge / Quiz), not the source PDF or the generic AI chat. "Start Exam"
+  // means "give me exam questions".
+  const section = _GENERATOR_SECTION_BY_TASK[task.task_type];
+  if (section && task._courseId && await _openCourseSection(task._courseId, section)) return;
   const opened = await _openTaskSource(task);
   if (!opened) _openInAi();
 }
@@ -730,6 +738,45 @@ function _openInAi(): void {
   if (typeof w._navigatePortal === 'function') w._navigatePortal('aipage');
   else if (typeof w.showPortalSection === 'function') w.showPortalSection('aipage');
 }
+
+// Open a course on a specific tool tab (e.g. ExamForge, Quiz). Mirrors the
+// chatbot shell's goToSection wiring so a Daily Mission button lands on the
+// generator that produces the work rather than the generic AI chat. Returns
+// false when the course can't be resolved so the caller can fall back.
+async function _openCourseSection(courseId: string, section: string): Promise<boolean> {
+  if (!courseId) return false;
+  const w = window as unknown as {
+    SEMS?: Record<string, { courses?: Array<{ id?: string }> }>;
+    _SEMS?: Record<string, { courses?: Array<{ id?: string }> }>;
+    setNavActive?: (id: string) => void;
+    showPortalSection?: (name: string) => void;
+    openCourse?: (course: unknown) => void;
+    showCourseSection?: (course: unknown, section: string) => void;
+  };
+  const sems = w.SEMS || w._SEMS || {};
+  let course: { id?: string } | undefined;
+  for (const sem of Object.values(sems)) {
+    course = (sem.courses || []).find((c) => c.id === courseId);
+    if (course) break;
+  }
+  if (!course || typeof w.openCourse !== 'function') return false;
+  await _ensureCourseFilesLoaded(courseId);
+  w.setNavActive?.('pcStudip');
+  w.showPortalSection?.('studip');
+  w.openCourse(course);
+  if (section !== 'files') w.showCourseSection?.(course, section);
+  return true;
+}
+
+// Task types that should open a generator tab instead of a PDF/chat: the user
+// wants exam questions or a quiz, not the source file. Maps each to its course
+// tool tab.
+const _GENERATOR_SECTION_BY_TASK: Record<string, string> = {
+  exam_style_practice: 'examforge',
+  examforge: 'examforge',
+  generate_quiz_if_no_exercises: 'quiz',
+  quiz: 'quiz',
+};
 
 // ─── Widget render ──────────────────────────────────────────────────────────────
 
@@ -897,7 +944,7 @@ function _renderWidget(): void {
         inner += '<div class="dm-widget-matches">';
         inner += '<div class="dm-widget-matches-heading">Suggested pairings</div>';
         visibleMatches.forEach((m) => {
-          const planId = _state.planIdByCourse[m.courseId] ?? '';
+          const planId = m.planId || _state.planIdByCourse[m.courseId] || '';
           inner += '<div class="dm-widget-match-card">';
           inner += '<div class="dm-widget-match-pair">' +
             escapeHtml(m.exerciseFileName) +
@@ -1042,8 +1089,14 @@ function _bindWidgetActions(host: HTMLElement): void {
     const exerciseFileId = btn.getAttribute('data-exercise-file-id');
     const lectureFileId = btn.getAttribute('data-lecture-file-id');
     const planId = btn.getAttribute('data-plan-id');
-    if (!matchAction || !exerciseFileId || !lectureFileId || !planId) return;
+    // Bind whenever we have the pairing + action. planId is validated inside the
+    // click so a missing one surfaces an error instead of a dead button.
+    if (!matchAction || !exerciseFileId || !lectureFileId) return;
     btn.addEventListener('click', () => {
+      if (!planId) {
+        console.error('[DailyMission] cannot confirm pairing: no planId for course', exerciseFileId);
+        return;
+      }
       btn.disabled = true;
       confirmPossibleMatch(planId, exerciseFileId, lectureFileId, matchAction, _state.todayDate)
         .then(() => {

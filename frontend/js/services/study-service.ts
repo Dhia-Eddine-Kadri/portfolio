@@ -25,6 +25,10 @@ export interface PossibleMatch {
   possibleLectureFileName: string;
   confidence: 'medium' | 'low';
   reason: string;
+  // Plan the match belongs to. Attached client-side at merge time so the
+  // confirm/dismiss endpoint always has a planId, even when the per-course
+  // planId map can't resolve it.
+  planId?: string;
 }
 
 export interface DailyMissionResponse {
