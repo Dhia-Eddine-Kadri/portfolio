@@ -42,6 +42,22 @@ test('quiz actions are no longer offered (inline quiz replaces them)', () => {
   assert.ok(!html.includes('<button'));
 });
 
+test('a disallowed action block never leaks its raw JSON as text', () => {
+  // The retired generate_quiz action renders no buttons; the marker + JSON must
+  // vanish entirely, both fenced and unfenced — not show up as chat text.
+  const fenced = renderActions({ actions: [{ action: 'generate_quiz', label: 'Quiz erstellen' }] });
+  assert.ok(!fenced.includes('generate_quiz'));
+  assert.ok(!fenced.includes('minallo-actions'));
+  assert.ok(!fenced.includes('Quiz erstellen'));
+
+  const unfenced = renderMarkdown(
+    'minallo-actions\n\n{"actions":[{"action":"generate_quiz","label":"Quiz erstellen"}]}'
+  );
+  assert.ok(!unfenced.includes('generate_quiz'));
+  assert.ok(!unfenced.includes('Quiz erstellen'));
+  assert.ok(!unfenced.includes('actions'));
+});
+
 test('unknown action ids are dropped; all-unknown renders nothing', () => {
   const mixed = renderActions({
     actions: [

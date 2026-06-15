@@ -1597,11 +1597,18 @@ export function renderMarkdown(text: string): string {
           if (depth <= 0) { closed = true; break; }
         }
         if (closed) {
-          const isQuiz = /quiz/i.test(_bareMarker[1] ?? '');
           const json = jsonLines.join('\n');
-          const html = isQuiz ? renderQuizBlock(json) : renderActionButtons(json);
-          if (html) {
-            out.push(html);
+          // Only swallow the marker + JSON when it actually parses as JSON —
+          // otherwise a stray "minallo-actions" word in prose followed by an
+          // unrelated `{…}` shouldn't be eaten. Once it parses, consume it
+          // REGARDLESS of whether it renders anything: a block whose actions
+          // are all disallowed (e.g. the retired generate_quiz) renders to ''
+          // and must vanish, never leak its raw JSON into the chat as text.
+          let isJson = false;
+          try { JSON.parse(json); isJson = true; } catch { isJson = false; }
+          if (isJson) {
+            const isQuiz = /quiz/i.test(_bareMarker[1] ?? '');
+            out.push(isQuiz ? renderQuizBlock(json) : renderActionButtons(json));
             i = j + 1;
             continue;
           }
