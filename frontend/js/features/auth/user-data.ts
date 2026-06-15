@@ -30,11 +30,23 @@ interface SubscriptionRow {
 }
 
 let _presenceTimer: ReturnType<typeof setInterval> | null = null;
+let _presenceUid: string | null = null;
 let _courseLoadTimer: ReturnType<typeof setTimeout> | null = null;
+
+// loadUserData de-dup: _enterApp can fire many times in a short window (initial
+// sign-in + session restore + token refresh + repeated SIGNED_IN events), and
+// each full run sends two profiles PATCHes plus admin/notes/subscription
+// fetches. Without a guard this snowballs into a request storm that exhausts
+// the browser connection pool and starves real data fetches (e.g. flashcard
+// decks). Skip a redundant run for the same uid within this window.
+let _lastLoadUid: string | null = null;
+let _lastLoadAt = 0;
+const _LOAD_DEDUP_MS = 30000;
 
 function stopPresenceHeartbeat(): void {
   if (_presenceTimer) clearInterval(_presenceTimer);
   _presenceTimer = null;
+  _presenceUid = null;
 }
 
 function stopHeartbeatOnUnauthorized(response: Response): void {
@@ -51,7 +63,12 @@ function scheduleUserCoursesLoad(courses: unknown, delay = 1200): void {
 }
 
 export function startPresenceHeartbeat(uid: string): void {
+  // Already beating for this user — don't fire another immediate beat or stack
+  // a second interval. This is the single biggest source of the profiles PATCH
+  // storm when _enterApp re-runs.
+  if (_presenceTimer && _presenceUid === uid) return;
   stopPresenceHeartbeat();
+  _presenceUid = uid;
   function _beat(): void {
     const token = window._sbToken;
     if (!uid || !token) return;
@@ -67,6 +84,13 @@ export function startPresenceHeartbeat(uid: string): void {
 }
 
 export async function loadUserData(uid: string): Promise<void> {
+  // De-dup redundant runs from rapid repeated _enterApp / SIGNED_IN events.
+  // The first run applies profile/settings/subscription and starts the
+  // heartbeat; re-running within the window only re-spams the network.
+  const _now = Date.now();
+  if (uid && uid === _lastLoadUid && _now - _lastLoadAt < _LOAD_DEDUP_MS) return;
+  _lastLoadUid = uid;
+  _lastLoadAt = _now;
   try {
     try {
       const cached = localStorage.getItem('profile_cache_' + uid);
