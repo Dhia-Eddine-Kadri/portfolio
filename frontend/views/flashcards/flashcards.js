@@ -188,7 +188,6 @@
         '<div class="fc-study-header">' +
           '<span class="fc-study-icon">&#x1F4DA;</span>' +
           '<div class="fc-study-meta"><div class="fc-study-deck-name" id="fcStudyName">Select a deck</div><div class="fc-study-deck-count" id="fcStudyCount">0 cards</div></div>' +
-          '<button class="fc-btn fc-btn-secondary fc-study-settings" id="fcStudySettingsBtn" type="button"><span class="fc-btn-icon">&#x2699;</span> Study settings</button>' +
         '</div>' +
         '<div class="fc-card-stage" id="fcCardStage"><div class="fc-card-empty">Pick a deck to start studying.</div></div>' +
         '<div class="fc-study-progress">' +
@@ -230,8 +229,6 @@
     if (name) name.textContent = _t('fc_select_deck');
     var count = root.querySelector('#fcStudyCount');
     if (count) count.textContent = _t('fc_zero_cards');
-    var settings = root.querySelector('#fcStudySettingsBtn');
-    if (settings) settings.textContent = _t('fc_study_settings');
     var pick = root.querySelector('.fc-card-empty');
     if (pick) pick.textContent = _t('fc_pick_deck');
     var prev = root.querySelector('#fcPrevBtn');
@@ -358,7 +355,6 @@
       sort: root.querySelector('#fcSortSelect'),
       studyName: root.querySelector('#fcStudyName'),
       studyCount: root.querySelector('#fcStudyCount'),
-      studySettings: root.querySelector('#fcStudySettingsBtn'),
       cardStage: root.querySelector('#fcCardStage'),
       progressBar: root.querySelector('#fcStudyProgressBar'),
       progressLabel: root.querySelector('#fcStudyProgressLabel'),
@@ -976,9 +972,6 @@
     });
 
     if (els.generate) els.generate.addEventListener('click', function() {
-      _showSettingsModal(function(settings) { _pickSourcesThenGenerate(settings); });
-    });
-    if (els.studySettings) els.studySettings.addEventListener('click', function() {
       _showSettingsModal(function(settings) { _pickSourcesThenGenerate(settings); });
     });
     if (els.newDeck) els.newDeck.addEventListener('click', function () {
