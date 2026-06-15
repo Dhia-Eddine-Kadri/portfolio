@@ -1402,6 +1402,40 @@ export function renderMarkdown(text: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
+    // Defensive fallback: the model is told to wrap actions in a
+    // ```minallo-actions fenced block, but it sometimes drops the fences and
+    // emits a bare `minallo-actions` marker line followed by the JSON. Without
+    // this, the marker word + raw JSON leak into the chat as plain text. Detect
+    // the unfenced form, gather the brace-balanced JSON that follows, and run it
+    // through the same renderActionButtons path. If it doesn't parse to real
+    // buttons we leave `i` untouched so the marker falls through to normal text.
+    if (/^\s*(minallo-actions|actions-json)\s*$/i.test(line)) {
+      let j = i + 1;
+      while (j < lines.length && (lines[j] ?? '').trim() === '') j++; // skip blanks
+      if (j < lines.length && (lines[j] ?? '').trim().startsWith('{')) {
+        const jsonLines: string[] = [];
+        let depth = 0;
+        let closed = false;
+        for (; j < lines.length; j++) {
+          const l = lines[j] ?? '';
+          jsonLines.push(l);
+          for (const ch of l) {
+            if (ch === '{') depth++;
+            else if (ch === '}') depth--;
+          }
+          if (depth <= 0) { closed = true; break; }
+        }
+        if (closed) {
+          const html = renderActionButtons(jsonLines.join('\n'));
+          if (html) {
+            out.push(html);
+            i = j + 1;
+            continue;
+          }
+        }
+      }
+    }
+
     if (/^\s*\\\[/.test(line)) {
       const mathLines: string[] = [];
       if (/\\\]/.test(line)) {

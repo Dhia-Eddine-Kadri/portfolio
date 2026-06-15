@@ -61,6 +61,33 @@ test('at most 3 buttons render', () => {
   assert.equal((html.match(/<button /g) || []).length, 3);
 });
 
+test('unfenced minallo-actions marker still renders buttons', () => {
+  // The model sometimes drops the code fences and emits a bare marker line
+  // followed by the JSON; it must not leak into the chat as plain text.
+  const html = renderMarkdown(
+    'Here you go:\n\nminallo-actions\n\n{"actions":[{"action":"generate_quiz","label":"Quiz erstellen"}]}'
+  );
+  assert.ok(html.includes('md-ai-actions'));
+  assert.ok(html.includes('data-ai-action="generate_quiz"'));
+  assert.ok(html.includes('Quiz erstellen'));
+  assert.ok(!html.includes('minallo-actions{'));
+  assert.ok(!html.includes('&quot;actions&quot;')); // raw JSON did not leak as text
+});
+
+test('unfenced multi-line minallo-actions JSON renders buttons', () => {
+  const html = renderMarkdown(
+    'minallo-actions\n{\n  "actions": [\n    {"action":"open_quiz","label":"Quiz öffnen"}\n  ]\n}'
+  );
+  assert.ok(html.includes('data-ai-action="open_quiz"'));
+  assert.ok(html.includes('Quiz öffnen'));
+});
+
+test('bare minallo-actions marker with no JSON falls through to text', () => {
+  const html = renderMarkdown('minallo-actions\n\nSome other prose.');
+  assert.ok(!html.includes('md-ai-actions'));
+  assert.ok(html.includes('Some other prose.'));
+});
+
 test('HTML in labels is escaped (no injection)', () => {
   const html = renderActions({
     actions: [{ action: 'open_quiz', label: '<img src=x onerror=alert(1)>' }],
