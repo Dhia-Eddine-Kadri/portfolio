@@ -192,6 +192,53 @@ body:not(.night) .co-files-loading {
 }
 .md-ai-action:hover { background: rgba(37, 99, 235, 0.3); transform: translateY(-1px); }
 .md-ai-action:disabled { cursor: default; opacity: 0.6; transform: none; }
+/* Interactive inline quiz the AI builds inside the chat (minallo-quiz block). */
+.md-quiz {
+  margin: 12px 0; padding: 12px; border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.md-quiz-head {
+  font-weight: 800; font-size: 0.82rem; letter-spacing: 0.02em;
+  color: #cbd5e1; opacity: 0.9;
+}
+.md-quiz-q { display: flex; flex-direction: column; gap: 8px; }
+.md-quiz-question { font-weight: 700; font-size: 0.92rem; line-height: 1.4; color: #e2e8f0; }
+.md-quiz-opts { display: flex; flex-direction: column; gap: 6px; }
+.md-quiz-opt {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.5); color: #e2e8f0;
+  font-size: 0.88rem; line-height: 1.35;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.md-quiz-opt:hover:not(:disabled) { background: rgba(37, 99, 235, 0.22); border-color: rgba(37, 99, 235, 0.5); }
+.md-quiz-opt:disabled { cursor: default; }
+.md-quiz-letter {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.74rem;
+  background: rgba(148, 163, 184, 0.2); color: #cbd5e1;
+}
+.md-quiz-opt-text { flex: 1 1 auto; min-width: 0; }
+.md-quiz-opt.correct {
+  background: rgba(34, 197, 94, 0.18); border-color: rgba(34, 197, 94, 0.6); color: #bbf7d0;
+}
+.md-quiz-opt.correct .md-quiz-letter { background: rgba(34, 197, 94, 0.5); color: #f0fdf4; }
+.md-quiz-opt.incorrect {
+  background: rgba(239, 68, 68, 0.16); border-color: rgba(239, 68, 68, 0.55); color: #fecaca;
+}
+.md-quiz-opt.incorrect .md-quiz-letter { background: rgba(239, 68, 68, 0.5); color: #fef2f2; }
+.md-quiz-explain {
+  font-size: 0.82rem; line-height: 1.45; color: #cbd5e1;
+  padding: 8px 10px; border-radius: 8px; background: rgba(148, 163, 184, 0.1);
+}
+.md-quiz-score {
+  align-self: flex-start; font-weight: 800; font-size: 0.85rem; color: #93c5fd;
+  padding: 6px 12px; border-radius: 999px; background: rgba(37, 99, 235, 0.16);
+}
 /* The input form is lifted into this centered modal (popup) by ai-markdown.ts. */
 .md-ai-input-modal-backdrop {
   position: fixed; inset: 0; z-index: 10050;

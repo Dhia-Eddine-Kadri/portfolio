@@ -49,14 +49,15 @@ _TAB_LABELS = {
 
 # Actions the model may offer as clickable buttons (```minallo-actions``` block).
 # Must stay in sync with the frontend allowlist in ai-markdown.ts.
+# Quiz actions (open_quiz / generate_quiz) are intentionally omitted: the model
+# builds an interactive quiz INLINE in the chat via a ```minallo-quiz block (see
+# QUIZ_CONTRACT) instead of sending the student to the Quiz tab.
 ALLOWED_AI_ACTIONS = (
     "open_files",
-    "open_quiz",
     "open_flashcards",
     "open_examforge",
     "open_cheatsheet",
     "open_deep_learn",
-    "generate_quiz",
     "generate_flashcards",
     "generate_cheatsheet",
     "generate_examforge_exam",
@@ -647,11 +648,40 @@ help, you may end the answer with ONE fenced block of clickable actions:
 ```
 
 Rules:
-- Allowed action ids ONLY: open_files, open_quiz, open_flashcards,
-  open_examforge, open_cheatsheet, open_deep_learn, generate_quiz,
+- Allowed action ids ONLY: open_files, open_flashcards,
+  open_examforge, open_cheatsheet, open_deep_learn,
   generate_flashcards, generate_cheatsheet, generate_examforge_exam,
   start_deeplearn, create_study_plan, review_weak_topics.
 - At most 3 actions. Labels ≤ 40 chars, in the student's language.
 - The block must be the LAST thing in the answer, after the prose.
 - Never emit the block for pure content questions that need no follow-up.
+- NEVER offer a quiz action button (there is none). When the student wants a
+  quiz, build it inline per the QUIZ block contract below instead.
+"""
+
+# Contract for an inline, interactive quiz. Mirrored by the frontend renderer
+# (ai-markdown.ts `minallo-quiz` block). The student takes the quiz right in the
+# chat — DO NOT tell them to open the Quiz tab or click a Generate button.
+QUIZ_CONTRACT = """
+
+QUIZ — when the student asks to do/take/make a quiz (or to test/practise
+themselves) on the material in context, BUILD IT INLINE. Generate the questions
+yourself from the source content and end your answer with ONE fenced quiz block:
+
+```minallo-quiz
+{"title":"<short topic title>","questions":[
+  {"q":"<question>","options":["<A>","<B>","<C>","<D>"],"answer":0,"explanation":"<why the answer is correct>"}
+]}
+```
+
+Rules:
+- Multiple-choice only: 2–4 options per question. "answer" is the 0-based index
+  of the correct option. Always include a short "explanation".
+- 3–8 questions unless the student asks for a specific number (cap 12).
+- Base every question strictly on the source material in context; never invent
+  facts. If there is no usable content, say so and do NOT emit the block.
+- Write questions, options and explanations in the student's language.
+- A short one-line intro before the block is fine; the block must be LAST.
+- Do NOT send the student to the Quiz tab and do NOT offer a quiz action button
+  — the inline quiz IS the quiz.
 """

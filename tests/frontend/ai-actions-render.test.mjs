@@ -18,14 +18,28 @@ test('valid minallo-actions renders allowlisted buttons', () => {
   const html = renderActions({
     actions: [
       { action: 'generate_flashcards', label: 'Generate flashcards' },
-      { action: 'open_quiz', label: 'Open Quiz' },
+      { action: 'open_flashcards', label: 'Open Flashcards' },
     ],
   });
   assert.ok(html.includes('md-ai-actions'));
   assert.ok(html.includes('data-ai-action="generate_flashcards"'));
-  assert.ok(html.includes('data-ai-action="open_quiz"'));
+  assert.ok(html.includes('data-ai-action="open_flashcards"'));
   assert.ok(html.includes('Generate flashcards'));
   assert.equal((html.match(/<button /g) || []).length, 2);
+});
+
+test('quiz actions are no longer offered (inline quiz replaces them)', () => {
+  assert.equal(AI_ACTION_TABS.open_quiz, undefined);
+  assert.equal(AI_ACTION_TABS.generate_quiz, undefined);
+  // A model that still emits them must render nothing — they are not allowlisted.
+  const html = renderActions({
+    actions: [
+      { action: 'open_quiz', label: 'Quiz öffnen' },
+      { action: 'generate_quiz', label: 'Quiz erstellen' },
+    ],
+  });
+  assert.ok(!html.includes('md-ai-actions'));
+  assert.ok(!html.includes('<button'));
 });
 
 test('unknown action ids are dropped; all-unknown renders nothing', () => {
@@ -53,7 +67,7 @@ test('at most 3 buttons render', () => {
   const html = renderActions({
     actions: [
       { action: 'open_files', label: 'a' },
-      { action: 'open_quiz', label: 'b' },
+      { action: 'open_cheatsheet', label: 'b' },
       { action: 'open_flashcards', label: 'c' },
       { action: 'open_examforge', label: 'd' },
     ],
@@ -65,21 +79,21 @@ test('unfenced minallo-actions marker still renders buttons', () => {
   // The model sometimes drops the code fences and emits a bare marker line
   // followed by the JSON; it must not leak into the chat as plain text.
   const html = renderMarkdown(
-    'Here you go:\n\nminallo-actions\n\n{"actions":[{"action":"generate_quiz","label":"Quiz erstellen"}]}'
+    'Here you go:\n\nminallo-actions\n\n{"actions":[{"action":"generate_flashcards","label":"Karten erstellen"}]}'
   );
   assert.ok(html.includes('md-ai-actions'));
-  assert.ok(html.includes('data-ai-action="generate_quiz"'));
-  assert.ok(html.includes('Quiz erstellen'));
+  assert.ok(html.includes('data-ai-action="generate_flashcards"'));
+  assert.ok(html.includes('Karten erstellen'));
   assert.ok(!html.includes('minallo-actions{'));
   assert.ok(!html.includes('&quot;actions&quot;')); // raw JSON did not leak as text
 });
 
 test('unfenced multi-line minallo-actions JSON renders buttons', () => {
   const html = renderMarkdown(
-    'minallo-actions\n{\n  "actions": [\n    {"action":"open_quiz","label":"Quiz öffnen"}\n  ]\n}'
+    'minallo-actions\n{\n  "actions": [\n    {"action":"open_flashcards","label":"Karten öffnen"}\n  ]\n}'
   );
-  assert.ok(html.includes('data-ai-action="open_quiz"'));
-  assert.ok(html.includes('Quiz öffnen'));
+  assert.ok(html.includes('data-ai-action="open_flashcards"'));
+  assert.ok(html.includes('Karten öffnen'));
 });
 
 test('bare minallo-actions marker with no JSON falls through to text', () => {
@@ -90,14 +104,14 @@ test('bare minallo-actions marker with no JSON falls through to text', () => {
 
 test('HTML in labels is escaped (no injection)', () => {
   const html = renderActions({
-    actions: [{ action: 'open_quiz', label: '<img src=x onerror=alert(1)>' }],
+    actions: [{ action: 'open_flashcards', label: '<img src=x onerror=alert(1)>' }],
   });
   assert.ok(!html.includes('<img src=x'));
   assert.ok(html.includes('&lt;img'));
 });
 
 test('a missing or empty label drops the button', () => {
-  const html = renderActions({ actions: [{ action: 'open_quiz' }, { action: 'open_files', label: '  ' }] });
+  const html = renderActions({ actions: [{ action: 'open_flashcards' }, { action: 'open_files', label: '  ' }] });
   assert.ok(!html.includes('<button'));
 });
 
@@ -112,6 +126,63 @@ test('ask actions compose non-empty follow-up questions', () => {
   for (const [action, text] of Object.entries(AI_ASK_ACTIONS)) {
     assert.ok(typeof text === 'string' && text.trim().length > 10, action);
   }
+});
+
+function renderQuiz(spec) {
+  return renderMarkdown('```minallo-quiz\n' + JSON.stringify(spec) + '\n```');
+}
+
+test('minallo-quiz renders an interactive quiz with options and answers', () => {
+  const html = renderQuiz({
+    title: 'Sandguss',
+    questions: [
+      {
+        q: 'Welcher Formgrundstoff?',
+        options: ['Wasser', 'Bentonit', 'Quarzsand'],
+        answer: 2,
+        explanation: 'Quarzsand ist der Formgrundstoff.',
+      },
+    ],
+  });
+  assert.ok(html.includes('class="md-quiz"'));
+  assert.ok(html.includes('data-answer="2"'));
+  assert.ok(html.includes('md-quiz-opt'));
+  assert.ok(html.includes('Quarzsand'));
+  assert.ok(html.includes('md-quiz-explain'));
+  assert.equal((html.match(/data-idx=/g) || []).length, 3); // three options
+});
+
+test('minallo-quiz accepts a letter answer and normalises to an index', () => {
+  const html = renderQuiz({
+    questions: [{ q: 'Q?', options: ['x', 'y', 'z'], answer: 'B' }],
+  });
+  assert.ok(html.includes('data-answer="1"'));
+});
+
+test('minallo-quiz drops questions with too few options and bad JSON renders nothing', () => {
+  const oneOpt = renderQuiz({ questions: [{ q: 'Q?', options: ['only'], answer: 0 }] });
+  assert.ok(!oneOpt.includes('md-quiz'));
+
+  const broken = renderMarkdown('```minallo-quiz\n{not valid,,,\n```');
+  assert.ok(!broken.includes('md-quiz'));
+});
+
+test('unfenced minallo-quiz marker still renders the quiz', () => {
+  const html = renderMarkdown(
+    'Hier dein Quiz:\n\nminallo-quiz\n\n{"questions":[{"q":"Q?","options":["a","b"],"answer":1}]}'
+  );
+  assert.ok(html.includes('class="md-quiz"'));
+  assert.ok(html.includes('data-answer="1"'));
+  assert.ok(!html.includes('minallo-quiz{'));
+});
+
+test('minallo-quiz escapes HTML in questions/options (no injection)', () => {
+  const html = renderQuiz({
+    questions: [{ q: '<img src=x onerror=alert(1)>', options: ['<b>a</b>', 'b'], answer: 0 }],
+  });
+  assert.ok(!html.includes('<img src=x'));
+  assert.ok(!html.includes('<b>a</b>'));
+  assert.ok(html.includes('&lt;'));
 });
 
 test('every generate-button action is a known tab action with a CSS selector', () => {

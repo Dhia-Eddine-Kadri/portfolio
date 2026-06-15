@@ -48,7 +48,12 @@ from .document_context import understanding_block_for_ids
 from .retrieval import RetrievedChunk
 from .storage import download_document_bytes
 from .usage_meter import record_usage, usage_from_response
-from .workspace_context import ACTIONS_CONTRACT, EXAM_COACH_OVERLAY, TUTOR_STRUCTURE_OVERLAY
+from .workspace_context import (
+    ACTIONS_CONTRACT,
+    EXAM_COACH_OVERLAY,
+    QUIZ_CONTRACT,
+    TUTOR_STRUCTURE_OVERLAY,
+)
 
 log = logging.getLogger(__name__)
 
@@ -1126,6 +1131,7 @@ def stream_answer(
         system_prompt += "\n" + workspace_block
         if not problem_solver:
             system_prompt += ACTIONS_CONTRACT
+            system_prompt += QUIZ_CONTRACT
     if assistant_mode == "exam_coach":
         system_prompt += EXAM_COACH_OVERLAY
     elif assistant_mode == "tutor" and not app_question:

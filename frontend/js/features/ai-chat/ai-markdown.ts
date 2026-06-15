@@ -372,14 +372,15 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 //     `minallo-ai-input-submit` event; the per-surface listeners route it
 //     through their own send path exactly like minallo-input forms.
 // Action ids must stay in sync with ALLOWED_AI_ACTIONS on the backend.
+// Quiz actions are intentionally absent: the AI builds an interactive quiz
+// inline in the chat (```minallo-quiz block) instead of sending the student to
+// the Quiz tab, so neither open_quiz nor generate_quiz is offered here.
 export const AI_ACTION_TABS: Record<string, string> = {
   open_files: 'files',
-  open_quiz: 'quiz',
   open_flashcards: 'flashcards',
   open_examforge: 'examforge',
   open_cheatsheet: 'cheatsheet',
   open_deep_learn: 'deeplearn',
-  generate_quiz: 'quiz',
   generate_flashcards: 'flashcards',
   generate_cheatsheet: 'cheatsheet',
   generate_examforge_exam: 'examforge',
@@ -395,7 +396,6 @@ export const AI_ASK_ACTIONS: Record<string, string> = {
 // actually starts generation instead of dumping them on the tab with a
 // "now click Generate yourself" toast. Keep ids in sync with the feature views.
 export const AI_ACTION_GENERATE_BTN: Record<string, string> = {
-  generate_quiz: '#qzGenerateBtn',
   generate_flashcards: '#fcGenerateBtn',
   generate_examforge_exam: '#efGenerateBtn',
   generate_cheatsheet: '#csGenerate',
@@ -476,6 +476,59 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         if (genSel) _clickGenerateWhenReady(genSel);
       } else if (typeof window.showToast === 'function') {
         window.showToast('Open a course first', 'Go to Courses and open the course, then try again.');
+      }
+    });
+  }
+}
+
+// Delegated handler for the inline interactive quiz (`minallo-quiz` block). The
+// quiz is self-contained — questions + correct answers live in the rendered
+// DOM (data-answer per question), so answering, revealing right/wrong, showing
+// the explanation and tallying the score all happen here, client-side. One-time
+// bound, idempotent across re-imports.
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const _w = window as unknown as { _ssAiQuizBound?: boolean };
+  if (!_w._ssAiQuizBound) {
+    _w._ssAiQuizBound = true;
+    document.addEventListener('click', (ev) => {
+      const opt = (ev.target as Element | null)?.closest?.(
+        '.md-quiz-opt'
+      ) as HTMLButtonElement | null;
+      if (!opt) return;
+      const qEl = opt.closest<HTMLElement>('.md-quiz-q');
+      const quiz = opt.closest<HTMLElement>('.md-quiz');
+      if (!qEl || !quiz || qEl.dataset.answered != null) return; // one shot per question
+
+      const correct = Number(qEl.dataset.answer);
+      const chosen = Number(opt.dataset.idx);
+      qEl.dataset.answered = String(chosen);
+
+      qEl.querySelectorAll<HTMLButtonElement>('.md-quiz-opt').forEach((b) => {
+        b.disabled = true;
+        const idx = Number(b.dataset.idx);
+        if (idx === correct) b.classList.add('correct');
+        else if (idx === chosen) b.classList.add('incorrect');
+      });
+      const explain = qEl.querySelector<HTMLElement>('.md-quiz-explain');
+      if (explain) explain.hidden = false;
+
+      // Re-tally: count answered questions that were answered correctly.
+      const all = quiz.querySelectorAll<HTMLElement>('.md-quiz-q');
+      let answered = 0;
+      let right = 0;
+      all.forEach((q) => {
+        if (q.dataset.answered == null) return;
+        answered++;
+        if (Number(q.dataset.answered) === Number(q.dataset.answer)) right++;
+      });
+      const score = quiz.querySelector<HTMLElement>('.md-quiz-score');
+      if (score) {
+        const total = Number(score.dataset.total) || all.length;
+        score.hidden = false;
+        const done = answered === total;
+        score.innerHTML =
+          '<b>' + right + '</b> / ' + total + ' correct' +
+          (done ? (right === total ? ' 🎉' : '') : ' · ' + (total - answered) + ' left');
       }
     });
   }
@@ -1398,6 +1451,86 @@ export function renderMarkdown(text: string): string {
     }
   }
 
+  // Render a `minallo-quiz` block — an interactive multiple-choice quiz the AI
+  // generates inline, right inside the chat bubble. The questions and answers
+  // live entirely in the JSON, so taking the quiz is fully client-side (no
+  // navigation to the Quiz tab, no server round-trip): the delegated click
+  // handler reveals correct/incorrect, shows the explanation and tallies score.
+  // Malformed JSON renders nothing so the prose above still stands alone.
+  function renderQuizBlock(raw: string): string {
+    const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+    try {
+      const spec = JSON.parse(raw) as {
+        title?: string;
+        questions?: Array<{
+          q?: string; question?: string;
+          options?: unknown; choices?: unknown;
+          answer?: unknown; correct?: unknown;
+          explanation?: string;
+        }>;
+      };
+      const rawQs = Array.isArray(spec.questions) ? spec.questions : [];
+      const cards: string[] = [];
+      rawQs.slice(0, 20).forEach((item) => {
+        if (!item) return;
+        const qText = (typeof item.q === 'string' ? item.q : item.question) || '';
+        const optsRaw = item.options ?? item.choices;
+        if (!qText.trim() || !Array.isArray(optsRaw)) return;
+        const opts = optsRaw
+          .map((o) => (o == null ? '' : String(o)))
+          .filter((o) => o.trim())
+          .slice(0, 6);
+        if (opts.length < 2) return;
+        // answer may be a 0-based index or a letter ('A'…'F').
+        const ans = item.answer ?? item.correct;
+        let ansIdx = -1;
+        if (typeof ans === 'number') ansIdx = ans;
+        else if (typeof ans === 'string') {
+          const m = ans.trim().toUpperCase().match(/^([A-F])/);
+          if (m) ansIdx = LETTERS.indexOf(m[1] ?? '');
+          else {
+            const hit = opts.map((o) => o.trim().toLowerCase()).indexOf(ans.trim().toLowerCase());
+            ansIdx = hit;
+          }
+        }
+        if (ansIdx < 0 || ansIdx >= opts.length) ansIdx = 0;
+        const optsHtml = opts
+          .map(
+            (o, i) =>
+              '<button type="button" class="md-quiz-opt" data-idx="' + i + '">' +
+              '<span class="md-quiz-letter">' + (LETTERS[i] || String(i + 1)) + '</span>' +
+              '<span class="md-quiz-opt-text">' + inline(o) + '</span>' +
+              '</button>'
+          )
+          .join('');
+        const explain = typeof item.explanation === 'string' && item.explanation.trim()
+          ? '<div class="md-quiz-explain" hidden>💡 ' + inline(item.explanation) + '</div>'
+          : '';
+        cards.push(
+          '<div class="md-quiz-q" data-answer="' + ansIdx + '">' +
+            '<div class="md-quiz-question">' + inline(qText) + '</div>' +
+            '<div class="md-quiz-opts">' + optsHtml + '</div>' +
+            explain +
+          '</div>'
+        );
+      });
+      if (!cards.length) return '';
+      const title = typeof spec.title === 'string' && spec.title.trim()
+        ? esc(spec.title.trim().slice(0, 120))
+        : 'Quiz';
+      return (
+        '<div class="md-quiz" data-quiz role="group" aria-label="Quiz">' +
+          '<div class="md-quiz-head">📋 <span>' + title + ' · ' + cards.length +
+            (cards.length === 1 ? ' question' : ' questions') + '</span></div>' +
+          cards.join('') +
+          '<div class="md-quiz-score" data-total="' + cards.length + '" hidden></div>' +
+        '</div>'
+      );
+    } catch {
+      return '';
+    }
+  }
+
   function inline(s: string): string {
     // Stash already-rendered math (and code spans) under sentinel placeholders
     // BEFORE escaping, so their trusted HTML survives the esc() pass that
@@ -1437,14 +1570,17 @@ export function renderMarkdown(text: string): string {
   while (i < lines.length) {
     const line = lines[i] ?? '';
 
-    // Defensive fallback: the model is told to wrap actions in a
-    // ```minallo-actions fenced block, but it sometimes drops the fences and
-    // emits a bare `minallo-actions` marker line followed by the JSON. Without
-    // this, the marker word + raw JSON leak into the chat as plain text. Detect
-    // the unfenced form, gather the brace-balanced JSON that follows, and run it
-    // through the same renderActionButtons path. If it doesn't parse to real
-    // buttons we leave `i` untouched so the marker falls through to normal text.
-    if (/^\s*(minallo-actions|actions-json)\s*$/i.test(line)) {
+    // Defensive fallback: the model is told to wrap actions/quizzes in a fenced
+    // block (```minallo-actions / ```minallo-quiz), but it sometimes drops the
+    // fences and emits a bare marker line followed by the JSON. Without this the
+    // marker word + raw JSON leak into the chat as plain text. Detect the
+    // unfenced form, gather the brace-balanced JSON that follows, and run it
+    // through the matching renderer. If it doesn't parse to real output we leave
+    // `i` untouched so the marker falls through to normal text.
+    const _bareMarker = line
+      .trim()
+      .match(/^(minallo-actions|actions-json|minallo-quiz|quiz-json)$/i);
+    if (_bareMarker) {
       let j = i + 1;
       while (j < lines.length && (lines[j] ?? '').trim() === '') j++; // skip blanks
       if (j < lines.length && (lines[j] ?? '').trim().startsWith('{')) {
@@ -1461,7 +1597,9 @@ export function renderMarkdown(text: string): string {
           if (depth <= 0) { closed = true; break; }
         }
         if (closed) {
-          const html = renderActionButtons(jsonLines.join('\n'));
+          const isQuiz = /quiz/i.test(_bareMarker[1] ?? '');
+          const json = jsonLines.join('\n');
+          const html = isQuiz ? renderQuizBlock(json) : renderActionButtons(json);
           if (html) {
             out.push(html);
             i = j + 1;
@@ -1535,6 +1673,11 @@ export function renderMarkdown(text: string): string {
       }
       if (/^(minallo-actions|actions-json)$/i.test(lang)) {
         out.push(renderActionButtons(code.join('\n')));
+        i++;
+        continue;
+      }
+      if (/^(minallo-quiz|quiz-json)$/i.test(lang)) {
+        out.push(renderQuizBlock(code.join('\n')));
         i++;
         continue;
       }
