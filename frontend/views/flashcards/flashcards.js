@@ -290,6 +290,14 @@
     });
   }
 
+  // Card text for display: escape, then turn the generator's line breaks into
+  // <br>. Models often emit a literal two-char "\n" (backslash-n) as well as
+  // real newlines; both should render as a break instead of running together
+  // or showing "\n" verbatim.
+  function _fcCardHtml(s) {
+    return _esc(s).replace(/\\n|\r\n|\r|\n/g, '<br>');
+  }
+
   function _initShell(root, course, options) {
     var courseId = (course && course.id) || 'unknown';
     if (course && course.id) root.dataset.courseId = course.id;
@@ -303,6 +311,7 @@
       sort: root.querySelector('#fcSortSelect'),
       studyName: root.querySelector('#fcStudyName'),
       studyCount: root.querySelector('#fcStudyCount'),
+      studySettings: root.querySelector('#fcStudySettingsBtn'),
       cardStage: root.querySelector('#fcCardStage'),
       progressBar: root.querySelector('#fcStudyProgressBar'),
       progressLabel: root.querySelector('#fcStudyProgressLabel'),
@@ -477,9 +486,12 @@
         els.cardStage.innerHTML =
           '<div class="fc-card-progress-pill">Card ' + (pos + 1) + ' / ' + sessionLen + '</div>' +
           '<div class="fc-card-source">' + _esc(source) + '</div>' +
-          '<div class="fc-card-content">' + _esc(content) + '</div>' +
+          '<div class="fc-card-content">' + _fcCardHtml(content) + '</div>' +
           ratingHtml;
-        var _katexOpts = { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }], throwOnError: false };
+        // strict:false lets KaTeX RENDER stray Unicode (φ, ∑, …) that the
+        // generator sometimes emits inside math mode instead of dumping the raw
+        // source in red error text.
+        var _katexOpts = { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }], throwOnError: false, strict: false };
         var _doMath = function() { if (window.renderMathInElement) try { renderMathInElement(els.cardStage, _katexOpts); } catch(e) {} };
         if (window.renderMathInElement) { _doMath(); }
         else if (window._ssEnsureKatex) { window._ssEnsureKatex().then(_doMath).catch(function(){}); }
@@ -866,9 +878,23 @@
     }
 
     // ── Study controls ──
+    // Deck progress (last_studied_at / study_progress) is soft metadata, not
+    // something that needs a DB write on every single flip/next/rate. Writing
+    // per interaction turned rapid (or accidentally repeated) study actions into
+    // a flashcard_decks PATCH storm that exhausted the connection pool. Update
+    // local state immediately and debounce the persistence into one trailing
+    // write per burst.
+    var _bumpTimers = {};
     function bumpStudied(d) {
+      if (!d) return;
       d.lastStudied = new Date().toISOString();
-      _dbUpdateDeck(d._dbId, { last_studied_at: d.lastStudied, study_progress: d.progress || 0, updated_at: d.lastStudied });
+      if (!d._dbId) return;
+      var key = d._dbId;
+      if (_bumpTimers[key]) clearTimeout(_bumpTimers[key]);
+      _bumpTimers[key] = setTimeout(function () {
+        delete _bumpTimers[key];
+        _dbUpdateDeck(d._dbId, { last_studied_at: d.lastStudied, study_progress: d.progress || 0, updated_at: d.lastStudied });
+      }, 1200);
     }
     if (els.flip) els.flip.addEventListener('click', function () {
       var d = state.decks.find(function (x) { return x.id === state.activeId; });
@@ -900,6 +926,9 @@
     });
 
     if (els.generate) els.generate.addEventListener('click', function() {
+      _showSettingsModal(function(settings) { _pickSourcesThenGenerate(settings); });
+    });
+    if (els.studySettings) els.studySettings.addEventListener('click', function() {
       _showSettingsModal(function(settings) { _pickSourcesThenGenerate(settings); });
     });
     if (els.newDeck) els.newDeck.addEventListener('click', function () {
