@@ -28,12 +28,16 @@
     } catch (e) { return null; }
   }
 
+  // Resolves to an array on success (possibly empty), or null on failure
+  // (network blip, non-2xx). Callers MUST treat null as "unknown, retry later"
+  // and NOT cache it as "this course has no decks" — otherwise a transient
+  // error permanently blanks the deck list until a full page reload.
   function _dbLoadDecks(courseId) {
     if (!_supaUrl()) return Promise.resolve([]);
     var url = _supaUrl() + '/rest/v1/flashcard_decks?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=50';
     return fetch(url, { headers: _supaHeaders() })
-      .then(function(r) { return r.ok ? r.json() : []; })
-      .catch(function() { return []; });
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function() { return null; });
   }
 
   function _dbSaveDeck(courseId, deck) {
@@ -925,10 +929,22 @@
       });
     });
 
-    // Load from DB then render
-    if (!state._loaded) {
+    // Load from DB then render. A failed load (rows === null) must NOT set
+    // _loaded — otherwise the empty result is cached for the session and the
+    // user's decks vanish until a full reload. Show a retry instead.
+    function _loadDecks() {
       if (els.grid) els.grid.innerHTML = '<div class="fc-empty">Loading decks…</div>';
       _dbLoadDecks(course.id).then(function(rows) {
+        if (rows === null) {
+          if (els.grid) {
+            els.grid.innerHTML =
+              '<div class="fc-empty">Couldn\'t load your decks — check your connection. ' +
+              '<button type="button" class="fc-retry-load">Retry</button></div>';
+            var rb = els.grid.querySelector('.fc-retry-load');
+            if (rb) rb.addEventListener('click', _loadDecks);
+          }
+          return;
+        }
         state._loaded = true;
         // Defensive: legacy decks can contain cards with missing/blank
         // front or back (saved before backend validation rejected them).
@@ -951,6 +967,10 @@
         state.activeId = null;
         renderAll();
       });
+    }
+
+    if (!state._loaded) {
+      _loadDecks();
     } else {
       state.activeId = null;
       renderAll();
