@@ -329,12 +329,20 @@
     return String(s).replace(_FC_SEG_RE, _fcConvertMath);
   }
 
-  // Card text for display: normalize math Unicode, escape, then turn the
-  // generator's line breaks into <br>. The newline rule deliberately ignores
-  // "\n" that is the start of a LaTeX command (\nabla, \ne, \nu) so it only
-  // breaks genuine literal newlines (which precede a space/digit/end).
+  // Card text for display.
+  // 1. NFKC-normalize: PDF extraction often yields Mathematical Alphanumeric
+  //    glyphs (𝜑 U+1D711, not φ U+03C6) that show as tofu boxes and that KaTeX
+  //    can't parse. NFKC folds them back to their canonical base (𝜑→φ, 𝑥→x),
+  //    which fixes both the math (via the map below) and the prose. Harmless
+  //    for normal German text.
+  // 2. Map leftover Unicode math glyphs to LaTeX inside math segments.
+  // 3. Escape, then turn the generator's line breaks into <br>. The newline
+  //    rule ignores "\n" that starts a LaTeX command (\nabla, \ne, \nu) so it
+  //    only breaks genuine literal newlines (which precede a space/digit/end).
   function _fcCardHtml(s) {
-    return _esc(_fcNormalizeMath(s)).replace(/\\n(?![A-Za-z])|\r\n|\r|\n/g, '<br>');
+    var normalized = String(s == null ? '' : s);
+    try { normalized = normalized.normalize('NFKC'); } catch (e) { /* very old engine */ }
+    return _esc(_fcNormalizeMath(normalized)).replace(/\\n(?![A-Za-z])|\r\n|\r|\n/g, '<br>');
   }
 
   function _initShell(root, course, options) {
