@@ -390,21 +390,57 @@ export const AI_ASK_ACTIONS: Record<string, string> = {
   review_weak_topics: 'Which topics am I weak in, and how should I review them?',
 };
 
+// Generate actions map to the primary "generate" button inside each course
+// tool tab. After navigating, we click it for the student so "Quiz erstellen"
+// actually starts generation instead of dumping them on the tab with a
+// "now click Generate yourself" toast. Keep ids in sync with the feature views.
+export const AI_ACTION_GENERATE_BTN: Record<string, string> = {
+  generate_quiz: '#qzGenerateBtn',
+  generate_flashcards: '#fcGenerateBtn',
+  generate_examforge_exam: '#efGenerateBtn',
+  generate_cheatsheet: '#csGenerate',
+  start_deeplearn: '#dlGenerate',
+};
+
 function _runCourseTabAction(tab: string): boolean {
   const w = window as unknown as {
     activeCourseRef?: unknown;
+    openCourse?: (course: unknown) => void;
     showCourseSection?: (course: unknown, section: string) => void;
     showPortalSection?: (section: string) => void;
+    setNavActive?: (id: string) => void;
   };
-  if (!w.activeCourseRef || typeof w.showCourseSection !== 'function') return false;
-  // Make sure the Courses section is on screen first (the click may come from
-  // the standalone Chatbot), then switch to the requested course tab. The
-  // internal portal-section id is 'studip' — passing 'courses' (a URL alias
-  // only) finds no `psec-courses` element, so showPortalSection hides every
-  // section and reveals none, blanking the page underneath the course view.
+  if (
+    !w.activeCourseRef ||
+    typeof w.openCourse !== 'function' ||
+    typeof w.showCourseSection !== 'function'
+  ) {
+    return false;
+  }
+  // The course overview lives in the 'file' top-level view (#app), which
+  // openCourse() reveals via selectTopLevelView('file'). Going through
+  // showPortalSection alone selects the *portal* top-level (the My Courses
+  // grid) and leaves #app — and the course overview — hidden, so the click
+  // appeared to dump the student on the courses list. Mirror the proven
+  // daily-mission path: highlight Courses, surface the section, open the
+  // course (file view + overview), then switch to the requested tab.
+  if (typeof w.setNavActive === 'function') w.setNavActive('pcStudip');
   if (typeof w.showPortalSection === 'function') w.showPortalSection('studip');
+  w.openCourse(w.activeCourseRef);
   w.showCourseSection(w.activeCourseRef, tab);
   return true;
+}
+
+// The feature panels mount asynchronously (see _mountFeaturePanel's retry
+// loop), so the generate button may not exist yet right after navigation.
+// Poll briefly for it, then click once.
+function _clickGenerateWhenReady(selector: string, tries = 60): void {
+  const el = document.querySelector<HTMLButtonElement>(selector);
+  if (el) {
+    el.click();
+    return;
+  }
+  if (tries > 0) setTimeout(() => _clickGenerateWhenReady(selector, tries - 1), 80);
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -434,11 +470,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const tab = AI_ACTION_TABS[action];
       if (!tab) return;
       if (_runCourseTabAction(tab)) {
-        if (action.startsWith('generate_') || action === 'start_deeplearn') {
-          if (typeof window.showToast === 'function') {
-            window.showToast(btn.textContent || 'Opening…', 'Use the Generate button in this tab.');
-          }
-        }
+        // For generate actions, start the flow for the student instead of
+        // telling them to click the Generate button themselves.
+        const genSel = AI_ACTION_GENERATE_BTN[action];
+        if (genSel) _clickGenerateWhenReady(genSel);
       } else if (typeof window.showToast === 'function') {
         window.showToast('Open a course first', 'Go to Courses and open the course, then try again.');
       }

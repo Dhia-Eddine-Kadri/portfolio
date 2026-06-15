@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // `typeof document !== 'undefined'`, so a bare window stub is enough.
 globalThis.window = globalThis.window || {};
 
-const { renderMarkdown, AI_ACTION_TABS, AI_ASK_ACTIONS } = await import(
+const { renderMarkdown, AI_ACTION_TABS, AI_ASK_ACTIONS, AI_ACTION_GENERATE_BTN } = await import(
   '../../frontend/js/features/ai-chat/ai-markdown.ts'
 );
 
@@ -111,5 +111,21 @@ test('every nav action maps to one of the six real course tabs', () => {
 test('ask actions compose non-empty follow-up questions', () => {
   for (const [action, text] of Object.entries(AI_ASK_ACTIONS)) {
     assert.ok(typeof text === 'string' && text.trim().length > 10, action);
+  }
+});
+
+test('every generate-button action is a known tab action with a CSS selector', () => {
+  for (const [action, selector] of Object.entries(AI_ACTION_GENERATE_BTN)) {
+    assert.ok(AI_ACTION_TABS[action], action + ' has a generate button but no tab mapping');
+    assert.ok(
+      typeof selector === 'string' && selector.startsWith('#'),
+      action + ' maps to a non-id selector: ' + selector
+    );
+  }
+  // Every generate_*/start action that opens a tab should auto-start its flow.
+  for (const action of Object.keys(AI_ACTION_TABS)) {
+    if (action.startsWith('generate_') || action === 'start_deeplearn') {
+      assert.ok(AI_ACTION_GENERATE_BTN[action], action + ' is missing a generate-button selector');
+    }
   }
 });
