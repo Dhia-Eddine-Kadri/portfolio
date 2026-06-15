@@ -71,8 +71,12 @@ Rules:
 4. Prefer formulas, definitions, theorems, worked examples, common mistakes.
 5. Back must be substantial — not a one-word answer.
 6. Use the source's notation/terminology.
-7. Math in KaTeX: $...$ inline, $$...$$ display. Use real LaTeX commands
-   (\\varphi, \\sum, \\Delta), NOT raw Unicode glyphs (φ, ∑), inside math.
+7. Math in KaTeX. ALWAYS wrap EVERY formula, variable, fraction, exponent and
+   symbol in delimiters — $...$ inline or $$...$$ display. NEVER write bare
+   \\frac, \\text, \\ln, ^ or _ outside $...$. Use real LaTeX commands
+   (\\varphi, \\varepsilon, \\sum, \\Delta, \\ln) — NOT \\text{φ}/\\text{ln} and
+   NOT raw Unicode glyphs (φ, ∑). Example: write "$\\varphi = \\ln(\\varepsilon^{pl} + 1)$",
+   never "φ = \\text{ln}(ε^{pl} + 1)".
 8. Use real newlines for line breaks, never the literal two characters "\\n".
 9. Cite source as "filename, p.N".
 10. Match the language of the source material.

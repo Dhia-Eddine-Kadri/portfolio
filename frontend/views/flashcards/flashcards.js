@@ -120,19 +120,23 @@
     var now = Date.now();
     var due = [];
     var fresh = [];
+    var later = []; // reviewed but not yet due — studied LAST, never dropped
     for (var i = 0; i < deck.cards.length; i++) {
       var row = reviews[i];
       if (!row) { fresh.push(i); continue; }
       var dueAt = row.due_at ? new Date(row.due_at).getTime() : 0;
       if (dueAt <= now) due.push({ idx: i, due: dueAt });
+      else later.push({ idx: i, due: dueAt });
     }
     due.sort(function(a, b) { return a.due - b.due; });
-    var order = due.map(function(d) { return d.idx; }).concat(fresh);
-    if (!order.length) {
-      // Everything is reviewed and not yet due — let the user study the full deck.
-      for (var j = 0; j < deck.cards.length; j++) order.push(j);
-    }
-    return order;
+    later.sort(function(a, b) { return a.due - b.due; });
+    // Due first (most overdue first), then new, then everything else. The
+    // session always covers the WHOLE deck so the count matches the "N cards"
+    // label — previously reviewed-not-yet-due cards were dropped, which made a
+    // 10-card deck show only 7.
+    return due.map(function(d) { return d.idx; })
+      .concat(fresh)
+      .concat(later.map(function(d) { return d.idx; }));
   }
 
   function _docStatusSummary(docs) {
@@ -343,20 +347,36 @@
     return String(s).replace(_FC_SEG_RE, _fcConvertMath);
   }
 
+  // Some cards arrive with LaTeX but NO math delimiters at all (the generator
+  // forgot the $…$). KaTeX only renders inside delimiters, so that math shows as
+  // raw "\frac{…}" text. When a card has zero delimiters, wrap the recognized
+  // LaTeX atoms (\frac{}{}, \text{…}, \sqrt{…}, bare \commands, and ^/_ groups
+  // on a preceding token) in $…$ so they render. Conservative: only backslash
+  // commands and super/subscripts are touched — prose is never wrapped. If the
+  // card already uses delimiters, trust them and do nothing.
+  var _FC_ATOM_RE = /\\(?:frac|dfrac|tfrac|binom)\s*\{[^{}]*\}\s*\{[^{}]*\}|\\(?:text|mathrm|operatorname|sqrt|vec|hat|bar|overline|boldsymbol|mathbf|mathit)\s*\{[^{}]*\}|\\[a-zA-Z]+|[A-Za-zΑ-Ωα-ω0-9)\]}]\s*[\^_]\s*(?:\{[^{}]*\}|[A-Za-z0-9])/g;
+  function _fcAutoWrapMath(s) {
+    if (!s || /[$]|\\\(|\\\[/.test(s)) return s;
+    if (!/\\[a-zA-Z]|[\^_]\{|[\^_][A-Za-z0-9]/.test(s)) return s; // no LaTeX at all
+    return s.replace(_FC_ATOM_RE, function (m) { return '$' + m + '$'; });
+  }
+
   // Card text for display.
   // 1. NFKC-normalize: PDF extraction often yields Mathematical Alphanumeric
   //    glyphs (𝜑 U+1D711, not φ U+03C6) that show as tofu boxes and that KaTeX
-  //    can't parse. NFKC folds them back to their canonical base (𝜑→φ, 𝑥→x),
-  //    which fixes both the math (via the map below) and the prose. Harmless
-  //    for normal German text.
-  // 2. Map leftover Unicode math glyphs to LaTeX inside math segments.
-  // 3. Escape, then turn the generator's line breaks into <br>. The newline
-  //    rule ignores "\n" that starts a LaTeX command (\nabla, \ne, \nu) so it
-  //    only breaks genuine literal newlines (which precede a space/digit/end).
+  //    can't parse. NFKC folds them back to their canonical base (𝜑→φ, 𝑥→x).
+  // 2. Convert the generator's line breaks to a sentinel FIRST, so a literal
+  //    "\n" isn't mistaken for a LaTeX command by the steps below.
+  // 3. Auto-wrap bare LaTeX (cards with no delimiters), then map leftover
+  //    Unicode math glyphs to LaTeX inside math segments.
+  // 4. Escape, then restore the line breaks as <br>.
   function _fcCardHtml(s) {
-    var normalized = String(s == null ? '' : s);
-    try { normalized = normalized.normalize('NFKC'); } catch (e) { /* very old engine */ }
-    return _esc(_fcNormalizeMath(normalized)).replace(/\\n(?![A-Za-z])|\r\n|\r|\n/g, '<br>');
+    var t = String(s == null ? '' : s);
+    try { t = t.normalize('NFKC'); } catch (e) { /* very old engine */ }
+    t = t.replace(/\\n(?![A-Za-z])|\r\n|\r|\n/g, '');
+    t = _fcAutoWrapMath(t);
+    t = _fcNormalizeMath(t);
+    return _esc(t).replace(//g, '<br>');
   }
 
   function _initShell(root, course, options) {
