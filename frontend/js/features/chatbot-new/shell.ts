@@ -4258,11 +4258,15 @@ async function generateChatTitle(state: ConversationState): Promise<string | nul
   const lastAi = [...state.messages].reverse().find((m) => m.role === 'assistant');
   if (!lastUser && !lastAi) return null;
 
+  // Strip fenced blocks (code / minallo-diagram / minallo-quiz JSON) from the
+  // AI sample before seeding the titler — feeding it raw block payloads both
+  // wastes tokens and risks the block leaking into the generated title.
+  const aiSample = (lastAi?.text || '').replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, ' ').trim();
   const seed =
     (lastUser?.text || '') +
     (lastUser?.images?.length ? ' [' + lastUser.images.length + ' image(s)]' : '') +
     '\n\n' +
-    (lastAi?.text || '').slice(0, 400);
+    aiSample.slice(0, 400);
 
   try {
     const resp = await fetch('/api/ai', {
@@ -4296,7 +4300,7 @@ async function generateChatTitle(state: ConversationState): Promise<string | nul
 function updateChatTitle(title: string): void {
   // PR-05: persist into store + re-render header and sidebar row from data.
   const active = chatStore.getActive();
-  active.title = title;
+  active.title = sanitizeChatTitle(title) || 'New chat';
   active.updatedAt = Date.now();
   saveChatStore();
 
@@ -4723,9 +4727,25 @@ function relativeTime(ts: number): string {
 
 // 'New chat' is the sentinel title for un-renamed chats. Translate at display
 // time so storage stays stable and language switches don't desync chat lists.
+const MAX_CHAT_TITLE_CHARS = 60;
+
+// Defensive title cleanup. A title should be a short phrase, but a malformed
+// one can slip through (e.g. an assistant reply that leaked a
+// ```minallo-diagram``` block into title generation). Take the text before any
+// code fence, keep the first line, drop markdown noise, collapse whitespace,
+// and hard-cap the length so it can never balloon the header card.
+function sanitizeChatTitle(raw: string): string {
+  let t = raw || '';
+  const fenceIdx = t.indexOf('```');
+  if (fenceIdx >= 0) t = t.slice(0, fenceIdx);
+  t = (t.split('\n')[0] || '').replace(/[`*#>_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (t.length > MAX_CHAT_TITLE_CHARS) t = t.slice(0, MAX_CHAT_TITLE_CHARS).trimEnd() + '…';
+  return t;
+}
+
 function displayChatTitle(title: string): string {
   if (title === 'New chat') return tStr('cb_chat_title_new', 'New chat');
-  return title;
+  return sanitizeChatTitle(title) || tStr('cb_chat_title_new', 'New chat');
 }
 
 function chatMeta(c: SavedChat): string {
