@@ -32,6 +32,7 @@ from .answer_intent import (
     classify_academic_intent,
     intent_is_math_like,
     intent_style_instruction,
+    wants_per_source_coverage,
 )
 from .retrieval import RetrievedChunk
 
@@ -1232,6 +1233,38 @@ def _build_context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]
     return body
 
 
+def build_source_coverage_overlay(
+    chunks: list[RetrievedChunk],
+    doc_names: dict[str, str],
+    *,
+    exam: bool,
+) -> str:
+    """Authoritative list of the selected source files so the model covers every
+    one and never invents a file. Numbered to match the [Source N] labels in the
+    context block (retrieval guarantees one chunk per selected document)."""
+    order: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for i, c in enumerate(chunks, start=1):
+        did = c.document_id
+        if did and did not in seen:
+            seen.add(did)
+            order.append((i, doc_names.get(did, "Unknown")))
+    if len(order) < 2:
+        return ""
+    listing = "\n".join(f"{n}. [Source {src}] {name}" for n, (src, name) in enumerate(order, start=1))
+    unit = "one `## Aufgabe` exam section" if exam else "one dedicated question/section"
+    return (
+        "\n\nSELECTED SOURCE FILES — AUTHORITATIVE LIST. These are the ONLY files "
+        "available to you. Never invent, rename, merge, or reference a file that is "
+        "not in this list (e.g. do not cite a chapter the student did not select):\n"
+        + listing
+        + f"\n\nCOVERAGE REQUIREMENT: produce exactly {unit} for EVERY file in the list "
+        "above, in this order. Do not skip any file, and do not produce two for the "
+        "same file while another is missing. If a file has little content, still write "
+        "at least one relevant question grounded in it."
+    )
+
+
 def generate_answer(
     *,
     question: str,
@@ -1276,6 +1309,12 @@ def generate_answer(
     wants_diagram = _wants_diagram(question) and not app_question
     if wants_diagram:
         system_prompt += _diagram_overlay(bool(used_chunks))
+    # Exam generation / "a question for every selected file": append the
+    # authoritative file list so the model covers each selected source exactly
+    # once and never invents a file the student didn't select.
+    is_exam_request = academic_intent == AcademicIntent.EXAM_GENERATION
+    if (is_exam_request or wants_per_source_coverage(question)) and used_chunks:
+        system_prompt += build_source_coverage_overlay(used_chunks, doc_names, exam=is_exam_request)
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Math reasoning is
     # where mini gets variable distinctions wrong (d vs d_3) and silently
@@ -1307,6 +1346,8 @@ def generate_answer(
     # Worked math/exercise solutions in KaTeX overrun the small default budget
     # and truncate mid-calculation; give the math path room to finish.
     effective_max_tokens = max(max_tokens, 4500) if (answer_mode == "math" or wants_diagram) else max_tokens
+    if is_exam_request:
+        effective_max_tokens = max(effective_max_tokens, 6000)
 
     client = get_openai_client()
     completion = client.chat.completions.create(

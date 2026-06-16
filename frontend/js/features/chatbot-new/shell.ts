@@ -2187,14 +2187,19 @@ function ragEligibility(
   const active = chatStore.getActive();
   const selected = sourceLibrary.items.filter((s) => active.selectedSourceIds.includes(s.id));
 
-  // When the chat is scoped to "Selected file(s)", narrow retrieval to the
-  // selected sources. The client only knows storage file NAMES (the document
-  // table id lives server-side), so we send names and let the backend resolve
-  // them to document ids. Ids are sent too when known, but in practice the
-  // client never has them. "All files" leaves both empty (whole-course search).
+  // Selecting sources is an explicit scoping action: whenever the user has any
+  // sources selected, narrow retrieval to exactly those files — regardless of
+  // the all/specific toggle (which most users never touch, so a selection used
+  // to be silently ignored and retrieval searched the whole course). Only when
+  // nothing is selected do we fall back to a whole-course search.
+  // The client only knows storage file NAMES (the document-table id lives
+  // server-side), so we send names and let the backend resolve them to ids; ids
+  // are sent too when known.
   let documentIds: string[] = [];
   let documentNames: string[] = [];
-  if (normaliseCourseFileScope(active.courseFileScope) === 'specific_files') {
+  const scopeToSelection =
+    selected.length > 0 || normaliseCourseFileScope(active.courseFileScope) === 'specific_files';
+  if (scopeToSelection) {
     const ids = new Set<string>();
     const names = new Set<string>();
     selected.forEach((s) => (s.documents || []).forEach((d) => {
@@ -2264,7 +2269,11 @@ async function streamFromAskStream(
       question,
       tutorMode: getCurrentTutorMode(),
       sourceMode: sourceModeForActiveChat(),
-      courseFileScope: courseFileScopeForActiveChat(),
+      // When we send a document selection, tell the backend to hard-scope to
+      // it (specific_files); otherwise it would treat the default
+      // all_course_files scope as "search everything" and ignore the ids.
+      courseFileScope:
+        documentIds.length || documentNames.length ? 'specific_files' : courseFileScopeForActiveChat(),
       previousTurns,
       // UI location (page / course tab / open document) for the backend's
       // live-workspace block. In the standalone Chatbot this mostly carries

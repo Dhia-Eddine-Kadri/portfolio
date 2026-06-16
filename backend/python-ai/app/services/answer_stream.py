@@ -26,7 +26,11 @@ from .openai_client import get_openai_client
 from ..config import get_settings
 from ..supabase_client import get_supabase
 from .access_control import heavy_model_cap_reached
-from .answer_intent import classify_academic_intent
+from .answer_intent import (
+    AcademicIntent,
+    classify_academic_intent,
+    wants_per_source_coverage,
+)
 from .answer import (
     DEFAULT_TUTOR_MODE,
     EQUATION_READABILITY_RULE,
@@ -35,6 +39,7 @@ from .answer import (
     MINALLO_APP_CONTEXT,
     _APP_ONLY_SYSTEM_PROMPT,
     _build_context_block,
+    build_source_coverage_overlay,
     _cited_indices,
     strip_answer_intro,
     _context_strength,
@@ -995,6 +1000,13 @@ def stream_answer(
     wants_diagram = _wants_diagram(question, problem_solver) and not app_question
     if wants_diagram:
         system_prompt += _diagram_overlay(bool(used_chunks or (has_open and deictic)))
+    # Exam generation / "a question for every selected file": append the
+    # authoritative file list so the model covers each selected source exactly
+    # once and never invents a file (e.g. a chapter the student didn't select).
+    is_exam_request = academic_intent == AcademicIntent.EXAM_GENERATION
+    wants_full_coverage = is_exam_request or wants_per_source_coverage(question)
+    if wants_full_coverage and used_chunks:
+        system_prompt += build_source_coverage_overlay(used_chunks, doc_names, exam=is_exam_request)
     # An exercise/figure page bitmap will be attached below whenever retrieval
     # surfaced a figure-bearing chunk on a math/exercise question — even if the
     # rigid math worksheet template wasn't picked (e.g. the formula sheet wasn't
@@ -1048,6 +1060,10 @@ def stream_answer(
         or will_attach_figure
     ):
         effective_max_tokens = max(max_tokens, 4500)
+    # A full practice exam (title, ~8-11 Aufgaben with sub-questions + a
+    # Kurzlösung) is long; give it room so it never truncates mid-exam.
+    if is_exam_request:
+        effective_max_tokens = max(effective_max_tokens, 6000)
 
     # Reasoning effort: the global default (medium) is tuned for the deep
     # multi-phase reasoning that actual exercise-SOLVING and diagram/figure

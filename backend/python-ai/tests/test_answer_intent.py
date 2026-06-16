@@ -83,3 +83,44 @@ def test_explain_visible_problem_without_solving_stays_conceptual() -> None:
     ]
 
     assert classify_academic_intent("Explain Aufgabe 1, do not solve it", chunks) == AcademicIntent.CONCEPTUAL_EXPLANATION
+
+
+def test_exam_generation_intent() -> None:
+    from app.services.answer_intent import classify_academic_intent, AcademicIntent
+
+    for q in ["create a practice exam from my files", "generate an exam with math questions",
+              "erstelle eine Probeklausur", "make me a mock exam"]:
+        assert classify_academic_intent(q) == AcademicIntent.EXAM_GENERATION, q
+
+
+def test_summary_of_exam_is_not_exam_generation() -> None:
+    from app.services.answer_intent import classify_academic_intent, AcademicIntent
+
+    assert classify_academic_intent("give me a summary of the exam topics") == AcademicIntent.COURSE_SUMMARY
+
+
+def test_wants_per_source_coverage() -> None:
+    from app.services.answer_intent import wants_per_source_coverage
+
+    for q in ["a question for every lecture I have selected", "one question per file",
+              "a question for each chapter", "alle Vorlesungen", "für jede Datei eine Frage"]:
+        assert wants_per_source_coverage(q), q
+    assert not wants_per_source_coverage("explain chapter 2")
+    assert not wants_per_source_coverage("what is Urformen")
+
+
+def test_exam_overlay_lists_files_and_demands_coverage() -> None:
+    from app.services.answer import build_source_coverage_overlay
+    from app.services.retrieval import RetrievedChunk
+
+    def chunk(doc_id: str, cid: str) -> RetrievedChunk:
+        return RetrievedChunk(chunk_id=cid, document_id=doc_id, page_start=1, page_end=1,
+                              text="x", score=1.0, similarity=0.5, chunk_type="lecture", section_title=None)
+
+    chunks = [chunk("d1", "c1"), chunk("d2", "c2"), chunk("d1", "c3")]
+    names = {"d1": "Kapitel_1.pdf", "d2": "Kapitel_2.pdf"}
+    overlay = build_source_coverage_overlay(chunks, names, exam=True)
+    assert "Kapitel_1.pdf" in overlay and "Kapitel_2.pdf" in overlay
+    assert "Aufgabe" in overlay and "EVERY file" in overlay
+    # Single doc -> no overlay (nothing to enforce coverage over).
+    assert build_source_coverage_overlay([chunk("d1", "c1")], names, exam=True) == ""

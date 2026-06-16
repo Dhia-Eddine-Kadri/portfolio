@@ -710,6 +710,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         exercise_hit = None
         formula_hits = []
     else:
+        # Scale retrieval breadth with the number of explicitly-selected
+        # documents so multi-file requests ("a question for every lecture",
+        # exams) surface material from each one; per-document coverage in
+        # retrieve_chunks then guarantees every selected doc is represented.
+        _sel_doc_count = len(retrieval_document_ids or [])
+        stream_top_k = 18 if _sel_doc_count <= 6 else min(48, _sel_doc_count * 3)
         try:
             exercise_hit = await run_in_threadpool(
                 lambda: retrieve_exercise_block(
@@ -725,7 +731,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                     preferred_document_ids=retrieval_document_ids,
                     active_document_id=payload.activeDocumentId,
                     document_name_query=question,
-                    top_k=18,
+                    top_k=stream_top_k,
                 )
             )
         except EmbeddingServiceUnavailable as exc:

@@ -18,6 +18,7 @@ class AcademicIntent(str, Enum):
     COMPARISON = "comparison"
     CODE_PROBLEM = "code_problem"
     QUIZ_GENERATION = "quiz_generation"
+    EXAM_GENERATION = "exam_generation"
     FLASHCARD_GENERATION = "flashcard_generation"
     CASE_OR_APPLICATION_REASONING = "case_or_application_reasoning"
     GENERAL_COURSE_QA = "general_course_qa"
@@ -83,6 +84,26 @@ _CODE_RE = re.compile(
     re.IGNORECASE,
 )
 _QUIZ_RE = re.compile(r"\b(quiz|mcq|multiple choice|practice questions?|test me|prüfe mich|uebungsfragen|übungsfragen)\b", re.IGNORECASE)
+# A request to BUILD an exam/Probeklausur. Either an unambiguous noun, or a
+# creation verb followed (within a short span) by exam/klausur/prüfung.
+_EXAM_GEN_RE = re.compile(
+    r"\b(?:probeklausur|(?:uebungs|übungs)klausur|mock\s+exam|practice\s+exam|sample\s+exam|past\s+paper)\b"
+    r"|\b(?:create|generate|make|write|build|prepare|design|compose|give\s+me|set\s+up|put\s+together|"
+    r"erstell\w*|generier\w*|mach\w*|schreib\w*|entwirf|bau\w*|gib\s+mir)\b"
+    r"[^.?!\n]{0,40}?\b(?:exam|klausur|pr(?:ü|ue)fung)\b",
+    re.IGNORECASE,
+)
+# "a question for every lecture", "one per file", "each chapter", "all sources".
+_COVERAGE_NOUN = (
+    r"(?:lectures?|files?|chapters?|sources?|pdfs?|topics?|documents?|"
+    r"kapitel\w*|vorlesung\w*|datei\w*|quelle\w*|thema\w*|themen|dokument\w*)"
+)
+_PER_SOURCE_COVERAGE_RE = re.compile(
+    r"\b(?:every|each|all|jede[rsn]?|alle[rsn]?)\b[^.?!\n]{0,30}?\b" + _COVERAGE_NOUN + r"\b"
+    r"|\b(?:one|a|eine?)\b[^.?!\n]{0,20}?\b(?:question|frage)\b[^.?!\n]{0,20}?\b(?:per|for\s+each|for\s+every|f(?:ü|ue)r\s+jede)\b"
+    r"|\b(?:per|for\s+each|for\s+every|f(?:ü|ue)r\s+jede)\b[^.?!\n]{0,20}?\b" + _COVERAGE_NOUN + r"\b",
+    re.IGNORECASE,
+)
 _FLASHCARD_RE = re.compile(r"\b(flashcards?|karteikarten?|anki)\b", re.IGNORECASE)
 _CASE_RE = re.compile(
     r"\b("
@@ -167,6 +188,11 @@ def classify_academic_intent(
         return AcademicIntent.COURSE_SUMMARY
     if _COMPARISON_RE.search(text):
         return AcademicIntent.COMPARISON
+    # Exam generation is checked after summary/comparison so "summary of the
+    # exam" routes to summary; a real "create an exam" request has no such
+    # keyword and falls through to here.
+    if _EXAM_GEN_RE.search(text):
+        return AcademicIntent.EXAM_GENERATION
 
     no_solve = bool(_NO_SOLVE_RE.search(text))
     calc_verb = bool(_CALC_VERB_RE.search(text))
@@ -206,6 +232,12 @@ def classify_academic_intent(
     return AcademicIntent.GENERAL_COURSE_QA
 
 
+def wants_per_source_coverage(question: str) -> bool:
+    """True when the student asks for output covering each/every selected file
+    ("a question for every lecture", "one per chapter", "all sources")."""
+    return bool(_PER_SOURCE_COVERAGE_RE.search(question or ""))
+
+
 def intent_is_math_like(intent: AcademicIntent | str | None) -> bool:
     return _normalise_intent(intent) in {
         AcademicIntent.MATH_PROBLEM,
@@ -236,6 +268,17 @@ def intent_style_instruction(intent: AcademicIntent | str | None) -> str:
         lines.append("- Treat this as a coding/debugging request: use fenced code blocks and explain the cause, fix, and trace when relevant.")
     elif intent == AcademicIntent.QUIZ_GENERATION:
         lines.append("- Treat this as quiz generation: produce study questions with answers/explanations grounded in the provided material.")
+    elif intent == AcademicIntent.EXAM_GENERATION:
+        lines.extend([
+            "- Treat this as EXAM GENERATION. Produce a complete, university-style practice exam (Probeklausur) grounded in the COURSE CONTEXT — NOT a short list of one-line questions.",
+            "- Begin with a title heading `# Probeklausur: <course/topic>` followed by an exam header block: **Time** (e.g. 60-90 min), **Total** (points summing to ~100), **Allowed tools**, and a one-line **Instructions**.",
+            "- Then one section per selected source file: `## Aufgabe N: <lecture/file name> — <points> Punkte`, and immediately under each heading a `**Source:** [Source N] — <file name>` line.",
+            "- Give each Aufgabe subquestions a), b), c) (and d) where useful) that MIX: a definition/theory question, an explanation/application question, a calculation/math task WHERE the source contains formulas, and a short comparison/classification or process-selection question.",
+            "- Write realistic calculation tasks wherever the source has formulas (state concrete given values and ask the student to compute, e.g. Umformgrad, Nenndehnung, Spanungsquerschnitt, Schnittgeschwindigkeit, Vorschubgeschwindigkeit, Bearbeitungszeit). Never invent formulas the sources do not contain.",
+            "- Default to open questions, calculations, and explanation/diagram prompts. Do NOT use multiple-choice unless the student explicitly asked for it.",
+            "- End with a clearly separated `## Kurzlösung` section: for calculations show the formula and final result; for theory give the expected bullet points.",
+            "- Match the language of the course material (German course → German exam).",
+        ])
     elif intent == AcademicIntent.FLASHCARD_GENERATION:
         lines.append("- Treat this as flashcard generation: use compact front/back cards grounded in the provided material.")
     elif intent == AcademicIntent.MIXED_MATH_AND_CONCEPT:
@@ -259,4 +302,5 @@ __all__ = (
     "intent_allows_missing_input",
     "intent_is_math_like",
     "intent_style_instruction",
+    "wants_per_source_coverage",
 )
