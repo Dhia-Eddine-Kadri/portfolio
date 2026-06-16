@@ -852,6 +852,7 @@ def stream_answer(
     assistant_mode: str | None = None,
     workspace_question: bool = False,
     user_id: str | None = None,
+    selected_file_names: list[str] | None = None,
 ) -> Generator[bytes, None, None]:
     """Generator that yields SSE byte chunks. Pluggable into FastAPI's
     StreamingResponse with media_type='text/event-stream'.
@@ -1006,7 +1007,10 @@ def stream_answer(
     is_exam_request = academic_intent == AcademicIntent.EXAM_GENERATION
     wants_full_coverage = is_exam_request or wants_per_source_coverage(question)
     if wants_full_coverage and used_chunks:
-        system_prompt += build_source_coverage_overlay(used_chunks, doc_names, exam=is_exam_request)
+        system_prompt += build_source_coverage_overlay(
+            used_chunks, doc_names, exam=is_exam_request,
+            selected_file_names=selected_file_names,
+        )
     # An exercise/figure page bitmap will be attached below whenever retrieval
     # surfaced a figure-bearing chunk on a math/exercise question — even if the
     # rigid math worksheet template wasn't picked (e.g. the formula sheet wasn't

@@ -1238,22 +1238,42 @@ def build_source_coverage_overlay(
     doc_names: dict[str, str],
     *,
     exam: bool,
+    selected_file_names: list[str] | None = None,
 ) -> str:
     """Authoritative list of the selected source files so the model covers every
-    one and never invents a file. Numbered to match the [Source N] labels in the
-    context block (retrieval guarantees one chunk per selected document)."""
-    order: list[tuple[int, str]] = []
-    seen: set[str] = set()
+    one and never invents a file.
+
+    The CONTRACT is the student's selection: when ``selected_file_names`` is
+    given, every one of those files must get a section. Files that produced no
+    retrieved chunk (still processing / not indexed) are listed separately as
+    "still processing" so the model reports them instead of fabricating
+    questions. Files with chunks are numbered to match the [Source N] labels in
+    the context block.
+    """
+    # filename -> first [Source N] that references it (also a "has chunks" flag).
+    name_to_src: dict[str, int] = {}
     for i, c in enumerate(chunks, start=1):
-        did = c.document_id
-        if did and did not in seen:
-            seen.add(did)
-            order.append((i, doc_names.get(did, "Unknown")))
-    if len(order) < 2:
+        name = doc_names.get(c.document_id)
+        if name and name not in name_to_src:
+            name_to_src[name] = i
+
+    # Authoritative ordered list: prefer the explicit selection; else fall back
+    # to whatever files the retrieved chunks came from.
+    if selected_file_names:
+        ordered = list(dict.fromkeys(n for n in selected_file_names if n))
+    else:
+        ordered = list(name_to_src.keys())
+
+    covered = [n for n in ordered if n in name_to_src]
+    not_ready = [n for n in ordered if n not in name_to_src]
+    if len(covered) < 2 and not not_ready:
         return ""
-    listing = "\n".join(f"{n}. [Source {src}] {name}" for n, (src, name) in enumerate(order, start=1))
+
+    listing = "\n".join(
+        f"{k}. [Source {name_to_src[n]}] {n}" for k, n in enumerate(covered, start=1)
+    )
     unit = "one `## Aufgabe` exam section" if exam else "one dedicated question/section"
-    return (
+    overlay = (
         "\n\nSELECTED SOURCE FILES — AUTHORITATIVE LIST. These are the ONLY files "
         "available to you. Never invent, rename, merge, or reference a file that is "
         "not in this list (e.g. do not cite a chapter the student did not select):\n"
@@ -1261,8 +1281,16 @@ def build_source_coverage_overlay(
         + f"\n\nCOVERAGE REQUIREMENT: produce exactly {unit} for EVERY file in the list "
         "above, in this order. Do not skip any file, and do not produce two for the "
         "same file while another is missing. If a file has little content, still write "
-        "at least one relevant question grounded in it."
+        "at least one relevant question grounded in it. Before you finish, re-check that "
+        "every file above has its own section."
     )
+    if not_ready:
+        overlay += (
+            "\n\nSTILL PROCESSING (no indexed content yet) — do NOT fabricate questions "
+            "for these. Instead add one short note at the very top that they were skipped: "
+            + ", ".join(not_ready)
+        )
+    return overlay
 
 
 def generate_answer(

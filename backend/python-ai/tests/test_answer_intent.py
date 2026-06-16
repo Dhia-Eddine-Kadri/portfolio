@@ -124,3 +124,23 @@ def test_exam_overlay_lists_files_and_demands_coverage() -> None:
     assert "Aufgabe" in overlay and "EVERY file" in overlay
     # Single doc -> no overlay (nothing to enforce coverage over).
     assert build_source_coverage_overlay([chunk("d1", "c1")], names, exam=True) == ""
+
+
+def test_overlay_uses_selection_as_contract_and_reports_not_ready() -> None:
+    from app.services.answer import build_source_coverage_overlay
+    from app.services.retrieval import RetrievedChunk
+
+    def chunk(doc_id: str, cid: str) -> RetrievedChunk:
+        return RetrievedChunk(chunk_id=cid, document_id=doc_id, page_start=1, page_end=1,
+                              text="x", score=1.0, similarity=0.5, chunk_type="lecture", section_title=None)
+
+    # d1/d2 have chunks; d3 was selected but produced none (still processing).
+    chunks = [chunk("d1", "c1"), chunk("d2", "c2")]
+    names = {"d1": "K1.pdf", "d2": "K2.pdf", "d3": "K3.pdf"}
+    overlay = build_source_coverage_overlay(
+        chunks, names, exam=True, selected_file_names=["K1.pdf", "K2.pdf", "K3.pdf"]
+    )
+    assert "K1.pdf" in overlay and "K2.pdf" in overlay
+    assert "STILL PROCESSING" in overlay and "K3.pdf" in overlay
+    # Covered files keep their [Source N] numbering; not-ready file isn't numbered.
+    assert "[Source 1] K1.pdf" in overlay

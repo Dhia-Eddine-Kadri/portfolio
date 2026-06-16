@@ -772,18 +772,20 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         relevance_score=relevance_score,
         used_document_ids=list(dict.fromkeys(c.document_id for c in chunks if c.document_id)),
     )
-    # In explicit Course Files mode the user has committed to grounding on their
-    # files, so any retrieved chunk is a sufficient anchor. Command-style
-    # requests ("generate an exam from these files", "summarise chapter 2")
-    # share almost no words with the content, so the relevance gate would
-    # otherwise wrongly reject them as "topic not found" even though the user
-    # explicitly selected the files. The low-relevance downgrade still applies
-    # in Auto mode, which falls through to a general-knowledge answer below.
+    # The user has committed to grounding on their files when EITHER they picked
+    # Course Files mode OR they explicitly selected specific documents (even in
+    # Auto mode). In that case any retrieved chunk is a sufficient anchor:
+    # command-style requests ("generate an exam from these files", "a question
+    # for every lecture") share almost no words with the content, so the
+    # relevance gate would otherwise wrongly downgrade them to general knowledge
+    # despite an explicit selection. Auto mode WITHOUT a selection keeps the
+    # low-relevance downgrade (falls through to a general answer below).
     explicit_course_files = source_decision.selected_source_mode.value == "course_files"
+    explicit_selection = bool(retrieval_document_ids)
     has_strong_course_anchor = bool(
         payload.openFileContext or exercise_hit or formula_hits
         or relevance_score >= 0.18
-        or (explicit_course_files and chunks)
+        or ((explicit_course_files or explicit_selection) and chunks)
     )
     # App/workspace questions need no course anchor — they're answered from the
     # product map + live workspace block, not from retrieved chunks. (Without
@@ -844,6 +846,12 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             assistant_mode=assistant_mode,
             workspace_question=workspace_question,
             user_id=user_id,
+            # The student's selection is the coverage contract for exam /
+            # per-file requests — pass the resolved names so every selected file
+            # gets a section and any still-processing ones are reported.
+            selected_file_names=[
+                doc_name_map[i] for i in retrieval_document_ids if i in doc_name_map
+            ] or None,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.

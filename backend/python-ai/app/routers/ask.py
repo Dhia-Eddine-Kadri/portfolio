@@ -657,16 +657,18 @@ def ask_endpoint(payload: AskRequest) -> AskResponse:
         relevance_score=relevance_score,
         used_document_ids=list(dict.fromkeys(c.document_id for c in chunks if c.document_id)),
     )
-    # In explicit Course Files mode the user has committed to grounding on their
-    # files, so any retrieved chunk is a sufficient anchor — a command-style
+    # The user committed to grounding on their files when EITHER they picked
+    # Course Files mode OR they explicitly selected specific documents (even in
+    # Auto mode). Then any retrieved chunk is a sufficient anchor — a command
     # request ("generate an exam from these files") shares almost no words with
-    # the content and would otherwise be wrongly rejected as "topic not found".
-    # Auto mode still downgrades to general knowledge below when relevance is low.
+    # the content and would otherwise be wrongly downgraded despite the explicit
+    # selection. Auto mode without a selection still downgrades when relevance is low.
     explicit_course_files = source_decision.selected_source_mode.value == "course_files"
+    explicit_selection = bool(retrieval_document_ids)
     has_strong_course_anchor = bool(
         open_file_context or exercise_hit or formula_hits
         or relevance_score >= 0.18
-        or (explicit_course_files and chunks)
+        or ((explicit_course_files or explicit_selection) and chunks)
     )
     if not has_strong_course_anchor:
         if source_decision.selected_source_mode.value == "course_files":
