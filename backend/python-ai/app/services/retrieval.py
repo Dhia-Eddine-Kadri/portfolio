@@ -667,6 +667,13 @@ def retrieve_chunks(
         conceptual_explanation=conceptual_explanation,
     )
 
+    # When several documents are explicitly selected, make sure each one is
+    # represented so per-document requests ("a question for every lecture")
+    # can address the whole selection instead of a top-k-favoured subset.
+    chosen = _ensure_per_document_coverage(
+        ranked, chosen, document_ids=document_ids, top_k=max(top_k, 1)
+    )
+
     # Fetch chunk_type for each in one batch — RPC predates the new column.
     chunk_ids = [r["id"] for _, r in chosen if r.get("id")]
     type_map: dict[str, str] = {}
@@ -874,6 +881,56 @@ def _ensure_professor_reference_mix(
 
     chosen.sort(key=lambda pair: pair[0], reverse=True)
     return chosen
+
+
+def _ensure_per_document_coverage(
+    ranked: list[tuple[float, dict[str, Any]]],
+    chosen: list[tuple[float, dict[str, Any]]],
+    *,
+    document_ids: list[str] | None,
+    top_k: int,
+) -> list[tuple[float, dict[str, Any]]]:
+    """Guarantee every explicitly-selected document is represented.
+
+    When the user hard-scopes retrieval to several documents (e.g. selects 8
+    lectures and asks for "one question per lecture"), a flat top-k can pack
+    the slots with chunks from a few high-scoring docs and starve the rest, so
+    the model never sees — and can't write about — every selection. For each
+    selected doc that has a candidate but isn't in `chosen`, splice in its
+    best-ranked chunk. Coverage wins over the exact top-k cap, but the result
+    is still bounded by the number of selected documents.
+    """
+    if not document_ids or len(document_ids) < 2:
+        return chosen
+    selected = set(document_ids)
+    present = {row.get("document_id") for _, row in chosen}
+    missing = [d for d in selected if d and d not in present]
+    if not missing:
+        return chosen
+
+    additions: list[tuple[float, dict[str, Any]]] = []
+    for doc_id in missing:
+        for score, row in ranked:
+            if row.get("document_id") == doc_id:
+                additions.append((score, row))
+                break
+    if not additions:
+        return chosen
+
+    # Drop the lowest-scored chosen chunks to make room, but never below one
+    # slot per *other* present document so we don't trade one starved doc for
+    # another. Falls back to coverage-first if top_k is tighter than the count.
+    keep = max(0, top_k - len(additions))
+    merged = chosen[:keep] + additions
+    seen: set[str] = set()
+    out: list[tuple[float, dict[str, Any]]] = []
+    for score, row in sorted(merged, key=lambda pair: pair[0], reverse=True):
+        cid = row.get("id")
+        if cid in seen:
+            continue
+        seen.add(cid)
+        out.append((score, row))
+    return out
 
 
 def _load_page_qualities(sb, rows: list[dict[str, Any]]) -> dict[tuple[str, int], str]:
