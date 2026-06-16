@@ -897,11 +897,10 @@ function initCourseStudyTools(co: HTMLElement, course: LegacyCourse): void {
 }
 
 function setCourseStudyMode(co: HTMLElement, _course: LegacyCourse, mode: string): void {
-  const nextMode = ['files', 'quiz', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(mode) ? mode : 'files';
+  const nextMode = ['files', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(mode) ? mode : 'files';
   const featureLoader = (window as unknown as {
     _ssLoadPortalFeature?: (name: string) => Promise<void>;
   })._ssLoadPortalFeature;
-  if (nextMode === 'quiz' && typeof featureLoader === 'function') void featureLoader('quiz');
   if (nextMode === 'flashcards' && typeof featureLoader === 'function') void featureLoader('flashcards');
   if (nextMode === 'examforge' && typeof featureLoader === 'function') void featureLoader('examforge');
   if (nextMode === 'cheatsheet' && typeof featureLoader === 'function') void featureLoader('cheatsheet');
@@ -919,7 +918,7 @@ function setCourseStudyMode(co: HTMLElement, _course: LegacyCourse, mode: string
   if (inner) {
     inner.classList.toggle(
       'co-inner-wide',
-      nextMode === 'quiz' || nextMode === 'flashcards' || nextMode === 'examforge' ||
+      nextMode === 'flashcards' || nextMode === 'examforge' ||
       nextMode === 'cheatsheet' || nextMode === 'deeplearn'
     );
   }

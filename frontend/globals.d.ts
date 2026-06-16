@@ -53,7 +53,6 @@ declare global {
     _saveUserCourses?: () => void;
     _setAiChipsVisible?: (visible: boolean) => void;
     _generateStudyTool?: (...args: unknown[]) => unknown;
-    mountQuiz?: (el: HTMLElement, course: LegacyCourse, opts: { generate: unknown }) => void;
     mountFlashcards?: (el: HTMLElement, course: LegacyCourse, opts: { generate: unknown }) => void;
     mountExamForge?: (el: HTMLElement, course: LegacyCourse, opts: { generate?: unknown }) => void;
     mountCheatsheet?: (el: HTMLElement, course: LegacyCourse, opts?: { generate?: unknown }) => void;
@@ -377,7 +376,6 @@ declare global {
       folders: string[],
       onPick: (chosen: string | null) => void
     ) => void;
-    resetQuizToGrid?: (panel: HTMLElement) => void;
     resetFlashcardsToGrid?: (panel: HTMLElement) => void;
   }
 }

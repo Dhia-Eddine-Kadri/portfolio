@@ -313,10 +313,6 @@ function buildFilesContent(course: LegacyCourse): string {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
         '<span>Files</span>' +
       '</button>' +
-      '<button class="co-course-tab" type="button" data-course-tab="quiz" role="tab" aria-selected="false">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
-        '<span>Quiz</span>' +
-      '</button>' +
       '<button class="co-course-tab" type="button" data-course-tab="flashcards" role="tab" aria-selected="false">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>' +
         '<span>Flashcards</span>' +
@@ -385,7 +381,6 @@ function buildFilesContent(course: LegacyCourse): string {
         '<button class="co-multi-summarise" id="coMultiSumBtn">&#x2728; AI Chat</button>' +
       '</div>' +
     '</div>' +
-    '<div class="co-course-panel" id="coQuizPanel" data-course-panel="quiz"></div>' +
     '<div class="co-course-panel" id="coFlashPanel" data-course-panel="flashcards"></div>' +
     '<div class="co-course-panel" id="coExamForgePanel" data-course-panel="examforge"></div>' +
     '<div class="co-course-panel" id="coCheatsheetPanel" data-course-panel="cheatsheet"></div>' +
@@ -573,7 +568,6 @@ export function openCourse(course: LegacyCourse): void {
     _ssLoadPortalFeature?: (name: string) => Promise<void>;
   })._ssLoadPortalFeature;
   if (typeof preload === 'function') {
-    void preload('quiz');
     void preload('flashcards');
     void preload('examforge');
     void preload('cheatsheet');
@@ -652,7 +646,6 @@ function _refreshFilesPanel(co: HTMLElement, course: LegacyCourse): void {
 
 function _mountFeaturePanel(co: HTMLElement, sec: string, course: LegacyCourse): void {
   const panelSelector =
-    sec === 'quiz' ? '#coQuizPanel' :
     sec === 'flashcards' ? '#coFlashPanel' :
     sec === 'examforge' ? '#coExamForgePanel' :
     sec === 'cheatsheet' ? '#coCheatsheetPanel' :
@@ -665,7 +658,6 @@ function _mountFeaturePanel(co: HTMLElement, sec: string, course: LegacyCourse):
   if (typeof loadFeature === 'function') void loadFeature(sec);
   const mountWhenReady = (tries: number): void => {
     const mountFn =
-      sec === 'quiz' ? window.mountQuiz :
       sec === 'flashcards' ? window.mountFlashcards :
       sec === 'examforge' ? window.mountExamForge :
       sec === 'cheatsheet' ? window.mountCheatsheet :
@@ -695,17 +687,17 @@ function _switchTabOnly(co: HTMLElement, sec: string, course: LegacyCourse): voi
   if (inner) {
     inner.classList.toggle(
       'co-inner-wide',
-      sec === 'quiz' || sec === 'flashcards' || sec === 'examforge' ||
+      sec === 'flashcards' || sec === 'examforge' ||
       sec === 'cheatsheet' || sec === 'deeplearn'
     );
   }
-  if (sec === 'quiz' || sec === 'flashcards' || sec === 'examforge' || sec === 'cheatsheet' || sec === 'deeplearn') {
+  if (sec === 'flashcards' || sec === 'examforge' || sec === 'cheatsheet' || sec === 'deeplearn') {
     _mountFeaturePanel(co, sec, course);
   }
 }
 
 export function showCourseSection(course: LegacyCourse, section: string): void {
-  const sec = ['files', 'quiz', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(section) ? section : 'files';
+  const sec = ['files', 'flashcards', 'examforge', 'cheatsheet', 'deeplearn'].includes(section) ? section : 'files';
 
   const co = document.getElementById('courseOverview');
   // "Already rendered" must compare against the course whose DOM is actually
@@ -823,7 +815,7 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
         '<div class="co-hero-left">' +
           '<div class="co-hero-body">' +
             '<h1 class="co-hero-title">' + _safeName + '</h1>' +
-            '<p class="co-hero-sub">Manage files, generate quizzes, study flashcards, and open AI or notes inside this course.</p>' +
+            '<p class="co-hero-sub">Manage files, study flashcards, build exams, and open AI or notes inside this course.</p>' +
           '</div>' +
         '</div>' +
         '<aside class="co-hero-progress">' +
@@ -995,7 +987,7 @@ export function showCourseSection(course: LegacyCourse, section: string): void {
     co.querySelectorAll<HTMLElement>('[data-course-panel]').forEach((panel) => {
       panel.classList.toggle('active', panel.getAttribute('data-course-panel') === targetTab);
     });
-    if (targetTab === 'quiz' || targetTab === 'flashcards' || targetTab === 'examforge' || targetTab === 'cheatsheet' || targetTab === 'deeplearn') {
+    if (targetTab === 'flashcards' || targetTab === 'examforge' || targetTab === 'cheatsheet' || targetTab === 'deeplearn') {
       _mountFeaturePanel(co, targetTab, course);
     }
   }
