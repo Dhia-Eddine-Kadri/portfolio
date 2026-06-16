@@ -91,6 +91,14 @@ Rules:
 2. Prefer high-value material: definitions, theorems, formulas, worked examples, exercises.
 3. For MCQ: distractors must be plausible, not obviously wrong.
 4. For true_false: include a brief explanation; do not write trivially-obvious statements.
+   ANSWER CORRECTNESS (most important): the keyed answer MUST be the factually correct one.
+   Before emitting each MCQ/true_false item, re-derive the correct answer from the context,
+   then set "answer" to the option that matches it — the keyed option must be unambiguously
+   supported by the context, and EVERY distractor must be definitely false. Pay special
+   attention to which value attaches to which entity: do not swap symbols, names, numbers,
+   units, or percentages between options (e.g. for a code like "AlSi8Cu3", Si is the 8%
+   element and Cu the 3% element — keep each figure with its own symbol). The "explanation"
+   must justify the keyed answer and stay consistent with it.
 5. For short_answer: write an answer key that an exam marker would accept.
 6. Cite the source like "filename, p.N" using the [Source N] header for every item.
 7. Math in KaTeX: $...$ inline, $$...$$ display.
