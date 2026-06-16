@@ -28,6 +28,11 @@ from ..services.access_control import (
 )
 from ..services.answer import DEFAULT_TUTOR_MODE, is_app_question, normalise_tutor_mode
 from ..services.answer_stream import stream_answer
+from ..services.answer_intent import (
+    AcademicIntent,
+    classify_academic_intent,
+    wants_per_source_coverage,
+)
 from ..services.cache import fetch_course_version_hash, lookup_answer, save_answer
 from ..services.embeddings import EmbeddingServiceUnavailable
 from ..services.general_answer import generate_general_answer
@@ -547,11 +552,20 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     # whenever there's open-PDF context — those answers depend on the visible
     # page, not just the question.
     from ..services.answer_stream import _is_deictic_question  # noqa: WPS433
+    # Exam generation and "a question for every selected file" are generative and
+    # selection-dependent — serving a previous answer here is exactly the stale
+    # bug that made fixes look like no-ops (an old cached exam shadowed the new
+    # one). Always regenerate these; never look up or save a cached answer.
+    generative_request = (
+        wants_per_source_coverage(question)
+        or classify_academic_intent(question) == AcademicIntent.EXAM_GENERATION
+    )
     cacheable = (
         tutor_mode == "explain"
         and not _is_deictic_question(question)
         and payload.problemSolver is None
         and not has_open_ctx
+        and not generative_request
     )
     # Normalise previousTurns once — folded into the cache key (two students
     # asking "explain that again" in different sessions must not collide) and
