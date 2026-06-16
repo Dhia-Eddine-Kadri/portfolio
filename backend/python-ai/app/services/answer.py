@@ -1272,17 +1272,22 @@ def build_source_coverage_overlay(
     listing = "\n".join(
         f"{k}. [Source {name_to_src[n]}] {n}" for k, n in enumerate(covered, start=1)
     )
-    unit = "one `## Aufgabe` exam section" if exam else "one dedicated question/section"
+    n_files = len(covered)
+    unit = "`## Aufgabe` exam section" if exam else "dedicated question/section"
     overlay = (
         "\n\nSELECTED SOURCE FILES — AUTHORITATIVE LIST. These are the ONLY files "
         "available to you. Never invent, rename, merge, or reference a file that is "
         "not in this list (e.g. do not cite a chapter the student did not select):\n"
         + listing
-        + f"\n\nCOVERAGE REQUIREMENT: produce exactly {unit} for EVERY file in the list "
-        "above, in this order. Do not skip any file, and do not produce two for the "
-        "same file while another is missing. If a file has little content, still write "
-        "at least one relevant question grounded in it. Before you finish, re-check that "
-        "every file above has its own section."
+        + f"\n\nCOVERAGE REQUIREMENT (MANDATORY): you MUST output EXACTLY {n_files} "
+        f"{unit}s — one for EACH of the {n_files} files listed above, in that order, "
+        "numbered 1 through "
+        + str(n_files)
+        + ". Do NOT stop early, do NOT skip a file, and do NOT write two sections for "
+        "the same file while another is missing. Even if a file has little content, "
+        "still write at least one relevant question grounded in it. This coverage "
+        f"requirement overrides any default length — keep going until all {n_files} "
+        "sections exist, then add the solution section."
     )
     if not_ready:
         overlay += (

@@ -1039,6 +1039,11 @@ def stream_answer(
         or wants_diagram
         or has_open_image
         or will_attach_figure
+        # A multi-section mock exam (one Aufgabe per selected file, with calc
+        # tasks + Kurzlösung) needs strong instruction-following: the mini model
+        # silently drops most sections and covers only a few files. Route exams
+        # to the strong model so the full per-file coverage is honoured.
+        or is_exam_request
     ):
         target_model = settings.openai_generate_model_strong
         # Monthly strong-model allowance: bounds worst-case OpenAI cost per
@@ -1064,10 +1069,12 @@ def stream_answer(
         or will_attach_figure
     ):
         effective_max_tokens = max(max_tokens, 4500)
-    # A full practice exam (title, ~8-11 Aufgaben with sub-questions + a
-    # Kurzlösung) is long; give it room so it never truncates mid-exam.
+    # A full practice exam (one Aufgabe per file + sub-questions + Kurzlösung)
+    # scales with the number of covered files; give it ~700 tokens per file so a
+    # 13-file exam doesn't truncate mid-way (capped to keep cost bounded).
     if is_exam_request:
-        effective_max_tokens = max(effective_max_tokens, 6000)
+        exam_file_count = len({c.document_id for c in used_chunks if c.document_id})
+        effective_max_tokens = max(effective_max_tokens, 6000, min(12000, exam_file_count * 700))
 
     # Reasoning effort: the global default (medium) is tuned for the deep
     # multi-phase reasoning that actual exercise-SOLVING and diagram/figure

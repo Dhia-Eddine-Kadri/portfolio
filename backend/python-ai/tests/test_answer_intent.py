@@ -121,7 +121,7 @@ def test_exam_overlay_lists_files_and_demands_coverage() -> None:
     names = {"d1": "Kapitel_1.pdf", "d2": "Kapitel_2.pdf"}
     overlay = build_source_coverage_overlay(chunks, names, exam=True)
     assert "Kapitel_1.pdf" in overlay and "Kapitel_2.pdf" in overlay
-    assert "Aufgabe" in overlay and "EVERY file" in overlay
+    assert "Aufgabe" in overlay and "EACH of the 2 files" in overlay
     # Single doc -> no overlay (nothing to enforce coverage over).
     assert build_source_coverage_overlay([chunk("d1", "c1")], names, exam=True) == ""
 
