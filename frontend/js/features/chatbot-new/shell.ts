@@ -983,7 +983,8 @@ async function streamAiReply(
     state.controller = null;
     state.isSending = false;
     setSendBtnMode(sendBtn, 'send');
-    scrollMsgsToBottom(msgs);
+    // Sticky: don't yank a user who scrolled up to read while the answer finished.
+    scrollMsgsToBottom(msgs, false);
   }
 }
 
@@ -2613,7 +2614,9 @@ function createSoftStreamReveal(
 
   const scroll = (): void => {
     const msgs = bubble.closest<HTMLElement>('.ncb-msgs');
-    if (msgs) scrollMsgsToBottom(msgs);
+    // Sticky follow: only track the streaming output while the user is near the
+    // bottom, so they can scroll up to read earlier content mid-response.
+    if (msgs) scrollMsgsToBottom(msgs, false);
   };
 
   // Promote any newly-completed blocks out of the raw tail into the rendered
@@ -2911,10 +2914,19 @@ function setSendBtnMode(btn: HTMLButtonElement, mode: 'send' | 'pause'): void {
   }
 }
 
-function scrollMsgsToBottom(msgs: HTMLElement): void {
+// `force` (default) always pins to the bottom — used when the user sends a
+// message or opens a chat. With `force = false` (streaming tokens) we only
+// follow the output if the user is already near the bottom, so scrolling up to
+// re-read earlier text during a long answer isn't constantly yanked back down.
+function scrollMsgsToBottom(msgs: HTMLElement, force = true): void {
   if (suppressMessageAutoScroll) return;
   const scroller = msgs.closest<HTMLElement>('.ncb-center');
-  if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  if (!scroller) return;
+  if (!force) {
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (distance > 140) return; // user scrolled up — leave them be
+  }
+  scroller.scrollTop = scroller.scrollHeight;
 }
 
 // Pin the chat scrollport to the latest message when a conversation is opened
