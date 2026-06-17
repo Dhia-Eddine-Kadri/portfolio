@@ -712,7 +712,11 @@ function initMessageNavigator(root: HTMLElement): void {
     snippetSource: (row) => row.querySelector<HTMLElement>('.ncb-bubble-text') || row,
     bottomGuard: () => root.querySelector<HTMLElement>('.ncb-input'),
     compact: false,
-    minMessages: 3,
+    // Show the right-edge message navigator as soon as there's a short
+    // back-and-forth (2 of the user's prompts), not only after 3 — in
+    // exam/summary chats one long answer dominates and the rail otherwise
+    // stayed hidden, which read as "the navigation bar disappeared".
+    minMessages: 2,
   });
 }
 
