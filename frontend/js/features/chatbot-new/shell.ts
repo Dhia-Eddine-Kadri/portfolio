@@ -705,14 +705,13 @@ function initMessageNavigator(root: HTMLElement): void {
     host: card,
     scroller,
     container: msgs,
-    // Mark BOTH prompts and replies (not user-only). In exam/summary chats the
-    // user sends ONE prompt and gets one long answer, so a user-only rail had a
-    // single marker, fell under the threshold, and stayed hidden — which read
-    // as "the right-edge navigation bar disappeared". Marking every row makes
-    // it appear in any chat with at least one exchange; user vs AI rows stay
-    // visually distinct (wider user dashes, different preview styling).
-    messageSelector: '.ncb-msg-row',
-    isUser: (row) => row.classList.contains('ncb-msg-row--user'),
+    // Questions only (ChatGPT-style): the rail lists the USER's prompts as the
+    // landmarks to jump between; AI replies are deliberately excluded to keep
+    // it clean. Threshold lowered to 2 so it appears after a couple of
+    // questions instead of 3 (a single-question chat shows no rail — there's
+    // nothing to navigate between yet).
+    messageSelector: '.ncb-msg-row--user',
+    isUser: () => true,
     snippetSource: (row) => row.querySelector<HTMLElement>('.ncb-bubble-text') || row,
     bottomGuard: () => root.querySelector<HTMLElement>('.ncb-input'),
     compact: false,
