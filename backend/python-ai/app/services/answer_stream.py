@@ -63,6 +63,40 @@ from .workspace_context import (
 log = logging.getLogger(__name__)
 
 
+# Coverage-intent requests ("a question per file", exams) must let EVERY
+# selected document reach the prompt. The default MAX_PROMPT_CHUNKS top-N
+# clusters on a few high-score files, so the per-file coverage contract would
+# only ever see those few. This ceiling bounds the coverage-aware selection so a
+# very large selection still can't blow up the prompt token budget.
+_COVERAGE_CHUNK_CEILING = 40
+
+
+def _coverage_chunk_selection(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    """Keep one chunk per distinct document (best-scored, in score order), then
+    fill the remaining budget with the next-best chunks.
+
+    Guarantees every retrieved document reaches the prompt so the per-file
+    coverage overlay can require one section per selected file. Bounded by
+    ``_COVERAGE_CHUNK_CEILING`` (extras only — the one-per-doc floor always
+    survives) to keep the prompt token-safe.
+    """
+    best_per_doc: dict[str, RetrievedChunk] = {}
+    for c in chunks:
+        doc_id = c.document_id
+        if doc_id and doc_id not in best_per_doc:
+            best_per_doc[doc_id] = c
+    selected = list(best_per_doc.values())
+    seen = {id(c) for c in selected}
+    budget = min(max(MAX_PROMPT_CHUNKS, len(selected)), _COVERAGE_CHUNK_CEILING)
+    for c in chunks:
+        if len(selected) >= budget:
+            break
+        if id(c) not in seen:
+            selected.append(c)
+            seen.add(id(c))
+    return selected
+
+
 # ── Figure vision: let the tutor SEE the exercise drawing ─────────────────────
 #
 # Engineering exercises put most of their data — lengths, diameters, the shape
@@ -885,10 +919,22 @@ def stream_answer(
         app_question = True
 
     strength = _context_strength(chunks)
+    # Coverage-intent requests ("a question per file", exams) must keep one
+    # chunk per selected document, NOT the top-MAX_PROMPT_CHUNKS by score — the
+    # latter clusters on a few high-relevance files and the per-file coverage
+    # overlay (build_source_coverage_overlay) would then require only as many
+    # sections as those few files. Exam/coverage detection is keyword-based and
+    # chunk-independent, so it's safe to classify here before academic_intent.
+    wants_full_coverage = not app_question and (
+        wants_per_source_coverage(question)
+        or classify_academic_intent(question) == AcademicIntent.EXAM_GENERATION
+    )
     # Review fix #3 — partial retrieval mode. Mirrors answer.py's logic:
     #   strong → top MAX_PROMPT_CHUNKS    weak → top 3 (PARTIAL prompt)    none → []
     if app_question:
         used_chunks = []
+    elif wants_full_coverage and chunks:
+        used_chunks = _coverage_chunk_selection(chunks)
     elif strength == "strong":
         used_chunks = chunks[:MAX_PROMPT_CHUNKS]
     elif strength == "weak":
