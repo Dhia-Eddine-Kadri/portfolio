@@ -119,6 +119,36 @@ def test_only_literature_skip_flagged():
     assert any("dismissed as non-technical" in i for i in lint_exam_output(bad))
 
 
+_HIGH_POINT_EXAM = """# Probeklausur: Fertigungstechnik
+**Total:** 17 Punkte
+
+## Aufgabe 1: Kunststofftechnik — 17 Punkte
+**Source:** [Source 1] — Kapitel_3.pdf
+a) Beschreiben Sie den Spritzgießprozess. (17 P)
+
+## Kurzlösung
+
+### Aufgabe 1
+**a)**
+{answer}
+"""
+
+
+def test_high_point_thin_answer_flagged():
+    bad = _HIGH_POINT_EXAM.format(
+        answer="- Granulat plastifizieren.\n- In die Form einspritzen.\n- Abkühlen und auswerfen."
+    )
+    assert any("too thin for its 17 points" in i for i in lint_exam_output(bad))
+
+
+def test_high_point_rich_answer_ok():
+    rich = "\n".join(
+        f"- Prozessschritt {i}: konkrete technische Beschreibung mit Fachbegriff." for i in range(1, 7)
+    )
+    ok = _HIGH_POINT_EXAM.format(answer=rich)
+    assert not any("too thin" in i for i in lint_exam_output(ok))
+
+
 def test_exam_prompt_carries_the_new_rules():
     prompt = intent_style_instruction(AcademicIntent.EXAM_GENERATION)
     # No-placeholder + complete Kurzlösung mandate.
@@ -132,3 +162,6 @@ def test_exam_prompt_carries_the_new_rules():
     assert "PER SLIDE/PAGE" in prompt
     assert "entfällt" in prompt
     assert "10-17" in prompt
+    # New: formula faithfulness + depth-to-points scaling.
+    assert "FORMULA FAITHFULNESS" in prompt
+    assert "SCALE ANSWER DEPTH" in prompt

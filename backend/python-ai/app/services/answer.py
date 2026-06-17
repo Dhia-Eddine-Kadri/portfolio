@@ -1326,6 +1326,10 @@ _OVER_SKIP_RE = re.compile(
     re.IGNORECASE,
 )
 _AUFGABE_HEADER_RE = re.compile(r"(?im)^#{1,4}\s*Aufgabe\s+(\d+)\b")
+# Aufgabe number → its point value, parsed from "Aufgabe N: … — 17 Punkte".
+_AUFGABE_POINTS_RE = re.compile(r"(?im)^#{1,4}\s*Aufgabe\s+(\d+)\b[^\n]*?(\d{1,3})\s*P(?:unkte|kt)?\b")
+# A high-point Aufgabe answered with too little — depth must match the points.
+_HIGH_POINT_THRESHOLD = 12
 
 
 def lint_exam_output(text: str) -> list[str]:
@@ -1364,12 +1368,22 @@ def lint_exam_output(text: str) -> list[str]:
         if _BARE_ELLIPSIS_RE.search(solution):
             issues.append("Kurzlösung uses a bare '…' in place of an answer")
 
-    # 7.3 — each answer carries some substance (proxy: not near-empty).
+    # 7.3 — each answer carries substance proportional to its points. A 16-17
+    # point Aufgabe answered with 2-4 short bullets is the most common failure,
+    # so a high-point task needs more bullets/length than a near-empty floor.
     if solution and a_nums:
+        points_by_num = {int(n): int(p) for n, p in _AUFGABE_POINTS_RE.findall(questions)}
         blocks = re.split(r"(?im)^#{1,4}\s*Aufgabe\s+\d+\b", solution)[1:]
         for n, block in zip(sorted(a_nums), blocks):
-            if len(block.strip()) < 60:
+            body = block.strip()
+            bullets = len(re.findall(r"(?m)^[\s>]*[-*•]\s+\S", block))
+            if len(body) < 60:
                 issues.append(f"Aufgabe {n} answer is too thin for the assigned points")
+            elif points_by_num.get(n, 0) >= _HIGH_POINT_THRESHOLD and bullets < 5 and len(body) < 260:
+                issues.append(
+                    f"Aufgabe {n} answer is too thin for its {points_by_num[n]} points "
+                    f"({bullets} bullets) — scale depth to the point value"
+                )
 
     # 7.4 / 7.5 — intro/admin slide material used as a question.
     if _NON_TECHNICAL_RE.search(questions):
