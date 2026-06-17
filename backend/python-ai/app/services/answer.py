@@ -1315,6 +1315,16 @@ _NON_TECHNICAL_RE = re.compile(
     r"|zielgruppen?\b|anmeldelink|veranstaltungs|agenda\b|stundenplan|raumnummer",
     re.IGNORECASE,
 )
+# A whole file wrongly dismissed as non-technical / literature. A chapter PDF
+# almost always has real content, so dropping one is judged-per-file when it
+# should be per-page — flag it. (The overlay's legitimate "still processing"
+# note is about files with NO chunks, which uses different wording.)
+_OVER_SKIP_RE = re.compile(
+    r"\bentf(?:ä|ae)llt\b|kein(?:e)?\s+technische[nr]?\s+inhalt"
+    r"|keine?\s+(?:verwertbaren|technischen)\s+inhalte|nur\s+literatur"
+    r"|no\s+technical\s+content",
+    re.IGNORECASE,
+)
 _AUFGABE_HEADER_RE = re.compile(r"(?im)^#{1,4}\s*Aufgabe\s+(\d+)\b")
 
 
@@ -1365,6 +1375,15 @@ def lint_exam_output(text: str) -> list[str]:
     if _NON_TECHNICAL_RE.search(questions):
         issues.append(
             "a question is built from non-technical (intro/admin/QR/event) slide material"
+        )
+
+    # Over-skip: a whole file dismissed as non-technical/literature. Judging a
+    # file from one info/literature slide instead of its other (technical)
+    # chunks — a chapter PDF almost always has real content.
+    if _OVER_SKIP_RE.search(text):
+        issues.append(
+            "a file/Aufgabe was dismissed as non-technical ('entfällt' / 'nur Literatur') "
+            "— judge per page, not per file; selected chapters have technical content"
         )
 
     # 7.6 — DIN level mix-up: classifying joining processes under DIN 8580 Hauptgruppen.

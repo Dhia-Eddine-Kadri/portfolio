@@ -71,30 +71,64 @@ log = logging.getLogger(__name__)
 # very large selection still can't blow up the prompt token budget.
 _COVERAGE_CHUNK_CEILING = 40
 
+# Slides that look like title/agenda/info/QR/literature pages — not exam
+# material. Used to push such chunks BEHIND a file's technical chunks so a file
+# is represented by real content, and never judged (and skipped) from one info
+# slide. Conservative: a chunk matching this is only DEPRIORITISED, never
+# dropped, so a file whose only chunks are like this is still represented.
+_NON_TECHNICAL_CHUNK_RE = re.compile(
+    r"literaturverzeichnis|quellenverzeichnis|\bliteratur\b|\bquellen\b"
+    r"|inhaltsverzeichnis|\bagenda\b|organisatorisch|qr[-\s]?code|studing"
+    r"|infoabend|info-?veranstaltung|anmeldung|herzlich\s+willkommen"
+    r"|viel\s+erfolg|gliederung\s+der\s+vorlesung|vorstellung\s+der",
+    re.IGNORECASE,
+)
+
+
+def _looks_non_technical(text: str) -> bool:
+    return bool(_NON_TECHNICAL_CHUNK_RE.search(text or ""))
+
 
 def _coverage_chunk_selection(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
-    """Keep one chunk per distinct document (best-scored, in score order), then
-    fill the remaining budget with the next-best chunks.
+    """Feed the prompt MULTIPLE, technical-first chunks per selected document.
 
-    Guarantees every retrieved document reaches the prompt so the per-file
-    coverage overlay can require one section per selected file. Bounded by
-    ``_COVERAGE_CHUNK_CEILING`` (extras only — the one-per-doc floor always
-    survives) to keep the prompt token-safe.
+    One chunk per file is dangerous for exam coverage: if the single chunk a
+    file contributes happens to be its title/info/QR/literature slide, the model
+    judges the whole file as non-technical and skips it ("entfällt"). So group
+    by document, order each file's chunks technical-first (info/literature slides
+    last but NOT dropped — a file with only such chunks is still represented),
+    and take a few per file via round-robin so every selected file is
+    represented by REAL content before any file gets a second chunk. Bounded by
+    ``_COVERAGE_CHUNK_CEILING`` to keep the prompt token-safe.
     """
-    best_per_doc: dict[str, RetrievedChunk] = {}
+    by_doc: dict[str, list[RetrievedChunk]] = {}
+    order: list[str] = []
     for c in chunks:
-        doc_id = c.document_id
-        if doc_id and doc_id not in best_per_doc:
-            best_per_doc[doc_id] = c
-    selected = list(best_per_doc.values())
-    seen = {id(c) for c in selected}
-    budget = min(max(MAX_PROMPT_CHUNKS, len(selected)), _COVERAGE_CHUNK_CEILING)
-    for c in chunks:
-        if len(selected) >= budget:
-            break
-        if id(c) not in seen:
-            selected.append(c)
-            seen.add(id(c))
+        doc_id = c.document_id or ""
+        if doc_id not in by_doc:
+            by_doc[doc_id] = []
+            order.append(doc_id)
+        by_doc[doc_id].append(c)
+    # Stable sort (0 = technical, 1 = non-technical) keeps score order within
+    # each group, so a file's best technical chunk leads.
+    for doc_id in by_doc:
+        by_doc[doc_id].sort(key=lambda c: 1 if _looks_non_technical(c.text) else 0)
+
+    n_docs = max(1, len(by_doc))
+    # Ceil division: richer per-file context when few files are selected, ~3
+    # when many. Three slides per file is enough for the model to see real
+    # content even if one of them is an info/title slide.
+    per_doc = max(3, -(-MAX_PROMPT_CHUNKS // n_docs))
+    selected: list[RetrievedChunk] = []
+    seen: set[int] = set()
+    for rank in range(per_doc):
+        for doc_id in order:
+            if len(selected) >= _COVERAGE_CHUNK_CEILING:
+                break
+            cs = by_doc[doc_id]
+            if rank < len(cs) and id(cs[rank]) not in seen:
+                selected.append(cs[rank])
+                seen.add(id(cs[rank]))
     return selected
 
 

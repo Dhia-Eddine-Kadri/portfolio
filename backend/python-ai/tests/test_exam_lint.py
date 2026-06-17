@@ -103,6 +103,22 @@ def test_din8593_joining_is_accepted():
     assert not any("DIN 8593" in i for i in lint_exam_output(ok))
 
 
+def test_over_skip_entfaellt_flagged():
+    bad = _CLEAN_EXAM.replace(
+        "a) Beschreiben Sie den Prozessablauf.",
+        "_Entfällt — die Datei enthält nur eine Infoveranstaltungs-Folie, kein technischer Inhalt._",
+    )
+    assert any("dismissed as non-technical" in i for i in lint_exam_output(bad))
+
+
+def test_only_literature_skip_flagged():
+    bad = _CLEAN_EXAM.replace(
+        "a) Erklären Sie den Spanwinkel.",
+        "a) Diese Datei enthält nur Literatur und wird übersprungen.",
+    )
+    assert any("dismissed as non-technical" in i for i in lint_exam_output(bad))
+
+
 def test_exam_prompt_carries_the_new_rules():
     prompt = intent_style_instruction(AcademicIntent.EXAM_GENERATION)
     # No-placeholder + complete Kurzlösung mandate.
@@ -112,3 +128,7 @@ def test_exam_prompt_carries_the_new_rules():
     assert "DIN 8593" in prompt and "DIN 8580" in prompt
     # Intro/admin slide exclusion.
     assert "QR" in prompt or "title page" in prompt
+    # Page-level judgment — do NOT skip whole files; balanced smaller tasks.
+    assert "PER SLIDE/PAGE" in prompt
+    assert "entfällt" in prompt
+    assert "10-17" in prompt
