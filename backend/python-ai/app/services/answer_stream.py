@@ -44,6 +44,7 @@ from .answer import (
     exam_style_overlay,
     build_source_coverage_overlay,
     lint_exam_output,
+    repair_exam_output,
     _cited_indices,
     strip_answer_intro,
     _context_strength,
@@ -1468,11 +1469,15 @@ def stream_answer(
                         intro_hold = False
                         if cleaned:
                             answer_buf.append(cleaned)
-                            yield _sse({"t": cleaned})
+                            # Exams are buffered (not streamed live) so they can be
+                            # linted + repaired BEFORE the user sees them.
+                            if not is_exam_request:
+                                yield _sse({"t": cleaned})
                         intro_buf = ""
                     continue
                 answer_buf.append(token)
-                yield _sse({"t": token})
+                if not is_exam_request:
+                    yield _sse({"t": token})
     except Exception as e:  # noqa: BLE001
         log.exception("stream_answer failed")
         if not answer_buf and not intro_buf:
@@ -1489,9 +1494,29 @@ def stream_answer(
         cleaned = strip_answer_intro(intro_buf).lstrip("\n")
         if cleaned:
             answer_buf.append(cleaned)
-            yield _sse({"t": cleaned})
+            if not is_exam_request:
+                yield _sse({"t": cleaned})
 
     full_answer = "".join(answer_buf)
+
+    # Buffered exam path: the tokens above were accumulated but NOT streamed, so
+    # we can lint and (on blocking failures) repair the exam BEFORE the user sees
+    # it, then emit the final version. Exams already pause on the reasoning model,
+    # so losing live streaming here is an acceptable trade for a validated exam.
+    if is_exam_request:
+        blocking = exam_lint_blocking(lint_exam_output(full_answer))
+        if blocking:
+            log.warning("exam lint blocking (%d) — repairing before stream: %s",
+                        len(blocking), "; ".join(blocking))
+            yield _sse({"status": "writing_answer"})
+            full_answer = repair_exam_output(
+                system_prompt=system_prompt, user_message=user_content,
+                bad_answer=full_answer, issues=blocking,
+                client=client, model=target_model, max_tokens=effective_max_tokens,
+            )
+        # Emit the final (possibly repaired) exam in slices the client appends.
+        for i in range(0, len(full_answer), 1500):
+            yield _sse({"t": full_answer[i:i + 1500]})
 
     # Diagram refusal-recovery. The system-prompt overlay tells the model
     # to emit a fenced ``minallo-diagram`` block, but gpt-4o's RLHF refusal
