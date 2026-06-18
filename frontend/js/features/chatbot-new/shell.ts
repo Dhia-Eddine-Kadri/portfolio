@@ -357,6 +357,13 @@ let currentTutorMode: TutorMode = TUTOR_MODE_DEFAULT;
 let messageRenderRun = 0;
 let sidebarRenderRun = 0;
 let activeChatLoadRaf: number | null = null;
+// In-flight AI replies keyed by their ORIGIN chat id. streamAiReply binds each
+// reply to the chat it started in and lets it finish in the background; this
+// registry lets loadActiveChatIntoCenter re-attach the still-streaming row (its
+// thinking indicator + tokens-so-far, plus the live controller for the pause
+// button) when the user switches BACK mid-stream — instead of showing a blank
+// chat that only fills in once the stream finally completes.
+const inFlightReplyRows = new Map<string, { row: HTMLElement; controller: AbortController }>();
 let suppressMessageAutoScroll = false;
 // Bumped on every chat (re)load; pending settle-scroll passes carry the token
 // they were scheduled with and bail if a newer load — or the user's own scroll
@@ -888,10 +895,17 @@ async function streamAiReply(
   const controller = new AbortController();
   state.controller = controller;
 
+  // Register this reply so a switch BACK to its chat re-attaches the live row
+  // (see loadActiveChatIntoCenter) and the user watches it write in real time.
+  inFlightReplyRows.set(originId, { row: aiRow, controller });
+
   // If the user navigated away and back while streaming, the live view was
   // re-rendered WITHOUT this still-in-flight reply (it isn't in the array yet).
   // Once the reply is saved, re-render so it appears instead of staying lost.
   const reconcileView = (): void => {
+    // The reply is now in chat.messages, so the registry's live row is obsolete
+    // — drop it before any re-render so it isn't ALSO re-attached as a duplicate.
+    if (inFlightReplyRows.get(originId)?.row === aiRow) inFlightReplyRows.delete(originId);
     if (isOriginActive() && !aiRow.isConnected) {
       const root = msgs.closest<HTMLElement>('.ncb-root');
       if (root) loadActiveChatIntoCenter(root);
@@ -1015,6 +1029,9 @@ async function streamAiReply(
       }
     }
   } finally {
+    // Belt-and-braces for the error/abort path (reconcileView doesn't run): drop
+    // this reply from the in-flight registry so it's never re-attached as stale.
+    if (inFlightReplyRows.get(originId)?.row === aiRow) inFlightReplyRows.delete(originId);
     // Only reset the SHARED send state if THIS stream is still the active one.
     // The user may have switched away and started another send in a new chat;
     // clobbering state/the send button then would break that live stream.
@@ -4943,14 +4960,20 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
 
   const chat = chatStore.getActive();
 
+  // A reply for this chat may still be streaming in the background (the user
+  // switched away and came back). Re-attach its live row below the history and
+  // restore the sending state so it visibly keeps writing — and the pause button
+  // can still stop it — instead of looking frozen until the stream completes.
+  const pending = inFlightReplyRows.get(chat.id) || null;
+
   // Reset transient live state.
   const state = getOrInitLiveState();
   state.messages = chat.messages;
   state.pasted = [];
   state.files = [];
-  state.controller = null;
-  state.isSending = false;
-  if (sendBtn) setSendBtnMode(sendBtn, 'send');
+  state.controller = pending ? pending.controller : null;
+  state.isSending = !!pending;
+  if (sendBtn) setSendBtnMode(sendBtn, pending ? 'pause' : 'send');
   if (textarea) {
     textarea.value = '';
     textarea.style.height = '44px';
@@ -4964,10 +4987,10 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   if (headerTitle) headerTitle.textContent = displayChatTitle(chat.title);
   updateContextPill(root);
 
-  // Stage mode: active iff there are any messages.
-  stage.dataset.state = chat.messages.length > 0 ? 'active' : 'empty';
+  // Stage mode: active iff there are any messages (or a reply is streaming in).
+  stage.dataset.state = (chat.messages.length > 0 || pending) ? 'active' : 'empty';
 
-  renderConversationMessages(msgs, chat.messages);
+  renderConversationMessages(msgs, chat.messages, pending?.row);
 
   // Re-render attached folders + sources panel + saved-replies count.
   renderAttachChips(root);
@@ -5058,10 +5081,25 @@ function appendStoredMessage(msgs: HTMLElement, m: ChatMessage): void {
   appendBubbleActions(row, m.text);
 }
 
-function renderConversationMessages(msgs: HTMLElement, messages: ChatMessage[]): void {
+function renderConversationMessages(
+  msgs: HTMLElement,
+  messages: ChatMessage[],
+  trailingRow?: HTMLElement | null
+): void {
   const runId = ++messageRenderRun;
   msgs.innerHTML = '';
-  if (!messages.length) return;
+
+  // A still-streaming reply for this chat (re-attached on switch-back) must sit
+  // BELOW all restored history, so append it only once the chunked render of the
+  // stored messages has finished — and only if this load is still the current one.
+  const attachTrailing = (): void => {
+    if (trailingRow && runId === messageRenderRun && trailingRow.parentElement !== msgs) {
+      msgs.appendChild(trailingRow);
+      scrollMsgsToBottom(msgs);
+    }
+  };
+
+  if (!messages.length) { attachTrailing(); return; }
 
   let index = 0;
   const firstChunk = Math.min(messages.length, 2);
@@ -5084,8 +5122,10 @@ function renderConversationMessages(msgs: HTMLElement, messages: ChatMessage[]):
     }
     scrollMsgsToBottom(msgs);
     if (index < messages.length) window.requestAnimationFrame(renderChunk);
+    else attachTrailing();
   };
   if (index < messages.length) window.requestAnimationFrame(renderChunk);
+  else attachTrailing();
 }
 
 // ============ PR-06: file upload + pdf extraction + files row + regenerate ============
