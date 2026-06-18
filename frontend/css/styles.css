@@ -4548,32 +4548,15 @@ body.pdf-maximized .annotate-popover {
 
 #courseOverview {
   background: var(--app-bg, var(--dp-bg));
-  background-attachment: fixed;
   position: relative;
   min-height: 100%;
 }
 #courseOverview::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  background-size: 180px;
-  opacity: 0.025;
-  z-index: 0;
+  content: none;
 }
 /* glowing blobs inside courseOverview */
 #courseOverview::after {
-  content: '';
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
-  top: -120px;
-  right: -80px;
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
 .co-inner {
@@ -8657,7 +8640,7 @@ input::-webkit-credentials-auto-fill-button {
 
 /* Color variables scoped to portal — dark (night) mode */
 body.night #portal {
-  --dp-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  --dp-bg: #0f172a;
   --app-bg: var(--dp-bg);
   --glass-bg: rgba(30, 41, 59, 0.6);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -8672,7 +8655,7 @@ body.night #portal {
 }
 /* Color variables scoped to portal — light mode */
 body:not(.night) #portal {
-  --dp-bg: linear-gradient(135deg, #eff6ff 0%, #f8fafc 50%, #f5f3ff 100%);
+  --dp-bg: #f8fafc;
   --app-bg: var(--dp-bg);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.08);

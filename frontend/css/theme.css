@@ -51,7 +51,7 @@ body.night {
   --auth-pw-label: rgba(255, 255, 255, 0.35);
   --auth-confirm-hint: rgba(255, 255, 255, 0.3);
   --auth-toggle-pw: rgba(255, 255, 255, 0.5);
-  --studip-bg: linear-gradient(135deg, #020617 0%, #0f172a 45%, #082f49 100%);
+  --studip-bg: #0f172a;
   --studip-back-bg: rgba(255, 255, 255, 0.08);
   --studip-back-border: rgba(255, 255, 255, 0.15);
   --studip-back-color: rgba(255, 255, 255, 0.7);
@@ -67,7 +67,7 @@ body.night {
   --muted: #64748b;
   --shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
   --border: #1e293b;
-  --dp-bg: linear-gradient(135deg, #020617 0%, #0f172a 48%, #082f49 100%);
+  --dp-bg: #0f172a;
   --dp-solid: #020617;
   --dp-modal: linear-gradient(135deg, #0f172a, #082f49);
   --app-bg: var(--dp-bg);
@@ -90,7 +90,7 @@ body.night {
   --slot-bg: rgba(255, 255, 255, 0.05);
 }
 html:has(body.night) {
-  --app-bg: linear-gradient(135deg, #020617 0%, #0f172a 48%, #082f49 100%);
+  --app-bg: #0f172a;
   background: var(--app-bg);
 }
 body.night .pdf-body {
