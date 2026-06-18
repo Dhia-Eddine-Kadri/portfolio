@@ -2006,18 +2006,17 @@ body.minallo-in-course .topbar {
 
 /* Light/Day mode toggle re-enabled — keep sidebar pill + settings row visible. */
 
-/* The course view stacks four containers that ALL paint near-black
- * (var(--dp-solid) = #020617 in night mode). Even with #app transparent
- * the inner .app-body covered the #portal gradient + blobs. Force every
- * layer in the chain transparent so the same shared backdrop the courses
- * overview shows survives all the way down to the cards. */
+/* The course/file view uses the shared app background for every outer layer.
+ * Keeping this flat prevents expanded folders and long panels from exposing a
+ * different body/portal backdrop lower on the page. */
 body.minallo-in-course #portal #app,
 body.minallo-in-course #app,
 body.minallo-in-course #app .app-body,
 body.minallo-in-course #courseOverview,
 body.minallo-in-course .pdf-viewer-wrap,
 body.minallo-in-course .welcome-state {
-  background: transparent !important;
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg))) !important;
+  background-image: none !important;
 }
 
 /* Tabs centered as a compact pill inside the workspace card. */

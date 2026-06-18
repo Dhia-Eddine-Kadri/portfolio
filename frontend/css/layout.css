@@ -1,6 +1,7 @@
 /* ── Shell ── */
 #portal {
-  background: var(--app-bg, var(--dp-bg));
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -11,7 +12,8 @@
   min-height: 100dvh;
   display: flex;
   align-items: stretch;
-  background: transparent;
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
 }
 
 /* File / PDF view owns its internal scroll: the PDF canvas and the docked AI
@@ -632,7 +634,8 @@ body.night .sb-night-thumb {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: transparent;
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
 }
 #portal .main .topbar {
   display: none !important;
@@ -688,8 +691,8 @@ body.night .sb-night-thumb {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 28px;
-  background: transparent;
-  background-image: var(--app-bg, var(--dp-bg));
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
   background-attachment: local;
   background-size: 100% 100%;
   scrollbar-width: thin;
@@ -775,10 +778,12 @@ body.night .sb-night-thumb {
   display: none;
   flex-direction: column;
   overflow: hidden;
-  background: transparent;
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
 }
 #portal #app .app-body {
-  background: transparent;
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
 }
 
 /* ── Fix: portal nav sidebar styles must NOT leak into #app's sidebar ── */

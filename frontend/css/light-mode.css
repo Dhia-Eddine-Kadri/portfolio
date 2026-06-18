@@ -2,7 +2,7 @@
  * LIGHT MODE — coherent system (no random patches)
  *
  * Rule of thumb:
- *   - PAGE background  = soft blue-grey radial gradient (NEVER pure white)
+ *   - PAGE background  = one flat blue-grey app surface
  *   - Every CONTENT FRAME / CARD / SECTION = clean white + soft blue border
  *   - NESTED rows/items = same white, only-slightly-softer border
  *   - Inputs            = near-white blue-grey + visible blue border
@@ -21,11 +21,9 @@
  * 1.  TOKENS
  * ────────────────────────────────────────────────────────────────────────── */
 body:not(.night) {
-  /* Page surface — soft blue-grey, not white, not muddy */
-  --lm-page-bg:
-    radial-gradient(circle at 12% 0%, rgba(96, 165, 250, 0.18) 0%, transparent 42%),
-    radial-gradient(circle at 88% 100%, rgba(14, 165, 233, 0.16) 0%, transparent 46%),
-    linear-gradient(160deg, #eef3fa 0%, #d9e3f2 55%, #dbe5f3 100%);
+  /* Page surface: flat, not height-dependent. */
+  --minallo-page-bg: #f8fafc;
+  --lm-page-bg: var(--minallo-page-bg);
 
   /* Text */
   --lm-text: #172033;
@@ -67,10 +65,10 @@ body:not(.night) {
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
 
   /* Aliases so feature CSS that reads --text/--muted/etc. still works */
-  --bg: #eef3fa;
-  --dp-solid: #eef3fa;
-  --dp-bg: var(--lm-page-bg);
-  --app-bg: var(--lm-page-bg);
+  --bg: var(--minallo-page-bg);
+  --dp-solid: var(--minallo-page-bg);
+  --dp-bg: var(--minallo-page-bg);
+  --app-bg: var(--minallo-page-bg);
   --dp-modal: linear-gradient(155deg, #ffffff 0%, #f7f9fd 100%);
   --text: var(--lm-text);
   --muted: var(--lm-muted);
@@ -144,10 +142,20 @@ body:not(.night) .pdf-text-layer ::-moz-selection {
  * ────────────────────────────────────────────────────────────────────────── */
 html:has(body:not(.night)),
 body:not(.night),
+body:not(.night) #ss-sections-root,
+body:not(.night) #root,
 body:not(.night) #portal,
+body:not(.night) #portal .shell,
+body:not(.night) #portal .main,
+body:not(.night) #portal .main .main-scroll,
+body:not(.night) #portal #app,
+body:not(.night) #portal #app .app-body,
 body:not(.night) .portal-shell,
 body:not(.night) .page-shell,
 body:not(.night) .app-shell,
+body:not(.night) .main-content,
+body:not(.night) .page-content,
+body:not(.night) .portal-section,
 body:not(.night) .courses-page,
 body:not(.night) .course-page,
 body:not(.night) .practice-page,
@@ -158,7 +166,8 @@ body:not(.night) #aiTutor,
 body:not(.night) .editor-portal-section,
 body:not(.night) .games-hub,
 body:not(.night) .gl-shell {
-  background: var(--app-bg, var(--lm-page-bg)) !important;
+  background: var(--minallo-page-bg, var(--app-bg, var(--lm-page-bg))) !important;
+  background-image: none !important;
   color: var(--lm-text) !important;
 }
 

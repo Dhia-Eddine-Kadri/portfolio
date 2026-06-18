@@ -26,7 +26,9 @@
 }
 
 html,
-body {
+body,
+#ss-sections-root,
+#root {
   min-height: 100%;
   font-family: var(--font-main);
   font-size: 16px;
@@ -35,7 +37,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: contain;
-  background: var(--app-bg, var(--dp-bg));
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
 }
 
 button,
@@ -553,7 +556,8 @@ body:not(.night) .rag-fb-btn {
   overflow-x: hidden;
   display: none;
   min-height: 100dvh;
-  background: var(--app-bg, var(--dp-bg));
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
   background-attachment: fixed;
 }
 #portal.show {
@@ -1010,7 +1014,8 @@ body:not(.night) .pc-icon {
   display: none;
   flex-direction: column;
   z-index: 10;
-  background: var(--app-bg, var(--dp-bg));
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg)));
+  background-image: none;
   overflow-x: hidden;
 }
 .topbar {
