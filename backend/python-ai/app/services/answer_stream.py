@@ -39,6 +39,7 @@ from .answer import (
     MINALLO_APP_CONTEXT,
     _APP_ONLY_SYSTEM_PROMPT,
     _build_context_block,
+    build_exam_style_overlay,
     build_source_coverage_overlay,
     lint_exam_output,
     _cited_indices,
@@ -1091,6 +1092,15 @@ def stream_answer(
         system_prompt += build_source_coverage_overlay(
             used_chunks, doc_names, exam=is_exam_request,
             selected_file_names=selected_file_names,
+        )
+    # Subject-aware exam style: exercise/solution sheets for a calculation
+    # subject (Technische Mechanik, Mathe, Physik) get a calculation-heavy exam
+    # (Rechenaufgaben + Kurzfragen, full worked Kurzlösung, unit checks) instead
+    # of the lecture-slide theory exam. No-op (theory) for lecture material.
+    if is_exam_request and used_chunks:
+        exam_doc_ids = {c.document_id for c in used_chunks if getattr(c, "document_id", None)}
+        system_prompt += build_exam_style_overlay(
+            question, used_chunks, doc_ids=exam_doc_ids, user_id=user_id,
         )
     # An exercise/figure page bitmap will be attached below whenever retrieval
     # surfaced a figure-bearing chunk on a math/exercise question — even if the

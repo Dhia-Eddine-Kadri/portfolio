@@ -26,7 +26,7 @@ from typing import Any
 
 from ..config import get_settings
 from .openai_client import get_openai_client
-from .document_context import understanding_block_for_ids
+from .document_context import source_type_buckets, understanding_block_for_ids
 from .answer_intent import (
     AcademicIntent,
     classify_academic_intent,
@@ -1233,6 +1233,177 @@ def _build_context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]
     return body
 
 
+# ── Exam-style detection (calculation-heavy vs theory) ──────────────────────
+# Different subjects need different exams. Lecture-slide subjects (e.g.
+# Fertigungstechnik) want theory tasks; exercise/solution sheets for a
+# calculation subject (Technische Mechanik, Mathe, Physik, ET) want numerical
+# Rechenaufgaben. The generic EXAM_GENERATION prompt is lecture-biased, so when
+# the selection is exercise material we append a calculation-exam override.
+
+# Cue verbs/nouns that mark a quantitative (calculation) request or source.
+_QUANT_CUE_RE = re.compile(
+    r"\b("
+    r"berechne|berechnen|bestimme|bestimmen|ermittle|ermitteln|"
+    r"l(?:ö|oe)se|l(?:ö|oe)sen|rechn\w*|gegeben|gesucht|"
+    r"calculate|compute|determine|solve|evaluate|"
+    r"geschwindigkeit|beschleunigung|winkelgeschwindigkeit|drehzahl|"
+    r"kinematik|kinetik|impuls|energie|moment|kraft|schwingung|"
+    r"velocity|acceleration|momentum|torque|angular"
+    r")\b",
+    re.IGNORECASE,
+)
+# Theory verbs typical of lecture-slide exams.
+_THEORY_CUE_RE = re.compile(
+    r"\b("
+    r"erkl(?:ä|ae)r\w*|erl(?:ä|ae)uter\w*|beschreib\w*|nenne\w*|"
+    r"vergleich\w*|diskutier\w*|begr(?:ü|ue)nd\w*|skizzier\w*|"
+    r"definier\w*|klassifizier\w*|ordnen\s+sie\s+ein|"
+    r"explain|describe|compare|discuss|define|classify|"
+    r"list\b|outline|summari[sz]e"
+    r")\b",
+    re.IGNORECASE,
+)
+# The student explicitly asking for exercise/calculation-style material.
+_EXERCISE_REQUEST_RE = re.compile(
+    r"\b("
+    r"(?:ü|ue)bung\w*|aufgabenbl\w*|rechenaufgab\w*|"
+    r"exercise\w*|worksheet\w*|problem\s*sheet|"
+    r"l(?:ö|oe)sungsbl\w*|solved\s+(?:exercise|example)\w*|worked\s+example\w*|"
+    r"calculation\w*"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def detect_exam_style(
+    question: str,
+    chunks: list[RetrievedChunk] | None,
+    *,
+    doc_ids: set[str] | list[str] | None = None,
+    user_id: str | None = None,
+) -> str:
+    """Return the exam style for EXAM_GENERATION: ``"quantitative"`` |
+    ``"hybrid"`` | ``"theory"`` (the default — keeps the existing behaviour).
+
+    Combines three signals: the SELECTED source types (exercise/solution sheets
+    vs lecture/reference), the retrieved CHUNKS (exercise chunk types, formulas +
+    given values, calc-vs-theory cue density), and the USER's wording ("similar
+    to the Übungen", "calculation questions").
+    """
+    chunks = chunks or []
+
+    # 1) What the selected SOURCES are (strongest signal when available).
+    exercise_docs = lecture_docs = 0
+    if doc_ids:
+        counts = source_type_buckets(list(doc_ids), user_id=user_id)
+        exercise_docs = counts.get("exercise", 0) + counts.get("solution", 0)
+        lecture_docs = counts.get("lecture", 0) + counts.get("reference", 0) + counts.get("exam", 0)
+
+    # 2) What the retrieved CHUNKS look like.
+    ex_chunks = sum(
+        1 for c in chunks if (getattr(c, "chunk_type", "") or "") in ("exercise", "solution")
+    )
+    joined = "\n".join((getattr(c, "text", "") or "") for c in chunks[:8])
+    quant_hits = len(_QUANT_CUE_RE.findall(joined))
+    theory_hits = len(_THEORY_CUE_RE.findall(joined))
+    has_formula_and_values = (
+        _any_chunk_has_formula(chunks) and len(_GIVEN_VALUE_RE.findall(joined)) >= 2
+    )
+
+    has_quant_evidence = (
+        ex_chunks > 0
+        or exercise_docs > lecture_docs
+        or has_formula_and_values
+        or quant_hits > theory_hits + 2
+    )
+    has_theory_evidence = (
+        lecture_docs > exercise_docs
+        or (theory_hits > quant_hits and not has_quant_evidence)
+    )
+
+    # 3) What the USER explicitly asked for.
+    q = question or ""
+    user_quant = bool(_EXERCISE_REQUEST_RE.search(q) or _QUANT_CUE_RE.search(q))
+
+    if user_quant and has_quant_evidence:
+        return "quantitative"
+    if has_quant_evidence and not has_theory_evidence:
+        return "quantitative"
+    if user_quant or has_quant_evidence:
+        return "hybrid"
+    return "theory"
+
+
+_QUANTITATIVE_EXAM_OVERLAY = (
+    "\n\nEXAM STYLE — CALCULATION-HEAVY (this OVERRIDES the generic exam-mix guidance above). "
+    "The selected sources are exercise / solution / problem sheets for a calculation-based "
+    "subject (e.g. Technische Mechanik, Mathematik, Physik, Elektrotechnik). The student wants "
+    "an exam in the style of those Übungen: mostly numerical Rechenaufgaben, NOT a theory exam.\n"
+    "STRUCTURE:\n"
+    "- Teil A: Rechenaufgaben — 70-80% of the total points and the main part of the exam. "
+    "Keep ONE `## Aufgabe N` per selected source file (this still satisfies the coverage list), "
+    "framed as a numerical calculation task.\n"
+    "- Teil B: Kurzfragen — the remaining 20-30% of the points: 4-8 short conceptual questions "
+    "worth a few points each, under `## Kurzfrage N` headings (NOT `## Aufgabe`).\n"
+    "- Do NOT make the exam mostly explanations. Verbs like erläutern, diskutieren, begründen, "
+    "'zeigen Sie, dass …' or 'leiten Sie … her' belong in Teil B or as ONE small subpart — never "
+    "as the bulk of Teil A.\n"
+    "EACH RECHENAUFGABE must have this shape: a short realistic scenario, then a `**Gegeben:**` "
+    "list of concrete numeric values WITH units, then `**Gesucht:**` with subquestions a), b), c) "
+    "(d) that ask the student to COMPUTE specific unknowns (Berechnen/Bestimmen/Ermitteln Sie …).\n"
+    "DO NOT GIVE THE ANSWER AWAY: never put the final formula or result in the question text "
+    "(no 'Zeigen Sie, dass v² = …', no 'Leiten Sie das Resultat … her'). Ask for the unknown and "
+    "let the student derive and compute it.\n"
+    "GENERATE NEW PROBLEMS — do not copy the sheet. The sources are solved exercises, so identify "
+    "each one's underlying PATTERN (the concept and the kind of unknown), then create a NEW problem "
+    "of the same type with DIFFERENT numbers. Never reuse a solution sheet's exact numbers and never "
+    "ask the student to repeat a derivation already printed in the source.\n"
+    "KURZLÖSUNG (mandatory, complete) — for EVERY Rechenaufgabe show the full worked steps: "
+    "Gegeben → Gesucht → Ansatz/Formel → Einsetzen (with the numbers) → Rechnung → Ergebnis with "
+    "the correct UNIT, plus a one-line plausibility note where useful. For Kurzfragen a concise "
+    "2-4 line answer (with the key formula) is enough.\n"
+    "NUMERICAL CORRECTNESS — verify every result BEFORE finalising:\n"
+    "- Unit conversions: n in min⁻¹ → ω = n·2π/60 in rad/s; degrees → radians where needed; cm/mm → m.\n"
+    "- Number of revolutions: N = φ/(2π) — do not forget the 2π factor.\n"
+    "- Normal acceleration uses ω² (a_n = r·ω²); tangential acceleration a_t = r·α.\n"
+    "- Distinguish an ANGLE α from an angular acceleration α; use radius (not diameter) unless the "
+    "formula calls for diameter.\n"
+    "- Check dimensions (m/s, m/s², rad/s, rad/s², J, kg·m/s) and do a rough plausibility check on "
+    "each numeric result; fix any value that fails the check before writing the Kurzlösung.\n"
+    "- Match the language of the course material (German sources → German exam).\n"
+)
+
+_HYBRID_EXAM_OVERLAY = (
+    "\n\nEXAM STYLE — HYBRID (calculation-leaning). The selection MIXES calculation material "
+    "(exercise/solution sheets) with lecture/theory material, so build a balanced exam: roughly "
+    "60-70% numerical Rechenaufgaben (Teil A) and 30-40% theory Kurzfragen (Teil B, under "
+    "`## Kurzfrage N`). Every Rechenaufgabe uses a `**Gegeben:**` / `**Gesucht:**` structure with "
+    "concrete numbers and asks the student to COMPUTE the unknowns — never put the final formula or "
+    "result in the question. The Kurzlösung must show full worked steps (Ansatz → Einsetzen → "
+    "Ergebnis with units) for every calculation, and verify units/conversions (ω = n·2π/60, the 2π "
+    "in the revolution count N = φ/(2π), a_n = r·ω²) before finalising. Keep theory verbs (erläutern, "
+    "vergleichen, diskutieren) in Teil B only. Match the course language.\n"
+)
+
+
+def build_exam_style_overlay(
+    question: str,
+    chunks: list[RetrievedChunk] | None,
+    *,
+    doc_ids: set[str] | list[str] | None = None,
+    user_id: str | None = None,
+) -> str:
+    """Style override for EXAM_GENERATION based on what the selected sources are.
+    Empty for the ``theory`` default (the existing lecture-exam behaviour is
+    unchanged); the calculation override only fires for exercise material."""
+    style = detect_exam_style(question, chunks, doc_ids=doc_ids, user_id=user_id)
+    if style == "quantitative":
+        return _QUANTITATIVE_EXAM_OVERLAY
+    if style == "hybrid":
+        return _HYBRID_EXAM_OVERLAY
+    return ""
+
+
 def build_source_coverage_overlay(
     chunks: list[RetrievedChunk],
     doc_names: dict[str, str],
@@ -1464,6 +1635,12 @@ def generate_answer(
     is_exam_request = academic_intent == AcademicIntent.EXAM_GENERATION
     if (is_exam_request or wants_per_source_coverage(question)) and used_chunks:
         system_prompt += build_source_coverage_overlay(used_chunks, doc_names, exam=is_exam_request)
+    # Subject-aware exam style: exercise/solution sheets for a calculation
+    # subject (Technische Mechanik, Mathe, Physik) get a calculation-heavy exam
+    # instead of the lecture-slide theory exam. No-op (theory) otherwise.
+    if is_exam_request and used_chunks:
+        exam_doc_ids = {c.document_id for c in used_chunks if getattr(c, "document_id", None)}
+        system_prompt += build_exam_style_overlay(question, used_chunks, doc_ids=exam_doc_ids)
     # Route by answer mode: math/exercise questions hit the strong model,
     # everything else stays on the cheaper mini model. Math reasoning is
     # where mini gets variable distinctions wrong (d vs d_3) and silently

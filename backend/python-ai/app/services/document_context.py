@@ -204,9 +204,31 @@ def understanding_block_for_ids(
         return ""
 
 
+def source_type_buckets(
+    document_ids: Iterable[str] | None,
+    *,
+    user_id: str | None = None,
+) -> dict[str, int]:
+    """Count selected documents per behaviour bucket (exam/lecture/exercise/
+    solution/reference/unknown). Lets a feature adapt to WHAT the selection is
+    — e.g. exam generation choosing a calculation vs theory style. Best-effort:
+    returns ``{}`` on any failure or when the migration isn't applied yet."""
+    try:
+        ctxs = load_document_understanding(document_ids, user_id=user_id)
+    except Exception:  # noqa: BLE001 — additive, never fatal
+        log.exception("source_type_buckets failed")
+        return {}
+    counts: dict[str, int] = {}
+    for c in ctxs.values():
+        bucket = _effective_bucket(c)
+        counts[bucket] = counts.get(bucket, 0) + 1
+    return counts
+
+
 __all__ = (
     "DocContext",
     "build_understanding_prompt_block",
     "load_document_understanding",
+    "source_type_buckets",
     "understanding_block_for_ids",
 )
