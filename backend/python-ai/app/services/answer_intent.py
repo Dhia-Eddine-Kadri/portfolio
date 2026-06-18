@@ -20,6 +20,11 @@ class AcademicIntent(str, Enum):
     QUIZ_GENERATION = "quiz_generation"
     EXAM_GENERATION = "exam_generation"
     FLASHCARD_GENERATION = "flashcard_generation"
+    # Distinct student workflows with their own output shape (added 2026-06-18).
+    ANSWER_CORRECTION_OR_GRADING = "answer_correction_or_grading"
+    PRACTICE_VARIANT_GENERATION = "practice_variant_generation"
+    FORMULA_EXTRACTION = "formula_extraction"
+    SOURCE_FINDING = "source_finding"
     CASE_OR_APPLICATION_REASONING = "case_or_application_reasoning"
     GENERAL_COURSE_QA = "general_course_qa"
     APP_QUESTION = "app_question"
@@ -105,6 +110,56 @@ _PER_SOURCE_COVERAGE_RE = re.compile(
     re.IGNORECASE,
 )
 _FLASHCARD_RE = re.compile(r"\b(flashcards?|karteikarten?|anki)\b", re.IGNORECASE)
+# Grading / checking the student's OWN submitted work. High precision: requires
+# self-reference ("my/this answer|solution|work") or an explicit grading ask, so
+# a plain "is X correct?" stays normal Q&A. Absorbs the chatbot "check my work".
+_GRADING_RE = re.compile(
+    r"\b(?:is|are|war|ist|sind)\s+(?:my|this|these|mein\w*|das|die)\s+"
+    r"(?:answer|solution|approach|work|attempt|antwort\w*|l(?:ö|oe)sung\w*|rechnung\w*|ansatz)"
+    r"\s+(?:correct|right|ok(?:ay)?|wrong|richtig|korrekt|falsch)"
+    r"|\b(?:correct|grade|check|rate|mark|improve|fix|review)\s+my\s+"
+    r"(?:answer|solution|work|attempt|antwort\w*|l(?:ö|oe)sung\w*)"
+    r"|\b(?:korrigier\w*|bewert\w*|benot\w*)\s+(?:meine?\w*|das|die)"
+    r"|\bhow\s+many\s+points\b|\bwie\s+viele?\s+punkte\b"
+    r"|\bwhat(?:'s| is|s)?\s+(?:wrong|missing)\s+(?:with|in)\s+my\b"
+    r"|\bwhere\s+did\s+i\s+(?:go\s+wrong|make\s+(?:a\s+)?mistake)\b"
+    r"|\bcheck\s+my\s+work\b|\bgrade\s+(?:this|my)\b",
+    re.IGNORECASE,
+)
+# A single practice VARIANT of an existing problem — not a quiz set, not a full
+# exam. "another Aufgabe like this", "change the numbers", "let me practice this".
+_PRACTICE_VARIANT_RE = re.compile(
+    r"\b(?:another|similar|one\s+more|a\s+new|noch\s+eine?|weitere?|(?:ä|ae)hnlich\w*)\s+"
+    r"(?:aufgabe|task|problem|exercise|(?:ü|ue)bung\w*)"
+    r"|\b(?:practice|(?:ü|ue)b\w*)\s+this\s+type\b|\blet\s+me\s+practice\b"
+    r"|\bchange\s+the\s+(?:numbers|values)\b|\b(?:ä|ae)ndere\s+die\s+(?:zahlen|werte)\b"
+    r"|\b(?:with|but\s+with|mit)\s+(?:different|other|anderen)\s+(?:numbers|values|zahlen|werten)\b"
+    r"|\blike\s+this\s+one\s+but\b|\bwie\s+diese[rs]?\s+aber\b",
+    re.IGNORECASE,
+)
+# Extract / list the formulas (build a Formelsammlung) — NOT explain one formula.
+_FORMULA_EXTRACTION_RE = re.compile(
+    r"\bformelsammlung\b"
+    r"|\b(?:list|give\s+me|extract|collect|sammle?|liste?(?:\s+(?:mir|alle))?)\b[^.?!\n]{0,30}"
+    r"\b(?:formula|formulae|formel\w*|equation|gleichung\w*)"
+    r"|\b(?:all|alle|every|welche)\b[^.?!\n]{0,20}\b(?:formula|formulae|formel\w*|equation|gleichung\w*)"
+    r"|\bwhat\s+(?:formula|formulae|formel\w*|equation)s?\b[^.?!\n]{0,25}\b(?:do\s+i\s+need|need|use|important)"
+    r"|\b(?:formula|formel\w*|equation)s?\b[^.?!\n]{0,20}\b(?:brauche\s+ich|do\s+i\s+need)",
+    re.IGNORECASE,
+)
+# Source / citation lookup: WHERE is something stated. Keeps it to a short
+# file/page answer instead of a full re-explanation.
+_SOURCE_FINDING_RE = re.compile(
+    r"\bwhere\s+(?:is|are|was|does|did|can\s+i\s+find)\b[^.?!\n]{0,45}"
+    r"\b(?:mention\w*|state\w*|said|cover\w*|defin\w*|discuss\w*|written|in\s+the\s+(?:file|slide|lecture|chapter|notes|pdf))"
+    r"|\bwhich\s+(?:file|document|chapter|slide|lecture|pdf|source|kapitel|datei|folie|vorlesung)\b"
+    r"|\bin\s+which\s+(?:file|document|chapter|slide|lecture|kapitel|datei|folie|vorlesung)\b"
+    r"|\bshow\s+me\s+(?:the\s+)?(?:source|where\s+it)\b|\bcite\s+(?:the\s+)?(?:source|file|page)\b"
+    r"|\bwhere\s+did\s+you\s+get\s+(?:that|this|it)\b"
+    r"|\bwo\s+(?:steht|wird|findet|kommt)\b|\bin\s+welche[rm]\s+(?:datei|vorlesung|kapitel|folie)\b"
+    r"|\bquelle\s+(?:angeben|nennen|f(?:ü|ue)r)\b",
+    re.IGNORECASE,
+)
 _CASE_RE = re.compile(
     r"\b("
     r"case|scenario|patient|diagnosis|treatment|symptoms?|clinical|"
@@ -211,6 +266,19 @@ def classify_academic_intent(
     # keyword and falls through to here.
     if _EXAM_GEN_RE.search(text):
         return AcademicIntent.EXAM_GENERATION
+
+    # Distinct student workflows, checked before the math/concept fallbacks so a
+    # self-referential "is my solution correct?" or "where is this stated?" gets
+    # its own structure instead of a generic explanation. High precision (see the
+    # regexes) so a plain question never trips them.
+    if _GRADING_RE.search(text):
+        return AcademicIntent.ANSWER_CORRECTION_OR_GRADING
+    if _PRACTICE_VARIANT_RE.search(text):
+        return AcademicIntent.PRACTICE_VARIANT_GENERATION
+    if _FORMULA_EXTRACTION_RE.search(text):
+        return AcademicIntent.FORMULA_EXTRACTION
+    if _SOURCE_FINDING_RE.search(text):
+        return AcademicIntent.SOURCE_FINDING
 
     no_solve = bool(_NO_SOLVE_RE.search(text))
     calc_verb = bool(_CALC_VERB_RE.search(text))
@@ -329,6 +397,29 @@ def intent_style_instruction(intent: AcademicIntent | str | None) -> str:
             "- Use the EXACT technical terms from the source so a student sees what earns the marks. For calculation subparts state the formula AND the expected/worked result; for classification subparts give the actual categories; for 'name N …' subparts list N real items; for 'explain the process' subparts give the FULL ordered process steps (e.g. Spritzgießen: Plastifizieren → Einspritzen → Nachdruck → Abkühlen/Erstarren → Werkzeug öffnen → Auswerfen).",
             "- ABSOLUTELY NO PLACEHOLDERS in the Kurzlösung. Never write '…', '...', 'stichpunktartig ergänzen', 'analog (zu oben)', 'für jede (weitere) Aufgabe …', 'etc.', 'usw.' or a single summary line in place of an answer. Every single Aufgabe must be answered in full, even if that makes the Kurzlösung long — completeness overrides brevity.",
             "- Match the language of the course material (German course → German exam).",
+        ])
+    elif intent == AcademicIntent.ANSWER_CORRECTION_OR_GRADING:
+        lines.extend([
+            "- Treat this as GRADING the student's OWN submitted answer/solution — evaluate it, do NOT just re-explain the topic or solve it from scratch.",
+            "- Use this exact structure: `## Verdict` (Correct / Partly correct / Wrong), `## Estimated points` (X / Y — only if a point total is known or implied, else omit), `## What is good`, `## What is missing or wrong` (name the FIRST wrong step for a multi-step solution), `## Corrected answer` (only the parts that need fixing — don't rewrite what was already right), `## Exam tip` (one line).",
+            "- Ground the judgement in the COURSE CONTEXT / expected method; if the student's work isn't actually included in the message, ask them to paste it instead of inventing one.",
+        ])
+    elif intent == AcademicIntent.PRACTICE_VARIANT_GENERATION:
+        lines.extend([
+            "- Treat this as PRACTICE-VARIANT generation: produce ONE new exercise of the SAME type as the referenced problem, with DIFFERENT numbers/context and comparable difficulty. Do not just restate the original.",
+            "- For a calculation subject use a `**Gegeben:**` / `**Gesucht:**` structure with concrete numeric values and units, and ask for the unknown(s).",
+            "- Put the full step-by-step solution in a SEPARATE `## Lösung` section at the very end (so the student can attempt it first); never reveal the result inside the task statement.",
+        ])
+    elif intent == AcademicIntent.FORMULA_EXTRACTION:
+        lines.extend([
+            "- Treat this as FORMULA EXTRACTION: list the formulas the SOURCE actually contains as a compact Formelsammlung — do NOT write prose explanations or solve anything.",
+            "- For each formula give: the formula (copied EXACTLY from the source — same symbols, same numerator/denominator), its variables with units, and a short 'used for / condition' note.",
+            "- NEVER invent or guess a formula that is not in the retrieved source. If a needed formula isn't present, say so rather than fabricating it.",
+        ])
+    elif intent == AcademicIntent.SOURCE_FINDING:
+        lines.extend([
+            "- Treat this as a SOURCE-FINDING request: the student wants WHERE something is, not a full explanation. Answer with the exact file name and the page/section/`[Source N]` where it appears, plus a SHORT quote or one-line summary of the relevant part.",
+            "- Keep it brief — do NOT generate a long explanation unless the student also asked for one. If it isn't in the selected sources, say so plainly instead of guessing a location.",
         ])
     elif intent == AcademicIntent.FLASHCARD_GENERATION:
         lines.append("- Treat this as flashcard generation: use compact front/back cards grounded in the provided material.")

@@ -58,6 +58,51 @@ def test_math_false_positives_stay_non_math(question: str) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("question", "intent"),
+    [
+        # Grading / checking the student's own work.
+        ("is my answer correct?", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        ("correct my solution", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        ("how many points would I get?", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        ("check my work", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        ("where did I make a mistake", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        ("korrigiere meine Loesung", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),
+        # Practice variant of an existing problem.
+        ("give me another Aufgabe like this", AcademicIntent.PRACTICE_VARIANT_GENERATION),
+        ("make a similar problem", AcademicIntent.PRACTICE_VARIANT_GENERATION),
+        ("let me practice this type", AcademicIntent.PRACTICE_VARIANT_GENERATION),
+        # Formula extraction / Formelsammlung.
+        ("list all formulas from this chapter", AcademicIntent.FORMULA_EXTRACTION),
+        ("make a Formelsammlung", AcademicIntent.FORMULA_EXTRACTION),
+        ("what formulas do I need for the exam", AcademicIntent.FORMULA_EXTRACTION),
+        # Source / citation lookup.
+        ("where is the Grove diagram mentioned?", AcademicIntent.SOURCE_FINDING),
+        ("which file says this", AcademicIntent.SOURCE_FINDING),
+        ("show me the source", AcademicIntent.SOURCE_FINDING),
+        ("in which chapter is this defined", AcademicIntent.SOURCE_FINDING),
+    ],
+)
+def test_classifies_new_student_workflow_intents(question: str, intent: AcademicIntent) -> None:
+    assert classify_academic_intent(question) == intent
+
+
+@pytest.mark.parametrize(
+    ("question", "intent"),
+    [
+        # High-precision: these must NOT trip the new intents (regression guard).
+        ("explain this formula", AcademicIntent.CONCEPTUAL_EXPLANATION),
+        ("where does energy come from in this reaction", AcademicIntent.GENERAL_COURSE_QA),
+        # "is X correct" without an answer/solution noun must NOT become grading.
+        ("is this proof correct", AcademicIntent.GENERAL_COURSE_QA),
+        ("create a quiz", AcademicIntent.QUIZ_GENERATION),
+        ("generate an exam from my files", AcademicIntent.EXAM_GENERATION),
+    ],
+)
+def test_new_intents_do_not_steal_existing_traffic(question: str, intent: AcademicIntent) -> None:
+    assert classify_academic_intent(question) == intent
+
+
 def test_deictic_visible_numeric_problem_routes_to_math() -> None:
     chunks = [
         SimpleNamespace(
