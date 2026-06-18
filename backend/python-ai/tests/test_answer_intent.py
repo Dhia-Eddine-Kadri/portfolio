@@ -102,10 +102,50 @@ def test_math_false_positives_stay_non_math(question: str) -> None:
         ("is this the same as that", AcademicIntent.MISCONCEPTION_CHECK),
         ("combine all the selected files", AcademicIntent.CROSS_FILE_SYNTHESIS),
         ("how do these topics relate", AcademicIntent.CROSS_FILE_SYNTHESIS),
+        # Batch 4: oral / complete-notes / fill-gaps / multi-source / output-review.
+        ("ask me like in an oral exam", AcademicIntent.ORAL_EXAM_PRACTICE),
+        ("pruef mich muendlich", AcademicIntent.ORAL_EXAM_PRACTICE),
+        ("ask me one question at a time", AcademicIntent.ORAL_EXAM_PRACTICE),
+        ("complete my notes", AcademicIntent.COMPLETE_NOTES),
+        ("extend my notes", AcademicIntent.COMPLETE_NOTES),
+        ("fill in the blanks", AcademicIntent.FILL_GAPS),
+        ("complete the missing terms", AcademicIntent.FILL_GAPS),
+        ("compare these two files", AcademicIntent.MULTI_SOURCE_COMPARISON),
+        ("compare chapter 4.1 and 4.2", AcademicIntent.MULTI_SOURCE_COMPARISON),
+        ("is this generated exam good?", AcademicIntent.GENERATED_OUTPUT_REVIEW),
+        ("rate this Minallo answer", AcademicIntent.GENERATED_OUTPUT_REVIEW),
+        ("why did the AI answer like this", AcademicIntent.GENERATED_OUTPUT_REVIEW),
     ],
 )
 def test_classifies_new_student_workflow_intents(question: str, intent: AcademicIntent) -> None:
     assert classify_academic_intent(question) == intent
+
+
+@pytest.mark.parametrize(
+    ("question", "intent"),
+    [
+        # Batch-4 guards: must keep existing routing.
+        ("create a quiz", AcademicIntent.QUIZ_GENERATION),
+        ("test me on chapter 3", AcademicIntent.QUIZ_GENERATION),
+        ("compare A and B", AcademicIntent.COMPARISON),                       # concepts, not files
+        ("compare photosynthesis and respiration", AcademicIntent.COMPARISON),
+        ("rate my answer", AcademicIntent.ANSWER_CORRECTION_OR_GRADING),      # student's, not AI's
+    ],
+)
+def test_batch4_intents_stay_high_precision(question: str, intent: AcademicIntent) -> None:
+    assert classify_academic_intent(question) == intent
+
+
+def test_self_contained_intents_skip_grounding() -> None:
+    from app.services.answer_intent import intent_is_self_contained as sc
+
+    assert sc(AcademicIntent.TRANSLATION)
+    assert sc(AcademicIntent.LANGUAGE_SIMPLIFICATION)
+    assert sc(AcademicIntent.GENERATED_OUTPUT_REVIEW)
+    # Grounded intents must NOT skip retrieval.
+    assert not sc(AcademicIntent.MISCONCEPTION_CHECK)
+    assert not sc(AcademicIntent.ORAL_EXAM_PRACTICE)
+    assert not sc(AcademicIntent.EXAM_GENERATION)
 
 
 @pytest.mark.parametrize(

@@ -32,6 +32,12 @@ class AcademicIntent(str, Enum):
     LANGUAGE_SIMPLIFICATION = "language_simplification"
     MISCONCEPTION_CHECK = "misconception_check"
     CROSS_FILE_SYNTHESIS = "cross_file_synthesis"
+    # Batch 4 (added 2026-06-18).
+    ORAL_EXAM_PRACTICE = "oral_exam_practice"
+    COMPLETE_NOTES = "complete_notes"
+    FILL_GAPS = "fill_gaps"
+    MULTI_SOURCE_COMPARISON = "multi_source_comparison"
+    GENERATED_OUTPUT_REVIEW = "generated_output_review"
     CASE_OR_APPLICATION_REASONING = "case_or_application_reasoning"
     GENERAL_COURSE_QA = "general_course_qa"
     APP_QUESTION = "app_question"
@@ -243,6 +249,51 @@ _CROSS_FILE_RE = re.compile(
     r"|\b(?:ü|ue)ber\s+alle\b[^.?!\n]{0,25}\b(?:dateien|kapitel|quellen)\s+hinweg",
     re.IGNORECASE,
 )
+# Interactive oral-exam simulation (one question at a time) — checked BEFORE quiz
+# so the conversational format wins over a one-shot question set.
+_ORAL_EXAM_RE = re.compile(
+    r"\boral\s+(?:exam|examination|test|pr(?:ü|ue)fung)\b"
+    r"|\bm(?:ü|ue)ndlich\w*\s+(?:pr(?:ü|ue)f\w*|examen|test)\b|\bpr(?:ü|ue)f\w*\s+mich\s+m(?:ü|ue)ndlich\b"
+    r"|\b(?:simulate|like\s+in|wie\s+(?:in|bei))\b[^.?!\n]{0,20}\boral\s+exam\b"
+    r"|\bask\s+me\b[^.?!\n]{0,30}\b(?:one\s+(?:question\s+)?at\s+a\s+time|one\s+by\s+one|like\s+(?:an?\s+)?(?:oral|examiner|professor))\b"
+    r"|\bviva\b",
+    re.IGNORECASE,
+)
+# Comparing the SELECTED FILES/CHAPTERS specifically (a table per file). Checked
+# before the generic COMPARISON; plain "compare A and B" stays COMPARISON.
+_MULTI_SOURCE_COMPARISON_RE = re.compile(
+    r"\b(?:compare|contrast|difference\s+between|unterschied\s+zwischen|vergleiche?)\b[^.?!\n]{0,40}"
+    r"\b(?:files?|chapters?|sources?|documents?|pdfs?|lectures?|dateien|quellen|vorlesungen|"
+    r"these\s+two|diese\s+(?:beiden|zwei))\b"
+    r"|\b(?:compare|vergleiche?)\b[^.?!\n]{0,15}\b(?:kapitel|chapter)\s*[\d.]+\b",
+    re.IGNORECASE,
+)
+# Extend / complete the student's OWN notes (preserve their structure).
+_COMPLETE_NOTES_RE = re.compile(
+    r"\b(?:complete|finish|extend|expand|erg(?:ä|ae)nze?|vervollst(?:ä|ae)ndige?)\b[^.?!\n]{0,20}"
+    r"\b(?:my\s+)?(?:notes?|notizen|aufzeichnungen|section|abschnitt)\b"
+    r"|\b(?:add|fill\s+in)\b[^.?!\n]{0,25}\b(?:what(?:'?s| is)?\s+missing|missing\s+(?:parts?|bits?|info|content))\b"
+    r"|\bmake\s+(?:my\s+)?notes?\s+complete\b",
+    re.IGNORECASE,
+)
+# Cloze / blanks completion.
+_FILL_GAPS_RE = re.compile(
+    r"\bfill\s+(?:in\s+)?(?:the\s+)?(?:blanks?|gaps?)\b"
+    r"|\bl(?:ü|ue)ckentext\b|\bf(?:ü|ue)lle?\s+die\s+l(?:ü|ue)cken\b"
+    r"|\bwhat\s+belongs\s+(?:here|in\s+the\s+(?:blank|gap))\b"
+    r"|\bcomplete\s+the\s+missing\s+(?:terms?|words?|parts?)\b",
+    re.IGNORECASE,
+)
+# Reviewing Minallo's OWN generated output (meta / self-audit). Requires explicit
+# AI/Minallo/generated context so it never steals "rate my answer" (grading).
+_OUTPUT_REVIEW_RE = re.compile(
+    r"\bis\s+(?:this|the)\s+(?:generated\s+)?(?:exam|quiz|answer|output|response)\s+(?:good|correct|ok|accurate)\b"
+    r"|\b(?:rate|review|audit|critique|evaluate)\b[^.?!\n]{0,25}\b(?:minallo|the\s+ai|ai|generated|your)\b"
+    r"[^.?!\n]{0,20}\b(?:answer|response|output|exam|quiz|generation)\b"
+    r"|\bwhat(?:'?s| is)?\s+wrong\s+with\s+(?:this|the|your)\s+(?:output|answer|response|exam|generation)\b"
+    r"|\bwhy\s+did\s+(?:you|the\s+ai|minallo)\b[^.?!\n]{0,20}\b(?:answer|generate|say|respond|output)\b",
+    re.IGNORECASE,
+)
 _CASE_RE = re.compile(
     r"\b("
     r"case|scenario|patient|diagnosis|treatment|symptoms?|clinical|"
@@ -336,12 +387,20 @@ def classify_academic_intent(
 
     if _FLASHCARD_RE.search(text):
         return AcademicIntent.FLASHCARD_GENERATION
+    # Oral exam BEFORE quiz: an interactive one-at-a-time viva must not collapse
+    # into a one-shot quiz set ("test me orally").
+    if _ORAL_EXAM_RE.search(text):
+        return AcademicIntent.ORAL_EXAM_PRACTICE
     if _QUIZ_RE.search(text):
         return AcademicIntent.QUIZ_GENERATION
     if _CODE_RE.search(text):
         return AcademicIntent.CODE_PROBLEM
     if _SUMMARY_RE.search(text):
         return AcademicIntent.COURSE_SUMMARY
+    # File/chapter comparison BEFORE the generic one so it gets the per-file
+    # table; plain "compare A and B" (concepts) stays COMPARISON.
+    if _MULTI_SOURCE_COMPARISON_RE.search(text):
+        return AcademicIntent.MULTI_SOURCE_COMPARISON
     if _COMPARISON_RE.search(text):
         return AcademicIntent.COMPARISON
     # Exam generation is checked after summary/comparison so "summary of the
@@ -368,10 +427,18 @@ def classify_academic_intent(
         return AcademicIntent.EXAM_PRIORITY_LIST
     if _SOURCE_FINDING_RE.search(text):
         return AcademicIntent.SOURCE_FINDING
+    # Reviewing Minallo's OWN output (meta) — before grading-ish/general so an
+    # explicit "rate this generated exam" doesn't fall through to a normal answer.
+    if _OUTPUT_REVIEW_RE.search(text):
+        return AcademicIntent.GENERATED_OUTPUT_REVIEW
     if _TRANSLATION_RE.search(text):
         return AcademicIntent.TRANSLATION
     if _LANGUAGE_SIMPLIFICATION_RE.search(text):
         return AcademicIntent.LANGUAGE_SIMPLIFICATION
+    if _COMPLETE_NOTES_RE.search(text):
+        return AcademicIntent.COMPLETE_NOTES
+    if _FILL_GAPS_RE.search(text):
+        return AcademicIntent.FILL_GAPS
     if _CROSS_FILE_RE.search(text):
         return AcademicIntent.CROSS_FILE_SYNTHESIS
     # Misconception last in this block: a "<claim>, right?" tag is the broadest
@@ -473,6 +540,22 @@ def intent_is_math_like(intent: AcademicIntent | str | None) -> bool:
     }
 
 
+# Intents that operate on the user's PROVIDED text (the message / selected /
+# visible passage) rather than retrieved course material, so they must NOT hit
+# the "no course material found" refusal when retrieval returned nothing.
+_SELF_CONTAINED_INTENTS = frozenset({
+    AcademicIntent.TRANSLATION,
+    AcademicIntent.LANGUAGE_SIMPLIFICATION,
+    AcademicIntent.GENERATED_OUTPUT_REVIEW,
+})
+
+
+def intent_is_self_contained(intent: AcademicIntent | str | None) -> bool:
+    """True for translate / simplify / review-a-pasted-artifact: these work off
+    the provided text, so a no-chunk retrieval must not trigger the weak refusal."""
+    return _normalise_intent(intent) in _SELF_CONTAINED_INTENTS
+
+
 def intent_allows_missing_input(intent: AcademicIntent | str | None) -> bool:
     return intent_is_math_like(intent)
 
@@ -571,6 +654,31 @@ def intent_style_instruction(intent: AcademicIntent | str | None) -> str:
             "- Treat this as CROSS-FILE SYNTHESIS across the selected sources. FIRST give a short per-file pass (one `### <file name>` block each, what that file contributes), THEN a `## Connection` section that synthesises how they relate.",
             "- Attribute each point to the file it came from (`[Source N]`); do NOT merge unrelated topics or invent links the sources don't support.",
         ])
+    elif intent == AcademicIntent.ORAL_EXAM_PRACTICE:
+        lines.extend([
+            "- Treat this as ORAL-EXAM PRACTICE: ask exactly ONE question at a time, grounded in the course material, then STOP and wait for the student's answer. Do NOT dump a list of questions or include the answer.",
+            "- On the next turn: give brief feedback on their answer, then ask ONE follow-up that goes a little deeper. Gradually increase difficulty. Keep it conversational, like a professor in a viva.",
+        ])
+    elif intent == AcademicIntent.COMPLETE_NOTES:
+        lines.extend([
+            "- Treat this as COMPLETING the student's OWN notes: PRESERVE their existing structure, headings and wording. Only ADD what is missing (definitions, formulas, examples, missing steps) grounded in the sources; mark added parts clearly.",
+            "- Do NOT rewrite or reorder what they already have unless they ask. If nothing important is missing, say so.",
+        ])
+    elif intent == AcademicIntent.FILL_GAPS:
+        lines.extend([
+            "- Treat this as FILLING GAPS/BLANKS: supply only the missing terms/values that belong in the blanks, keeping the original wording around them intact. Present the completed text (or a short list of blank → answer).",
+            "- Ground each fill in the sources; if a blank is ambiguous, give the most likely answer and flag it briefly.",
+        ])
+    elif intent == AcademicIntent.MULTI_SOURCE_COMPARISON:
+        lines.extend([
+            "- Treat this as a MULTI-SOURCE COMPARISON of the named files/chapters. Use a Markdown table with one column per source and rows for the key aspects (topic, main idea, key formulas/definitions, exam relevance).",
+            "- Attribute rows to the source (`[Source N]`); compare like-for-like and note where a source is silent on an aspect instead of inventing content.",
+        ])
+    elif intent == AcademicIntent.GENERATED_OUTPUT_REVIEW:
+        lines.extend([
+            "- Treat this as REVIEWING an AI-generated artifact the user is showing you (exam, answer, quiz). Evaluate it; do not regenerate it from scratch. Use: `## Rating`, `## What it did well`, `## Problems` (be specific), `## Source-grounding issues`, `## Technical/calculation issues`, `## How to improve`.",
+            "- Judge correctness against the COURSE CONTEXT where available; check formulas, numbers/units, depth, and whether claims are actually grounded.",
+        ])
     elif intent == AcademicIntent.FLASHCARD_GENERATION:
         lines.append("- Treat this as flashcard generation: use compact front/back cards grounded in the provided material.")
     elif intent == AcademicIntent.MIXED_MATH_AND_CONCEPT:
@@ -595,6 +703,7 @@ __all__ = (
     "classify_academic_intent",
     "intent_allows_missing_input",
     "intent_is_math_like",
+    "intent_is_self_contained",
     "intent_style_instruction",
     "is_non_academic_chitchat",
     "wants_per_source_coverage",

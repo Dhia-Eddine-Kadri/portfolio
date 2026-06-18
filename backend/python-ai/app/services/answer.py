@@ -32,6 +32,7 @@ from .answer_intent import (
     PROFESSOR_STYLE_INSTRUCTION,
     classify_academic_intent,
     intent_is_math_like,
+    intent_is_self_contained,
     intent_style_instruction,
     wants_per_source_coverage,
     wants_professor_style,
@@ -1019,7 +1020,13 @@ def pick_system_prompt(
     else:
         academic_intent = classify_academic_intent(question, chunks, {"tutor_mode": tutor_mode})
 
-    if strength == "weak":
+    if intent_is_self_contained(academic_intent) and strength != "strong":
+        # Translate / simplify / review-a-pasted-artifact operate on the user's
+        # PROVIDED text, so a no-chunk retrieval must not drop them into the
+        # PARTIAL/WEAK "no course material found" refusal. Use the capable
+        # template; the intent overlay tells it to work off the provided text.
+        base, label = _SYSTEM_PROMPT_STRONG, "strong"
+    elif strength == "weak":
         # Review fix #3 — partial retrieval mode. We DO have chunks, just
         # not enough confidence to solve. PARTIAL prompt surfaces them
         # with strict "don't solve" guard rails.
