@@ -3272,3 +3272,90 @@ body.night .co-inner-v2 .co-folder-section.co-folder-v2.folder-drop-target-activ
   line-height: 1.5;
   padding: 30px 20px;
 }
+
+/* Uniform page/content surfaces ------------------------------------------------
+ * Large workspace panels must not use vertical/radial gradients: when their
+ * content grows, those gradients make the upper and lower halves look like
+ * different page colors. Keep small action controls accented, but make the
+ * pages and long panels flat so every scroll position reads as one surface.
+ */
+body.night #portal,
+body.night #portal #app,
+body.night #portal .portal-section,
+body.night #courseOverview,
+body.night #psec-studip,
+body.night #psec-dashboard,
+body.night #psec-profile,
+body.night #psec-settings,
+body.night #psec-subscription,
+body.night #psec-admin,
+body.night #psec-aipage,
+body.night #psec-chat,
+body.night #psec-editor,
+body.night #psec-notes,
+body.night #psec-notifications,
+body.night #psec-games,
+body.night #psec-lounge,
+body.night #psec-german {
+  background: #0f172a !important;
+  background-image: none !important;
+}
+
+body:not(.night) #portal,
+body:not(.night) #portal #app,
+body:not(.night) #portal .portal-section,
+body:not(.night) #courseOverview,
+body:not(.night) #psec-studip,
+body:not(.night) #psec-dashboard,
+body:not(.night) #psec-profile,
+body:not(.night) #psec-settings,
+body:not(.night) #psec-subscription,
+body:not(.night) #psec-admin,
+body:not(.night) #psec-aipage,
+body:not(.night) #psec-chat,
+body:not(.night) #psec-editor,
+body:not(.night) #psec-notes,
+body:not(.night) #psec-notifications,
+body:not(.night) #psec-games,
+body:not(.night) #psec-lounge,
+body:not(.night) #psec-german {
+  background: #f8fafc !important;
+  background-image: none !important;
+}
+
+body.night .co-inner-v2 .co-hero,
+body.night .co-inner-v2 .co-card.co-card-v2,
+body.night .co-inner-v2 .co-files-inner-card,
+body.night .co-inner-v2 .co-next-steps,
+body.night .co-inner-v2 .qz-deck-pane,
+body.night .co-inner-v2 .fc-deck-pane,
+body.night .co-inner-v2 .qz-study-pane,
+body.night .co-inner-v2 .fc-study-pane,
+body.night #psec-studip .sd-hero,
+body.night #psec-studip .sd-daily-mission-card,
+body.night #psec-studip .sd-course-card {
+  background: rgba(15, 23, 42, 0.55) !important;
+  background-image: none !important;
+}
+
+body:not(.night) .co-inner-v2 .co-hero,
+body:not(.night) .co-inner-v2 .co-card.co-card-v2,
+body:not(.night) .co-inner-v2 .co-files-inner-card,
+body:not(.night) .co-inner-v2 .co-next-steps,
+body:not(.night) .co-inner-v2 .qz-deck-pane,
+body:not(.night) .co-inner-v2 .fc-deck-pane,
+body:not(.night) .co-inner-v2 .qz-study-pane,
+body:not(.night) .co-inner-v2 .fc-study-pane,
+body:not(.night) #psec-studip .sd-hero,
+body:not(.night) #psec-studip .sd-daily-mission-card,
+body:not(.night) #psec-studip .sd-course-card {
+  background: rgba(255, 255, 255, 0.72) !important;
+  background-image: none !important;
+}
+
+.co-inner-v2 .co-hero-glow,
+#psec-studip .sd-hero-glow,
+#psec-studip .sd-course-card::before,
+#psec-studip .sd-daily-mission-card::after {
+  display: none !important;
+}
