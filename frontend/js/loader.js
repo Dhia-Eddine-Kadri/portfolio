@@ -361,13 +361,13 @@
     // Inject feature CSS
     (function () {
         [
-            'css/base.css?v=6',
-            'css/theme.css?v=6',
-            'css/styles.css?v=43',
-            'css/courses-redesign.css?v=41',
+            'css/base.css?v=7',
+            'css/theme.css?v=7',
+            'css/styles.css?v=44',
+            'css/courses-redesign.css?v=42',
             'views/daily-mission/daily-mission.css?v=11',
             'css/app-design-system.css?v=6',
-            'css/layout.css?v=15',
+            'css/layout.css?v=16',
             'css/document-rail.css?v=28',
             'css/auth.css?v=5',
             'css/onboarding.css?v=1',
@@ -375,7 +375,7 @@
             'views/games/games.css',
             // Light-mode polish loads LAST so it wins source-order ties
             // against feature CSS that still hard-codes greys.
-            'css/light-mode.css?v=53',
+            'css/light-mode.css?v=54',
         ].forEach((href) => {
             const link = document.createElement('link');
             link.rel = 'stylesheet';
@@ -573,7 +573,6 @@
                     profile: ['views/profile/profile.js'],
                     settings: ['views/settings/settings.js'],
                     flashcards: ['js/utils/db-helpers.js', 'views/flashcards/flashcards.js'],
-                    quiz: ['js/utils/db-helpers.js', 'views/quiz/quiz.js'],
                     examforge: ['js/utils/db-helpers.js', 'views/examforge/examforge.js'],
                     cheatsheet: ['js/utils/db-helpers.js', 'views/cheatsheet/cheatsheet.js'],
                     deeplearn: ['js/utils/db-helpers.js', 'views/deep-learn/deep-learn.js'],
@@ -596,7 +595,6 @@
                     settings: ['views/settings/settings.css'],
                     subscription: ['views/subscription/subscription.css'],
                     flashcards: ['views/flashcards/flashcards.css'],
-                    quiz: ['views/quiz/quiz.css'],
                     examforge: ['views/examforge/examforge.css?v=2'],
                     cheatsheet: ['views/cheatsheet/cheatsheet.css'],
                     deeplearn: ['views/deep-learn/deep-learn.css'],

@@ -3323,9 +3323,6 @@ body:not(.night) #psec-german {
 }
 
 body.night .co-inner-v2 .co-hero,
-body.night .co-inner-v2 .co-card.co-card-v2,
-body.night .co-inner-v2 .co-files-inner-card,
-body.night .co-inner-v2 .co-next-steps,
 body.night .co-inner-v2 .qz-deck-pane,
 body.night .co-inner-v2 .fc-deck-pane,
 body.night .co-inner-v2 .qz-study-pane,
@@ -3338,9 +3335,6 @@ body.night #psec-studip .sd-course-card {
 }
 
 body:not(.night) .co-inner-v2 .co-hero,
-body:not(.night) .co-inner-v2 .co-card.co-card-v2,
-body:not(.night) .co-inner-v2 .co-files-inner-card,
-body:not(.night) .co-inner-v2 .co-next-steps,
 body:not(.night) .co-inner-v2 .qz-deck-pane,
 body:not(.night) .co-inner-v2 .fc-deck-pane,
 body:not(.night) .co-inner-v2 .qz-study-pane,
@@ -3349,6 +3343,20 @@ body:not(.night) #psec-studip .sd-hero,
 body:not(.night) #psec-studip .sd-daily-mission-card,
 body:not(.night) #psec-studip .sd-course-card {
   background: rgba(255, 255, 255, 0.72) !important;
+  background-image: none !important;
+}
+
+body.night .co-inner-v2 .co-card.co-card-v2,
+body.night .co-inner-v2 .co-files-inner-card,
+body.night .co-inner-v2 .co-next-steps {
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg))) !important;
+  background-image: none !important;
+}
+
+body:not(.night) .co-inner-v2 .co-card.co-card-v2,
+body:not(.night) .co-inner-v2 .co-files-inner-card,
+body:not(.night) .co-inner-v2 .co-next-steps {
+  background: var(--minallo-page-bg, var(--app-bg, var(--dp-bg))) !important;
   background-image: none !important;
 }
 
