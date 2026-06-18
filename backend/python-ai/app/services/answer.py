@@ -1656,7 +1656,11 @@ def generate_answer(
     # is tight enough to keep cost predictable.
     if model:
         target_model = model
-    elif answer_mode == "math" or wants_diagram:
+    elif answer_mode == "math" or wants_diagram or is_exam_request:
+        # Exams join the strong-model route (parity with stream_answer): a
+        # multi-section Probeklausur + Kurzlösung needs the stronger model's
+        # instruction-following and arithmetic, or mini drops sections and
+        # rounds the calculation answer key.
         target_model = settings.openai_generate_model_strong
     else:
         target_model = settings.openai_generate_model

@@ -91,9 +91,35 @@ def test_math_false_positives_stay_non_math(question: str) -> None:
         ("what should I focus on", AcademicIntent.EXAM_PRIORITY_LIST),
         ("what is likely to appear on the exam", AcademicIntent.EXAM_PRIORITY_LIST),
         ("most important topics", AcademicIntent.EXAM_PRIORITY_LIST),
+        # Batch 3: translation / simplification / misconception / cross-file.
+        ("translate this paragraph to English", AcademicIntent.TRANSLATION),
+        ("was heisst das auf Englisch", AcademicIntent.TRANSLATION),
+        ("what does this German sentence mean", AcademicIntent.TRANSLATION),
+        ("explain this in simpler terms", AcademicIntent.LANGUAGE_SIMPLIFICATION),
+        ("explain entropy for beginners", AcademicIntent.LANGUAGE_SIMPLIFICATION),
+        ("erklaere das einfacher", AcademicIntent.LANGUAGE_SIMPLIFICATION),
+        ("Kaltumformen happens above the recrystallization temperature, right?", AcademicIntent.MISCONCEPTION_CHECK),
+        ("is this the same as that", AcademicIntent.MISCONCEPTION_CHECK),
+        ("combine all the selected files", AcademicIntent.CROSS_FILE_SYNTHESIS),
+        ("how do these topics relate", AcademicIntent.CROSS_FILE_SYNTHESIS),
     ],
 )
 def test_classifies_new_student_workflow_intents(question: str, intent: AcademicIntent) -> None:
+    assert classify_academic_intent(question) == intent
+
+
+@pytest.mark.parametrize(
+    ("question", "intent"),
+    [
+        # Batch-3 high-precision guards (must keep existing routing).
+        ("study in German tonight", AcademicIntent.GENERAL_COURSE_QA),
+        ("explain entropy in English", AcademicIntent.CONCEPTUAL_EXPLANATION),
+        ("simplify this expression", AcademicIntent.MATH_PROBLEM),
+        ("compare A and B", AcademicIntent.COMPARISON),
+        ("summarize all files", AcademicIntent.COURSE_SUMMARY),
+    ],
+)
+def test_batch3_intents_stay_high_precision(question: str, intent: AcademicIntent) -> None:
     assert classify_academic_intent(question) == intent
 
 

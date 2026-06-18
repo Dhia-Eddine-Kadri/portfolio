@@ -27,6 +27,11 @@ class AcademicIntent(str, Enum):
     FORMULA_EXPLANATION = "formula_explanation"
     EXAM_PRIORITY_LIST = "exam_priority_list"
     SOURCE_FINDING = "source_finding"
+    # Batch 3 (added 2026-06-18).
+    TRANSLATION = "translation"
+    LANGUAGE_SIMPLIFICATION = "language_simplification"
+    MISCONCEPTION_CHECK = "misconception_check"
+    CROSS_FILE_SYNTHESIS = "cross_file_synthesis"
     CASE_OR_APPLICATION_REASONING = "case_or_application_reasoning"
     GENERAL_COURSE_QA = "general_course_qa"
     APP_QUESTION = "app_question"
@@ -198,6 +203,46 @@ _PROFESSOR_STYLE_RE = re.compile(
     r"|\b(?:answer|write|antworte?)\b[^.?!\n]{0,20}\blike\s+(?:in\s+)?(?:the\s+)?(?:lecture|script|skript|exam|klausur)\b",
     re.IGNORECASE,
 )
+# Translate the selected text / message into another language. High precision:
+# only an explicit translate request (bare "in German" would catch "study in
+# German"); "explain in English" stays a normal explanation.
+_TRANSLATION_RE = re.compile(
+    r"\b(?:translate|translation|(?:ü|ue)bersetz\w*)\b"
+    r"|\bwhat\s+does\b[^.?!\n]{0,40}\b(?:german|french|spanish|word|sentence|phrase)\b[^.?!\n]{0,15}\bmean\b"
+    r"|\bwas\s+hei(?:ß|ss)t\b[^.?!\n]{0,30}\bauf\s+(?:englisch|deutsch)",
+    re.IGNORECASE,
+)
+# Re-explain the SAME content in simpler language (NOT algebraic "simplify").
+_LANGUAGE_SIMPLIFICATION_RE = re.compile(
+    r"\b(?:in\s+)?(?:simpler|simple)\s+(?:terms|words|language|english|german)\b"
+    r"|\bmake\s+(?:it|this)\s+(?:simpler|easier)\b|\bsimplify\s+(?:the\s+)?(?:explanation|wording|language|text)\b"
+    r"|\bexplain\b[^.?!\n]{0,30}\b(?:for\s+(?:a\s+)?(?:beginners?|dummies|child(?:ren)?|5[-\s]?year)|like\s+i'?m\s+5|eli5)\b"
+    r"|\b(?:b1|b2|a2)\s+(?:level|niveau)\b|\beli5\b"
+    r"|\beinfacher?\s+(?:erkl(?:ä|ae)r\w*|formulier\w*|ausgedr(?:ü|ue)ckt)\b"
+    r"|\berkl(?:ä|ae)r\w*\b[^.?!\n]{0,20}\beinfacher?\b|\bin\s+einfachen\s+worten\b",
+    re.IGNORECASE,
+)
+# A stated (possibly wrong) assumption seeking confirmation: "<claim>, right?".
+# Anchored to the end so it's a confirmation tag, not a mid-sentence word.
+_MISCONCEPTION_RE = re.compile(
+    r",\s*(?:right|correct|true|oder|ne|gell)\s*\?\s*$"
+    r"|\bisn'?t\s+it\??\s*$|\bdoesn'?t\s+it\??\s*$|\bright\?\s*$"
+    r"|\b(?:stimmt(?:'s|\s+das)?|nicht\s+wahr|oder\s+nicht)\s*\?\s*$"
+    r"|\b(?:is|are|isn'?t|aren'?t)\s+(?:this|that|these|it)\s+the\s+same\s+as\b",
+    re.IGNORECASE,
+)
+# Combine / connect / synthesise ACROSS multiple selected files (not a 2-item
+# "compare A and B", which stays COMPARISON, and not "overview" → summary).
+_CROSS_FILE_RE = re.compile(
+    r"\b(?:combine|connect|synthesi[sz]e?|integrate|relate|link|tie\s+together|"
+    r"verbinde?|kombinier\w*|verkn(?:ü|ue)pf\w*)\b[^.?!\n]{0,40}"
+    r"\b(?:files?|chapters?|sources?|pdfs?|topics?|lectures?|documents?|notes|"
+    r"dateien|kapitel|quellen|themen|vorlesungen)\b"
+    r"|\bhow\s+do\s+(?:these|the|all)\b[^.?!\n]{0,30}\b(?:relate|connect|fit\s+together|link)"
+    r"|\bacross\s+(?:all|the|these)\s+(?:files?|chapters?|sources?|documents?)\b"
+    r"|\b(?:ü|ue)ber\s+alle\b[^.?!\n]{0,25}\b(?:dateien|kapitel|quellen)\s+hinweg",
+    re.IGNORECASE,
+)
 _CASE_RE = re.compile(
     r"\b("
     r"case|scenario|patient|diagnosis|treatment|symptoms?|clinical|"
@@ -323,6 +368,16 @@ def classify_academic_intent(
         return AcademicIntent.EXAM_PRIORITY_LIST
     if _SOURCE_FINDING_RE.search(text):
         return AcademicIntent.SOURCE_FINDING
+    if _TRANSLATION_RE.search(text):
+        return AcademicIntent.TRANSLATION
+    if _LANGUAGE_SIMPLIFICATION_RE.search(text):
+        return AcademicIntent.LANGUAGE_SIMPLIFICATION
+    if _CROSS_FILE_RE.search(text):
+        return AcademicIntent.CROSS_FILE_SYNTHESIS
+    # Misconception last in this block: a "<claim>, right?" tag is the broadest
+    # pattern, so let the specific intents above win first.
+    if _MISCONCEPTION_RE.search(text):
+        return AcademicIntent.MISCONCEPTION_CHECK
 
     no_solve = bool(_NO_SOLVE_RE.search(text))
     calc_verb = bool(_CALC_VERB_RE.search(text))
@@ -495,6 +550,26 @@ def intent_style_instruction(intent: AcademicIntent | str | None) -> str:
         lines.extend([
             "- Treat this as a SOURCE-FINDING request: the student wants WHERE something is, not a full explanation. Answer with the exact file name and the page/section/`[Source N]` where it appears, plus a SHORT quote or one-line summary of the relevant part.",
             "- Keep it brief — do NOT generate a long explanation unless the student also asked for one. If it isn't in the selected sources, say so plainly instead of guessing a location.",
+        ])
+    elif intent == AcademicIntent.TRANSLATION:
+        lines.extend([
+            "- Treat this as a TRANSLATION request: translate the user's text (or the selected/visible passage) into the requested language. Preserve the technical meaning exactly, keep formulas and symbols unchanged, and keep an important domain term in the original language in parentheses where a precise translation is ambiguous.",
+            "- Output ONLY the translation (no added explanation) unless the user also asked for one. Do NOT require course retrieval for this.",
+        ])
+    elif intent == AcademicIntent.LANGUAGE_SIMPLIFICATION:
+        lines.extend([
+            "- Treat this as LANGUAGE SIMPLIFICATION: re-state the SAME content in simpler language at the level the student asked for (e.g. B1/B2, beginner). Keep the technical meaning and the key technical terms — briefly gloss a hard term in parentheses — and do NOT add new facts the source doesn't support.",
+            "- Use short sentences. If a target level is named, match it; otherwise aim for clear, plain language.",
+        ])
+    elif intent == AcademicIntent.MISCONCEPTION_CHECK:
+        lines.extend([
+            "- The student is stating an assumption and asking for confirmation. FIRST check whether it is correct against the COURSE CONTEXT. If it's right, confirm briefly. If it's wrong, correct it GENTLY, do not just agree.",
+            "- When correcting, use: a one-line acknowledgement (e.g. 'Almost — the direction is reversed.'), `## Correct version`, `## Why`, and `## Exam wording` (how to phrase it correctly in an exam).",
+        ])
+    elif intent == AcademicIntent.CROSS_FILE_SYNTHESIS:
+        lines.extend([
+            "- Treat this as CROSS-FILE SYNTHESIS across the selected sources. FIRST give a short per-file pass (one `### <file name>` block each, what that file contributes), THEN a `## Connection` section that synthesises how they relate.",
+            "- Attribute each point to the file it came from (`[Source N]`); do NOT merge unrelated topics or invent links the sources don't support.",
         ])
     elif intent == AcademicIntent.FLASHCARD_GENERATION:
         lines.append("- Treat this as flashcard generation: use compact front/back cards grounded in the provided material.")
