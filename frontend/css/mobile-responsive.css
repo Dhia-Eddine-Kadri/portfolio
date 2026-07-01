@@ -357,6 +357,43 @@
   .pdf-toolbar-v2 .pdf-file-info .pdf-tb-title {
     max-width: calc(100vw - 120px);
   }
+
+  #pdfViewerWrap {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  #pdfViewerWrap .pdf-body,
+  #pdfViewerWrap .pdf-body-right {
+    padding: 8px 7px 18px !important;
+    gap: 10px !important;
+    align-items: center !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #pdfViewerWrap .pdf-bodies.is-split {
+    flex-direction: column;
+    --pdf-split-left: auto;
+  }
+
+  #pdfViewerWrap .pdf-bodies.is-split > #pdfBody,
+  #pdfViewerWrap .pdf-bodies.is-split > .pdf-right-pane {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 42dvh;
+  }
+
+  #pdfViewerWrap .pdf-bodies.is-split > .pdf-pane-divider {
+    display: none !important;
+  }
+
+  #pdfViewerWrap .pdf-page-wrap {
+    max-width: calc(100vw - 18px);
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 @media (max-width: 520px) {
@@ -411,6 +448,120 @@
 
   .ncb-input-row {
     padding: 6px 8px;
+  }
+
+  .pdf-toolbar-v2 .pdf-toolbar-inner {
+    padding: 8px 8px 7px !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-toolbar-top {
+    gap: 8px !important;
+    align-items: flex-start;
+  }
+
+  .pdf-toolbar-v2 .pdf-left {
+    gap: 8px !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-file-info strong {
+    font-size: 0.78rem !important;
+    max-width: calc(100vw - 108px) !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-file-info .pdf-tb-title {
+    font-size: 0.66rem !important;
+    max-width: calc(100vw - 108px) !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-toolbar-controls {
+    margin-top: 7px !important;
+    gap: 5px !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pdf-toolbar-v2 .pdf-toolbar-controls::-webkit-scrollbar,
+  .pdf-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pdf-toolbar-v2 .pdf-toolbar-button,
+  .pdf-toolbar-v2 .pdf-primary-button,
+  .pdf-toolbar-v2 .pdf-study-button {
+    height: 32px !important;
+    min-height: 32px !important;
+    border-radius: 10px !important;
+    padding: 0 9px !important;
+    font-size: 0.72rem !important;
+    gap: 5px !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-icon-button,
+  .pdf-toolbar-v2 .pdf-control-group .pdf-icon-button {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    padding: 0 !important;
+    border-radius: 9px !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-control-group {
+    height: 34px !important;
+    border-radius: 11px !important;
+    padding: 1px 3px !important;
+    flex: 0 0 auto;
+  }
+
+  .pdf-toolbar-v2 .pdf-page-info {
+    font-size: 0.72rem !important;
+    gap: 4px !important;
+    padding: 0 3px !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-page-input {
+    width: 20px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .pdf-toolbar-v2 .pdf-zoom-pct,
+  .pdf-toolbar-v2 .pdf-control-group .pdf-zoom-pct {
+    min-width: 42px !important;
+    height: 28px !important;
+    padding: 0 6px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .pdf-tabs-bar {
+    margin-top: 7px !important;
+    gap: 5px !important;
+  }
+
+  .pdf-tab {
+    height: 30px !important;
+    min-width: 112px !important;
+    max-width: 165px !important;
+    border-radius: 9px 9px 5px 5px !important;
+    font-size: 0.7rem !important;
+    padding-left: 9px !important;
+  }
+
+  .pdf-tabs-add {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 9px !important;
+  }
+
+  body.pdf-maximized #pdfToolbar {
+    top: max(6px, env(safe-area-inset-top, 0px)) !important;
+    max-width: calc(100vw - 12px) !important;
+  }
+
+  body.pdf-maximized #pdfToolbar .pdf-toolbar-controls {
+    padding: 5px !important;
   }
 }
 

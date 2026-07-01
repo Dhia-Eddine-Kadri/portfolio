@@ -37,7 +37,8 @@ function _pdfRenderIntoWrap(wrap, num) {
   wrap.dataset.rendered = '1';
   pdfDoc.getPage(num).then(function (page) {
     var body = document.getElementById('pdfBody');
-    var cW = (body && body.clientWidth ? body.clientWidth : wrap.clientWidth) - 32;
+    var cW = (body && body.clientWidth ? body.clientWidth : wrap.clientWidth) - (window.innerWidth <= 640 ? 14 : 32);
+    if (window.innerWidth <= 640) cW = Math.max(240, Math.floor(cW * 0.92));
     var vp0 = page.getViewport({ scale: 1 });
     var scale = pdfScale * (cW / vp0.width);
     var vp = page.getViewport({ scale: scale });
@@ -129,7 +130,8 @@ function renderPages() {
   // for any page that enters the viewport ± rootMargin.
   var pageCount = pdfTotal;
   pdfDoc.getPage(1).then(function (page1) {
-    var cW = body.clientWidth - 32;
+    var cW = body.clientWidth - (window.innerWidth <= 640 ? 14 : 32);
+    if (window.innerWidth <= 640) cW = Math.max(240, Math.floor(cW * 0.92));
     var vp0 = page1.getViewport({ scale: 1 });
     var scale = pdfScale * (cW / vp0.width);
     var vp = page1.getViewport({ scale: scale });

@@ -1395,7 +1395,7 @@ body:not(.night) .gcw-reminder-close:hover {
 }
 @media (max-width: 600px) {
   .dash-canvas {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
     grid-auto-rows: 140px !important;
   }
   .dash-greeting h1 {

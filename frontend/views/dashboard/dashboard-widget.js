@@ -34,6 +34,24 @@
       ROW_H = 160,
       GAP = 14;
 
+    function layoutCols() {
+      if (window.innerWidth <= 640) return 1;
+      if (window.innerWidth <= 768) return 2;
+      return COLS;
+    }
+
+    function clampWidgetToLayout(w) {
+      var cols = layoutCols();
+      w.cs = Math.max(1, Math.min(w.cs || 1, cols));
+      w.col = Math.max(1, Math.min(w.col || 1, cols - w.cs + 1));
+      w.row = Math.max(1, w.row || 1);
+    }
+
+    function normalizeLayoutForViewport(anchorUid) {
+      state.forEach(clampWidgetToLayout);
+      resolveVerticalOverlaps(anchorUid);
+    }
+
     function _t(key, fallback) {
       var v = window._t && window._t(key);
       // window._t returns the key itself when no translation exists — treat that as "missing"
@@ -350,8 +368,10 @@
       });
     }
     function findFree(cs, rs) {
+      var cols = layoutCols();
+      cs = Math.min(cs, cols);
       for (var r = 1; r <= 20; r++)
-        for (var c = 1; c <= COLS - cs + 1; c++)
+        for (var c = 1; c <= cols - cs + 1; c++)
           if (isFree(c, r, cs, rs)) return { col: c, row: r };
       return { col: 1, row: 1 };
     }
@@ -412,7 +432,7 @@
       canvas.querySelectorAll('.dash-widget').forEach(function (el) {
         snap[el.dataset.uid] = el.getBoundingClientRect();
       });
-      resolveVerticalOverlaps();
+      normalizeLayoutForViewport();
       compact();
       render();
       canvas.querySelectorAll('.dash-widget').forEach(function (el) {
@@ -434,6 +454,7 @@
     }
 
     function computeDrop(w, col, row) {
+      var cols = layoutCols();
       var newPos = { col: col, row: row, cs: w.cs, rs: w.rs };
       var displaced = state.filter(function (x) {
         return x.uid !== w.uid && overlap(x, newPos);
@@ -456,7 +477,7 @@
       displaced.forEach(function (d) {
         var preferred = { col: w.col, row: w.row, cs: d.cs, rs: d.rs };
         var fits =
-          w.col + d.cs - 1 <= COLS &&
+          w.col + d.cs - 1 <= cols &&
           !tempUsed.some(function (t) {
             return overlap(t, preferred);
           });
@@ -466,7 +487,7 @@
         } else {
           dest = null;
           scan: for (var r = 1; r <= 20; r++) {
-            for (var c = 1; c <= COLS - d.cs + 1; c++) {
+            for (var c = 1; c <= cols - d.cs + 1; c++) {
               var cand = { col: c, row: r, cs: d.cs, rs: d.rs };
               if (
                 !tempUsed.some(function (t) {
@@ -487,13 +508,14 @@
     }
 
     function updateWidgetGridPositions() {
+      normalizeLayoutForViewport(resizing && resizing.uid);
       canvas.querySelectorAll('.dash-widget').forEach(function (el) {
         var u = +el.dataset.uid;
         var w = state.find(function (x) {
           return x.uid === u;
         });
         if (!w) return;
-        var mCols = window.innerWidth <= 768 ? 2 : COLS;
+        var mCols = layoutCols();
         var mCs = Math.min(w.cs, mCols),
           mCol = Math.min(w.col, mCols - mCs + 1);
         el.style.gridColumn = mCol + ' / span ' + mCs;
@@ -529,11 +551,16 @@
         var anchor = state.find(function (x) {
           return x.uid === anchorUid;
         });
-        if (anchor) anchor.col = Math.max(1, Math.min(anchor.col, COLS - anchor.cs + 1));
+        if (anchor) {
+          var cols = layoutCols();
+          anchor.cs = Math.min(anchor.cs, cols);
+          anchor.col = Math.max(1, Math.min(anchor.col, cols - anchor.cs + 1));
+        }
       }
     }
 
     function render() {
+      normalizeLayoutForViewport();
       canvas.innerHTML = '';
       state.forEach(function (w) {
         var def = DEFS.find(function (d) {
@@ -543,7 +570,7 @@
         el.className = 'dash-widget';
         if (w.type === 'dailyMission') el.classList.add('dash-widget--daily-mission');
         el.dataset.uid = w.uid;
-        var mCols = window.innerWidth <= 768 ? 2 : COLS;
+        var mCols = layoutCols();
         var mCs = Math.min(w.cs, mCols),
           mCol = Math.min(w.col, mCols - mCs + 1);
         el.style.gridColumn = mCol + ' / span ' + mCs;
@@ -1207,10 +1234,11 @@
 
     function getCellAt(ax, ay) {
       var r = canvas.getBoundingClientRect();
-      var cw = (r.width + GAP) / COLS,
+      var cols = layoutCols();
+      var cw = (r.width + GAP) / cols,
         ch = ROW_H + GAP;
       return {
-        col: Math.max(1, Math.min(Math.floor((ax - r.left) / cw) + 1, COLS)),
+        col: Math.max(1, Math.min(Math.floor((ax - r.left) / cw) + 1, cols)),
         row: Math.max(1, Math.floor((ay - r.top) / ch) + 1)
       };
     }
@@ -1253,7 +1281,8 @@
         ghost.style.left = e.clientX - dragging.offX + 'px';
         ghost.style.top = e.clientY - dragging.offY + 'px';
         var cell = getCellAt(e.clientX - dragging.offX, e.clientY - dragging.offY);
-        var col = Math.min(cell.col, COLS - dragging.cs + 1),
+        var cols = layoutCols();
+        var col = Math.min(cell.col, cols - Math.min(dragging.cs, cols) + 1),
           row = Math.max(1, cell.row);
         var lc = dragging.lastCell;
         if (lc && lc.col === col && lc.row === row) return;
@@ -1266,7 +1295,7 @@
           el.style.transform = '';
         });
         var canvasRect = canvas.getBoundingClientRect();
-        var cw = (canvasRect.width + GAP) / COLS,
+        var cw = (canvasRect.width + GAP) / cols,
           ch = ROW_H + GAP;
         computeDrop(w, col, row).forEach(function (move) {
           var el = canvas.querySelector('[data-uid="' + move.uid + '"]');
@@ -1295,7 +1324,9 @@
           return x.uid === dragging.uid;
         });
         if (w) {
-          var newCol = Math.min(cell.col, COLS - w.cs + 1),
+          var cols = layoutCols();
+          w.cs = Math.min(w.cs, cols);
+          var newCol = Math.min(cell.col, cols - w.cs + 1),
             newRow = Math.max(1, cell.row);
           computeDrop(w, newCol, newRow).forEach(function (move) {
             var d = state.find(function (x) {
@@ -1419,6 +1450,15 @@
     });
     overlay.addEventListener('click', closePanel);
     document.getElementById('wpClose').addEventListener('click', closePanel);
+
+    var _dashResizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(_dashResizeTimer);
+      _dashResizeTimer = setTimeout(function () {
+        if (!document.getElementById('dashCanvas')) return;
+        renderAnimated();
+      }, 120);
+    });
 
     // ── Daily Mission: size its tile to content ───────────────────────────────
     // The Daily Mission widget's logic is "show the whole list; scroll only if

@@ -410,7 +410,7 @@ interface LandingTranslation {
       'css/app-design-system.css?v=6',
       'css/layout.css?v=16',
       'css/document-rail.css?v=30',
-      'css/mobile-responsive.css?v=1',
+      'css/mobile-responsive.css?v=2',
       'css/auth.css?v=6',
       'css/onboarding.css?v=1',
       'views/toast/toast.css',
@@ -603,7 +603,7 @@ interface LandingTranslation {
         (function setupPortalFeatureLazyLoad(): void {
           const lazyMap: Record<string, string[]> = {
             dashboard: [
-              'views/dashboard/dashboard-widget.js',
+              'views/dashboard/dashboard-widget.js?v=2',
             ],
             dashboardCalendar: ['views/dashboard/dashboard-calendar.js'],
             chat: ['views/chat/chat.js'],
@@ -626,7 +626,7 @@ interface LandingTranslation {
             ],
           };
           const lazyCssMap: Record<string, string[]> = {
-            dashboard: ['views/dashboard/dashboard.css?v=5'],
+            dashboard: ['views/dashboard/dashboard.css?v=6'],
             chat: ['views/chat/chat.css?v=2'],
             aipage: ['views/chatbot/chatbot.css?v=16'],
             german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
