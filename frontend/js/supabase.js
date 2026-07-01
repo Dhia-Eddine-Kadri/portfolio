@@ -592,7 +592,12 @@ function _enterApp(user) {
     typeof nightOn !== 'undefined' ? nightOn : sessionStorage.getItem('ss_dark') !== '0';
   if (_nb) _nb.textContent = _nightOn ? '☀️' : '🌙';
   var modal = document.getElementById('authModal');
-  if (modal) modal.style.display = 'none';
+  document.body.classList.add('minallo-app-active');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.style.pointerEvents = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
 
   // Only reset to portal view on the first entry into the app.
   // If the user is already in the app (Stud.IP or files view), a repeated
@@ -751,7 +756,12 @@ function _showModal() {
   } catch (e) {}
 
   var modal = document.getElementById('authModal');
-  if (modal) modal.style.display = 'flex';
+  document.body.classList.remove('minallo-app-active');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.style.pointerEvents = '';
+    modal.removeAttribute('aria-hidden');
+  }
 
   var portal = document.getElementById('portal');
   if (portal) {
@@ -898,7 +908,12 @@ window.addEventListener('ss-ready', function () {
     } catch (e) {}
 
     var modal = document.getElementById('authModal');
-    if (modal) modal.style.display = 'flex';
+    document.body.classList.remove('minallo-app-active');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.style.pointerEvents = '';
+      modal.removeAttribute('aria-hidden');
+    }
 
     var portal = document.getElementById('portal');
     if (portal) {

@@ -240,7 +240,7 @@
                 document.head.appendChild(link);
             }
             ensureStylesheet('css/new-landing.css?v=23');
-            ensureStylesheet('css/auth.css?v=5');
+            ensureStylesheet('css/auth.css?v=6');
         })();
         _fetchTimeout('pages/new_landing.html?v=25', 10000)
             .then((r) => {
@@ -368,9 +368,9 @@
             'views/daily-mission/daily-mission.css?v=11',
             'css/app-design-system.css?v=6',
             'css/layout.css?v=16',
-            'css/document-rail.css?v=29',
+            'css/document-rail.css?v=30',
             'css/mobile-responsive.css?v=1',
-            'css/auth.css?v=5',
+            'css/auth.css?v=6',
             'css/onboarding.css?v=1',
             'views/toast/toast.css',
             'views/games/games.css',
@@ -600,7 +600,7 @@
                 };
                 const lazyCssMap = {
                     dashboard: ['views/dashboard/dashboard.css?v=5'],
-                    chat: ['views/chat/chat.css'],
+                    chat: ['views/chat/chat.css?v=2'],
                     aipage: ['views/chatbot/chatbot.css?v=16'],
                     german: ['views/practice/practice.css', 'views/writing-coach/writing-coach.css'],
                     notes: ['views/lecturenotes/lecturenotes.css'],

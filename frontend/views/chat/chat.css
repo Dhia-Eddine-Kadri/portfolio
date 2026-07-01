@@ -3352,6 +3352,154 @@ body.night .music-yt-input {
     0 12px 48px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
+
+@media (max-width: 760px) {
+  #psec-chat {
+    padding: 10px !important;
+    min-width: 0;
+    overflow-x: hidden !important;
+  }
+
+  #psec-chat::before,
+  #psec-chat::after,
+  #psec-chat .dc-blob {
+    width: 260px;
+    height: 260px;
+    filter: blur(52px);
+    opacity: 0.24;
+  }
+
+  .dc-layout {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .dc-sidebar {
+    width: 100%;
+    min-width: 0;
+    max-height: 178px;
+    border-radius: 18px;
+  }
+
+  .dc-sidebar-top {
+    padding: 12px;
+  }
+
+  .dc-sidebar-title {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+
+  .dc-sidebar-btns {
+    gap: 8px;
+  }
+
+  .dc-top-btn {
+    min-height: 40px;
+    border-radius: 14px;
+    font-size: 0.72rem;
+  }
+
+  .dc-sidebar-body {
+    display: none;
+  }
+
+  .dc-sidebar-footer {
+    padding: 8px 12px;
+  }
+
+  .dc-main {
+    min-width: 0;
+    min-height: 420px;
+    height: calc(100dvh - 380px);
+    border-radius: 18px;
+  }
+
+  .dc-main-hdr {
+    height: auto;
+    min-height: 52px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .dc-main-room-name {
+    font-size: 0.95rem;
+  }
+
+  .dc-main-room-desc {
+    font-size: 0.64rem;
+  }
+
+  .dc-main-hdr-right {
+    gap: 4px;
+  }
+
+  .dc-hdr-icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .dc-msgs {
+    padding: 12px 12px 8px;
+  }
+
+  .chat-empty {
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 14px;
+    margin: auto;
+    box-sizing: border-box;
+  }
+
+  .chat-msg-bubble {
+    max-width: 100%;
+  }
+
+  .dc-input-row {
+    padding: 9px 10px 10px;
+    gap: 7px;
+  }
+
+  .dc-input-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .dc-input-wrap {
+    min-width: 0;
+    padding: 0 10px;
+  }
+
+  .dc-send-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .dc-members-panel {
+    display: none !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .dc-sidebar-btns {
+    grid-template-columns: 1fr 1fr;
+    display: grid;
+  }
+
+  .dc-top-btn {
+    width: 100%;
+  }
+
+  .dc-main {
+    height: calc(100dvh - 404px);
+  }
+}
 .dc-members-section {
   margin-bottom: 10px;
 }

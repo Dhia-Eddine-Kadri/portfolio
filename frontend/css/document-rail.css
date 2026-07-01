@@ -385,7 +385,7 @@
   inset: auto !important;
   width: 100% !important;
   height: 100% !important;
-  max-width: none !important;
+  max-width: 100% !important;
   max-height: none !important;
   border: none !important;
   border-radius: 0 !important;
@@ -398,6 +398,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 /* Drawer already has its own header (title, trash, close) — hide the legacy
@@ -536,6 +537,181 @@
 
   body.dr-pdf-split-open {
     --dr-drawer-w: 390px;
+  }
+
+  .dr-drawer,
+  .dr-drawer.dr-inline-split,
+  body.pdf-maximized .dr-drawer.dr-inline-split {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    height: min(78dvh, 680px) !important;
+    max-height: calc(100dvh - 84px) !important;
+    flex: none !important;
+    z-index: 9499;
+    border-radius: 22px 22px 0 0;
+    padding: 10px;
+    transform: translateY(calc(100% + 20px)) !important;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .dr-drawer,
+  .dr-drawer * {
+    box-sizing: border-box;
+  }
+
+  .dr-drawer .dr-orb {
+    display: none;
+  }
+
+  .dr-drawer .dr-header,
+  .dr-drawer .dr-content,
+  .dr-drawer #aiPanel.dr-host-ai,
+  .dr-drawer .dr-host-ai .ai-file-chip-bar,
+  .dr-drawer .dr-host-ai .ai-msgs,
+  .dr-drawer .dr-host-ai .ai-input-area,
+  .dr-drawer .dr-host-ai .ai-input-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden;
+  }
+
+  .dr-drawer .dr-header-l,
+  .dr-drawer .dr-header-text {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .dr-drawer .dr-header-r {
+    flex: 0 0 auto;
+  }
+
+  .dr-drawer.is-open,
+  .dr-drawer.dr-inline-split.is-open,
+  body.pdf-maximized .dr-drawer.dr-inline-split.is-open {
+    transform: translateY(0) !important;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dr-drawer #drResize,
+  .dr-resize {
+    display: none !important;
+  }
+
+  .dr-root.is-open .dr-rail {
+    display: none;
+  }
+
+  body.dr-pdf-split-open .app-body,
+  body.dr-pdf-split-open #pdfViewerWrap {
+    min-width: 0;
+  }
+
+  body.pdf-maximized.dr-pdf-split-open #pdfViewerWrap.is-maximized,
+  body.pdf-maximized:has(#drDrawer.is-open:not(.dr-sheet)) #pdfViewerWrap.is-maximized {
+    right: 0;
+  }
+
+  body.pdf-maximized.dr-pdf-split-open #pdfToolbar,
+  body.pdf-maximized:has(#drDrawer.is-open:not(.dr-sheet)) #pdfToolbar {
+    left: 50%;
+    max-width: calc(100vw - 20px);
+  }
+
+  .dr-drawer.dr-mode-ai .dr-header {
+    min-height: 48px;
+    padding: 0 0 8px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-header-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-title {
+    font-size: 0.98rem;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-subtitle {
+    max-width: 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip-bar {
+    padding: 6px 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip #aiFileChipName,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-file-chip span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-msgs {
+    padding: 8px 6px 4px;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-msg,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-msg-wrap,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-msgs-body,
+  .dr-drawer.dr-mode-ai .dr-host-ai .msg-body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bubble {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bubble pre,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bubble table,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bubble .katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-input-area,
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-input-box {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-bottom-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .dr-drawer.dr-mode-ai .dr-host-ai .ai-mode-pill {
+    max-width: calc(100% - 112px);
+    min-width: 0;
   }
 }
 

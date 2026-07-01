@@ -48,6 +48,12 @@
   contain: layout paint style;
 }
 
+body.minallo-app-active #authModal {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 #authModal ::selection {
   background: var(--na-sky-300);
   color: #0f172a;

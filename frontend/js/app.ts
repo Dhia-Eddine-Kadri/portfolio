@@ -144,7 +144,29 @@ function _ssReplaceHistory(_state?: unknown, _hash?: string): void { /* replaced
 window._showFilesView = (): void => { _showFilesView(); };
 
 function showStudip(): void { _showStudip(); }
-function showPortal(): void { _showPortal(); }
+function suppressAuthModalIfAppActive(): void {
+  try {
+    const hasAppSession =
+      sessionStorage.getItem('ss_logged_in') === 'true' ||
+      sessionStorage.getItem('ss_force_app') === 'true' ||
+      !!(window as unknown as { _currentUser?: unknown })._currentUser;
+    if (!hasAppSession) return;
+    document.body.classList.add('minallo-app-active');
+    const modal = document.getElementById('authModal');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.style.pointerEvents = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  } catch {
+    /* storage can be unavailable; portal navigation still works */
+  }
+}
+
+function showPortal(): void {
+  _showPortal();
+  suppressAuthModalIfAppActive();
+}
 function hideStudip(): void {
   _hideStudip(typeof _stRunning !== 'undefined' ? _stRunning : false);
 }
@@ -156,6 +178,11 @@ function setNavActive(id: string): void { _setNavActive(id); }
 function showPortalSection(sec: string): void { _showPortalSection(sec); }
 window.showPortalSection = showPortalSection;
 window.showPortal = showPortal;
+
+new MutationObserver(() => suppressAuthModalIfAppActive()).observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+});
 window.showStudip = showStudip;
 window.hideStudip = hideStudip;
 window.setNavActive = setNavActive;
@@ -1031,10 +1058,28 @@ _bindIf('nightBtn', 'click', function (this: HTMLElement) {
   const scrim = document.getElementById('mobScrim');
   const sb = document.querySelector<HTMLElement>('#portal .sidebar');
   if (!ham || !scrim || !sb) return;
-  function openMobSb(): void { sb!.classList.add('mob-open'); scrim!.classList.add('show'); }
-  function closeMobSb(): void { sb!.classList.remove('mob-open'); scrim!.classList.remove('show'); }
-  ham.addEventListener('click', openMobSb);
-  scrim.addEventListener('click', closeMobSb);
+  function openMobSb(ev?: Event): void {
+    ev?.preventDefault();
+    sb!.classList.add('mob-open');
+    scrim!.classList.add('show');
+    ham!.setAttribute('aria-expanded', 'true');
+  }
+  function closeMobSb(ev?: Event): void {
+    ev?.preventDefault();
+    sb!.classList.remove('mob-open');
+    scrim!.classList.remove('show');
+    ham!.setAttribute('aria-expanded', 'false');
+  }
+  function bindTap(el: HTMLElement, fn: (ev: Event) => void): void {
+    el.addEventListener('click', fn);
+    el.addEventListener('pointerup', fn);
+    el.addEventListener('touchend', fn, { passive: false });
+  }
+  bindTap(ham, openMobSb);
+  bindTap(scrim, closeMobSb);
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) closeMobSb();
+  });
   sb.addEventListener('click', (e: Event) => {
     const target = e.target as Element | null;
     if (window.innerWidth <= 768 && target && target.closest('.sb-item')) closeMobSb();
