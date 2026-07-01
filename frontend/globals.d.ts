@@ -297,6 +297,8 @@ declare global {
     /** Scale the PDF canvases were last rasterised at; the live Ctrl+wheel CSS
      *  zoom multiplier is pdfScale ÷ this. Set by renderPages. */
     _pdfRenderedScale?: number;
+    _pdfRenderedWidth?: number;
+    _refitPdfWidth?: () => void;
     saveState?: () => void;
     _ssPushHistory?: (state: unknown, hash?: string) => void;
     _ssReplaceHistory?: (state: unknown, hash?: string) => void;

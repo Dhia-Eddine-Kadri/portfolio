@@ -636,39 +636,19 @@ function isMobileViewport(): boolean {
   }
 }
 
-// Re-rendering the PDF (renderPages does body.innerHTML='') tears down the text
-// layer and drops any active selection. Opening/closing/resizing the drawer only
-// needs that re-render to re-fit the page width — so if the user currently has
-// text selected in the PDF, defer the re-fit until they clear the selection
-// rather than yanking it out from under them (e.g. select text → AI panel opens
-// → selection vanished).
-let _deferredRenderPending = false;
-function pdfHasActiveSelection(): boolean {
-  try {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
-    if (!String(sel).trim()) return false;
-    const body = document.getElementById('pdfBody');
-    return !!(body && sel.anchorNode && body.contains(sel.anchorNode));
-  } catch {
-    return false;
-  }
-}
-function renderPagesPreservingSelection(): void {
-  if (typeof (window as any).renderPages !== 'function') return;
-  if (!pdfHasActiveSelection()) {
-    (window as any).renderPages();
+// Opening/closing/resizing the rail changes the PDF column width. Re-fit via CSS
+// zoom (no re-render) so the page never blanks/reloads and the user's scroll
+// position and text selection are preserved. renderPages() would instead do
+// body.innerHTML='' — a full teardown that flashes the page, jumps scroll to the
+// top and wipes any selection. Fall back to it only if the CSS re-fit helper is
+// somehow unavailable.
+function refitPdfToDrawer(): void {
+  const w = window as unknown as { _refitPdfWidth?: () => void; renderPages?: () => void };
+  if (typeof w._refitPdfWidth === 'function') {
+    w._refitPdfWidth();
     return;
   }
-  if (_deferredRenderPending) return;
-  _deferredRenderPending = true;
-  const onSelChange = (): void => {
-    if (pdfHasActiveSelection()) return;
-    document.removeEventListener('selectionchange', onSelChange);
-    _deferredRenderPending = false;
-    if (typeof (window as any).renderPages === 'function') (window as any).renderPages();
-  };
-  document.addEventListener('selectionchange', onSelChange);
+  if (typeof w.renderPages === 'function') w.renderPages();
 }
 
 function openDrawer(mode: DocRailMode): void {
@@ -706,7 +686,7 @@ function openDrawer(mode: DocRailMode): void {
     // the drawer's final dimensions are settled before rendering.
     const afterTransition = (): void => {
       if (_openMode === mode) renderModeContent(mode);
-      renderPagesPreservingSelection();
+      refitPdfToDrawer();
     };
     let fired = false;
     const onEnd = (e: TransitionEvent): void => {
@@ -761,7 +741,7 @@ function closeDrawer(): void {
   // Re-render PDF after the slide-out transition so the canvas expands
   // back to the full column width (deferred if the user has a live selection).
   window.setTimeout(() => {
-    renderPagesPreservingSelection();
+    refitPdfToDrawer();
   }, 320);
   const w2 = window as DocRailWindow;
   if (typeof w2._ssSyncUrl === 'function') w2._ssSyncUrl();
@@ -817,7 +797,7 @@ function wireResize(): void {
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
     saveWidth(_drawerWidth);
-    renderPagesPreservingSelection();
+    refitPdfToDrawer();
   };
 
   handle.addEventListener('mousedown', (e: MouseEvent) => {

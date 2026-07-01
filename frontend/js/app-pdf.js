@@ -98,6 +98,9 @@ function renderPages() {
   // Record the scale we rendered at and drop the multiplier so it doesn't
   // compound on top of the fresh render.
   window._pdfRenderedScale = pdfScale;
+  // Column width these pages were fit to. _refitPdfWidth (app.ts) uses it to
+  // rescale via CSS zoom when the AI rail opens/closes instead of re-rendering.
+  window._pdfRenderedWidth = body.clientWidth;
   body.style.removeProperty('--pdf-wheel-zoom');
   // Stop any previous virtualization observer.
   if (window._pdfPageObserver && typeof window._pdfPageObserver.disconnect === 'function') {

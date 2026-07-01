@@ -531,9 +531,14 @@ function _pdfScrollToPage(num: number): void {
 function _applyPdfZoom(targetScale: number): void {
   const body = document.getElementById('pdfBody');
   const rendered = window._pdfRenderedScale || 0.9;
-  const prevMul = pdfScale / rendered;
+  // The multiplier also folds in a width factor so a column-width change
+  // (e.g. the AI rail opening) that was fitted via _refitPdfWidth survives a
+  // subsequent zoom instead of snapping back to the rendered width.
+  const widthFactor =
+    body && window._pdfRenderedWidth ? body.clientWidth / window._pdfRenderedWidth : 1;
+  const prevMul = (pdfScale / rendered) * widthFactor;
   pdfScale = Math.min(4, Math.max(0.2, Math.round(targetScale * 100) / 100));
-  const newMul = pdfScale / rendered;
+  const newMul = (pdfScale / rendered) * widthFactor;
   if (body) {
     const prevTop = body.scrollTop;
     body.style.setProperty('--pdf-wheel-zoom', String(newMul));
@@ -541,6 +546,25 @@ function _applyPdfZoom(targetScale: number): void {
   }
   updateZoomPct();
 }
+
+// Re-fit the PDF to the current column width WITHOUT re-rendering. Used when the
+// document rail opens/closes and the PDF column changes width: re-rendering would
+// blank the page, reset the scroll position and drop any text selection, whereas
+// scaling the already-rendered pages via the same CSS `zoom` multiplier keeps all
+// of that intact (the canvas just downscales/upscales to fit).
+function _refitPdfWidth(): void {
+  const body = document.getElementById('pdfBody');
+  if (!body || !window._pdfRenderedWidth) return;
+  const rendered = window._pdfRenderedScale || 0.9;
+  const widthFactor = body.clientWidth / window._pdfRenderedWidth;
+  const newMul = (pdfScale / rendered) * widthFactor;
+  const prevRaw = parseFloat(getComputedStyle(body).getPropertyValue('--pdf-wheel-zoom'));
+  const prevMul = Number.isFinite(prevRaw) && prevRaw > 0 ? prevRaw : pdfScale / rendered;
+  const prevTop = body.scrollTop;
+  body.style.setProperty('--pdf-wheel-zoom', String(newMul));
+  if (prevMul > 0) body.scrollTop = prevTop * (newMul / prevMul);
+}
+window._refitPdfWidth = _refitPdfWidth;
 
 document.getElementById('pdfZoomIn')?.addEventListener('click', () => {
   _applyPdfZoom(Math.round((pdfScale + 0.1) * 10) / 10);
