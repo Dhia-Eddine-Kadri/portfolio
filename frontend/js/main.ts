@@ -89,7 +89,6 @@ function lazyImportEncoded(encodedPath: string): Promise<Record<string, unknown>
   return import(/* @vite-ignore */ url);
 }
 
-runIdle(() => lazyImportEncoded('Li9jb3JlL3B1bGwtdG8tcmVmcmVzaC5qcw==').then((m) => (m.initPullToRefresh as () => void)()));
 runIdle(() => lazyImportEncoded('Li9jb3JlL2NvbnNvbGUtZmlsdGVyLmpz').then((m) => (m.initConsoleFilter as () => void)()));
 runDelayed(() => lazyImportEncoded('Li9mZWF0dXJlcy9hZG1pbi9hZG1pbi1wYW5lbC5qcw==').then((m) => (m.initAdminPanel as () => void)()));
 // Onboarding can appear immediately after signup/login. Do not defer this:
