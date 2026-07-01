@@ -224,20 +224,29 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
       warnRejected(rejected, files.length === 0);
       try { this.value = ''; } catch { /* ignore */ }
       if (!files.length) return;
-      Promise.all(
+      let folderFailed = 0;
+      Promise.allSettled(
         files.map((file) => window._ufUpload?.(uid, course, file, null, targetFolder))
       )
-        .then(() => {
+        .then((results) => {
+          folderFailed = results.filter((r) => r.status === 'rejected').length;
+          // Keep the files that did upload — only bail when all failed.
+          if (folderFailed === files.length) {
+            const first = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+            throw first && first.reason instanceof Error ? first.reason : new Error('Please try again.');
+          }
           course.userFolders = null as unknown as LegacyCourse['userFolders'];
           return window._ufMerge?.(course);
         })
         .then(() => {
           showCourseSection(course, 'files');
           if (typeof window.showToast === 'function') {
+            const up = files.length - folderFailed;
             window.showToast(
-              'Files uploaded',
-              files.length + ' file' + (files.length !== 1 ? 's' : '') +
-              ' added to "' + targetFolder + '"'
+              folderFailed ? 'Some files uploaded' : 'Files uploaded',
+              up + ' of ' + files.length + ' file' + (files.length !== 1 ? 's' : '') +
+              ' added to "' + targetFolder + '"' +
+              (folderFailed ? ' — ' + folderFailed + ' failed, please retry those' : '')
             );
           }
           if (course.id) {

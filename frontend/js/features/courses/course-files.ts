@@ -510,13 +510,14 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
       modal.onClose = () => { cancelled = true; };
 
       let completed = 0;
+      let failedCount = 0;
       const totalPct = new Array(files.length).fill(0) as number[];
       function updateUploadProgress(idx: number, pct: number): void {
         totalPct[idx] = pct;
         const avg = Math.round(totalPct.reduce((a, b) => a + b, 0) / files.length);
         modal.setUploadPct(avg);
       }
-      Promise.all(
+      Promise.allSettled(
         files.map((file, idx) =>
           window
             ._ufUpload?.(uid, course, file, (pct: number) => updateUploadProgress(idx, pct), targetFolder)
@@ -526,7 +527,16 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
             })
         )
       )
-        .then(() => {
+        .then((results) => {
+          failedCount = results.filter((r) => r.status === 'rejected').length;
+          // Only bail (close modal + error toast) when EVERY file failed. A
+          // single failed upload used to reject Promise.all and discard the
+          // whole batch — the modal vanished and the files that did upload were
+          // never merged/shown, which read as "nothing uploaded".
+          if (failedCount === files.length) {
+            const first = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+            throw first && first.reason instanceof Error ? first.reason : new Error('Please try again.');
+          }
           modal.setUploadPct(100);
           modal.setStage('upload', 'complete');
           modal.setStage('processing', 'active');
@@ -552,9 +562,12 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
           } catch { /* quota */ }
           showCourseSection(course, 'files');
           if (typeof window.showToast === 'function') {
+            const uploaded = files.length - failedCount;
             window.showToast(
-              'Files uploaded',
-              '' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' added to ' + (course.short || course.name)
+              failedCount ? 'Some files uploaded' : 'Files uploaded',
+              '' + uploaded + ' of ' + files.length + ' file' + (files.length > 1 ? 's' : '') +
+                ' added to ' + (course.short || course.name) +
+                (failedCount ? ' — ' + failedCount + ' failed, please retry those' : '')
             );
           }
           const pdfFiles = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'));

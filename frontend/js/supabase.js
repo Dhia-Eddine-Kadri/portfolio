@@ -25,6 +25,13 @@ var _sbToken = null; // access token after login
 window._sbToken = null; // expose to window for API clients
 var _currentUser = null;
 var _sbAuthCallbacks = [];
+// Single-flight guard for refreshSession(). Supabase rotates the refresh token
+// on every use, so N callers firing N concurrent refreshes with the same stored
+// token make all-but-one fail — and the failing path nulls _sbToken + clears the
+// stored session. That knocks out in-flight work (e.g. a multi-file upload where
+// each _ufUpload awaits _ufEnsureFreshToken). Sharing one in-flight promise means
+// concurrent callers get the single successful refresh instead of racing.
+var _sbRefreshInFlight = null;
 var _SS = window.Minallo;
 
 function _sbStoreSession(accessToken, refreshToken) {
@@ -332,9 +339,13 @@ var _sb = {
       _sbAuthCallbacks.push(cb);
     },
     refreshSession: function () {
+      // Coalesce concurrent refreshes onto one network round-trip (see
+      // _sbRefreshInFlight note above) so parallel callers can't race the
+      // refresh-token rotation and clobber each other's session.
+      if (_sbRefreshInFlight) return _sbRefreshInFlight;
       var ref = _sbStoredRefresh();
       if (!ref) return Promise.resolve(null);
-      return fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+      _sbRefreshInFlight = fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         headers: _sbHeaders(),
         body: JSON.stringify({ refresh_token: ref })
@@ -355,7 +366,11 @@ var _sb = {
         })
         .catch(function () {
           return null;
+        })
+        .finally(function () {
+          _sbRefreshInFlight = null;
         });
+      return _sbRefreshInFlight;
     },
     restoreSession: function () {
       _ssAuth('checking', { source: 'restoreSession' });
