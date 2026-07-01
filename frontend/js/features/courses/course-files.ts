@@ -476,7 +476,11 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
   // ── Upload button ────────────────────────────────────────────────────────
   const uploadBtn = co.querySelector<HTMLButtonElement>('#coUploadBtn');
   const uploadInput = co.querySelector<FolderUploadInput>('#coUploadInput');
-  if (uploadBtn && uploadInput) {
+  // bindFileEvents runs again on every background _refreshFilesPanel; the
+  // toolbar (and this button/input) persists across those, so guard the
+  // listeners or they stack up and fire the upload handler N times.
+  if (uploadBtn && uploadInput && uploadBtn.dataset.uploadBound !== '1') {
+    uploadBtn.dataset.uploadBound = '1';
     uploadBtn.addEventListener('click', () => {
       const folders = (course.userFolders || []).map((fd) => fd.name);
       if (folders.length === 0) {
@@ -492,14 +496,9 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
   }
 
   function startUpload(picked: File[], targetFolder: string | null): void {
-      console.log('[upload-diag] startUpload; picked =', picked.length, 'folder =', targetFolder);
-      if (!picked.length) {
-        console.warn('[upload-diag] BAIL: picked list empty');
-        return;
-      }
+      if (!picked.length) return;
       const uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
       if (!uid) {
-        console.warn('[upload-diag] BAIL: no uid / not signed in');
         if (typeof window.showToast === 'function') {
           window.showToast('Not signed in', 'Sign in to upload files.');
         }
@@ -507,13 +506,8 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
       }
 
       const { valid: files, rejected } = filterOversizedFiles(picked);
-      console.log('[upload-diag] after size filter; valid =', files.length, 'rejected =', rejected.length, rejected.map((r) => r.file.name + ' — ' + r.reason));
       warnRejected(rejected, files.length === 0);
-      if (!files.length) {
-        console.warn('[upload-diag] BAIL: no valid files after size filter');
-        return;
-      }
-      console.log('[upload-diag] opening modal + firing', files.length, 'upload request(s)');
+      if (!files.length) return;
 
       const modal = openUploadModal();
       let cancelled = false;
@@ -620,17 +614,24 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
         });
   }
 
-  if (uploadInput) {
+  if (uploadInput && uploadInput.dataset.uploadBound !== '1') {
+    uploadInput.dataset.uploadBound = '1';
     uploadInput.addEventListener('change', function (this: FolderUploadInput) {
       const picked = Array.from(this.files || []);
-      // [upload-diag] temporary instrumentation — remove once the >2-file
-      // upload bug is diagnosed.
-      console.log('[upload-diag] change fired; browser delivered', picked.length, 'file(s):', picked.map((f) => f.name + ' (' + f.size + 'B)'));
-      if (typeof window.showToast === 'function')
-        window.showToast('Upload debug', 'change: ' + picked.length + ' file(s) selected');
       // Reset the input so picking the same (oversized) file again still fires
       // `change`. Otherwise the user is stuck after one rejection.
       try { this.value = ''; } catch { /* ignore */ }
+      // `change` firing with an empty list means the OS file dialog handed back
+      // nothing — Windows/Chrome does this when the combined selection (several
+      // files, or long filenames) overflows the picker's buffer. The dialog only
+      // reports it via an empty change, so steer the user to drag-and-drop, which
+      // never touches that dialog. (A real cancel fires no change, so this can't
+      // misfire on cancel.)
+      if (!picked.length) {
+        if (typeof window.showToast === 'function')
+          window.showToast('Windows didn’t hand over the files', 'This happens when selecting several or long-named files at once. Drag the files onto the Files area instead, or pick fewer at a time.');
+        return;
+      }
       startUpload(picked, this._targetFolder || null);
     });
   }

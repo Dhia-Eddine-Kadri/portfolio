@@ -282,7 +282,7 @@ function _buildFilesListHtml(course: LegacyCourse): string {
       '</div>' +
       '<style>@keyframes co-spin{to{transform:rotate(360deg)}}</style>';
   } else {
-    filesHtml = '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
+    filesHtml = '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click <b>Upload files</b> or drag files here to add some</div>';
   }
 
   return (
