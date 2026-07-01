@@ -3366,3 +3366,328 @@ body:not(.night) .co-inner-v2 .co-next-steps {
 #psec-studip .sd-daily-mission-card::after {
   display: none !important;
 }
+
+/* Phone course workspace polish.
+   Keep these late in the file so they override saved desktop/tablet layout
+   choices and the earlier redesigned-course rules. */
+@media (max-width: 640px) {
+  #psec-studip .sd-shell {
+    max-width: none;
+    width: 100%;
+    padding: 0 0 48px;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-hero,
+  #psec-studip .sd-daily-mission-card,
+  #psec-studip .sd-course-card,
+  #psec-studip .sd-next-steps {
+    border-radius: 16px;
+  }
+
+  #psec-studip .sd-hero {
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+
+  #psec-studip .sd-hero-grid,
+  #psec-studip .sd-daily-mission-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px;
+  }
+
+  #psec-studip .sd-hero-title {
+    display: block;
+    font-size: 1.65rem;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  #psec-studip .sd-hero-emoji {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 1.45rem;
+    vertical-align: -0.08em;
+  }
+
+  #psec-studip .sd-hero-sub {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  #psec-studip .sd-hero-actions {
+    width: 100%;
+  }
+
+  #psec-studip .sd-hero-stats,
+  #psec-studip .sd-dm-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+
+  #psec-studip .sd-hero-stat,
+  #psec-studip .sd-dm-meta span {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-daily-mission-card {
+    padding: 16px;
+    margin: 0 0 14px;
+  }
+
+  #psec-studip .sd-dm-orb {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  #psec-studip .sd-daily-mission-card h2 {
+    font-size: 1.08rem;
+  }
+
+  #psec-studip .sd-dm-cta {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  #psec-studip .sd-search-wrap,
+  #psec-studip .sd-layout-btn,
+  #psec-studip .sd-add-btn {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-layout-btn,
+  #psec-studip .sd-add-btn {
+    justify-content: center;
+    padding: 13px 16px;
+  }
+
+  #psec-studip .sd-search-input {
+    padding-top: 13px;
+    padding-bottom: 13px;
+    border-radius: 14px;
+  }
+
+  #psec-studip .sd-course-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px;
+  }
+
+  #psec-studip .sd-course-card {
+    width: 100%;
+    min-width: 0;
+    padding: 18px;
+    gap: 14px;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-course-head {
+    gap: 12px;
+    padding-right: 36px;
+  }
+
+  #psec-studip .sd-course-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    font-size: 1.25rem;
+  }
+
+  #psec-studip .sd-course-name {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  #psec-studip .sd-course-meta-row,
+  #psec-studip .sd-course-chips {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #psec-studip .sd-course-progress-head {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  #psec-studip .sd-course-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #psec-studip .sd-stat-pill {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 6px;
+  }
+
+  #psec-studip .sd-stat-label,
+  #psec-studip .sd-stat-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #psec-studip .sd-course-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  #psec-studip .sd-course-open-btn,
+  #psec-studip .sd-course-summary-btn {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  #psec-studip .sd-next-steps {
+    margin-top: 18px;
+    padding: 16px;
+  }
+
+  #psec-studip .sd-next-steps-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #psec-studip .sd-next-step {
+    padding: 14px;
+  }
+
+  #psec-studip .sd-next-step-title {
+    white-space: normal;
+  }
+
+  .co-inner.co-inner-v2 {
+    max-width: none;
+    width: 100%;
+    padding: 0 0 48px;
+    box-sizing: border-box;
+  }
+
+  .co-inner-v2 .co-topnav,
+  .co-inner-v2 .co-panel-header,
+  .co-inner-v2 .co-panel-header-v2,
+  .co-inner-v2 .co-files-toolbar,
+  .co-inner-v2 .co-files-toolbar-primary,
+  .co-inner-v2 .co-files-toolbar-secondary,
+  .co-inner-v2 .qz-toolbar,
+  .co-inner-v2 .fc-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .co-inner-v2 .co-back-btn,
+  .co-inner-v2 .co-study-wrap,
+  .co-inner-v2 .co-study-btn,
+  .co-inner-v2 .co-tool-btn,
+  .co-inner-v2 .co-tool-btn-primary,
+  .co-inner-v2 .qz-btn,
+  .co-inner-v2 .fc-btn,
+  .co-inner-v2 .qz-sort,
+  .co-inner-v2 .fc-sort {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .co-inner-v2 .co-hero,
+  .co-inner-v2 .co-card.co-card-v2,
+  .co-inner-v2 .co-files-inner-card,
+  .co-inner-v2 .co-next-steps,
+  .co-inner-v2 .qz-deck-pane,
+  .co-inner-v2 .fc-deck-pane,
+  .co-inner-v2 .qz-study-pane,
+  .co-inner-v2 .fc-study-pane {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .co-inner-v2 .co-hero-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .co-inner-v2 .co-hero-left,
+  .co-inner-v2 .co-study-header,
+  .co-inner-v2 .fc-study-header,
+  .co-inner-v2 .qz-study-header {
+    align-items: flex-start;
+  }
+
+  .co-inner-v2 .co-hero-title {
+    font-size: 1.55rem;
+    line-height: 1.14;
+  }
+
+  .co-inner-v2 .co-course-tabs {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .co-inner-v2 .co-course-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .co-inner-v2 .co-course-tab {
+    flex: 0 0 auto;
+  }
+
+  .co-inner-v2 .co-file.co-file-v2,
+  .co-inner-v2 .co-folder-section.co-folder-v2 .co-folder-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .co-inner-v2 .co-file.co-file-v2 {
+    padding: 14px;
+  }
+
+  .co-inner-v2 .co-file.co-file-v2 .co-file-actions,
+  .co-inner-v2 .qz-study-controls,
+  .co-inner-v2 .fc-study-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .co-inner-v2 .co-file-action,
+  .co-inner-v2 .co-file-chip {
+    justify-content: center;
+  }
+
+  .co-inner-v2 .co-folder-section.co-folder-v2 .co-folder-text {
+    flex-basis: calc(100% - 90px);
+  }
+
+  .co-inner-v2 .co-folder-section.co-folder-v2 .co-folder-open-btn,
+  .co-inner-v2 .co-folder-section.co-folder-v2 .co-folder-toggle-btn,
+  .co-inner-v2 .co-folder-section.co-folder-v2 .co-folder-more {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+  }
+}

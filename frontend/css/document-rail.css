@@ -526,6 +526,10 @@
     width: auto;
   }
 
+  .dr-root.is-courses .dr-rail {
+    display: none;
+  }
+
   .dr-root.is-open {
     --dr-drawer-w: 390px;
   }
