@@ -515,17 +515,29 @@
                     if (loaded)
                         return;
                     loaded = true;
-                    // async=false scripts download in PARALLEL but execute in
-                    // insertion order, so games.js (the hub) still runs after every
-                    // sub-module — readiness drops from 13 sequential round trips
-                    // (the old promise chain) to roughly one.
-                    GAMES_SCRIPTS.forEach((src) => {
+                    // Load with a small concurrency cap. Appending all ~13 <script>s
+                    // at once — especially during the idle prewarm, while the app is
+                    // already busy with uploads/indexing — exhausted Chrome's request
+                    // pool (net::ERR_INSUFFICIENT_RESOURCES) and starved other network
+                    // work, so file uploads silently couldn't even start their request.
+                    // async=false still guarantees the hub (games.js, last) executes
+                    // after every sub-module regardless of download order.
+                    const queue = GAMES_SCRIPTS.slice();
+                    const MAX_PARALLEL = 2;
+                    function startNext() {
+                        const src = queue.shift();
+                        if (!src)
+                            return;
                         const s = document.createElement('script');
                         s.src = versioned(src);
                         s.async = false;
-                        s.onerror = () => { console.error('lazy-games failed:', src); };
+                        const done = () => startNext();
+                        s.onload = done;
+                        s.onerror = () => { console.error('lazy-games failed:', src); done(); };
                         document.body.appendChild(s);
-                    });
+                    }
+                    for (let i = 0; i < MAX_PARALLEL; i++)
+                        startNext();
                 }
                 function bindTrigger() {
                     const btn = document.getElementById('psbGames');
