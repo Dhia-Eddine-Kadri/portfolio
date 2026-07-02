@@ -279,16 +279,17 @@ export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left
               window.pdfDoc = pdfDoc;
               window.pdfTotal = pdfDoc.numPages;
               window.pdfPage = 1;
-              // Default to single-page mode for large PDFs — rendering all
-              // pages of a 200-page Skript freezes mid-range laptops. The
-              // toolbar button below stays in sync.
-              const _largePdf = pdfDoc.numPages > 20;
-              window.pdfShowAll = !_largePdf;
+              // Always open in all-pages (continuous) mode. Show-all is
+              // virtualized (app-pdf.ts renderPages uses an IntersectionObserver,
+              // rendering only pages that scroll into view), so even a 200-page
+              // Skript opens cheaply — the old single-page default for large PDFs
+              // is no longer needed. The toolbar button reflects the active mode.
+              window.pdfShowAll = true;
               window.pdfFullText = '';
               if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
               if (typeof window.updateZoomPct === 'function') window.updateZoomPct();
               const pdfAll = document.getElementById('pdfAll');
-              if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
+              if (pdfAll) pdfAll.textContent = 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
               snapshotWindowInto(pane);
@@ -299,6 +300,15 @@ export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left
               if (savedPage && savedPage > 1 && savedPage <= pdfDoc.numPages) {
                 setTimeout(() => {
                   if (window._pdfOpenSeq !== mySeq) return;
+                  // In all-pages (continuous) mode, scroll to the saved page and
+                  // stay in continuous mode — dispatching a page-input blur here
+                  // would flip pdfShowAll to false and drop us into single-page.
+                  if (window.pdfShowAll && typeof window._pdfScrollToPage === 'function') {
+                    window.pdfPage = savedPage;
+                    window._pdfScrollToPage(savedPage);
+                    if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
+                    return;
+                  }
                   const inp = document.getElementById('pdfPageInput') as HTMLInputElement | null;
                   if (inp) {
                     inp.value = String(savedPage);
@@ -403,13 +413,14 @@ export function openFile(f: FileLite, course: LegacyCourse, pane: PaneId = 'left
               window.pdfDoc = pdfDoc;
               window.pdfTotal = pdfDoc.numPages;
               window.pdfPage = 1;
-              const _largePdf = pdfDoc.numPages > 20;
-              window.pdfShowAll = !_largePdf;
+              // Always open in all-pages (continuous) mode — see the note in the
+              // uploaded-file path above; show-all is virtualized so it's cheap.
+              window.pdfShowAll = true;
               window.pdfFullText = '';
               if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
               if (typeof window.updateZoomPct === 'function') window.updateZoomPct();
               const pdfAll = document.getElementById('pdfAll');
-              if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
+              if (pdfAll) pdfAll.textContent = 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
               snapshotWindowInto(pane);
