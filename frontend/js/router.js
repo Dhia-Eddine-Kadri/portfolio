@@ -439,6 +439,51 @@ try {
   _ssSkipBootRoute = sessionStorage.getItem('ss_show_auth') === 'true';
 } catch (e) {}
 
+// When the app boots directly inside a course or a file — either from a
+// deep-restore of ss_state or from a reloaded course/file URL — the naive fix
+// was a single replaceState. That left the course/file as the ONLY history
+// entry, so pressing Back walked straight out of the app instead of returning
+// to the courses list. Seed a synthetic "courses list" entry underneath (and,
+// for a file, an intermediate course entry) so Back climbs file → course →
+// courses list, matching what the user expects. German/learner courses keep
+// the old single-entry behavior — their in-page navigation owns Back.
+function _ssIsGermanCourseId(id) {
+  return String(id || '').indexOf('german-') === 0;
+}
+
+function _ssSeedCourseStack(courseId, courseShort, section, fileName) {
+  var cid = courseId || '';
+  var sec = section || 'files';
+  // Base entry: the courses grid. replaceState so we don't grow the stack past
+  // the entry the browser already created for this document load.
+  _ssReplaceHistory({ view: 'portal', section: 'studip' }, '#portal=courses');
+  var courseHash =
+    '#portal=courses&course=' + encodeURIComponent(cid) +
+    '&section=' + encodeURIComponent(sec);
+  try {
+    history.pushState(
+      { view: 'course', courseId: cid, courseShort: courseShort || null, section: sec },
+      '',
+      courseHash
+    );
+  } catch (e) {}
+  if (fileName) {
+    try {
+      history.pushState(
+        {
+          view: 'file',
+          courseId: cid,
+          courseShort: courseShort || null,
+          fileName: fileName,
+          section: sec
+        },
+        '',
+        courseHash + '&file=' + encodeURIComponent(fileName)
+      );
+    } catch (e) {}
+  }
+}
+
 if (!_ssSkipBootRoute &&
     (!window.location.hash || window.location.hash.indexOf('access_token') === -1)) {
   var _hashState = _ssStateFromHash(window.location.hash);
@@ -447,9 +492,23 @@ if (!_ssSkipBootRoute &&
     _rst = JSON.parse(localStorage.getItem('ss_state') || '{}');
   } catch (e) {}
   if (_hashState) {
-    _ssReplaceHistory(_hashState, window.location.hash);
+    if (
+      (_hashState.view === 'course' || _hashState.view === 'file') &&
+      !_ssIsGermanCourseId(_hashState.courseId)
+    ) {
+      _ssSeedCourseStack(
+        _hashState.courseId,
+        _hashState.courseShort,
+        _hashState.section,
+        _hashState.view === 'file' ? _hashState.fileName : null
+      );
+    } else {
+      _ssReplaceHistory(_hashState, window.location.hash);
+    }
   } else if (_rst.inApp && (_rst.view === 'studip' || _rst.view === 'courses')) {
     _ssReplaceHistory({ view: 'courses' }, '#portal=courses');
+  } else if (_rst.inApp && _rst.fileName && !_ssIsGermanCourseId(_rst.courseId)) {
+    _ssSeedCourseStack(_rst.courseId, null, _rst.section || 'files', _rst.fileName);
   } else if (_rst.inApp && _rst.fileName) {
     _ssReplaceHistory(
       {
@@ -462,6 +521,8 @@ if (!_ssSkipBootRoute &&
         '&section=' + encodeURIComponent(_rst.section || 'files') +
         '&file=' + encodeURIComponent(_rst.fileName)
     );
+  } else if (_rst.inApp && _rst.courseId && !_ssIsGermanCourseId(_rst.courseId)) {
+    _ssSeedCourseStack(_rst.courseId, null, _rst.section || 'files', null);
   } else if (_rst.inApp && _rst.courseId) {
     _ssReplaceHistory(
       { view: 'course', courseId: _rst.courseId, section: _rst.section || 'files' },
