@@ -592,7 +592,7 @@
         canvas.appendChild(el);
       });
       if (empty) empty.style.display = state.length ? 'none' : 'flex';
-      canvas.querySelectorAll('.dw-header').forEach(bindDrag);
+      canvas.querySelectorAll('.dash-widget').forEach(bindDrag);
       canvas.querySelectorAll('.dw-resize').forEach(bindResize);
       canvas.querySelectorAll('.dw-remove').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
@@ -1247,12 +1247,25 @@
       };
     }
 
-    function bindDrag(hdr) {
-      hdr.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0) return;
-        if (e.target.closest('.dw-remove')) return;
-        var el = hdr.closest('.dash-widget'),
-          u = +el.dataset.uid;
+    function bindDrag(widget) {
+      var pressTimer = null;
+      var pendingPress = null;
+
+      function isTouchPointer(e) {
+        return e.pointerType === 'touch' || e.pointerType === 'pen';
+      }
+
+      function isInteractiveDragTarget(target) {
+        return !!(
+          target &&
+          target.closest(
+            'button,input,textarea,select,a,[contenteditable="true"],.dw-remove,.dw-resize,.cw-pill,.gcw-cell,.gcw-list-row,.gcw-add-btn,.gcw-nav-btn'
+          )
+        );
+      }
+
+      function startDrag(e, el) {
+        var u = +el.dataset.uid;
         var w = state.find(function (x) {
           return x.uid === u;
         });
@@ -1261,6 +1274,7 @@
         var rect = el.getBoundingClientRect();
         dragging = {
           uid: u,
+          pointerId: e.pointerId,
           offX: e.clientX - rect.left,
           offY: e.clientY - rect.top,
           cs: w.cs,
@@ -1279,12 +1293,59 @@
           (e.clientY - dragging.offY) +
           'px';
         try {
-          hdr.setPointerCapture(e.pointerId);
+          el.setPointerCapture(e.pointerId);
         } catch (err) {}
-        document.addEventListener('pointermove', onDragMove);
+        document.addEventListener('pointermove', onDragMove, { passive: false });
         document.addEventListener('pointerup', onDragEnd);
         document.addEventListener('pointercancel', onDragCancel);
+      }
+
+      function clearPendingPress() {
+        if (pressTimer) clearTimeout(pressTimer);
+        pressTimer = null;
+        pendingPress = null;
+      }
+
+      widget.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0) return;
+        if (dragging || resizing || isInteractiveDragTarget(e.target)) return;
+        var headerDrag = !isTouchPointer(e) || e.target.closest('.dw-header');
+        if (headerDrag) {
+          startDrag(e, widget);
+          return;
+        }
+        pendingPress = {
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          event: e
+        };
+        document.addEventListener('pointermove', onPressMove, { passive: false });
+        document.addEventListener('pointerup', onPressEnd);
+        document.addEventListener('pointercancel', onPressEnd);
+        pressTimer = setTimeout(function () {
+          if (!pendingPress) return;
+          startDrag(pendingPress.event, widget);
+          clearPendingPress();
+          document.removeEventListener('pointermove', onPressMove);
+          document.removeEventListener('pointerup', onPressEnd);
+          document.removeEventListener('pointercancel', onPressEnd);
+        }, 220);
       });
+
+      function onPressMove(e) {
+        if (!pendingPress || e.pointerId !== pendingPress.pointerId) return;
+        var dx = e.clientX - pendingPress.startX;
+        var dy = e.clientY - pendingPress.startY;
+        if (Math.hypot(dx, dy) > 8) onPressEnd();
+      }
+
+      function onPressEnd() {
+        clearPendingPress();
+        document.removeEventListener('pointermove', onPressMove);
+        document.removeEventListener('pointerup', onPressEnd);
+        document.removeEventListener('pointercancel', onPressEnd);
+      }
 
       function clearDragListeners() {
         document.removeEventListener('pointermove', onDragMove);
@@ -1294,6 +1355,7 @@
 
       function onDragMove(e) {
         if (!dragging) return;
+        if (e.pointerId !== dragging.pointerId) return;
         e.preventDefault();
         ghost.style.left = e.clientX - dragging.offX + 'px';
         ghost.style.top = e.clientY - dragging.offY + 'px';
@@ -1327,8 +1389,9 @@
         });
       }
 
-      function onDragCancel() {
+      function onDragCancel(e) {
         if (!dragging) return;
+        if (e && e.pointerId !== dragging.pointerId) return;
         clearDragListeners();
         ghost.style.display = 'none';
         var el2 = canvas.querySelector('[data-uid="' + dragging.uid + '"]');
@@ -1339,6 +1402,7 @@
 
       function onDragEnd(e) {
         if (!dragging) return;
+        if (e.pointerId !== dragging.pointerId) return;
         clearDragListeners();
         var cell = getCellAt(e.clientX - dragging.offX, e.clientY - dragging.offY);
         var w = state.find(function (x) {
