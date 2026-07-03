@@ -793,7 +793,10 @@ body:not(.night) #psec-studip .sd-skel-bar {
   line-height: 1.45;
 }
 
-/* Course card actions */
+/* Course card actions. Note: .sd-course-summary-btn now renders the Stats
+   button (courses-render.ts) — the class name is kept because this file is
+   immutable-cached under ?v= and a rename would unstyle the button for
+   returning users. */
 #psec-studip .sd-course-actions {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);

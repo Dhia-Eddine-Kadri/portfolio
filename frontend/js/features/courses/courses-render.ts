@@ -320,11 +320,15 @@ export function sdRenderCourses(state: CoursesRenderState): void {
         '<span>' + progress.lastOpened + '</span>' +
       '</span>';
 
+    // The Stats button keeps the .sd-course-summary-btn class on purpose:
+    // courses-redesign.css is immutable-cached under a ?v= only bumped via
+    // loader.js, so renaming the class would leave returning users with an
+    // unstyled button until their CSS cache turns over.
     const actionsHtml =
       '<div class="sd-course-actions">' +
-        '<button type="button" class="sd-course-summary-btn" data-course-summary>' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>' +
-          '<span>Summary</span>' +
+        '<button type="button" class="sd-course-summary-btn" data-course-stats>' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' +
+          '<span>Stats</span>' +
         '</button>' +
         '<button type="button" class="sd-course-open-btn" data-open-course>Open course</button>' +
       '</div>';
@@ -381,9 +385,9 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       if (typeof window.openCourse === 'function') window.openCourse(c);
     }
 
-    card.querySelector<HTMLButtonElement>('[data-course-summary]')?.addEventListener('click', (e) => {
+    card.querySelector<HTMLButtonElement>('[data-course-stats]')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      _openCourseAiPrompt(c, 'summary');
+      _openCourseStatsModal(c, progress, col, courseIcon);
     });
     card.querySelector<HTMLButtonElement>('[data-open-course]')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -406,26 +410,175 @@ export function sdRenderCourses(state: CoursesRenderState): void {
   applyCoursesLayoutPrefs();
 }
 
-function _openCourseAiPrompt(course: LegacyCourse, prompt: string): void {
-  const w = window as unknown as {
-    activeCourseRef?: LegacyCourse | null;
-    activeCourseId?: string | null;
-    showPortalSection?: (section: string) => void;
-    _navigatePortal?: (section: string) => void;
+// ── Course stats modal ───────────────────────────────────────────────────────
+// Opened from the Stats button on each course card. Rendered onto document.body
+// (outside #psec-studip), so its styles are injected from JS — same pattern as
+// study-timer / message-navigator — which also means the feature ships
+// atomically with this module instead of needing a courses-redesign.css ?v=
+// bump through loader.js.
+
+function _ensureStatsModalCss(): void {
+  if (document.getElementById('sdStatsModalCss')) return;
+  const s = document.createElement('style');
+  s.id = 'sdStatsModalCss';
+  s.textContent =
+    '.sd-stats-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgba(2,6,23,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:sdStatsFade .18s ease}' +
+    '@keyframes sdStatsFade{from{opacity:0}to{opacity:1}}' +
+    '@keyframes sdStatsRise{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}' +
+    '@keyframes sdStatsSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}' +
+    '.sd-stats-modal{--sd-stats-accent:#2563eb;position:relative;width:min(500px,100%);max-height:min(86vh,700px);overflow-y:auto;box-sizing:border-box;padding:26px;border-radius:24px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015)),#0b1223;color:#e2e8f0;box-shadow:0 32px 90px -18px rgba(0,0,0,.65);animation:sdStatsRise .24s cubic-bezier(.22,1,.36,1);font-family:inherit}' +
+    '.sd-stats-modal::-webkit-scrollbar{width:6px}' +
+    '.sd-stats-modal::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}' +
+    '.sd-stats-close{position:absolute;top:16px;right:16px;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#cbd5e1;cursor:pointer;transition:background .15s ease,color .15s ease}' +
+    '.sd-stats-close:hover{background:rgba(255,255,255,.12);color:#fff}' +
+    '.sd-stats-head{display:flex;align-items:center;gap:14px;margin-bottom:22px;padding-right:44px}' +
+    '.sd-stats-icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex:0 0 auto;border-radius:14px;font-size:1.4rem;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06)}' +
+    '.sd-stats-title{margin:0 0 4px;font-size:1.15rem;font-weight:800;color:#fff;line-height:1.3}' +
+    '.sd-stats-sub{font-size:.82rem;color:rgba(226,232,240,.6)}' +
+    '.sd-stats-hero{display:flex;align-items:center;gap:22px;margin-bottom:22px}' +
+    '.sd-stats-ring{position:relative;width:124px;height:124px;flex:0 0 auto}' +
+    '.sd-stats-ring svg{width:100%;height:100%;transform:rotate(-90deg)}' +
+    '.sd-stats-ring-track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:11}' +
+    '.sd-stats-ring-fill{fill:none;stroke:var(--sd-stats-accent);stroke-width:11;stroke-linecap:round}' +
+    '.sd-stats-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}' +
+    '.sd-stats-ring-label strong{font-size:1.5rem;font-weight:800;color:#fff;line-height:1}' +
+    '.sd-stats-ring-label span{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(226,232,240,.55)}' +
+    '.sd-stats-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;flex:1;min-width:0}' +
+    '.sd-stats-tile{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}' +
+    '.sd-stats-tile-value{font-size:1.05rem;font-weight:800;color:#fff}' +
+    '.sd-stats-tile-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(226,232,240,.55)}' +
+    '.sd-stats-rows{display:flex;flex-direction:column;gap:14px}' +
+    '.sd-stats-row-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}' +
+    '.sd-stats-row-label{font-size:.85rem;font-weight:700;color:#e2e8f0}' +
+    '.sd-stats-row-value{font-size:.85rem;font-weight:800;color:#fff}' +
+    '.sd-stats-row.is-untracked .sd-stats-row-value{color:rgba(226,232,240,.45)}' +
+    '.sd-stats-row-track{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}' +
+    '.sd-stats-row-fill{height:100%;border-radius:999px;background:var(--sd-stats-accent);transition:width .5s cubic-bezier(.22,1,.36,1)}' +
+    '.sd-stats-row-hint{margin-top:5px;font-size:.74rem;color:rgba(226,232,240,.5)}' +
+    'body:not(.night) .sd-stats-overlay{background:rgba(15,23,42,.45)}' +
+    'body:not(.night) .sd-stats-modal{background:#fff;border-color:rgba(15,23,42,.08);color:#1e293b;box-shadow:0 32px 90px -30px rgba(15,23,42,.35)}' +
+    'body:not(.night) .sd-stats-title{color:#0f172a}' +
+    'body:not(.night) .sd-stats-sub{color:#64748b}' +
+    'body:not(.night) .sd-stats-close{background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.08);color:#475569}' +
+    'body:not(.night) .sd-stats-close:hover{background:rgba(15,23,42,.1);color:#0f172a}' +
+    'body:not(.night) .sd-stats-icon{background:rgba(15,23,42,.04);border-color:rgba(15,23,42,.08)}' +
+    'body:not(.night) .sd-stats-ring-track{stroke:rgba(15,23,42,.08)}' +
+    'body:not(.night) .sd-stats-ring-label strong{color:#0f172a}' +
+    'body:not(.night) .sd-stats-ring-label span{color:#64748b}' +
+    'body:not(.night) .sd-stats-tile{background:rgba(15,23,42,.03);border-color:rgba(15,23,42,.08)}' +
+    'body:not(.night) .sd-stats-tile-value{color:#0f172a}' +
+    'body:not(.night) .sd-stats-tile-label{color:#64748b}' +
+    'body:not(.night) .sd-stats-row-label{color:#334155}' +
+    'body:not(.night) .sd-stats-row-value{color:#0f172a}' +
+    'body:not(.night) .sd-stats-row-track{background:rgba(15,23,42,.08)}' +
+    'body:not(.night) .sd-stats-row-hint{color:#94a3b8}' +
+    '@media (max-width:640px){' +
+      '.sd-stats-overlay{padding:0;align-items:flex-end}' +
+      '.sd-stats-modal{width:100%;max-height:88vh;max-height:88dvh;border-radius:22px 22px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom));animation:sdStatsSheet .28s cubic-bezier(.22,1,.36,1)}' +
+      '.sd-stats-hero{flex-direction:column;gap:18px}' +
+      '.sd-stats-tiles{width:100%}' +
+    '}';
+  document.head.appendChild(s);
+}
+
+function _openCourseStatsModal(
+  course: LegacyCourse,
+  progress: CourseProgress,
+  accent: string,
+  icon: string
+): void {
+  _ensureStatsModalCss();
+  document.querySelector('.sd-stats-overlay')?.remove();
+
+  const esc = (v: string): string =>
+    v.replace(/[<>&"]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch] || ch));
+  const name = esc(course.name || 'Course');
+  const fileWord = progress.files === 1 ? 'file' : 'files';
+
+  // Overall ring: r=52 in a 120 viewBox → circumference ≈ 326.73.
+  const circumference = 2 * Math.PI * 52;
+  const dash = (Math.max(0, Math.min(100, progress.total)) / 100) * circumference;
+
+  const aiHint = progress.aiSessions > 0
+    ? progress.aiSessions + ' chat session' + (progress.aiSessions !== 1 ? 's' : '')
+    : 'No AI chats yet';
+  // null = no tracking source exists yet (matches the card's sub-stat pills,
+  // which render those as 0%); the modal shows an em dash + hint instead.
+  const rows: Array<{ label: string; value: number | null; hint: string }> = [
+    { label: 'Read', value: progress.readingProgress, hint: progress.studiedFiles + ' of ' + progress.files + ' ' + fileWord + ' opened' },
+    { label: 'Notes', value: progress.notesProgress, hint: 'Not tracked yet' },
+    { label: 'Practice', value: progress.practiceProgress, hint: 'Not tracked yet' },
+    { label: 'AI review', value: progress.aiReviewProgress, hint: aiHint },
+  ];
+  const rowsHtml = rows.map((r) =>
+    '<div class="sd-stats-row' + (r.value === null ? ' is-untracked' : '') + '">' +
+      '<div class="sd-stats-row-head">' +
+        '<span class="sd-stats-row-label">' + r.label + '</span>' +
+        '<span class="sd-stats-row-value">' + (r.value === null ? '&mdash;' : r.value + '%') + '</span>' +
+      '</div>' +
+      '<div class="sd-stats-row-track"><div class="sd-stats-row-fill" style="width:' + (r.value ?? 0) + '%"></div></div>' +
+      '<div class="sd-stats-row-hint">' + r.hint + '</div>' +
+    '</div>'
+  ).join('');
+
+  const tilesHtml = [
+    { v: String(progress.files), l: 'Files' },
+    { v: String(progress.studiedFiles), l: 'Opened' },
+    { v: String(progress.unreadFilesCount), l: 'Unread' },
+    { v: String(progress.aiSessions), l: 'AI chats' },
+  ].map((t) =>
+    '<div class="sd-stats-tile">' +
+      '<span class="sd-stats-tile-value">' + t.v + '</span>' +
+      '<span class="sd-stats-tile-label">' + t.l + '</span>' +
+    '</div>'
+  ).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sd-stats-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', (course.name || 'Course') + ' statistics');
+  overlay.innerHTML =
+    '<div class="sd-stats-modal" style="--sd-stats-accent:' + esc(accent) + '">' +
+      '<button type="button" class="sd-stats-close" aria-label="Close">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button>' +
+      '<header class="sd-stats-head">' +
+        '<div class="sd-stats-icon" aria-hidden="true">' + icon + '</div>' +
+        '<div>' +
+          '<h3 class="sd-stats-title">' + name + '</h3>' +
+          '<div class="sd-stats-sub">' + progress.files + ' ' + fileWord + ' &middot; ' + progress.lastOpened + '</div>' +
+        '</div>' +
+      '</header>' +
+      '<div class="sd-stats-hero">' +
+        '<div class="sd-stats-ring">' +
+          '<svg viewBox="0 0 120 120" aria-hidden="true">' +
+            '<circle class="sd-stats-ring-track" cx="60" cy="60" r="52"/>' +
+            '<circle class="sd-stats-ring-fill" cx="60" cy="60" r="52" stroke-dasharray="' + dash.toFixed(1) + ' ' + circumference.toFixed(1) + '"/>' +
+          '</svg>' +
+          '<div class="sd-stats-ring-label"><strong>' + progress.total + '%</strong><span>overall</span></div>' +
+        '</div>' +
+        '<div class="sd-stats-tiles">' + tilesHtml + '</div>' +
+      '</div>' +
+      '<div class="sd-stats-rows">' + rowsHtml + '</div>' +
+    '</div>';
+
+  const prevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const close = (): void => {
+    document.removeEventListener('keydown', onKey);
+    overlay.remove();
+    prevFocus?.focus();
   };
-  w.activeCourseRef = course;
-  w.activeCourseId = course.id || null;
-  try { sessionStorage.setItem('ss_ai_target_course', course.id || ''); } catch { /* ignore */ }
-  // Bug 2 fix: use _navigatePortal so URL hash and sidebar highlight are updated.
-  if (typeof w._navigatePortal === 'function') w._navigatePortal('aipage');
-  else if (typeof w.showPortalSection === 'function') w.showPortalSection('aipage');
-  window.setTimeout(() => {
-    const ta = document.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
-    if (!ta) return;
-    ta.value = prompt;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    ta.focus();
-  }, 350);
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  overlay.querySelector<HTMLButtonElement>('.sd-stats-close')?.addEventListener('click', close);
+  document.body.appendChild(overlay);
+  overlay.querySelector<HTMLButtonElement>('.sd-stats-close')?.focus();
 }
 
 function _renderDailyMissionPreview(state: CoursesRenderState, beforeEl: HTMLElement): void {
