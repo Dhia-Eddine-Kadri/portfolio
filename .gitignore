@@ -71,4 +71,6 @@ artifacts/
 
 # Supabase CLI config (backend)
 .supabase/
-bewerbung-silkroad24/
+
+# Personal job-application documents (not part of Minallo)
+bewerbung-*/

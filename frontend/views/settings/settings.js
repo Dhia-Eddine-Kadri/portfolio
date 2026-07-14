@@ -93,7 +93,10 @@ function bindSettingsControls() {
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (window._sbToken || '') },
           body: JSON.stringify({ type: typeEl.value, message: message, pageUrl: window.location.href })
         });
-        if (!response.ok) throw new Error('Could not send your message. Please try again.');
+        if (!response.ok) {
+          var errorBody = await response.json().catch(function () { return null; });
+          throw new Error(errorBody && errorBody.error ? errorBody.error : 'Could not send your message. Please try again.');
+        }
         messageEl.value = '';
         statusEl.textContent = 'Thank you — your message was sent.';
         statusEl.className = 'feedback-status success';
@@ -102,7 +105,7 @@ function bindSettingsControls() {
         statusEl.className = 'feedback-status error';
       } finally {
         submitEl.disabled = false;
-        submitEl.textContent = 'Send feedback';
+        submitEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg><span>Send feedback</span>';
       }
     });
   }
