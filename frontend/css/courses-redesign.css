@@ -1897,7 +1897,7 @@ body.minallo-in-course .topbar {
 }
 .st-popup.st-popup-v2 .st-music-sources {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 .st-popup.st-popup-v2 .st-music-src {
