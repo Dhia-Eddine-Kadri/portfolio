@@ -19,6 +19,7 @@ interface RightState {
   pdfScale: number;
   pdfShowAll: boolean;
   pdfTotal: number;
+  renderedScale: number;
   observer: IntersectionObserver | null;
 }
 
@@ -28,6 +29,7 @@ const state: RightState = {
   pdfScale: 0.9,
   pdfShowAll: true,
   pdfTotal: 0,
+  renderedScale: 0.9,
   observer: null,
 };
 
@@ -109,6 +111,8 @@ function renderPageIntoWrap(wrap: HTMLElement, num: number): void {
 export function renderRightPages(): void {
   const body = bodyEl();
   if (!body || !state.pdfDoc) return;
+  body.style.removeProperty('--pdf-wheel-zoom');
+  state.renderedScale = state.pdfScale;
   body.innerHTML = '';
   if (state.observer) {
     state.observer.disconnect();
@@ -210,17 +214,11 @@ export function rightNext(): void {
 }
 
 export function rightZoomIn(): void {
-  if (!state.pdfDoc) return;
-  state.pdfScale = Math.min(3, state.pdfScale + 0.1);
-  persist();
-  renderRightPages();
+  applyRightZoom(state.pdfScale + 0.1);
 }
 
 export function rightZoomOut(): void {
-  if (!state.pdfDoc) return;
-  state.pdfScale = Math.max(0.3, state.pdfScale - 0.1);
-  persist();
-  renderRightPages();
+  applyRightZoom(state.pdfScale - 0.1);
 }
 
 export function rightToggleShowAll(): void {
@@ -231,10 +229,7 @@ export function rightToggleShowAll(): void {
 }
 
 export function rightFit(): void {
-  if (!state.pdfDoc) return;
-  state.pdfScale = 0.9;
-  persist();
-  renderRightPages();
+  applyRightZoom(0.9);
 }
 
 function applyRightZoom(targetScale: number): void {
@@ -246,7 +241,10 @@ function applyRightZoom(targetScale: number): void {
 
   const previousTop = body?.scrollTop || 0;
   persist();
-  renderRightPages();
+  if (body) {
+    body.style.setProperty('--pdf-wheel-zoom', String(state.pdfScale / state.renderedScale));
+  }
+  updateRightToolbar();
 
   // Keep the content under the pointer at roughly the same vertical position,
   // matching the left viewer's anchored Ctrl/Cmd + wheel zoom behaviour.
@@ -321,9 +319,6 @@ function scheduleToolbarInit(): void {
 }
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('pdf-viewer-layout-change', () => {
-    if (state.pdfDoc) renderRightPages();
-  });
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => scheduleToolbarInit(), { once: true });
   } else {
