@@ -237,6 +237,39 @@ export function rightFit(): void {
   renderRightPages();
 }
 
+function applyRightZoom(targetScale: number): void {
+  if (!state.pdfDoc) return;
+  const body = bodyEl();
+  const previousScale = state.pdfScale;
+  state.pdfScale = Math.min(3, Math.max(0.3, Math.round(targetScale * 100) / 100));
+  if (state.pdfScale === previousScale) return;
+
+  const previousTop = body?.scrollTop || 0;
+  persist();
+  renderRightPages();
+
+  // Keep the content under the pointer at roughly the same vertical position,
+  // matching the left viewer's anchored Ctrl/Cmd + wheel zoom behaviour.
+  if (body && previousScale > 0) {
+    body.scrollTop = previousTop * (state.pdfScale / previousScale);
+  }
+}
+
+function bindRightWheelZoom(): void {
+  const body = bodyEl();
+  if (!body || body.dataset.wheelZoomBound === '1') return;
+  body.dataset.wheelZoomBound = '1';
+  body.addEventListener(
+    'wheel',
+    (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      applyRightZoom(state.pdfScale * (event.deltaY < 0 ? 1.1 : 1 / 1.1));
+    },
+    { passive: false }
+  );
+}
+
 function updateRightToolbar(): void {
   const tb = document.getElementById('pdfRightToolbar');
   if (!tb) return;
@@ -270,6 +303,7 @@ function initRightToolbar(): void {
   document.getElementById('pdfRightZoomOut')?.addEventListener('click', rightZoomOut);
   document.getElementById('pdfRightAll')?.addEventListener('click', rightToggleShowAll);
   document.getElementById('pdfRightFit')?.addEventListener('click', rightFit);
+  bindRightWheelZoom();
 }
 
 function scheduleToolbarInit(): void {
@@ -287,6 +321,9 @@ function scheduleToolbarInit(): void {
 }
 
 if (typeof document !== 'undefined') {
+  document.addEventListener('pdf-viewer-layout-change', () => {
+    if (state.pdfDoc) renderRightPages();
+  });
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => scheduleToolbarInit(), { once: true });
   } else {

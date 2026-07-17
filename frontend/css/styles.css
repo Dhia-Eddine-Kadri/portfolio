@@ -1664,6 +1664,16 @@ body.night .sb-acc-chev-btn {
 #pdfMaximize .pdf-min-icon { display: none; }
 body.pdf-maximized #pdfMaximize .pdf-max-icon { display: none; }
 body.pdf-maximized #pdfMaximize .pdf-min-icon { display: inline-flex; }
+.pdf-max-both-label { display: none; white-space: nowrap; }
+body.pdf-compare-open:not(.pdf-maximized) #pdfMaximize {
+  width: auto;
+  min-width: 132px;
+  padding-inline: 12px;
+  gap: 7px;
+}
+body.pdf-compare-open:not(.pdf-maximized) #pdfMaximize .pdf-max-both-label {
+  display: inline;
+}
 
 /* In fullscreen, collapse the toolbar to a compact floating pill centred at the
    top of the screen — only the page / zoom / fit / fullscreen / annotate /

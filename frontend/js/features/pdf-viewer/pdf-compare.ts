@@ -100,6 +100,13 @@ function setSplitMode(on: boolean): void {
   const bodies = document.getElementById('pdfBodies');
   if (!bodies) return;
   bodies.classList.toggle('is-split', on);
+  document.body.classList.toggle('pdf-compare-open', on);
+  const maximize = document.getElementById('pdfMaximize');
+  if (maximize && !document.body.classList.contains('pdf-maximized')) {
+    const label = on ? 'Maximize both PDFs' : 'Fullscreen';
+    maximize.setAttribute('title', label);
+    maximize.setAttribute('aria-label', label);
+  }
 }
 
 function showRightLoading(fileName: string): void {

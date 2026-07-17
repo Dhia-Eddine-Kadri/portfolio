@@ -629,11 +629,14 @@ function _applyPdfMax(on: boolean): void {
   document.body.classList.toggle('pdf-maximized', on);
   const mbtn = document.getElementById('pdfMaximize');
   if (mbtn) {
+    const hasBoth = document.getElementById('pdfBodies')?.classList.contains('is-split');
+    const enterLabel = hasBoth ? 'Maximize both PDFs' : 'Fullscreen';
     mbtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    mbtn.setAttribute('title', on ? 'Exit fullscreen (Esc)' : 'Fullscreen');
-    mbtn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
+    mbtn.setAttribute('title', on ? 'Exit fullscreen (Esc)' : enterLabel);
+    mbtn.setAttribute('aria-label', on ? 'Exit fullscreen' : enterLabel);
   }
   renderPages();
+  document.dispatchEvent(new CustomEvent('pdf-viewer-layout-change', { detail: { maximized: on } }));
   setTimeout(() => _pdfScrollToPage(pg), 120);
 }
 function _pdfIsMax(): boolean {
