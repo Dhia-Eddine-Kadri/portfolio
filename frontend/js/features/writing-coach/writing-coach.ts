@@ -14,6 +14,7 @@ import {
   TaskType,
   WritingAnalysis,
 } from './writing-coach-ai.js';
+import { friendlyAiErrorMessage } from '../../services/ai-error-message.js';
 
 const DRAFT_KEY = 'ss_writing_coach_draft';
 const TASK_KEY = 'ss_writing_coach_task';
@@ -229,7 +230,7 @@ async function _analyze(): Promise<void> {
     console.error('[writing-coach] analyze error:', e);
     if (results) {
       results.style.display = '';
-      const msg = e instanceof Error ? e.message : 'Analysis failed. Please try again.';
+      const msg = friendlyAiErrorMessage(e);
       results.innerHTML = `<div class="wc-error">${_escape(msg)}</div>`;
     }
   } finally {

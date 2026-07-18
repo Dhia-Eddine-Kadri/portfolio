@@ -20,6 +20,7 @@ import {
   type AIThinkingStatus
 } from './ai-thinking-status.js';
 import { getAiChatKey } from './chat-key.js';
+import { friendlyAiErrorMessage } from '../../services/ai-error-message.js';
 
 /** The subscription gate (HTTP 402 / "subscription required") should read as a
  * calm upgrade prompt, not a raw server error. */
@@ -1356,7 +1357,7 @@ export function initAskAI(
                       const data = await res.json() as { detail?: string };
                       detail = data.detail || detail;
                     } catch { /* keep fallback detail */ }
-                    resolve({ content: [{ text: '❌ ' + detail }] });
+                    resolve({ content: [{ text: friendlyAiErrorMessage(detail) }] });
                     return;
                   }
                   fallbackToRag();
@@ -1453,8 +1454,7 @@ export function initAskAI(
                 })
                 .catch((err: unknown) => {
                   removeThinking();
-                  const msg = err instanceof Error ? ' (' + err.message + ')' : '';
-                  resolve({ content: [{ text: '❌ Could not reach the AI' + msg + '. Please try again.' }] });
+                  resolve({ content: [{ text: friendlyAiErrorMessage(err) }] });
                 });
             }
 

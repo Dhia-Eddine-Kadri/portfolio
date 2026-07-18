@@ -24,6 +24,7 @@ import {
   todayLocalDate as _studyServiceToday,
   type DailyMissionResponse
 } from '../../services/study-service.js';
+import { friendlyAiErrorMessage } from '../../services/ai-error-message.js';
 
 /** Returns today's date as YYYY-MM-DD in the local timezone. */
 function todayLocalDateStr(): string {
@@ -1022,9 +1023,7 @@ async function streamAiReply(
         );
         attachSubscribeCta(aiRow, bubble);
       } else {
-        bubble.innerHTML = renderInlineMarkdown(
-          '❌ ' + ((err as Error)?.message || tStr('cb_request_failed', 'Request failed.'))
-        );
+        bubble.innerHTML = renderInlineMarkdown(friendlyAiErrorMessage(err));
         attachErrorRetry(aiRow, bubble);
       }
     }
@@ -2833,7 +2832,7 @@ async function callGenericAi(
   }
   const data = (await resp.json()) as { content?: Array<{ text?: string }>; error?: { message?: string } };
   const rawResponse = data.error
-    ? tStr('cb_error_prefix', '❌ Error: ') + (data.error.message || JSON.stringify(data.error))
+    ? friendlyAiErrorMessage(data.error.message || data.error)
     : data.content
       ? data.content.map((b) => b.text || '').join('')
       : tStr('cb_no_response', 'No response.');

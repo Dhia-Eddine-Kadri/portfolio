@@ -519,7 +519,7 @@ async function runMultiSummary(fnames, course) {
           body.innerHTML =
             tagsHtml +
             '<p style="color:#ff6b35">\u274C ' +
-            _escHtml(data.error.message || 'API error') +
+            'I couldn\'t create that summary just now. Please try again in a moment.' +
             '</p>';
           return;
         }
@@ -534,7 +534,7 @@ async function runMultiSummary(fnames, course) {
         document.getElementById('msmSaveBtn').style.display = '';
       })
       .catch(function (e) {
-        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">\u274C ' + _escHtml(e.message) + '</p>';
+        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">I couldn\'t create that summary just now. Please try again in a moment.</p>';
       });
   });
 }

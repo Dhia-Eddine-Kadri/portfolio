@@ -773,7 +773,7 @@
 
   function _renderResult(els, res) {
     if (!res || res.error) {
-      els.result.innerHTML = '<div class="dl-msg dl-error">' + _esc((res && res.error) || 'Deep Learn failed. Please try again.') + '</div>';
+      els.result.innerHTML = '<div class="dl-msg dl-error">I couldn\'t create that lesson just now. Please try again in a moment.</div>';
       return;
     }
     if ((!res.lesson || !res.lesson.trim()) && res.warning) {
@@ -1230,7 +1230,7 @@
         .catch(function (err) {
           els.gen.disabled = false;
           progress.stop();
-          els.result.innerHTML = '<div class="dl-msg dl-error">' + _esc(err && err.message ? err.message : 'Deep Learn failed. Please try again.') + '</div>';
+          els.result.innerHTML = '<div class="dl-msg dl-error">I couldn\'t create that lesson just now. Please try again in a moment.</div>';
         });
     }
 

@@ -483,12 +483,13 @@
   }
 
   function _errorMessage(err, fallback) {
-    if (!err) return fallback || 'Request failed';
-    if (typeof err === 'string') return err;
-    if (err.message) return err.message;
-    if (err.error) return _errorMessage(err.error, fallback);
-    try { return JSON.stringify(err); } catch (_) {}
-    return fallback || 'Request failed';
+    var raw = typeof err === 'string' ? err : (err && (err.message || err.error)) || '';
+    raw = String(raw).toLowerCase();
+    if (/401|expired token|session/.test(raw)) return 'Your session needs a quick refresh. Please sign in again and retry.';
+    if (/429|rate.?limit|too many/.test(raw)) return 'The AI is busy right now. Please wait a moment and try again.';
+    if (/too long|token limit|payload too large/.test(raw)) return 'There is too much material to process at once. Try selecting fewer pages.';
+    if (/network|fetch|connection|offline/.test(raw)) return 'I couldn\'t connect just now. Please check your connection and try again.';
+    return fallback || 'I couldn\'t create those notes just now. Please try again in a moment.';
   }
 
   function _setGenMsg(msg) {

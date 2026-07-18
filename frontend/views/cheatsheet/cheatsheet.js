@@ -1347,7 +1347,7 @@
   function _renderResult(els, res) {
     if (!res || res.error) {
       els.result.innerHTML =
-        '<div class="cs-msg cs-error">' + _esc((res && res.error) || 'Cheatsheet failed. Please try again.') + '</div>';
+        '<div class="cs-msg cs-error">I couldn\'t create that cheatsheet just now. Please try again in a moment.</div>';
       return;
     }
     if (!res.text || !res.text.trim()) {
@@ -1742,7 +1742,7 @@
           els.gen.disabled = false;
           progress.stop();
           els.result.innerHTML =
-            '<div class="cs-msg cs-error">' + _esc(err && err.message ? err.message : 'Cheatsheet failed. Please try again.') + '</div>';
+            '<div class="cs-msg cs-error">I couldn\'t create that cheatsheet just now. Please try again in a moment.</div>';
         });
     }
 
