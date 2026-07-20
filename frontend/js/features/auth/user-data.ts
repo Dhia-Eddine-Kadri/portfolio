@@ -222,11 +222,6 @@ export async function loadUserData(uid: string): Promise<void> {
         if (isAdmin) {
           const btn = document.getElementById('psbAdmin');
           if (btn) btn.style.display = '';
-          const affiliateLink = document.getElementById('psbAffiliate');
-          const accountEmail = String(window._currentUser?.email || '').toLowerCase();
-          if (affiliateLink && accountEmail === 'medalimariam@gmail.com') {
-            affiliateLink.style.display = '';
-          }
           if (!window._userIsPro && window.applySubscription) {
             window.applySubscription({
               ...(sub || {}),

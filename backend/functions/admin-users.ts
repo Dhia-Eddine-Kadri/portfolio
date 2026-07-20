@@ -58,6 +58,7 @@ async function collectUserEmails(serviceKey: string): Promise<Map<string, string
 
 interface AdminRow { user_id: string }
 interface SubscriptionLite { plan?: string; status?: string }
+interface ProfileStatusLite { status?: string }
 interface UsersListResponse { users?: SupabaseUser[] }
 
 async function checkAdmin(user: SupabaseUser, serviceKey: string): Promise<{ ok: boolean; method: string }> {
@@ -112,7 +113,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage', 'usageexport'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'setuserstatus', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage', 'usageexport'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -147,21 +148,29 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       if (page > 20) break;
     }
 
-    const results: Array<{ id: string; email?: string; created_at?: string; plan: string; status: string }> = [];
+    const results: Array<{ id: string; email?: string; created_at?: string; plan: string; status: string; accountStatus: string }> = [];
     for (const u of matchedUsers.slice(0, 10)) {
-      const subRes = await supaRequest<SubscriptionLite[]>(
-        'GET',
-        'subscriptions?user_id=eq.' + encodeURIComponent(u.id) + '&select=plan,status',
-        null, serviceKey
-      );
+      const [subRes, profileRes] = await Promise.all([
+        supaRequest<SubscriptionLite[]>(
+          'GET', 'subscriptions?user_id=eq.' + encodeURIComponent(u.id) + '&select=plan,status',
+          null, serviceKey
+        ),
+        supaRequest<ProfileStatusLite[]>(
+          'GET', 'profiles?id=eq.' + encodeURIComponent(u.id) + '&select=status&limit=1',
+          null, serviceKey
+        )
+      ]);
       const sub = Array.isArray(subRes.body) && subRes.body[0]
         ? subRes.body[0] : { plan: 'free', status: 'none' };
+      const profile = Array.isArray(profileRes.body) && profileRes.body[0]
+        ? profileRes.body[0] : { status: 'user' };
       results.push({
         id: u.id,
         email: u.email,
         created_at: u['created_at'] as string | undefined,
         plan: sub.plan || 'free',
-        status: sub.status || 'none'
+        status: sub.status || 'none',
+        accountStatus: profile.status || 'user'
       });
     }
 
@@ -239,6 +248,24 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       report_id: reportId, status, auth_method: adminCheck.method
     });
     return jsonResponse(200, { ok: true });
+  }
+
+  if (action === 'setuserstatus') {
+    if (typeof status !== 'string' || !['user', 'affiliate'].includes(status)) {
+      return fail(400, 'Invalid user status');
+    }
+    if (typeof userId !== 'string' || !isUuid(userId)) return fail(400, 'Invalid userId');
+    const updateRes = await supaRequest(
+      'PATCH', 'profiles?id=eq.' + encodeURIComponent(userId), { status }, serviceKey,
+      { Prefer: 'return=representation' }
+    );
+    if (updateRes.status < 200 || updateRes.status >= 300 || !Array.isArray(updateRes.body) || !updateRes.body.length) {
+      return fail(500, 'User status update failed');
+    }
+    await logSecurityEvent(serviceKey, callerUser.id, 'admin_set_user_status', {
+      target_user_id: userId, new_status: status, auth_method: adminCheck.method
+    });
+    return jsonResponse(200, { ok: true, status });
   }
 
   // ── Analytics: signup growth ──────────────────────────────────────────────

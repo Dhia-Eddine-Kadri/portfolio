@@ -1,6 +1,6 @@
 interface AdminFetchBody {
   action:
-    | 'status' | 'search' | 'setplan' | 'reports' | 'resolvereport' | 'deleteself'
+    | 'status' | 'search' | 'setplan' | 'setuserstatus' | 'reports' | 'resolvereport' | 'deleteself'
     | 'signups' | 'newusers' | 'subscriptions' | 'retention'
     | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage' | 'aiusage' | 'usageexport';
   [k: string]: unknown;
@@ -30,6 +30,14 @@ export async function searchUsers(query: string): Promise<unknown> {
 
 export async function setUserPlan(userId: string, plan: 'free' | 'pro'): Promise<void> {
   await _adminFetch({ action: 'setplan', userId, plan });
+}
+
+export async function setUserStatus(userId: string, status: 'user' | 'affiliate'): Promise<void> {
+  const res = await _adminFetch({ action: 'setuserstatus', userId, status });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(data?.error?.message || 'Could not update user status');
+  }
 }
 
 // ── Admin analytics ─────────────────────────────────────────────────────────

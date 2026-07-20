@@ -2,6 +2,7 @@ import {
   checkAdminStatus,
   searchUsers,
   setUserPlan,
+  setUserStatus,
   reindexUserCourse,
   listRetrievalLogs,
   getRetrievalLog,
@@ -33,6 +34,7 @@ interface AdminUser {
   email?: string;
   plan?: string;
   status?: string;
+  accountStatus?: string;
   created_at?: string;
 }
 
@@ -1073,6 +1075,7 @@ async function adminSearch(): Promise<void> {
     results.innerHTML = '';
     (users as AdminUser[]).forEach((u) => {
       const isPro = u.plan === 'pro' && u.status === 'active';
+      const isAffiliate = u.accountStatus === 'affiliate';
       const isNew = _isNewUser(u.created_at);
       const joined = u.created_at ? new Date(u.created_at).toLocaleDateString() : '';
 
@@ -1101,7 +1104,13 @@ async function adminSearch(): Promise<void> {
         'font-size:.75rem;margin-top:4px;font-weight:800;color:' + (isPro ? '#22c55e' : '#f87171');
       statusEl.textContent = isPro ? '✓ Pro (subscribed)' : '✕ Free (not subscribed)';
 
-      info.append(emailEl, joinedEl, statusEl);
+      const accountStatusEl = document.createElement('div');
+      accountStatusEl.style.cssText =
+        'font-size:.75rem;margin-top:3px;font-weight:800;color:' +
+        (isAffiliate ? '#a3e635' : 'var(--on-glass-muted)');
+      accountStatusEl.textContent = isAffiliate ? 'Affiliate access' : 'Standard user';
+
+      info.append(emailEl, joinedEl, statusEl, accountStatusEl);
 
       const actionBtn = document.createElement('button');
       actionBtn.className = 'sub-btn ' + (isPro ? 'sub-btn-current' : 'sub-btn-upgrade');
@@ -1124,6 +1133,27 @@ async function adminSearch(): Promise<void> {
           const msg = e instanceof Error ? e.message : String(e);
           if (typeof window.showToast === 'function') window.showToast('Error', msg);
           this.disabled = false;
+        }
+      });
+
+      const affiliateBtn = document.createElement('button');
+      affiliateBtn.className = 'sub-btn ' + (isAffiliate ? 'sub-btn-current' : 'sub-btn-upgrade');
+      affiliateBtn.style.cssText = 'width:auto;padding:8px 14px;font-size:.72rem';
+      affiliateBtn.textContent = isAffiliate ? 'Remove Affiliate' : 'Make Affiliate';
+      affiliateBtn.addEventListener('click', async function (this: HTMLButtonElement) {
+        this.disabled = true;
+        this.textContent = '...';
+        try {
+          await setUserStatus(u.id, isAffiliate ? 'user' : 'affiliate');
+          if (typeof window.showToast === 'function') {
+            window.showToast(isAffiliate ? 'Affiliate removed' : 'Affiliate granted', u.email);
+          }
+          adminSearch();
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (typeof window.showToast === 'function') window.showToast('Error', msg);
+          this.disabled = false;
+          this.textContent = isAffiliate ? 'Remove Affiliate' : 'Make Affiliate';
         }
       });
 
@@ -1162,7 +1192,7 @@ async function adminSearch(): Promise<void> {
         }
       });
 
-      card.append(info, actionBtn, reindexBtn);
+      card.append(info, actionBtn, affiliateBtn, reindexBtn);
       results.appendChild(card);
     });
   } catch (e: unknown) {
