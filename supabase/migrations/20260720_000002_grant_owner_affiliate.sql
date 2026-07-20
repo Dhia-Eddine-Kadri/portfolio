@@ -10,5 +10,5 @@ update public.profiles
  where id in (
    select id
      from auth.users
-    where lower(email) = 'medalimarima@gmail.com'
+    where lower(email) = 'medalimariam@gmail.com'
  );

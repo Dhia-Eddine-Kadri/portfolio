@@ -45,7 +45,7 @@ async function ensureOwnerAffiliateStatus(
   user: { id: string; email?: string }
 ): Promise<boolean> {
   if (await hasAffiliateStatus(serviceKey, user.id)) return true;
-  if (String(user.email || '').toLowerCase() !== 'medalimarima@gmail.com') return false;
+  if (String(user.email || '').toLowerCase() !== 'medalimariam@gmail.com') return false;
 
   const update = await supaRequest(
     'PATCH',
