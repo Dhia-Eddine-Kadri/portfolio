@@ -498,6 +498,67 @@
     background: linear-gradient(135deg, var(--adm-blue), var(--adm-green));
   }
 
+  #psec-admin .adm-tool-card {
+    max-width: 960px;
+    margin: 26px auto 0;
+    padding: 22px;
+    border: 1px solid var(--adm-line);
+    border-radius: 18px;
+    background: var(--adm-card-bg);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 16px 40px rgba(2,8,23,.18);
+  }
+  #psec-admin .adm-tool-head { margin-bottom: 16px; }
+  #psec-admin .adm-tool-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 5px;
+    color: var(--on-glass, #f8fafc);
+    font-size: 15px;
+    font-weight: 850;
+  }
+  #psec-admin .adm-tool-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: #7dd3fc;
+    background: rgba(56,189,248,.12);
+    border: 1px solid rgba(56,189,248,.2);
+  }
+  #psec-admin .adm-tool-desc { margin: 0; color: var(--adm-muted); font-size: 12.5px; line-height: 1.5; }
+  #psec-admin .adm-tool-row { display: flex; align-items: center; gap: 10px; }
+  #psec-admin .adm-tool-row .chat-friend-search {
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid rgba(148,163,184,.18);
+    border-radius: 12px;
+    background: rgba(15,23,42,.64);
+    color: var(--on-glass, #f8fafc);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    transition: border-color .16s, box-shadow .16s, background .16s;
+  }
+  #psec-admin .adm-tool-row .chat-friend-search:focus {
+    outline: none;
+    border-color: rgba(56,189,248,.65);
+    background: rgba(15,23,42,.82);
+    box-shadow: 0 0 0 3px rgba(56,189,248,.11);
+  }
+  #psec-admin .adm-tool-row .sub-btn {
+    min-height: 44px;
+    margin: 0;
+    padding: 0 20px !important;
+    border-radius: 12px;
+    flex: 0 0 auto;
+  }
+  @media (max-width: 720px) {
+    #psec-admin .adm-tool-card { padding: 17px; }
+    #psec-admin .adm-tool-row { align-items: stretch; flex-direction: column; }
+    #psec-admin .adm-tool-row .chat-friend-search,
+    #psec-admin .adm-tool-row .sub-btn { width: 100% !important; min-width: 0 !important; }
+  }
+
   @media (max-width: 900px) {
     #psec-admin .adm-grid { grid-template-columns: 1fr; }
   }
@@ -1032,8 +1093,12 @@
             </div>
           </div>
 
-          <div class="adm-search" id="adminUserTools" style="max-width: 640px; margin: 26px auto 0">
-            <div style="display: flex; gap: 10px; margin-bottom: 18px">
+          <section class="adm-search adm-tool-card" id="adminUserTools">
+            <div class="adm-tool-head">
+              <h2 class="adm-tool-title"><span class="adm-tool-icon">⌕</span>User management</h2>
+              <p class="adm-tool-desc">Find an account to manage its Pro plan or affiliate access.</p>
+            </div>
+            <div class="adm-tool-row">
               <input
                 id="adminSearchInput"
                 class="chat-friend-search"
@@ -1045,21 +1110,23 @@
               <button
                 id="adminSearchBtn"
                 class="sub-btn sub-btn-upgrade"
-                style="width: auto; padding: 10px 20px"
+                style="width: auto"
               >
                 <span data-i18n="admin_search_btn">Search</span>
               </button>
             </div>
             <div id="adminResults"></div>
-          </div>
+          </section>
 
           <!-- RETRIEVAL INSPECTOR -->
-          <div id="adminRetrievalTools" style="max-width: 960px; margin: 36px auto 0">
-            <h2 style="font-size: 1.1rem; margin-bottom: 6px" data-i18n="admin_retr_title">🔍 Retrieval inspector</h2>
-            <p style="color: var(--on-glass-muted); font-size: .8rem; margin-bottom: 14px" data-i18n="admin_retr_sub">
+          <section id="adminRetrievalTools" class="adm-tool-card">
+            <div class="adm-tool-head">
+              <h2 class="adm-tool-title" data-i18n="admin_retr_title"><span class="adm-tool-icon">⌕</span>Retrieval inspector</h2>
+              <p class="adm-tool-desc" data-i18n="admin_retr_sub">
               Inspect the most recent retrieval_debug_log rows to see which chunks the AI saw for a given question.
-            </p>
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px">
+              </p>
+            </div>
+            <div class="adm-tool-row">
               <input
                 id="retrInspectorUser"
                 class="chat-friend-search"
@@ -1077,14 +1144,14 @@
               <button
                 id="retrInspectorLoad"
                 class="sub-btn sub-btn-upgrade"
-                style="width: auto; padding: 10px 20px"
+                style="width: auto"
               >
                 <span data-i18n="admin_retr_load">Load</span>
               </button>
             </div>
             <div id="retrInspectorList"></div>
             <div id="retrInspectorDetail" style="margin-top: 18px"></div>
-          </div>
+          </section>
         </div>
 
         <!-- PAYWALL MODAL -->
