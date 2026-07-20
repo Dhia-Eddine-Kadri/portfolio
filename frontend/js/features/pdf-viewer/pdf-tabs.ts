@@ -1,5 +1,6 @@
 import type { LegacyCourse } from '../../../globals.js';
 import { loadCompareDoc, clearCompareDoc, getCompareFileName, isCompareLoading, onCompareChange } from './pdf-compare.js';
+import { persistablePdfFile } from './pdf-tab-persistence.js';
 
 interface PdfTabFile {
   name: string;
@@ -116,7 +117,11 @@ function currentCourse(): LegacyCourse | null {
 function persist(): void {
   try {
     const state: PersistedState = {
-      tabs: tabs.map((tab) => ({ key: tab.key, courseId: tab.courseId, file: tab.file })),
+      tabs: tabs.map((tab) => ({
+        key: tab.key,
+        courseId: tab.courseId,
+        file: persistablePdfFile(tab.file),
+      })),
       activeKey,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -165,7 +170,7 @@ function scheduleRestore(): void {
   let tries = 0;
   const id = window.setInterval(() => {
     tries += 1;
-    if (tryRestore() || tries >= 25) window.clearInterval(id);
+    if (tryRestore() || tries >= 150) window.clearInterval(id);
   }, 200);
 }
 
@@ -595,6 +600,13 @@ function mountPdfTabs(host: HTMLElement): void {
 
   renderTabsStrip();
   scheduleRestore();
+}
+
+// Normal tab actions persist immediately. These lifecycle hooks are a final
+// safeguard for abrupt navigation/browser shutdown after the last UI update.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', persist);
+  window.addEventListener('beforeunload', persist);
 }
 
 if (typeof document !== 'undefined') {
