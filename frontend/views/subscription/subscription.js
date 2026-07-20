@@ -240,6 +240,7 @@ function applySubscription(sub) {
   var isExpired = !isPaused && Number.isFinite(expiresAt) && expiresAt <= Date.now();
   var status = sub && sub.status ? String(sub.status) : '';
   var hasBillingProvider = !!(sub && (sub.stripe_subscription_id || sub.stripe_customer_id || sub.paypal_subscription_id));
+  var managedAccess = !!(sub && (sub.admin_managed || sub.affiliate_managed));
   var dbManagedPro =
     !!(sub && sub.plan === 'pro' && !hasBillingProvider && ['cancelled', 'expired', 'past_due', 'paused'].indexOf(status) === -1);
   _userIsPro = !!(
@@ -279,7 +280,9 @@ function applySubscription(sub) {
         proStatus.textContent =
           _subT('sub_status_ends_pre', '⏳ Pro access until ') + endStr;
       } else {
-        proStatus.textContent = _subT('sub_status_active', '✓ Active subscription');
+        proStatus.textContent = managedAccess
+          ? _subT('sub_status_included', '✓ Pro access included')
+          : _subT('sub_status_active', '✓ Active subscription');
       }
       proStatus.style.display = '';
     }
@@ -295,12 +298,12 @@ function applySubscription(sub) {
     if (manageBtn) manageBtn.style.display = _stripeCustomerId ? '' : 'none';
     // Hide the standalone Cancel button when a Stripe customer exists OR when
     // cancellation is already scheduled — there's nothing more to cancel.
-    if (cancelBtn) cancelBtn.style.display = (_stripeCustomerId || scheduledCancel) ? 'none' : '';
+    if (cancelBtn) cancelBtn.style.display = (_stripeCustomerId || scheduledCancel || managedAccess) ? 'none' : '';
     // Reactivate: only meaningful for Stripe (one-call un-cancel). PayPal goes
     // through the resubscribe flow with the existing PayPal button instead.
     if (reactivateBtn) reactivateBtn.style.display = (scheduledCancel && hasStripeSub) ? '' : 'none';
     // No vacation pause when a cancellation is already pending.
-    if (pausePanel) pausePanel.style.display = scheduledCancel ? 'none' : '';
+    if (pausePanel) pausePanel.style.display = (scheduledCancel || managedAccess) ? 'none' : '';
     if (resumePanel) resumePanel.style.display = 'none';
     // Hide the upgrade-only chrome when Pro is uninterrupted. For PayPal
     // scheduled-cancel we expose it so the user can resubscribe before the

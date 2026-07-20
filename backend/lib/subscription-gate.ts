@@ -19,6 +19,7 @@ interface SubscriptionRow {
 }
 
 interface AdminRow { user_id: string }
+interface ProfileStatusRow { status?: string | null }
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
@@ -32,15 +33,21 @@ export async function requireActiveSubscription(
 ): Promise<LambdaResponse | null> {
   // Admins bypass the paywall — same row in `admins` table that other admin
   // endpoints (admin-users.ts) check against.
-  const adminRes = await supaRequest<AdminRow[]>(
-    'GET',
-    'admins?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id&limit=1',
-    null,
-    serviceKey
-  );
+  const [adminRes, profileRes] = await Promise.all([
+    supaRequest<AdminRow[]>(
+      'GET', 'admins?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id&limit=1',
+      null, serviceKey
+    ),
+    supaRequest<ProfileStatusRow[]>(
+      'GET', 'profiles?id=eq.' + encodeURIComponent(userId) + '&select=status&limit=1',
+      null, serviceKey
+    )
+  ]);
   if (Array.isArray(adminRes.body) && adminRes.body[0]?.user_id === userId) {
     return null;
   }
+  const profile = Array.isArray(profileRes.body) ? profileRes.body[0] : undefined;
+  if (String(profile?.status || '').toLowerCase() === 'affiliate') return null;
 
   const path =
     'subscriptions?user_id=eq.' + encodeURIComponent(userId) +

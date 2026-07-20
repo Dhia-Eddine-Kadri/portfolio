@@ -113,7 +113,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(500, 'Delete failed');
   }
 
-  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'setuserstatus', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage', 'usageexport'].includes(action)) {
+  if (typeof action !== 'string' || !['status', 'search', 'setplan', 'setuserstatus', 'affiliates', 'reports', 'resolvereport', 'signups', 'newusers', 'subscriptions', 'retention', 'financials', 'financeseries', 'getcostconfig', 'savecostconfig', 'usage', 'aiusage', 'usageexport'].includes(action)) {
     return fail(400, 'Unknown action');
   }
 
@@ -266,6 +266,58 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       target_user_id: userId, new_status: status, auth_method: adminCheck.method
     });
     return jsonResponse(200, { ok: true, status });
+  }
+
+  if (action === 'affiliates') {
+    const requestedDays = typeof days === 'number' && Number.isFinite(days) ? Math.floor(days) : 30;
+    const periodDays = Math.max(1, Math.min(365, requestedDays));
+    const sinceMs = Date.now() - periodDays * 24 * 60 * 60 * 1000;
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const [partnersRes, referralsRes, commissionsRes] = await Promise.all([
+      supaRequest<Array<{ user_id: string; referral_code: string; created_at: string }>>(
+        'GET', 'affiliate_partners?select=user_id,referral_code,created_at&order=created_at.desc', null, serviceKey
+      ),
+      supaRequest<Array<{ affiliate_user_id: string; signed_up_at: string; trial_started_at?: string | null; subscribed_at?: string | null }>>(
+        'GET', 'affiliate_referrals?select=affiliate_user_id,signed_up_at,trial_started_at,subscribed_at', null, serviceKey
+      ),
+      supaRequest<Array<{ affiliate_user_id: string; amount_cents: number; status: string; earned_at: string }>>(
+        'GET', 'affiliate_commissions?select=affiliate_user_id,amount_cents,status,earned_at', null, serviceKey
+      )
+    ]);
+    const partners = Array.isArray(partnersRes.body) ? partnersRes.body : [];
+    const referrals = Array.isArray(referralsRes.body) ? referralsRes.body : [];
+    const commissions = Array.isArray(commissionsRes.body) ? commissionsRes.body : [];
+    const rows = await Promise.all(partners.map(async (partner) => {
+      const ownRefs = referrals.filter((r) => r.affiliate_user_id === partner.user_id);
+      const ownCommissions = commissions.filter((c) => c.affiliate_user_id === partner.user_id && c.status !== 'void');
+      const userRes = await supaAuthAdminRequest<SupabaseUser>('GET', 'users/' + partner.user_id, serviceKey);
+      return {
+        userId: partner.user_id,
+        email: userRes.status >= 200 && userRes.status < 300 ? userRes.body.email : undefined,
+        referralCode: partner.referral_code,
+        joinedAt: partner.created_at,
+        referralsTotal: ownRefs.length,
+        referralsPeriod: ownRefs.filter((r) => Date.parse(r.signed_up_at) >= sinceMs).length,
+        newToday: ownRefs.filter((r) => Date.parse(r.signed_up_at) >= today.getTime()).length,
+        trialsPeriod: ownRefs.filter((r) => r.trial_started_at && Date.parse(r.trial_started_at) >= sinceMs).length,
+        subscriptionsPeriod: ownRefs.filter((r) => r.subscribed_at && Date.parse(r.subscribed_at) >= sinceMs).length,
+        earnedCentsTotal: ownCommissions.reduce((sum, c) => sum + Number(c.amount_cents || 0), 0),
+        earnedCentsPeriod: ownCommissions.filter((c) => Date.parse(c.earned_at) >= sinceMs)
+          .reduce((sum, c) => sum + Number(c.amount_cents || 0), 0)
+      };
+    }));
+    return jsonResponse(200, {
+      days: periodDays,
+      affiliates: rows,
+      summary: {
+        affiliates: rows.length,
+        referralsPeriod: rows.reduce((sum, r) => sum + r.referralsPeriod, 0),
+        newToday: rows.reduce((sum, r) => sum + r.newToday, 0),
+        earnedCentsPeriod: rows.reduce((sum, r) => sum + r.earnedCentsPeriod, 0),
+        earnedCentsTotal: rows.reduce((sum, r) => sum + r.earnedCentsTotal, 0)
+      }
+    });
   }
 
   // ── Analytics: signup growth ──────────────────────────────────────────────

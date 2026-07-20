@@ -810,6 +810,33 @@
             </div>
           </header>
 
+          <div class="adm-segmented" id="adminPageTabs" style="margin-bottom: 22px">
+            <button class="active" data-admin-page="overview">Overview</button>
+            <button data-admin-page="affiliates">Affiliates</button>
+          </div>
+
+          <section id="adminAffiliatesView" style="display: none">
+            <div class="adm-card">
+              <div class="adm-card-head">
+                <div>
+                  <h2 class="adm-card-title">Affiliate performance</h2>
+                  <p class="adm-card-desc">Referrals, paid conversions and commission earned from the database.</p>
+                </div>
+                <select id="adminAffiliateRange" class="chat-friend-search" style="width:auto;min-width:140px">
+                  <option value="1">Today</option>
+                  <option value="7">Last 7 days</option>
+                  <option value="30" selected>Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="365">Last year</option>
+                </select>
+              </div>
+              <div class="adm-card-body">
+                <div class="adm-mini-grid" id="adminAffiliateSummary"></div>
+                <div id="adminAffiliateTable" style="margin-top:18px"></div>
+              </div>
+            </div>
+          </section>
+
           <!-- ANALYTICS DASHBOARD (populated by admin-panel.ts) -->
           <div id="adminStats">
             <div id="adminStatsLoading" class="adm-loading">Loading stats…</div>
@@ -1005,7 +1032,7 @@
             </div>
           </div>
 
-          <div class="adm-search" style="max-width: 640px; margin: 26px auto 0">
+          <div class="adm-search" id="adminUserTools" style="max-width: 640px; margin: 26px auto 0">
             <div style="display: flex; gap: 10px; margin-bottom: 18px">
               <input
                 id="adminSearchInput"
@@ -1027,7 +1054,7 @@
           </div>
 
           <!-- RETRIEVAL INSPECTOR -->
-          <div style="max-width: 960px; margin: 36px auto 0">
+          <div id="adminRetrievalTools" style="max-width: 960px; margin: 36px auto 0">
             <h2 style="font-size: 1.1rem; margin-bottom: 6px" data-i18n="admin_retr_title">🔍 Retrieval inspector</h2>
             <p style="color: var(--on-glass-muted); font-size: .8rem; margin-bottom: 14px" data-i18n="admin_retr_sub">
               Inspect the most recent retrieval_debug_log rows to see which chunks the AI saw for a given question.

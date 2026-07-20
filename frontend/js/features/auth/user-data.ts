@@ -186,6 +186,15 @@ export async function loadUserData(uid: string): Promise<void> {
       sub = { ...sub, status: sub.status || 'active' };
     }
     if (window.applySubscription) window.applySubscription(sub || {});
+    const isAffiliate = String(profile?.status || '').toLowerCase() === 'affiliate';
+    if (isAffiliate && window.applySubscription) {
+      window.applySubscription({
+        ...(sub || {}),
+        plan: 'pro',
+        status: 'active',
+        affiliate_managed: true,
+      });
+    }
 
     // The trial paywall is a conversion surface, not the enforcement layer
     // (the backend 402s AI usage regardless). Showing it requires a POSITIVE
@@ -201,10 +210,10 @@ export async function loadUserData(uid: string): Promise<void> {
       let cachedPro = false;
       try { cachedPro = localStorage.getItem(proSeenKey) === '1'; } catch { /* ignore */ }
       try {
-        if (window._userIsPro || isAdmin) localStorage.setItem(proSeenKey, '1');
+        if (window._userIsPro || isAdmin || isAffiliate) localStorage.setItem(proSeenKey, '1');
         else if (subStatusKnown && adminKnown) localStorage.removeItem(proSeenKey);
       } catch { /* ignore */ }
-      if (!window._userIsPro && !isAdmin && subStatusKnown && adminKnown && !cachedPro && window._showPaywall) {
+      if (!window._userIsPro && !isAdmin && !isAffiliate && subStatusKnown && adminKnown && !cachedPro && window._showPaywall) {
         setTimeout(window._showPaywall, 800);
       }
     };

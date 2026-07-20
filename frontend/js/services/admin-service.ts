@@ -1,6 +1,6 @@
 interface AdminFetchBody {
   action:
-    | 'status' | 'search' | 'setplan' | 'setuserstatus' | 'reports' | 'resolvereport' | 'deleteself'
+    | 'status' | 'search' | 'setplan' | 'setuserstatus' | 'affiliates' | 'reports' | 'resolvereport' | 'deleteself'
     | 'signups' | 'newusers' | 'subscriptions' | 'retention'
     | 'financials' | 'financeseries' | 'getcostconfig' | 'savecostconfig' | 'usage' | 'aiusage' | 'usageexport';
   [k: string]: unknown;
@@ -38,6 +38,23 @@ export async function setUserStatus(userId: string, status: 'user' | 'affiliate'
     const data = await res.json().catch(() => null) as { error?: { message?: string } } | null;
     throw new Error(data?.error?.message || 'Could not update user status');
   }
+}
+
+export interface AffiliateAdminRow {
+  userId: string; email?: string; referralCode: string; joinedAt: string;
+  referralsTotal: number; referralsPeriod: number; newToday: number;
+  trialsPeriod: number; subscriptionsPeriod: number;
+  earnedCentsTotal: number; earnedCentsPeriod: number;
+}
+export interface AffiliateAdminResult {
+  days: number;
+  affiliates: AffiliateAdminRow[];
+  summary: { affiliates: number; referralsPeriod: number; newToday: number; earnedCentsPeriod: number; earnedCentsTotal: number };
+}
+export async function getAffiliateAnalytics(days: number): Promise<AffiliateAdminResult | null> {
+  const res = await _adminFetch({ action: 'affiliates', days });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
 }
 
 // ── Admin analytics ─────────────────────────────────────────────────────────

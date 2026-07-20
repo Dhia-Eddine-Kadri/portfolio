@@ -67,6 +67,68 @@ export function initAdminPanel(): void {
   initRetrievalInspector();
   initAdminStats();
   initUsageExport();
+  initAffiliateAdmin();
+}
+
+function initAffiliateAdmin(): void {
+  const tabs = document.querySelectorAll<HTMLButtonElement>('#adminPageTabs [data-admin-page]');
+  const affiliatesView = document.getElementById('adminAffiliatesView');
+  const overviewNodes = ['adminStats', 'adminUserTools', 'adminRetrievalTools']
+    .map((id) => document.getElementById(id)).filter((el): el is HTMLElement => Boolean(el));
+  tabs.forEach((button) => {
+    button.addEventListener('click', () => {
+      const showAffiliates = button.dataset.adminPage === 'affiliates';
+      tabs.forEach((tab) => tab.classList.toggle('active', tab === button));
+      overviewNodes.forEach((node) => { node.style.display = showAffiliates ? 'none' : ''; });
+      if (affiliatesView) affiliatesView.style.display = showAffiliates ? '' : 'none';
+      if (showAffiliates) void loadAffiliateAdmin();
+    });
+  });
+  document.getElementById('adminAffiliateRange')?.addEventListener('change', () => {
+    void loadAffiliateAdmin();
+  });
+}
+
+async function loadAffiliateAdmin(): Promise<void> {
+  const summary = document.getElementById('adminAffiliateSummary');
+  const table = document.getElementById('adminAffiliateTable');
+  const range = document.getElementById('adminAffiliateRange') as HTMLSelectElement | null;
+  if (!summary || !table) return;
+  summary.innerHTML = '<div class="adm-loading">Loading affiliate data…</div>';
+  table.innerHTML = '';
+  const getter = (adminSvc as unknown as { getAffiliateAnalytics?: (days: number) => Promise<import('../../services/admin-service.js').AffiliateAdminResult | null> }).getAffiliateAnalytics;
+  if (!getter) {
+    summary.innerHTML = '<div class="adm-loading">Refresh required to load affiliate analytics.</div>';
+    return;
+  }
+  const data = await getter(Number(range?.value || 30));
+  if (!data) {
+    summary.innerHTML = '<div class="adm-loading">Could not load affiliate data.</div>';
+    return;
+  }
+  const euro = (cents: number): string => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  const cards = [
+    ['Affiliates', data.summary.affiliates],
+    ['Referrals in period', data.summary.referralsPeriod],
+    ['New today', data.summary.newToday],
+    ['Commission in period', euro(data.summary.earnedCentsPeriod)],
+    ['Commission all time', euro(data.summary.earnedCentsTotal)]
+  ];
+  summary.innerHTML = cards.map(([label, value]) =>
+    '<div class="adm-mini"><span>' + escapeHtml(String(label)) + '</span><b>' + escapeHtml(String(value)) + '</b></div>'
+  ).join('');
+  if (!data.affiliates.length) {
+    table.innerHTML = '<div class="adm-loading">No affiliates in the database yet.</div>';
+    return;
+  }
+  table.innerHTML = '<div style="overflow-x:auto"><table class="adm-table"><thead><tr>' +
+    '<th>Affiliate</th><th>Referrals</th><th>New today</th><th>Trials</th><th>Paid</th><th>Period commission</th><th>All-time commission</th>' +
+    '</tr></thead><tbody>' + data.affiliates.map((row) =>
+      '<tr><td class="lead">' + escapeHtml(row.email || row.userId) + '<br><small>' + escapeHtml(row.referralCode) + '</small></td>' +
+      '<td>' + row.referralsPeriod + ' <small>/ ' + row.referralsTotal + ' total</small></td>' +
+      '<td>' + row.newToday + '</td><td>' + row.trialsPeriod + '</td><td>' + row.subscriptionsPeriod + '</td>' +
+      '<td>' + euro(row.earnedCentsPeriod) + '</td><td>' + euro(row.earnedCentsTotal) + '</td></tr>'
+    ).join('') + '</tbody></table></div>';
 }
 
 // ── Per-user cost/revenue/profit export (downloadable Excel/CSV report) ───────
