@@ -143,6 +143,7 @@ export async function loadUserData(uid: string): Promise<void> {
       ) as Promise<SubscriptionRow | null>,
     ]);
 
+    applyAffiliateAccess(profile);
     if (profile && profile.full_name) {
       try {
         localStorage.setItem('profile_cache_' + uid, JSON.stringify(profile));
@@ -252,8 +253,17 @@ export async function loadUserData(uid: string): Promise<void> {
   }
 }
 
+function applyAffiliateAccess(p: ProfileRow | null | undefined): void {
+  if (!p) return;
+  const affiliateLink = document.getElementById('psbAffiliate');
+  if (affiliateLink) {
+    affiliateLink.style.display = String(p.status || '').toLowerCase() === 'affiliate' ? '' : 'none';
+  }
+}
+
 export function applyProfile(p: ProfileRow | null | undefined): void {
   if (!p) return;
+  applyAffiliateAccess(p);
   const n = document.getElementById('profileName') as HTMLInputElement | null;
   const e = document.getElementById('profileEmail') as HTMLInputElement | null;
   const u = document.getElementById('profileUniversity') as HTMLInputElement | null;
