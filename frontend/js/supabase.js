@@ -1,6 +1,17 @@
 // ── EARLY OAUTH HASH EXTRACTION ───────────────────────────────────────────
 // app.js calls _ssReplaceHistory() at top-level, which overwrites the URL hash
 // (#access_token=...) with #portal=dashboard BEFORE the ss-ready handler runs.
+
+// Keep promoter attribution through email confirmation, OAuth redirects and
+// page reloads. The API writes it once to the database after authentication.
+(function _captureReferralCode() {
+  try {
+    var code = new URLSearchParams(window.location.search).get('ref');
+    if (code && /^[a-z0-9]{8,32}$/i.test(code)) {
+      localStorage.setItem('minallo_referral_code', code.toLowerCase());
+    }
+  } catch (e) {}
+})();
 // We must grab the token NOW — supabase.js loads via <script src> before app.js,
 // so the original hash is still intact here.
 (function () {
@@ -555,6 +566,22 @@ function _enterApp(user) {
   if (user && user.id) {
     try {
       localStorage.setItem('ss_last_uid', user.id);
+    } catch (e) {}
+    try {
+      var _referralCode = localStorage.getItem('minallo_referral_code');
+      var _claimedFor = localStorage.getItem('minallo_referral_claimed_for');
+      if (_referralCode && _claimedFor !== user.id && _sbToken) {
+        fetch('/api/affiliate-dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + _sbToken },
+          body: JSON.stringify({ referralCode: _referralCode })
+        }).then(function (response) {
+          if (response.ok) {
+            localStorage.setItem('minallo_referral_claimed_for', user.id);
+            localStorage.removeItem('minallo_referral_code');
+          }
+        }).catch(function () { /* retry on the next authenticated boot */ });
+      }
     } catch (e) {}
   }
 
