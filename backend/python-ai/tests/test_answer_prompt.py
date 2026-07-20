@@ -220,6 +220,25 @@ def test_math_prompt_reserves_missing_context_for_absent_formula() -> None:
     assert "having the formula but lacking some numeric inputs is not" in body
 
 
+def test_math_prompt_forbids_formula_then_missing_context_contradiction() -> None:
+    """Regression: the model reproduced machining formulas correctly, then
+    paradoxically claimed those same formulas were absent from the sources."""
+    body = _SYSTEM_PROMPT_MATH.lower()
+    assert "if you can identify or reproduce the required formula" in body
+    assert "forbidden from displaying that formula and then claiming that it is missing" in body
+    assert "n = v_c/(\\pi d_f)" in body
+    assert "f = f_z \\cdot z" in body
+    assert "formatting differences" in body
+
+
+def test_weak_math_retrieval_requests_missing_context_in_popup() -> None:
+    prompt, mode = pick_system_prompt("Calculate the spindle speed", "none")
+    assert mode == "weak"
+    assert "CALCULATION MISSING-CONTEXT POPUP" in prompt
+    assert '"type":"textarea"' in prompt
+    assert "not generic \"more context\"" in prompt
+
+
 def test_all_prompts_include_exact_intent_overlay() -> None:
     prompt, _mode = pick_system_prompt("solve it", "none")
     assert USER_INTENT_OVERLAY in prompt
@@ -263,8 +282,10 @@ def test_math_prompt_documents_interactive_missing_input() -> None:
     assert "reaches the input quickly" in low or "show only the" in low
     # The blocked-on-input confidence string the frontend keys off.
     assert "partially verified — awaiting user input" in low
-    # A missing FORMULA must NOT become an input request.
-    assert "must not emit a `minallo-input` block" in low
+    # Missing formulas/statements must now open the same popup with a text field.
+    assert "missing formula/statement" in low or "formula, exercise statement" in low
+    assert 'type: "textarea"' in body
+    assert "awaiting user input" in low
     assert "allowed only for real calculation/math intents" in low
 
 
@@ -348,6 +369,21 @@ def test_deictic_with_visible_context_binds_to_source_zero() -> None:
     assert "Resolve it to [Source 0]" in overlay
     assert "Seminar.pdf" in overlay
     assert "must not replace the visible problem" in overlay
+
+
+def test_popup_submission_resumes_instead_of_repeating_missing_context() -> None:
+    overlay = _intent_resolution_runtime_overlay(
+        "Continue the previous calculation using this user-provided missing information: "
+        "v_c = 120 m/min; d_f = 20 mm. Finish the solution.",
+        has_visible_context=False,
+        has_history=True,
+        active_file_name=None,
+    )
+    low = overlay.lower()
+    assert "direct response to the missing-context popup" in low
+    assert "finish the requested solution now" in low
+    assert "do not repeat the missing-context refusal" in low
+    assert "another popup" in low
 
 
 def test_problem_solver_full_solution_requires_final_arithmetic() -> None:

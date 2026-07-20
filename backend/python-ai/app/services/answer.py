@@ -172,7 +172,9 @@ Rules:
 1. Use ONLY the context for the exercise statement, givens, requested quantities, and COURSE-SPECIFIC formulas/conventions. Do not invent numbers or symbols. Do not silently fall back to generic textbook equations for course-specific engineering topics (e.g. do NOT write `τ = F/A`, `σ = M·y/I`, or any other course-specific "standard" formula unless it appears verbatim — symbol-for-symbol — in the COURSE CONTEXT).
 1a. EXCEPTION — universal mathematics is ALWAYS allowed and is NOT "inventing". You may and SHOULD use elementary, professor-independent identities even when they are not printed in the context: the area of a circle or annulus ($A = \\pi d^2/4$, $A = \\pi (d_a^2 - d_i^2)/4$), basic geometry (Pythagoras, triangle/rectangle/trapezoid areas), unit conversions, and ordinary algebra/trigonometry. These are not course-specific conventions, so compute them directly instead of declaring them missing. When you use one, label it briefly e.g. "(standard geometry)" / "(Standardgeometrie)" rather than attaching a `[Source N]`. In particular: whenever a cross-sectional area is needed and the corresponding diameter is given (e.g. core diameter $d_3$, nominal diameter $d$), COMPUTE the area from the given diameter — never leave it as "not given".
 1b. BOUNDARY on rule 1a — it covers ONLY quantities fully DETERMINED by values you already have (an area from a given diameter, a hypotenuse from two given sides). It does NOT license guessing an input that must be measured or read from the problem statement or figure. Never approximate a length, clamping length, segment length, wall thickness, or distance with a made-up rule of thumb (e.g. do NOT invent $l_K = 0.5\\,d$) unless that exact relation is printed in the COURSE CONTEXT. If such a value is not given in the text and not visible in an attached figure, keep it SYMBOLIC and mark the answer Partially verified — do not fabricate it, and never label a guessed dimension as "(standard geometry)".
-2. Before writing the Formula section, verify the required formula appears in at least one chunk. If it does NOT, STOP after the Required section and write only:
+2. Before writing the Formula section, verify the required formula appears in the COURSE CONTEXT. Mathematical formatting differences (fraction layout vs `/`, multiplication dots, whitespace, line breaks, or equivalent rearrangement) do NOT make a formula absent. The formula may also be assembled from multiple chunks as explained below.
+   **LOGICAL INVARIANT:** If you can identify or reproduce the required formula from COURSE CONTEXT in your response or reasoning, then the formula IS present. You are forbidden from displaying that formula and then claiming that it is missing. Use it and continue the calculation. For example, if context contains $n = v_c/(\\pi d_f)$ or $f = f_z \\cdot z$, calculate with it; never write either equation followed by "Missing context — the formula ... is not contained in the uploaded materials."
+   Only if the required formula cannot be found anywhere in COURSE CONTEXT, STOP after the Required section, explain exactly what is missing, and request it with the interactive popup contract below. Emit one `minallo-input` block with a text field such as `{"symbol":"formula","label":"Required course formula","type":"textarea"}`. Do not attempt the calculation until the student supplies it.
    ### Confidence
    Missing context — the formula for this exercise is not in your uploaded course files.
    Do not write the Formula, Substitution, Calculation, Unit check, or Final answer sections in that case. Do not invent the formula from general knowledge.
@@ -236,24 +238,25 @@ A single line confirming that the units on both sides agree.
 ### Final answer
 The boxed result on its own line, e.g. $$\\boxed{M = 100\\ \\mathrm{N\\,m}}$$.
 
-**Interactive missing input.** If finishing the calculation requires a numeric INPUT that the student could supply — a value that is NOT derivable (rule 1a), NOT stated in the problem text, and NOT visible in any attached figure — do NOT leave it symbolic and do NOT guess it. Instead, ASK the student for it:
+**Interactive missing context/input.** If finishing the calculation requires information the student could supply — a numeric value, the exercise statement, a table/figure value, or a required formula genuinely absent from COURSE CONTEXT — do NOT merely end with "Missing context", leave it symbolic, or guess it. ASK the student for the missing information in a popup:
 - Show ONLY the Given / Formula / Substitution needed to IDENTIFY the missing value. Keep it short so the student reaches the input quickly — do NOT write the Calculation / Unit check / Final answer sections and do NOT add a long explanation.
 - This flow is allowed only for real calculation/math intents or mixed concept-plus-calculation intents. Never emit a `minallo-input` block for conceptual explanation, summary, definition/theorem, comparison, coding/debugging, quiz, flashcards, case/application reasoning, general course Q&A, or Minallo app-support questions.
 - Then emit EXACTLY ONE fenced block requesting the value(s), and STOP. The block must be valid JSON on the lines between the fences:
 
 ```minallo-input
-{"requestId": "in-<short-unique-token>", "prompt": "<one short sentence asking for the value(s)>", "fields": [{"symbol": "l_K", "label": "Clamping length", "unit": "mm"}]}
+{"requestId": "in-<short-unique-token>", "prompt": "<one short sentence asking for the missing information>", "fields": [{"symbol": "l_K", "label": "Clamping length", "unit": "mm", "type": "number"}]}
 ```
 
-  One `fields` entry per missing value; `unit` is optional; add several entries if several values are missing. `requestId` is any short unique string.
-- Set Confidence to "Partially verified — awaiting user input" and write nothing after the block. When the student later supplies the value in a follow-up turn, continue from this setup and finish the numeric solution.
-- This applies ONLY to a missing numeric INPUT VALUE. A missing FORMULA or exercise statement is "Missing context" (see below) and must NOT emit a `minallo-input` block.
+  One `fields` entry per missing item; `unit` is optional. Use `type: "number"` for numeric values, `type: "text"` for a short answer, and `type: "textarea"` for a formula, exercise statement, or longer context. Add several entries if several items are missing. `requestId` is any short unique string.
+- For a missing formula, ask for the exact course formula or a pasted/photo transcription. For a missing exercise statement, ask the student to paste the complete statement and givens. Never ask generically for "more context" when you can name the missing item.
+- Set Confidence to "Partially verified — awaiting user input" for missing numeric inputs, or "Missing context — awaiting user input: <exact item>" for a missing formula/statement, and write nothing after the block. When the student replies, continue from the previous setup and finish the solution.
+- This popup applies only to real calculation/math intents or mixed concept-plus-calculation intents. Other intents use a normal concise clarifying question when essential.
 
 ### Confidence
 One of:
 - "Verified" — every formula and number used was found in the context (universal-math derivations per rule 1a still count as verified).
 - "Partially verified — <what was missing>" — the required formula IS present and you solved/substituted as far as the available data allows, but one or more numeric INPUTS (or a sub-derivation) are not in the context. Give the symbolic or partial result and name exactly which inputs are missing. This is the correct status whenever you have the formula but a length/area/value lives in a figure or table you cannot see — do NOT downgrade such a case to "Missing context". If the missing value is one the STUDENT could simply provide, prefer the Interactive missing input flow above (emit a `minallo-input` block and set Confidence to "Partially verified — awaiting user input") instead of only leaving it symbolic.
-- "Missing context — <what was missing>" — use this ONLY when the exercise statement itself, or the required course-specific FORMULA, is not in the context. In that case STOP after this section and do not invent the rest. Having the formula but lacking some numeric inputs is NOT "Missing context" — that is "Partially verified", and you must still compute everything derivable first. Do not use "Missing context" for a complete elementary constant-acceleration problem; solve it and mark it Partially verified if the course formula source was not retrieved.
+- "Missing context — awaiting user input: <what is missing>" — use this ONLY when the exercise statement itself, or the required course-specific FORMULA, is not in the context. Emit the interactive popup immediately before this status so the student can supply the exact missing item; do not invent the rest. Having the formula but lacking some numeric inputs is NOT "Missing context" — that is "Partially verified", and you must still compute everything derivable first. Do not use "Missing context" for a complete elementary constant-acceleration problem; solve it and mark it Partially verified if the course formula source was not retrieved.
 
 Do not skip sections. If a section genuinely has nothing to put in it (e.g. a pure derivation has no Given values), say so explicitly with "— none —".""".replace(
     "{EQUATION_READABILITY_RULE}",
@@ -302,6 +305,17 @@ Behaviour (keep the response short — under ~260 words):
 5. End with: "For a course-specific answer, upload/select the relevant <missing material>."
 6. Match the language of the question (German for German). Write math with KaTeX: $...$ inline, $$...$$ display.
 7. Code: triple-backtick fences with a language tag (```python, ```java, ...). Inline identifiers in `single backticks`. Never wrap code in `$...$`."""
+
+
+_MATH_MISSING_CONTEXT_POPUP = """
+
+CALCULATION MISSING-CONTEXT POPUP:
+This is a calculation request, but retrieval did not provide enough course context to finish it. After briefly naming the exact missing item, emit EXACTLY ONE `minallo-input` fenced JSON block and stop. Ask for the specific missing formula, complete exercise statement/givens, or figure/table value—not generic "more context". Use `type: "textarea"` for formulas/statements and `type: "number"` for numeric values. Example:
+```minallo-input
+{"requestId":"in-context-<short-token>","prompt":"Paste the required course formula so I can continue.","fields":[{"symbol":"formula","label":"Required course formula","type":"textarea"}]}
+```
+Do not invent the missing course content and do not finish the calculation before the student replies.
+"""
 
 
 _SOURCE_REF_RE = re.compile(r"\bSources?\s+([0-9 ,andund&]+)\b", re.IGNORECASE)
@@ -1121,6 +1135,8 @@ def pick_system_prompt(
     if coach:
         prompt += coach
     prompt += intent_style_instruction(academic_intent)
+    if label in {"partial", "weak"} and intent_is_math_like(academic_intent):
+        prompt += _MATH_MISSING_CONTEXT_POPUP
     # Cross-cutting style modifier: layered on ANY intent so "explain X like my
     # professor" keeps its base structure but adopts the course's wording.
     if wants_professor_style(question):

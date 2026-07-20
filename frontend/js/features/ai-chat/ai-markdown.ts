@@ -302,15 +302,17 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
     if (!form) return;
     ev.preventDefault();
     if (form.dataset.submitted) return;
-    const inputs = Array.from(form.querySelectorAll<HTMLInputElement>('input[data-symbol]'));
+    const inputs = Array.from(
+      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-symbol]')
+    );
     if (!inputs.length) return;
     const parts: string[] = [];
-    let firstEmpty: HTMLInputElement | null = null;
+    let firstEmpty: HTMLInputElement | HTMLTextAreaElement | null = null;
     for (const inp of inputs) {
       const raw = (inp.value || '').trim();
       if (!raw) { if (!firstEmpty) firstEmpty = inp; continue; }
-      // German decimal comma → dot (only between digits), so "5,5" → "5.5".
-      const val = normalizeDecimalValue(raw);
+      // Preserve formulas/statements verbatim; only numeric fields use decimal normalisation.
+      const val = inp.dataset.inputType === 'number' ? normalizeDecimalValue(raw) : raw;
       const sym = inp.dataset.symbol || '';
       const unit = inp.dataset.unit || '';
       parts.push(sym + ' = ' + val + (unit ? ' ' + unit : ''));
@@ -324,12 +326,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
     const btn = form.querySelector<HTMLButtonElement>('.md-ai-input-submit');
     if (btn) { btn.disabled = true; btn.textContent = '✓ Submitted'; }
     const text =
-      'Continue the previous calculation using these user-provided missing values: ' +
-      parts.join(', ') +
-      '. Do not restart from unrelated assumptions. Finish the numeric solution.';
-    // Surface is captured at promote time (data-surface) because by now the
-    // form has been moved into the body-level modal and is no longer inside
-    // .ncb-root — closest() would always say pdf-panel otherwise.
+      'Continue the previous calculation using this user-provided missing information: ' +
+      parts.join('; ') +
+      '. Treat it as the answer to your popup request, preserve any formula exactly, ' +
+      'and do not restart from unrelated assumptions. Finish the solution.';
+    // Surface is captured when the panel popup is activated so the submission
+    // always returns through the conversation that displayed the request.
     const surface =
       form.dataset.surface || (form.closest('.ncb-root') ? 'chatbot' : 'pdf-panel');
     const reqId = form.dataset.requestId || '';
@@ -346,15 +348,13 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
         detail: { text, requestId: reqId, surface },
       })
     );
-    // If the form lives in the modal, close it and update the in-bubble
-    // placeholder to a submitted summary.
-    const backdrop = form.closest('.md-ai-input-modal-backdrop');
-    if (backdrop) {
-      const sel = reqId ? '.md-ai-input-placeholder[data-request-id="' + (window.CSS && CSS.escape ? CSS.escape(reqId) : reqId) + '"]' : null;
-      const ph = sel ? document.querySelector(sel) : null;
-      if (ph) ph.textContent = '✓ Submitted: ' + parts.join(', ');
-      backdrop.remove();
-    }
+    // Keep the request inside the side panel and turn it into a compact status
+    // while the normal send path continues the same conversation below it.
+    form.classList.add('md-ai-input--submitted');
+    const fields = form.querySelector<HTMLElement>('.md-ai-input-fields');
+    if (fields) fields.hidden = true;
+    const prompt = form.querySelector<HTMLElement>('.md-ai-input-prompt');
+    if (prompt) prompt.textContent = '✓ Submitted: ' + parts.join(', ');
   });
 }
 
@@ -534,14 +534,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   }
 }
 
-// Lift a `minallo-input` form out of the message bubble into a small centered
-// modal (a popup), leaving a placeholder note in the bubble. This both reads
-// as a dialog the student must answer and escapes the bubble's inline CSS that
-// otherwise mashed the labels/units together. Restored history forms (inside
-// [data-restored]) are left inline — they were already answered, so we don't
-// re-pop them. A global MutationObserver promotes forms as bubbles render
-// (streaming finalize, chat restore, etc.).
-function promoteAiInputToModal(form: HTMLFormElement): void {
+// Present `minallo-input` as a popup card INSIDE its AI side panel/chat bubble.
+// Never move it to document.body: a viewport-centered modal obscures the PDF
+// and can lose the panel/conversation association. Restored history stays quiet.
+function activateAiInputPanelPopup(form: HTMLFormElement): void {
   if (form.dataset.promoted) return;
   form.dataset.promoted = '1';
   // Capture the surface NOW, while the form is still inside its bubble.
@@ -549,35 +545,18 @@ function promoteAiInputToModal(form: HTMLFormElement): void {
   // Don't pop up already-answered history.
   if (form.closest('[data-restored]') || form.dataset.submitted) return;
 
-  const reqId = form.dataset.requestId || '';
-  const ph = document.createElement('div');
-  ph.className = 'md-ai-input-placeholder';
-  if (reqId) ph.setAttribute('data-request-id', reqId);
-  ph.textContent = '⌨ Waiting for your input…';
-  form.parentNode?.insertBefore(ph, form);
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'md-ai-input-modal-backdrop';
-  const card = document.createElement('div');
-  card.className = 'md-ai-input-modal';
-  backdrop.appendChild(card);
-  card.appendChild(form);
-  (document.body || document.documentElement).appendChild(backdrop);
-  (form.querySelector('input') as HTMLInputElement | null)?.focus();
-
-  // Click outside the card → dismiss, re-inlining the form so it isn't lost.
-  backdrop.addEventListener('mousedown', (e) => {
-    if (e.target !== backdrop) return;
-    if (ph.isConnected) ph.replaceWith(form); else card.replaceWith(form);
-    backdrop.remove();
-  });
+  form.classList.add('md-ai-input--panel-popup');
+  form.setAttribute('role', 'dialog');
+  form.setAttribute('aria-label', 'Additional information required');
+  form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  (form.querySelector('input, textarea') as HTMLInputElement | HTMLTextAreaElement | null)?.focus();
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._ssAiInputModalBound) {
   window._ssAiInputModalBound = true;
   const promoteAll = (root: ParentNode): void => {
     root.querySelectorAll?.('form.md-ai-input:not([data-promoted])')
-      .forEach((f) => promoteAiInputToModal(f as HTMLFormElement));
+      .forEach((f) => activateAiInputPanelPopup(f as HTMLFormElement));
   };
   const start = (): void => {
     const obs = new MutationObserver((muts) => {
@@ -585,7 +564,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
         m.addedNodes.forEach((n) => {
           if (n.nodeType !== 1) return;
           const el = n as Element;
-          if (el.matches?.('form.md-ai-input')) promoteAiInputToModal(el as HTMLFormElement);
+          if (el.matches?.('form.md-ai-input')) activateAiInputPanelPopup(el as HTMLFormElement);
           else promoteAll(el);
         });
       }
@@ -1356,7 +1335,12 @@ export function renderMarkdown(text: string): string {
       const spec = JSON.parse(raw) as {
         requestId?: string;
         prompt?: string;
-        fields?: Array<{ symbol?: string; label?: string; unit?: string }>;
+        fields?: Array<{
+          symbol?: string;
+          label?: string;
+          unit?: string;
+          type?: 'number' | 'text' | 'textarea';
+        }>;
       };
       const fields = (Array.isArray(spec.fields) ? spec.fields : [])
         .filter(
@@ -1389,14 +1373,21 @@ export function renderMarkdown(text: string): string {
           const sym = String(f.symbol).slice(0, 40);
           const label = String(f.label).slice(0, 80);
           const unit = typeof f.unit === 'string' ? f.unit.slice(0, 24) : '';
+          const inputType = f.type === 'text' || f.type === 'textarea' ? f.type : 'number';
+          const control = inputType === 'textarea'
+            ? '<textarea autocomplete="off" rows="4" class="md-ai-input-value" ' +
+                'data-symbol="' + escAttr(sym) + '" data-unit="' + escAttr(unit) + '" ' +
+                'data-input-type="textarea" placeholder="' + escAttr(label) + '"></textarea>'
+            : '<input type="text" inputmode="' + (inputType === 'number' ? 'decimal' : 'text') +
+                '" autocomplete="off" class="md-ai-input-value" data-symbol="' + escAttr(sym) +
+                '" data-unit="' + escAttr(unit) + '" data-input-type="' + inputType +
+                '" placeholder="' + escAttr(inputType === 'number' ? sym : label) + '">';
           return (
             '<label class="md-ai-input-field">' +
               '<span class="md-ai-input-label">' + esc(label) +
                 ' <span class="md-ai-input-sym">' + esc(sym) + '</span></span>' +
               '<span class="md-ai-input-control">' +
-                '<input type="text" inputmode="decimal" autocomplete="off" ' +
-                  'class="md-ai-input-value" data-symbol="' + escAttr(sym) + '" ' +
-                  'data-unit="' + escAttr(unit) + '" placeholder="' + escAttr(sym) + '">' +
+                control +
                 (unit ? '<span class="md-ai-input-unit">' + esc(unit) + '</span>' : '') +
               '</span>' +
             '</label>'

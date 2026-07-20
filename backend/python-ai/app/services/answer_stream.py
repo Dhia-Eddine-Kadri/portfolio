@@ -323,6 +323,18 @@ def _intent_resolution_runtime_overlay(
     model whether "this/it/first problem" can actually be resolved in the
     current request.
     """
+    if (question or "").lstrip().lower().startswith(
+        "continue the previous calculation using this user-provided missing information:"
+    ):
+        return (
+            "\n\nInteractive-input continuation note: the current user message is the "
+            "student's direct response to the missing-context popup. Treat every supplied "
+            "field as newly available context for the calculation. Resume from the previous "
+            "assistant setup in chat history and finish the requested solution now. Do not "
+            "repeat the missing-context refusal or emit another popup for an item the student "
+            "just supplied. Ask again only if a different, genuinely required item is still "
+            "missing, and name that item exactly."
+        )
     if not _is_deictic_question(question):
         return (
             "\n\nIntent-resolution note: answer the student's exact request. "

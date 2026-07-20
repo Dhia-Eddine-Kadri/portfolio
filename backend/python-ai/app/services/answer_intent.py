@@ -689,7 +689,7 @@ def intent_style_instruction(intent: AcademicIntent | str | None) -> str:
         lines.append("- Treat this as general university course Q&A; adapt to the student's major and the retrieved source type.")
 
     if intent_allows_missing_input(intent):
-        lines.append("- `minallo-input` is permitted only for missing numeric input values needed to finish this calculation.")
+        lines.append("- `minallo-input` is permitted for missing numeric values or missing formula/statement context needed to finish this calculation; request the exact missing item.")
     else:
         lines.append("- Never emit `minallo-input` for this request; ask a normal clarifying question only if needed.")
 

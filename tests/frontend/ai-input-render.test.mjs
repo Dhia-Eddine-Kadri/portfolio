@@ -53,6 +53,21 @@ test('multiple fields each render an input', () => {
   assert.equal((html.match(/<input /g) || []).length, 2);
 });
 
+test('text and textarea context fields render without decimal input mode', () => {
+  const html = renderInput({
+    requestId: 'in-context',
+    prompt: 'Provide the missing course information:',
+    fields: [
+      { symbol: 'formula', label: 'Required course formula', type: 'textarea' },
+      { symbol: 'exercise', label: 'Exercise number', type: 'text' },
+    ],
+  });
+  assert.ok(html.includes('<textarea'));
+  assert.ok(html.includes('data-input-type="textarea"'));
+  assert.ok(html.includes('inputmode="text"'));
+  assert.ok(!html.includes('data-symbol="formula" data-unit="" data-input-type="number"'));
+});
+
 test('malformed JSON renders a safe fallback, not a form, no throw', () => {
   const html = renderMarkdown('```minallo-input\n{not valid json,,,\n```');
   assert.ok(html.includes('md-ai-input-fallback'));
