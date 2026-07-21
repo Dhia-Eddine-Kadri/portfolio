@@ -1,0 +1,18 @@
+.reveal {
+  opacity: 1;
+  transform: none;
+  animation: reveal-in .75s ease both;
+}
+
+.delay-1 { animation-delay: .12s; }
+.delay-2 { animation-delay: .24s; }
+
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal, .ticker div { animation: none !important; }
+}
