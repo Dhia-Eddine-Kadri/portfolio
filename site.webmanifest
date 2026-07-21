@@ -1,0 +1,9 @@
+{
+  "name": "Dhia Eddine Kadri — Portfolio",
+  "short_name": "Dhia Kadri",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071018",
+  "theme_color": "#071018",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

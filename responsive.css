@@ -1,0 +1,38 @@
+@media (max-width: 600px) {
+  body { width: 100%; overflow-x: clip; }
+  .site-header { width: calc(100% - 32px); gap: 12px; }
+  .menu-toggle { position: relative; z-index: 2; flex: 0 0 auto; }
+  main, section, .hero-copy, .hero-visual, .project-content, .pipeline { min-width: 0; max-width: 100%; }
+  h1 { font-size: clamp(42px, 13vw, 52px); }
+  .hero { min-height: auto; padding: 44px 0 65px; }
+  .hero-lead { max-width: 100%; font-size: 16px; margin: 24px 0; overflow-wrap: anywhere; }
+  .hero-meta { gap: 12px; margin-top: 38px; }
+  .hero-meta strong { font-size: 20px; }
+  .hero-meta span { font-size: 10px; }
+  .hero-visual { height: 390px; }
+  .code-card pre { font-size: 10px; padding: 16px; white-space: pre-wrap; }
+  .float-chip { font-size: 9px; padding: 8px 10px; }
+  .chip-one { top: 32px; }
+  .chip-three { bottom: 55px; left: 5px; }
+  .status-card { right: 0; bottom: 2px; }
+  .project, .skill-card { max-width: 100%; padding: 24px; }
+  .project-main { gap: 26px; }
+  .pipeline { gap: 8px; }
+  .pipeline div { min-height: 90px; padding: 13px; }
+  .details-grid { margin-top: 38px; }
+  .contact-panel, .contact-aside { padding: 26px; }
+  .contact h2 { font-size: clamp(38px, 12vw, 56px); }
+  .button { max-width: 100%; }
+  .contact-aside a { word-break: break-word; }
+}
+
+@media (max-width: 380px) {
+  :root { --shell: calc(100% - 24px); }
+  .site-header { width: calc(100% - 24px); height: 68px; }
+  .site-header nav { top: 68px; }
+  .hero-visual { height: 355px; }
+  .code-card pre { font-size: 9px; }
+  .hero-meta { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .hero-meta div { text-align: center; }
+  .float-chip { display: none; }
+}

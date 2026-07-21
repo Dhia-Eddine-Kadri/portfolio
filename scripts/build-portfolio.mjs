@@ -12,8 +12,14 @@ for (const file of [
   'index.html',
   'styles.css',
   'reveal-fix.css',
+  'responsive.css',
   'script.js',
-  'Dhia_Lebenslauf.pdf'
+  'Dhia_Lebenslauf.pdf',
+  'robots.txt',
+  'sitemap.xml',
+  'site.webmanifest',
+  'favicon.svg',
+  '404.html'
 ]) {
   await cp(resolve(source, file), resolve(output, file));
 }
