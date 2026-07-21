@@ -1,4 +1,0 @@
-# Fixture PDFs are real (often copyrighted) course material — keep them
-# local-only. The harness, README, template and *.expected.json are tracked;
-# the PDFs are not.
-*.pdf

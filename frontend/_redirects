@@ -1,3 +1,0 @@
-# Cloudflare Pages redirects. Pages Functions under /functions/api/* are
-# auto-routed by filename, so the per-API redirects from netlify.toml are
-# NOT needed here — listing them would shadow the Functions and 404.

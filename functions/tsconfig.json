@@ -1,7 +1,0 @@
-{
-  "extends": "../backend/tsconfig.json",
-  "compilerOptions": {
-    "types": ["node"]
-  },
-  "include": ["./**/*.ts", "../backend/lib/**/*.ts", "../backend/functions/**/*.ts"]
-}
